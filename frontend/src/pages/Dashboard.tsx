@@ -6,9 +6,9 @@ import { scoreCardApi } from '../api/scoreCards'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-4">
-      <p className="text-[10px] tracking-widest uppercase text-white/30">{label}</p>
-      <p className={`text-2xl font-mono font-normal mt-1 ${gold ? 'text-[#D4A44A]' : 'text-white/80'}`}>
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5">
+      <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
+      <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
         {value}
       </p>
     </div>
@@ -29,11 +29,11 @@ export default function Dashboard() {
   const recentCards = history?.items ?? []
 
   return (
-    <div className="p-4 space-y-6 max-w-lg mx-auto">
-      <h1 className="text-xl font-medium tracking-widest uppercase text-white/80">Dashboard</h1>
+    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
+      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Dashboard</h1>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <StatCard
           label="Best Score"
           value={stats?.best_score != null ? String(stats.best_score) : '—'}
@@ -57,10 +57,10 @@ export default function Dashboard() {
       {/* Recent cards */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-white/40">Recent Cards</h2>
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">Recent Cards</h2>
           <Link
             to="/scores/new"
-            className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[#D4A44A] hover:text-[#e0b45a] transition-colors"
+            className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
           >
             <Plus size={12} />
             New
@@ -68,26 +68,26 @@ export default function Dashboard() {
         </div>
 
         {recentCards.length === 0 ? (
-          <p className="text-sm text-white/25 tracking-wide">Log your first card to start tracking.</p>
+          <p className="text-sm text-muted tracking-wide">Log your first card to start tracking.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {recentCards.map(card => (
               <Link
                 key={card.id}
                 to="/scores/$id"
                 params={{ id: card.id }}
-                className="flex items-center justify-between p-3 rounded border border-white/[0.06] bg-white/[0.02] hover:border-[#D4A44A]/30 transition-colors"
+                className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
               >
                 <div>
-                  <p className="font-mono text-white/70 text-sm">{card.shot_at}</p>
+                  <p className="font-mono text-secondary text-sm">{card.shot_at}</p>
                   {card.location && (
-                    <p className="text-[11px] text-white/25">{card.location}</p>
+                    <p className="text-[11px] text-muted">{card.location}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 font-mono">
-                  <span className="text-lg font-semibold text-white">{card.total_score}</span>
+                  <span className="text-lg font-semibold text-primary">{card.total_score}</span>
                   {card.x_count > 0 && (
-                    <span className="text-xs text-[#D4A44A]">{card.x_count}X</span>
+                    <span className="text-xs text-[var(--brass)]">{card.x_count}X</span>
                   )}
                 </div>
               </Link>
@@ -95,7 +95,7 @@ export default function Dashboard() {
             {stats && stats.cards_logged > 5 && (
               <Link
                 to="/scores"
-                className="block text-center text-[11px] tracking-widest uppercase text-white/25 hover:text-white/50 transition-colors pt-1"
+                className="block text-center text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors pt-1 lg:col-span-2"
               >
                 View all {stats.cards_logged} cards →
               </Link>

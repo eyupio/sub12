@@ -5,34 +5,34 @@ import { ChevronLeft, Users, Trophy } from 'lucide-react'
 import { leagueApi, LeagueStanding } from '../api/leagues'
 
 function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="text-[#D4A44A] font-mono text-sm font-semibold">1st</span>
-  if (rank === 2) return <span className="text-slate-300 font-mono text-sm font-semibold">2nd</span>
-  if (rank === 3) return <span className="text-amber-700 font-mono text-sm font-semibold">3rd</span>
-  return <span className="font-mono text-sm text-white/40">{rank}th</span>
+  if (rank === 1) return <span className="text-[var(--brass)] font-mono text-sm font-semibold">1st</span>
+  if (rank === 2) return <span className="text-secondary font-mono text-sm font-semibold">2nd</span>
+  if (rank === 3) return <span className="text-amber-700 dark:text-amber-600 font-mono text-sm font-semibold">3rd</span>
+  return <span className="font-mono text-sm text-muted">{rank}th</span>
 }
 
 function StandingRow({ standing }: { standing: LeagueStanding }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-white/[0.04] last:border-0">
+    <div className="flex items-center gap-3 py-3 border-b border-subtle last:border-0">
       <div className="w-10 text-center">
         <RankBadge rank={standing.rank} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/80 truncate">{standing.display_name}</p>
-        <p className="text-[11px] text-white/25">
+        <p className="text-sm text-secondary truncate">{standing.display_name}</p>
+        <p className="text-[11px] text-muted">
           {standing.card_count} card{standing.card_count !== 1 ? 's' : ''}
         </p>
       </div>
       <div className="text-right font-mono shrink-0">
         {standing.best_score != null ? (
           <>
-            <span className="text-lg font-semibold text-white">{standing.best_score}</span>
+            <span className="text-lg font-semibold text-primary">{standing.best_score}</span>
             {standing.best_x != null && standing.best_x > 0 && (
-              <span className="text-xs text-[#D4A44A] ml-1.5">{standing.best_x}X</span>
+              <span className="text-xs text-[var(--brass)] ml-1.5">{standing.best_x}X</span>
             )}
           </>
         ) : (
-          <span className="text-white/20 text-sm">—</span>
+          <span className="text-muted text-sm">—</span>
         )}
       </div>
     </div>
@@ -75,22 +75,22 @@ export default function LeagueDetail() {
   })
 
   return (
-    <div className="p-4 space-y-6 max-w-lg mx-auto">
+    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/leagues" className="text-white/30 hover:text-white/60 transition-colors">
+        <Link to="/leagues" className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
         <div className="flex-1 min-w-0">
           {leagueLoading ? (
-            <div className="h-5 w-40 bg-white/[0.06] rounded animate-pulse" />
+            <div className="h-5 w-40 bg-surface rounded animate-pulse" />
           ) : (
             <>
-              <h1 className="text-lg font-medium tracking-widest uppercase text-white/80 truncate">
+              <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary truncate">
                 {league?.name ?? 'League'}
               </h1>
               {league?.description && (
-                <p className="text-xs text-white/30 truncate mt-0.5">{league.description}</p>
+                <p className="text-xs text-muted truncate mt-0.5">{league.description}</p>
               )}
             </>
           )}
@@ -99,15 +99,15 @@ export default function LeagueDetail() {
 
       {/* Join action */}
       {!joinSuccess && (
-        <div className="flex items-center justify-between border border-white/[0.06] rounded p-3 bg-white/[0.02]">
-          <div className="flex items-center gap-2 text-white/40 text-xs tracking-widest uppercase">
+        <div className="flex items-center justify-between border border-subtle rounded p-3 lg:p-4 bg-surface">
+          <div className="flex items-center gap-2 text-muted text-xs tracking-widest uppercase">
             <Users size={14} />
             Public league
           </div>
           <button
             onClick={() => { setJoinError(''); joinMutation.mutate() }}
             disabled={joinMutation.isPending}
-            className="text-[11px] tracking-widest uppercase bg-[#D4A44A] hover:bg-[#E0B35A] disabled:opacity-50 text-[#0C0C0C] font-medium px-4 py-1.5 rounded transition-colors"
+            className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
           >
             {joinMutation.isPending ? 'Joining…' : 'Join'}
           </button>
@@ -115,43 +115,43 @@ export default function LeagueDetail() {
       )}
 
       {joinSuccess && (
-        <div className="flex items-center gap-2 border border-green-500/20 rounded p-3 bg-green-500/5 text-green-400 text-xs tracking-widest uppercase">
+        <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 lg:p-4 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
           <Trophy size={14} />
           You've joined this league
         </div>
       )}
 
       {joinError && (
-        <p className="text-amber-400 text-xs">{joinError}</p>
+        <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
       )}
 
       {/* Standings */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <h2 className="text-[11px] tracking-widest uppercase text-white/30">Standings</h2>
-          <span className="text-[11px] tracking-widest uppercase text-white/20">Best score</span>
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">Standings</h2>
+          <span className="text-[11px] tracking-widest uppercase text-muted">Best score</span>
         </div>
 
         {isLoading && (
           <div className="space-y-px pt-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-white/[0.02] rounded animate-pulse" />
+              <div key={i} className="h-12 bg-surface rounded animate-pulse" />
             ))}
           </div>
         )}
 
         {isError && (
-          <p className="text-red-400 text-sm pt-2">Failed to load standings.</p>
+          <p className="text-[var(--error-text)] text-sm pt-2">Failed to load standings.</p>
         )}
 
         {standings && standings.items.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-white/20 text-sm tracking-widest uppercase">No members yet</p>
+            <p className="text-muted text-sm tracking-widest uppercase">No members yet</p>
           </div>
         )}
 
         {standings && standings.items.length > 0 && (
-          <div className="border border-white/[0.06] rounded bg-white/[0.02] px-3 mt-2">
+          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
             {standings.items.map(standing => (
               <StandingRow key={standing.user_id} standing={standing} />
             ))}

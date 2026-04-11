@@ -45,4 +45,10 @@ export const scoreCardApi = {
 
   get: (id: string) =>
     api.get<ScoreCard>(`/score-cards/${id}`),
+
+  uploadImage: (cardId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.upload<{ card_image_url: string }>(`/score-cards/${cardId}/image`, formData)
+  },
 }

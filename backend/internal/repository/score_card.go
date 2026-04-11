@@ -116,3 +116,15 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	}
 	return cards, rows.Err()
 }
+
+// UpdateImageURL sets the card_image_url for a score card.
+func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE score_cards SET card_image_url = $1, updated_at = NOW() WHERE id = $2`,
+		imageURL, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update card image url: %w", err)
+	}
+	return nil
+}

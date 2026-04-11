@@ -44,3 +44,8 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 	}
 	return s.users.UpdateMe(ctx, id, in)
 }
+
+// UpdateAvatarURL sets the avatar_url for a user.
+func (s *UserService) UpdateAvatarURL(ctx context.Context, id, avatarURL string) (*model.User, error) {
+	return s.users.UpdateAvatarURL(ctx, id, avatarURL)
+}

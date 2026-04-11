@@ -107,6 +107,27 @@ func (r *UserRepository) UpdateMe(ctx context.Context, id string, in *model.Upda
 	return &u, nil
 }
 
+func (r *UserRepository) UpdateAvatarURL(ctx context.Context, id, avatarURL string) (*model.User, error) {
+	var u model.User
+	err := r.db.QueryRow(ctx, `
+		UPDATE users
+		SET avatar_url = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, email, password_hash, display_name, bio, location, club, avatar_url, created_at, updated_at
+	`, id, avatarURL).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.DisplayName,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update avatar url: %w", err)
+	}
+	return &u, nil
+}
+
 // isUniqueViolation checks for PostgreSQL unique constraint error (code 23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

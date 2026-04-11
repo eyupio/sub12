@@ -8,18 +8,18 @@ function CardRow({ card }: { card: ScoreCardSummary }) {
     <Link
       to="/scores/$id"
       params={{ id: card.id }}
-      className="flex items-center justify-between p-3 rounded border border-white/[0.06] bg-white/[0.02] hover:border-[#D4A44A]/30 transition-colors"
+      className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
     >
       <div className="space-y-0.5">
-        <p className="font-mono text-white/80 text-sm">{card.shot_at}</p>
+        <p className="font-mono text-secondary text-sm">{card.shot_at}</p>
         {card.location && (
-          <p className="text-[11px] text-white/30 tracking-wide">{card.location}</p>
+          <p className="text-[11px] text-muted tracking-wide">{card.location}</p>
         )}
       </div>
       <div className="flex items-center gap-4 font-mono">
-        <span className="text-xl font-semibold text-white">{card.total_score}</span>
+        <span className="text-xl font-semibold text-primary">{card.total_score}</span>
         {card.x_count > 0 && (
-          <span className="text-sm text-[#D4A44A]">{card.x_count}X</span>
+          <span className="text-sm text-[var(--brass)]">{card.x_count}X</span>
         )}
       </div>
     </Link>
@@ -33,12 +33,12 @@ export default function ScoreHistory() {
   })
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto">
+    <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-medium tracking-widest uppercase text-white/80">My Cards</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">My Cards</h1>
         <Link
           to="/scores/new"
-          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[#D4A44A] hover:text-[#e0b45a] transition-colors"
+          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
         >
           <Plus size={14} />
           New
@@ -48,21 +48,21 @@ export default function ScoreHistory() {
       {isLoading && (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 rounded border border-white/[0.04] bg-white/[0.01] animate-pulse" />
+            <div key={i} className="h-14 rounded border border-subtle bg-surface animate-pulse" />
           ))}
         </div>
       )}
 
       {isError && (
-        <p className="text-red-400 text-sm">Failed to load score cards.</p>
+        <p className="text-[var(--error-text)] text-sm">Failed to load score cards.</p>
       )}
 
       {data && data.items.length === 0 && (
         <div className="text-center py-16 space-y-3">
-          <p className="text-white/20 text-sm tracking-widest uppercase">No cards logged yet</p>
+          <p className="text-muted text-sm tracking-widest uppercase">No cards logged yet</p>
           <Link
             to="/scores/new"
-            className="inline-block text-[11px] tracking-widest uppercase text-[#D4A44A] hover:text-[#e0b45a] transition-colors"
+            className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
           >
             Log your first card →
           </Link>
@@ -70,7 +70,7 @@ export default function ScoreHistory() {
       )}
 
       {data && data.items.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
           {data.items.map(card => (
             <CardRow key={card.id} card={card} />
           ))}
