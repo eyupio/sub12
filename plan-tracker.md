@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-11 (session 3)
+> Last updated: 2026-04-11 (session 4)
 
 ---
 
@@ -50,14 +50,15 @@
 - [x] Frontend: personal score history list (`/scores`)
 
 ### Personal Stats
-- [ ] `GET /api/v1/users/me/stats` — personal bests, averages, X count totals
-- [ ] Frontend: dashboard stats cards (best score, best X, cards logged)
+- [x] `GET /api/v1/users/me/stats` — cards logged, best score, best X, avg score
+- [x] Frontend: Dashboard stats cards (live data via TanStack Query) + recent cards list
 
 ### Rifles & Pellets
-- [ ] `CRUD /api/v1/rifles` — manage rifle inventory
-- [ ] `CRUD /api/v1/pellets` — manage pellet inventory
-- [ ] Frontend: rifle/pellet management screens
-- [ ] Link rifle/pellet to score card on entry
+- [x] `POST/GET/PATCH/DELETE /api/v1/rifles`
+- [x] `POST/GET/PATCH/DELETE /api/v1/pellets`
+- [x] Frontend: `/gear` page (tabbed Rifles / Pellets, add + delete)
+- [x] Gear nav item (replaces Leagues stub in bottom nav)
+- [x] Rifle/pellet selectors in score entry (shown when gear exists)
 
 ### Leagues (public only)
 - [ ] `POST /api/v1/leagues` — create a public league

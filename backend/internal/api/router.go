@@ -14,7 +14,16 @@ import (
 )
 
 // NewRouter builds and returns the application HTTP router.
-func NewRouter(cfg *config.Config, log zerolog.Logger, db handler.Pinger, auth *service.AuthService, scoreCards *service.ScoreCardService) http.Handler {
+func NewRouter(
+	cfg *config.Config,
+	log zerolog.Logger,
+	db handler.Pinger,
+	auth *service.AuthService,
+	scoreCards *service.ScoreCardService,
+	stats *service.StatsService,
+	rifles *service.RifleService,
+	pellets *service.PelletService,
+) http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -47,11 +56,29 @@ func NewRouter(cfg *config.Config, log zerolog.Logger, db handler.Pinger, auth *
 				w.Write([]byte(`{"user_id":"` + userID + `"}`))
 			})
 
+			// Stats
+			sh := handler.NewStats(stats)
+			r.Get("/users/me/stats", sh.GetMe)
+
 			// Score cards
 			sc := handler.NewScoreCard(scoreCards)
 			r.Post("/score-cards", sc.Create)
 			r.Get("/score-cards", sc.List)
 			r.Get("/score-cards/{id}", sc.Get)
+
+			// Rifles
+			rh := handler.NewRifle(rifles)
+			r.Post("/rifles", rh.Create)
+			r.Get("/rifles", rh.List)
+			r.Patch("/rifles/{id}", rh.Update)
+			r.Delete("/rifles/{id}", rh.Delete)
+
+			// Pellets
+			ph := handler.NewPellet(pellets)
+			r.Post("/pellets", ph.Create)
+			r.Get("/pellets", ph.List)
+			r.Patch("/pellets/{id}", ph.Update)
+			r.Delete("/pellets/{id}", ph.Delete)
 		})
 	})
 

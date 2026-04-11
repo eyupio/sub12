@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { scoreCardApi } from '../api/scoreCards'
+import { gearApi } from '../api/gear'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -13,6 +14,13 @@ export default function ScoreEntry() {
   const [shotAt, setShotAt] = useState(today())
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
+  const [rifleId, setRifleId] = useState<string>('')
+  const [pelletId, setPelletId] = useState<string>('')
+
+  const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
+  const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
+  const rifles = rifleData?.items ?? []
+  const pellets = pelletData?.items ?? []
 
   const totalScore = shotScores.reduce((a, b) => a + b, 0)
   const xCount = shotXs.filter(Boolean).length
@@ -49,6 +57,8 @@ export default function ScoreEntry() {
         shot_xs: shotXs,
         location: location || undefined,
         notes: notes || undefined,
+        rifle_id: rifleId || undefined,
+        pellet_id: pelletId || undefined,
       }),
     onSuccess: (card) => {
       navigate({ to: '/scores/$id', params: { id: card.id } })
@@ -56,6 +66,8 @@ export default function ScoreEntry() {
   })
 
   const allFilled = shotScores.every(s => s > 0)
+
+  const selectCls = 'w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4A44A]/50'
 
   return (
     <div className="p-4 space-y-6 max-w-lg mx-auto">
@@ -108,6 +120,28 @@ export default function ScoreEntry() {
 
       {/* Metadata */}
       <div className="space-y-3">
+        {rifles.length > 0 && (
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Rifle</label>
+            <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={selectCls}>
+              <option value="">— none —</option>
+              {rifles.map(r => (
+                <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {pellets.length > 0 && (
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Pellet</label>
+            <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={selectCls}>
+              <option value="">— none —</option>
+              {pellets.map(p => (
+                <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Date</label>
           <input

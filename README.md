@@ -13,6 +13,15 @@ A modern platform for the UK airgun benchrest shooting community. Track scores, 
 | Mobile | Capacitor (iOS / Android) |
 | PWA | vite-plugin-pwa |
 
+## Test Accounts
+
+Seed these with `cd backend && make seed` (requires Postgres running).
+
+| Email | Password | Display Name | Notes |
+|---|---|---|---|
+| `dev@sub12.local` | `password123` | Dev User | General dev account |
+| `admin@sub12.local` | `password123` | Admin | Platform admin account |
+
 ## Quick Start
 
 ### Prerequisites

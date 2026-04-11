@@ -60,7 +60,16 @@ func main() {
 	scoreCardRepo := repository.NewScoreCardRepository(pool)
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc)
+	statsRepo := repository.NewStatsRepository(pool)
+	statsSvc := service.NewStatsService(statsRepo)
+
+	rifleRepo := repository.NewRifleRepository(pool)
+	rifleSvc := service.NewRifleService(rifleRepo)
+
+	pelletRepo := repository.NewPelletRepository(pool)
+	pelletSvc := service.NewPelletService(pelletRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
