@@ -3,10 +3,8 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -107,32 +105,21 @@ func (h *ScoreCardHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 	cardID := chi.URLParam(r, "id")
 
-	// Limit upload to 10MB
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
-
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "file too large (max 10MB)")
-		return
-	}
-
-	file, header, err := r.FormFile("image")
+	data, contentType, err := parseAndValidateImage(r, "image", 10<<20)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "missing image file")
-		return
-	}
-	defer file.Close()
-
-	// Validate content type
-	contentType := header.Header.Get("Content-Type")
-	switch {
-	case strings.HasPrefix(contentType, "image/jpeg"):
-		contentType = "image/jpeg"
-	case strings.HasPrefix(contentType, "image/png"):
-		contentType = "image/png"
-	case strings.HasPrefix(contentType, "image/webp"):
-		contentType = "image/webp"
-	default:
-		writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+		if errors.Is(err, ErrFileTooLarge) {
+			writeError(w, http.StatusBadRequest, "file too large (max 10MB)")
+			return
+		}
+		if errors.Is(err, ErrMissingFile) {
+			writeError(w, http.StatusBadRequest, "missing image file")
+			return
+		}
+		if errors.Is(err, ErrUnsupportedType) {
+			writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to read image")
 		return
 	}
 
@@ -144,13 +131,6 @@ func (h *ScoreCardHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to verify score card")
-		return
-	}
-
-	// Read file data
-	data, err := io.ReadAll(file)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read image")
 		return
 	}
 
@@ -169,4 +149,37 @@ func (h *ScoreCardHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"card_image_url": imageURL})
+}
+
+// PATCH /api/v1/score-cards/{id}
+func (h *ScoreCardHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var input model.UpdateScoreCardInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	card, err := h.svc.Update(r.Context(), id, userID, &input)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update score card")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, card)
 }
