@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS pellets;
+DROP TABLE IF EXISTS rifles;

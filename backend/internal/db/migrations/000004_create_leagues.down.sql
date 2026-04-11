@@ -1,0 +1,7 @@
+ALTER TABLE score_cards DROP CONSTRAINT IF EXISTS fk_score_cards_round;
+DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS rounds;
+DROP TABLE IF EXISTS seasons;
+DROP TABLE IF EXISTS league_members;
+DROP TABLE IF EXISTS leagues;
+DROP TYPE IF EXISTS league_type;
