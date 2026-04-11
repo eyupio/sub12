@@ -3,7 +3,44 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Light mode (default) ─────────────────────────────── */
   :root {
+    --gunmetal: #F5F5F0;
+    --carbon: #FFFFFF;
+    --brass: #B8882C;
+    --brass-dim: rgba(184, 136, 44, 0.12);
+    --brass-glow: rgba(184, 136, 44, 0.03);
+    --paper: #0C0C0C;
+    --steel: #666666;
+    --range: #2D5A27;
+    --grid-line: rgba(0, 0, 0, 0.04);
+
+    --text-primary: #1a1a1a;
+    --text-secondary: #444444;
+    --text-muted: #888888;
+    --text-inverse: #ffffff;
+
+    --border-subtle: rgba(0, 0, 0, 0.10);
+    --border-strong: rgba(0, 0, 0, 0.18);
+
+    --surface: rgba(0, 0, 0, 0.03);
+    --surface-hover: rgba(0, 0, 0, 0.06);
+    --surface-active: rgba(0, 0, 0, 0.08);
+
+    --nav-bg: rgba(255, 255, 255, 0.92);
+    --overlay-bg: rgba(0, 0, 0, 0.40);
+
+    --error-bg: rgba(220, 38, 38, 0.08);
+    --error-border: rgba(220, 38, 38, 0.20);
+    --error-text: #dc2626;
+
+    --success-bg: rgba(34, 197, 94, 0.08);
+    --success-border: rgba(34, 197, 94, 0.20);
+    --success-text: #16a34a;
+  }
+
+  /* ── Dark mode ────────────────────────────────────────── */
+  .dark {
     --gunmetal: #0C0C0C;
     --carbon: #111111;
     --brass: #D4A44A;
@@ -13,6 +50,29 @@
     --steel: #888888;
     --range: #2D5A27;
     --grid-line: rgba(255, 255, 255, 0.03);
+
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.80);
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --text-inverse: #0C0C0C;
+
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.12);
+
+    --surface: rgba(255, 255, 255, 0.03);
+    --surface-hover: rgba(255, 255, 255, 0.06);
+    --surface-active: rgba(255, 255, 255, 0.10);
+
+    --nav-bg: rgba(17, 17, 17, 0.92);
+    --overlay-bg: rgba(0, 0, 0, 0.60);
+
+    --error-bg: rgba(220, 38, 38, 0.15);
+    --error-border: rgba(220, 38, 38, 0.30);
+    --error-text: #f87171;
+
+    --success-bg: rgba(34, 197, 94, 0.10);
+    --success-border: rgba(34, 197, 94, 0.25);
+    --success-text: #4ade80;
   }
 
   html {
@@ -24,7 +84,9 @@
   }
 
   body {
-    @apply bg-gunmetal text-white font-sans;
+    background-color: var(--gunmetal);
+    color: var(--text-primary);
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
     position: relative;
@@ -65,8 +127,25 @@
 }
 
 @layer utilities {
+  /* Brand colours */
   .text-brass   { color: var(--brass); }
   .bg-brass     { background-color: var(--brass); }
   .border-brass { border-color: var(--brass); }
   .text-steel   { color: var(--steel); }
+
+  /* Theme-aware semantic utilities */
+  .text-primary   { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted     { color: var(--text-muted); }
+  .text-inverse   { color: var(--text-inverse); }
+
+  .bg-surface       { background-color: var(--surface); }
+  .bg-surface-hover { background-color: var(--surface-hover); }
+  .bg-surface-active { background-color: var(--surface-active); }
+  .bg-nav           { background-color: var(--nav-bg); }
+  .bg-page          { background-color: var(--gunmetal); }
+  .bg-card          { background-color: var(--carbon); }
+
+  .border-subtle { border-color: var(--border-subtle); }
+  .border-strong { border-color: var(--border-strong); }
 }

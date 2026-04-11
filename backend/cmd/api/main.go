@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -26,6 +27,11 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal().Err(err).Msg("load config")
+	}
+
+	// Ensure upload directories exist
+	if err := os.MkdirAll(filepath.Join(cfg.UploadDir, "score-cards"), 0755); err != nil {
+		log.Fatal().Err(err).Msg("create upload directory")
 	}
 
 	if cfg.Env == "development" {

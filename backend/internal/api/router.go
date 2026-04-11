@@ -40,6 +40,10 @@ func NewRouter(
 	r.Get("/healthz", h.Liveness)
 	r.Get("/readyz", h.Readiness)
 
+	// Serve uploaded files (public, no auth)
+	uploadsDir := http.Dir(cfg.UploadDir)
+	r.Handle("/uploads/*", http.StripPrefix("/uploads", http.FileServer(uploadsDir)))
+
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public auth routes
@@ -70,10 +74,11 @@ func NewRouter(
 			r.Get("/users/me/stats", sh.GetMe)
 
 			// Score cards
-			sc := handler.NewScoreCard(scoreCards)
+			sc := handler.NewScoreCard(scoreCards, cfg.UploadDir)
 			r.Post("/score-cards", sc.Create)
 			r.Get("/score-cards", sc.List)
 			r.Get("/score-cards/{id}", sc.Get)
+			r.Post("/score-cards/{id}/image", sc.UploadImage)
 
 			// Rifles
 			rh := handler.NewRifle(rifles)

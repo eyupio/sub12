@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { Camera, Upload, X } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 
@@ -20,6 +21,10 @@ export default function ScoreEntry() {
   const [notes, setNotes] = useState('')
   const [rifleId, setRifleId] = useState<string>('')
   const [pelletId, setPelletId] = useState<string>('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
@@ -72,6 +77,21 @@ export default function ScoreEntry() {
     }
     if (selectedShot < 24) {
       setSelectedShot(selectedShot + 1)
+    }
+  }
+
+  function handleImageSelect(file: File | undefined) {
+    if (file) {
+      setImageFile(file)
+      setImagePreview(URL.createObjectURL(file))
+    }
+  }
+
+  function clearImage() {
+    setImageFile(null)
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+      setImagePreview(null)
     }
   }
 
@@ -132,8 +152,8 @@ export default function ScoreEntry() {
   }, [])
 
   const mutation = useMutation({
-    mutationFn: () =>
-      scoreCardApi.create({
+    mutationFn: async () => {
+      const card = await scoreCardApi.create({
         shot_at: shotAt,
         shot_scores: shotScores,
         shot_xs: shotXs,
@@ -141,14 +161,19 @@ export default function ScoreEntry() {
         notes: notes || undefined,
         rifle_id: rifleId || undefined,
         pellet_id: pelletId || undefined,
-      }),
+      })
+      if (imageFile) {
+        await scoreCardApi.uploadImage(card.id, imageFile)
+      }
+      return card
+    },
     onSuccess: (card) => {
       navigate({ to: '/scores/$id', params: { id: card.id } })
     },
   })
 
   const inputCls =
-    'w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4A44A]/50'
+    'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm focus:outline-none focus:border-[var(--brass)]/50'
 
   function cellLabel(i: number): string {
     const { score, x } = shots[i]
@@ -158,173 +183,230 @@ export default function ScoreEntry() {
   }
 
   return (
-    <div className="p-4 space-y-6 max-w-lg mx-auto">
-      <h1 className="text-xl font-medium tracking-widest uppercase text-white/80">
+    <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
+      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
         New Score Card
       </h1>
 
-      {/* Shot grid — 5 × 5 */}
-      <div className="grid grid-cols-5 gap-2">
-        {shots.map(({ score, x }, i) => {
-          const isSelected = selectedShot === i
-          const label = cellLabel(i)
-          return (
-            <button
-              key={i}
-              onClick={() => handleCellClick(i)}
-              className={[
-                'relative aspect-square rounded font-mono font-semibold transition-all select-none flex items-center justify-center',
-                isSelected
-                  ? 'border-2 border-[#D4A44A] ring-2 ring-[#D4A44A]/30 scale-[1.05] z-10'
-                  : 'border border-white/[0.08]',
-                !isSelected && score === 0 && 'bg-white/[0.03] text-white/20',
-                !isSelected && score === 10 && x && 'bg-[#D4A44A]/15 border-[#D4A44A]/50 text-[#D4A44A]',
-                !isSelected && score === 10 && !x && 'bg-[#D4A44A]/10 border-[#D4A44A]/40 text-[#D4A44A]',
-                !isSelected && score > 0 && score < 10 && 'bg-white/[0.06] border-white/[0.15] text-white/80',
-                isSelected && score === 0 && 'bg-[#D4A44A]/5 text-white/40',
-                isSelected && score > 0 && score < 10 && 'bg-[#D4A44A]/10 text-white',
-                isSelected && score === 10 && 'bg-[#D4A44A]/15 text-[#D4A44A]',
-              ].filter(Boolean).join(' ')}
-            >
-              <span className={label === 'X' ? 'text-xl' : label === '10' ? 'text-base' : 'text-lg'}>
-                {label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Score input panel — visible when a cell is selected */}
-      {selectedShot !== null && (
-        <div className="space-y-3 bg-white/[0.02] border border-white/[0.08] rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] tracking-widest uppercase text-white/40">
-              Shot {selectedShot + 1}
-            </span>
-            <button
-              onClick={() => setSelectedShot(null)}
-              className="text-[11px] tracking-widest uppercase text-white/30 hover:text-white/50 transition-colors"
-            >
-              Done
-            </button>
-          </div>
-          <div className="grid grid-cols-6 gap-1.5">
-            {([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'X'] as const).map((val) => {
-              const { score, x: xFlag } = shots[selectedShot]
-              const isActive =
-                val === 'X'
-                  ? score === 10 && xFlag
-                  : score === (val as number) && !(val === 10 && xFlag)
+      {/* Desktop: two-column layout */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-8">
+        {/* Left column: shot grid + input panel */}
+        <div className="space-y-6">
+          {/* Shot grid — 5 × 5 */}
+          <div className="grid grid-cols-5 gap-2 lg:gap-3">
+            {shots.map(({ score, x }, i) => {
+              const isSelected = selectedShot === i
+              const label = cellLabel(i)
               return (
                 <button
-                  key={val}
-                  onClick={() => handleScoreButton(val as number | 'X')}
+                  key={i}
+                  onClick={() => handleCellClick(i)}
                   className={[
-                    'py-2.5 rounded font-mono text-sm font-semibold transition-colors',
-                    isActive
-                      ? val === 'X' || val === 10
-                        ? 'bg-[#D4A44A] text-black'
-                        : 'bg-white/20 text-white'
-                      : val === 'X'
-                        ? 'bg-[#D4A44A]/10 text-[#D4A44A] hover:bg-[#D4A44A]/20'
-                        : 'bg-white/[0.06] text-white/60 hover:bg-white/[0.12]',
-                  ].join(' ')}
+                    'relative aspect-square rounded font-mono font-semibold transition-all select-none flex items-center justify-center',
+                    isSelected
+                      ? 'border-2 border-[var(--brass)] ring-2 ring-[var(--brass)]/30 scale-[1.05] z-10'
+                      : 'border border-subtle',
+                    !isSelected && score === 0 && 'bg-surface text-muted',
+                    !isSelected && score === 10 && x && 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]',
+                    !isSelected && score === 10 && !x && 'bg-[var(--brass)]/10 border-[var(--brass)]/40 text-[var(--brass)]',
+                    !isSelected && score > 0 && score < 10 && 'bg-surface-hover border-strong text-secondary',
+                    isSelected && score === 0 && 'bg-[var(--brass)]/5 text-muted',
+                    isSelected && score > 0 && score < 10 && 'bg-[var(--brass)]/10 text-primary',
+                    isSelected && score === 10 && 'bg-[var(--brass)]/15 text-[var(--brass)]',
+                  ].filter(Boolean).join(' ')}
                 >
-                  {val}
+                  <span className={label === 'X' ? 'text-xl' : label === '10' ? 'text-base' : 'text-lg'}>
+                    {label}
+                  </span>
                 </button>
               )
             })}
           </div>
-          <p className="text-[10px] text-white/20 text-center">
-            Arrow keys to navigate · type 0–9 or X · Esc to close
-          </p>
-        </div>
-      )}
 
-      {/* Running totals */}
-      <div className="flex gap-8 font-mono text-sm border-t border-white/[0.06] pt-4">
-        <span className="text-white/30 tracking-widest uppercase text-[11px]">
-          Total <strong className="text-white ml-2 text-base">{totalScore}</strong>
-        </span>
-        <span className="text-white/30 tracking-widest uppercase text-[11px]">
-          X <strong className="text-[#D4A44A] ml-2 text-base">{xCount}</strong>
-        </span>
-      </div>
+          {/* Score input panel — visible when a cell is selected */}
+          {selectedShot !== null && (
+            <div className="space-y-3 bg-surface border border-subtle rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] tracking-widest uppercase text-muted">
+                  Shot {selectedShot + 1}
+                </span>
+                <button
+                  onClick={() => setSelectedShot(null)}
+                  className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'X'] as const).map((val) => {
+                  const { score, x: xFlag } = shots[selectedShot]
+                  const isActive =
+                    val === 'X'
+                      ? score === 10 && xFlag
+                      : score === (val as number) && !(val === 10 && xFlag)
+                  return (
+                    <button
+                      key={val}
+                      onClick={() => handleScoreButton(val as number | 'X')}
+                      className={[
+                        'py-2.5 rounded font-mono text-sm font-semibold transition-colors',
+                        isActive
+                          ? val === 'X' || val === 10
+                            ? 'bg-[var(--brass)] text-inverse'
+                            : 'bg-surface-active text-primary'
+                          : val === 'X'
+                            ? 'bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20'
+                            : 'bg-surface-hover text-secondary hover:bg-surface-active',
+                      ].join(' ')}
+                    >
+                      {val}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-muted text-center">
+                Arrow keys to navigate · type 0–9 or X · Esc to close
+              </p>
+            </div>
+          )}
 
-      {/* Metadata */}
-      <div className="space-y-3">
-        {rifles.length > 0 && (
-          <div>
-            <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Rifle</label>
-            <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
-              <option value="">— none —</option>
-              {rifles.map(r => (
-                <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
-              ))}
-            </select>
+          {/* Running totals */}
+          <div className="flex gap-8 font-mono text-sm border-t border-subtle pt-4">
+            <span className="text-muted tracking-widest uppercase text-[11px]">
+              Total <strong className="text-primary ml-2 text-base">{totalScore}</strong>
+            </span>
+            <span className="text-muted tracking-widest uppercase text-[11px]">
+              X <strong className="text-[var(--brass)] ml-2 text-base">{xCount}</strong>
+            </span>
           </div>
-        )}
-        {pellets.length > 0 && (
+        </div>
+
+        {/* Right column: metadata + photo + submit */}
+        <div className="space-y-3 mt-6 lg:mt-0">
+          {rifles.length > 0 && (
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+              <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
+                <option value="">— none —</option>
+                {rifles.map(r => (
+                  <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {pellets.length > 0 && (
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
+              <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
+                <option value="">— none —</option>
+                {pellets.map(p => (
+                  <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Pellet</label>
-            <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
-              <option value="">— none —</option>
-              {pellets.map(p => (
-                <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
-              ))}
-            </select>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Date</label>
+            <input
+              type="date"
+              value={shotAt}
+              onChange={e => setShotAt(e.target.value)}
+              className={`${inputCls} font-mono`}
+            />
           </div>
-        )}
-        <div>
-          <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Date</label>
-          <input
-            type="date"
-            value={shotAt}
-            onChange={e => setShotAt(e.target.value)}
-            className={`${inputCls} font-mono`}
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Location</label>
-          <input
-            type="text"
-            value={location}
-            onChange={e => setLocation(e.target.value)}
-            placeholder="Range / club"
-            className={`${inputCls} placeholder:text-white/20`}
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] tracking-widest uppercase text-white/40 mb-1">Notes</label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={2}
-            placeholder="Conditions, observations…"
-            className={`${inputCls} placeholder:text-white/20 resize-none`}
-          />
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+            <input
+              type="text"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="Range / club"
+              className={`${inputCls} placeholder:text-muted`}
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Conditions, observations…"
+              className={`${inputCls} placeholder:text-muted resize-none`}
+            />
+          </div>
+
+          {/* Photo upload */}
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Score Card Photo</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleImageSelect(e.target.files?.[0])}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleImageSelect(e.target.files?.[0])}
+            />
+            {imagePreview ? (
+              <div className="relative">
+                <img src={imagePreview} alt="Score card preview" className="rounded border border-subtle max-h-48 w-full object-contain bg-surface" />
+                <button
+                  onClick={clearImage}
+                  className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+                  aria-label="Remove photo"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                >
+                  <Upload size={16} />
+                  Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                >
+                  <Camera size={16} />
+                  Camera
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Error */}
+          {mutation.isError && (
+            <p className="text-[var(--error-text)] text-sm">Failed to save score card. Please try again.</p>
+          )}
+
+          {/* Submit */}
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || !shotAt}
+            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
+          >
+            {mutation.isPending ? 'Saving…' : 'Save Card'}
+          </button>
+
+          {selectedShot === null && (
+            <p className="text-center text-[11px] text-muted tracking-widest uppercase">
+              Tap a shot to select · tap again to cycle · after 10 → X
+            </p>
+          )}
         </div>
       </div>
-
-      {/* Error */}
-      {mutation.isError && (
-        <p className="text-red-400 text-sm">Failed to save score card. Please try again.</p>
-      )}
-
-      {/* Submit */}
-      <button
-        onClick={() => mutation.mutate()}
-        disabled={mutation.isPending || !shotAt}
-        className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[#D4A44A] text-black hover:bg-[#e0b45a]"
-      >
-        {mutation.isPending ? 'Saving…' : 'Save Card'}
-      </button>
-
-      {selectedShot === null && (
-        <p className="text-center text-[11px] text-white/20 tracking-widest uppercase">
-          Tap a shot to select · tap again to cycle · after 10 → X
-        </p>
-      )}
     </div>
   )
 }

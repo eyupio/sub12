@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Package, Trophy, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Target, Package, Trophy, User, LogOut, Sun, Moon, Monitor } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
+import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
 
 const navItems = [
@@ -11,6 +12,30 @@ const navItems = [
   { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
+function ThemeToggle() {
+  const { theme, setTheme } = useThemeStore()
+
+  function cycle() {
+    if (theme === 'dark') setTheme('light')
+    else if (theme === 'light') setTheme('system')
+    else setTheme('dark')
+  }
+
+  const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
+  const title = theme === 'dark' ? 'Dark mode' : theme === 'light' ? 'Light mode' : 'System theme'
+
+  return (
+    <button
+      onClick={cycle}
+      className="text-muted hover:text-secondary transition-colors"
+      aria-label={title}
+      title={title}
+    >
+      <Icon size={17} />
+    </button>
+  )
+}
+
 // Minimal crosshair corner mark
 function CornerMark({ className }: { className: string }) {
   return (
@@ -18,8 +43,8 @@ function CornerMark({ className }: { className: string }) {
       viewBox="0 0 30 30"
       className={`fixed w-[30px] h-[30px] opacity-[0.08] pointer-events-none z-0 ${className}`}
     >
-      <line x1="15" y1="0" x2="15" y2="30" stroke="white" strokeWidth="0.5"/>
-      <line x1="0"  y1="15" x2="30" y2="15" stroke="white" strokeWidth="0.5"/>
+      <line x1="15" y1="0" x2="15" y2="30" stroke="currentColor" strokeWidth="0.5"/>
+      <line x1="0"  y1="15" x2="30" y2="15" stroke="currentColor" strokeWidth="0.5"/>
     </svg>
   )
 }
@@ -27,6 +52,10 @@ function CornerMark({ className }: { className: string }) {
 export default function Layout() {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
+  const theme = useThemeStore((s) => s.theme)
+
+  // Resolve effective theme for logo selection
+  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   async function handleLogout() {
     if (refreshToken) {
@@ -36,56 +65,105 @@ export default function Layout() {
     navigate({ to: '/login' })
   }
 
+  const navLinkBase = 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-hover transition-colors text-sm tracking-wide'
+  const navLinkActive = 'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[var(--brass)]/10 text-[var(--brass)] text-sm tracking-wide'
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen">
       {/* Corner crosshair decorations */}
-      <CornerMark className="top-5 left-5" />
-      <CornerMark className="top-5 right-5" />
-      <CornerMark className="bottom-5 left-5" />
-      <CornerMark className="bottom-5 right-5" />
+      <CornerMark className="top-5 left-5 text-muted" />
+      <CornerMark className="top-5 right-5 text-muted" />
+      <CornerMark className="bottom-5 left-5 text-muted" />
+      <CornerMark className="bottom-5 right-5 text-muted" />
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-[#111111]/90 backdrop-blur border-b border-white/[0.06] px-4 py-2 flex items-center justify-between">
-        <img
-          src="/logo-horizontal-dark.svg"
-          alt="SUB12"
-          className="h-8 w-auto"
-        />
-        <div className="flex items-center gap-3">
-          {user && (
-            <span className="text-sm text-steel hidden sm:block tracking-wide">{user.display_name}</span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="text-white/30 hover:text-white/70 transition-colors"
-            aria-label="Sign out"
-          >
-            <LogOut size={17} />
-          </button>
+      {/* ── Desktop sidebar ──────────────────────────────── */}
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-r border-subtle bg-nav backdrop-blur z-40">
+        <div className="px-5 py-4 border-b border-subtle">
+          <img
+            src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+            alt="SUB12"
+            className="h-8 w-auto"
+          />
         </div>
-      </header>
 
-      {/* Page content */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-
-      {/* Bottom nav */}
-      <nav className="sticky bottom-0 z-50 bg-[#111111]/90 backdrop-blur border-t border-white/[0.06]">
-        <div className="flex justify-around">
+        <nav className="flex-1 py-4 px-3 space-y-1">
           {navItems.map(({ to, icon: Icon, label }) => (
             <Link
               key={to}
               to={to}
-              className="flex flex-col items-center gap-1 px-4 py-3 text-white/30 hover:text-[#D4A44A] transition-colors"
-              activeProps={{ className: 'flex flex-col items-center gap-1 px-4 py-3 text-[#D4A44A]' }}
+              className={navLinkBase}
+              activeProps={{ className: navLinkActive }}
             >
-              <Icon size={22} />
-              <span className="text-[10px] tracking-widest uppercase">{label}</span>
+              <Icon size={20} />
+              <span>{label}</span>
             </Link>
           ))}
+        </nav>
+
+        <div className="px-4 py-4 border-t border-subtle space-y-3">
+          <div className="flex items-center justify-between">
+            <ThemeToggle />
+            <button
+              onClick={handleLogout}
+              className="text-muted hover:text-secondary transition-colors"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
+          {user && (
+            <p className="text-xs text-muted tracking-wide truncate">{user.display_name}</p>
+          )}
         </div>
-      </nav>
+      </aside>
+
+      {/* ── Main content column ──────────────────────────── */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Mobile top bar */}
+        <header className="lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 flex items-center justify-between">
+          <img
+            src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+            alt="SUB12"
+            className="h-8 w-auto"
+          />
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-sm text-muted hidden sm:block tracking-wide">{user.display_name}</span>
+            )}
+            <ThemeToggle />
+            <button
+              onClick={handleLogout}
+              className="text-muted hover:text-secondary transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="lg:hidden sticky bottom-0 z-50 bg-nav backdrop-blur border-t border-subtle">
+          <div className="flex justify-around">
+            {navItems.map(({ to, icon: Icon, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className="flex flex-col items-center gap-1 px-4 py-3 text-muted hover:text-[var(--brass)] transition-colors"
+                activeProps={{ className: 'flex flex-col items-center gap-1 px-4 py-3 text-[var(--brass)]' }}
+              >
+                <Icon size={22} />
+                <span className="text-[10px] tracking-widest uppercase">{label}</span>
+              </Link>
+            ))}
+          </div>
+        </nav>
+      </div>
     </div>
   )
 }

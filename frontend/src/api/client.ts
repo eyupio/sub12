@@ -28,6 +28,25 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return res.json() as Promise<T>
 }
 
+async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const token = useAuthStore.getState().accessToken
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}: ${await res.text()}`)
+  }
+
+  if (res.status === 204) return undefined as T
+  return res.json() as Promise<T>
+}
+
 export const api = {
   get: <T>(path: string, init?: RequestOptions) => request<T>(path, { method: 'GET', ...init }),
   post: <T>(path: string, body: unknown, init?: RequestOptions) =>
@@ -35,4 +54,5 @@ export const api = {
   patch: <T>(path: string, body: unknown, init?: RequestOptions) =>
     request<T>(path, { method: 'PATCH', body, ...init }),
   del: <T>(path: string, init?: RequestOptions) => request<T>(path, { method: 'DELETE', ...init }),
+  upload: <T>(path: string, formData: FormData) => requestMultipart<T>(path, formData),
 }

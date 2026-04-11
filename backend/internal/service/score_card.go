@@ -69,3 +69,13 @@ func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit,
 	}
 	return s.cards.ListByUser(ctx, userID, limit, offset)
 }
+
+// UpdateImageURL updates the card_image_url for a score card owned by the given user.
+func (s *ScoreCardService) UpdateImageURL(ctx context.Context, id, userID, imageURL string) error {
+	// Verify ownership first
+	_, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
+		return err
+	}
+	return s.cards.UpdateImageURL(ctx, id, imageURL)
+}

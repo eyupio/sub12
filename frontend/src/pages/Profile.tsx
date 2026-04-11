@@ -9,9 +9,9 @@ import { usersApi, UpdateProfileInput } from '../api/users'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-4">
-      <p className="text-[10px] tracking-widest uppercase text-white/30">{label}</p>
-      <p className={`text-2xl font-mono font-normal mt-1 ${gold ? 'text-[#D4A44A]' : 'text-white/80'}`}>
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5">
+      <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
+      <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
         {value}
       </p>
     </div>
@@ -80,16 +80,17 @@ export default function Profile() {
   }
 
   const recentCards = history?.items ?? []
+  const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 placeholder-muted'
 
   return (
-    <div className="p-4 space-y-6 max-w-lg mx-auto">
+    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <h1 className="text-xl font-medium tracking-widest uppercase text-white/80">Profile</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Profile</h1>
         {!editing && (
           <button
             onClick={startEdit}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-white/30 hover:text-white/60 transition-colors"
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
           >
             <Pencil size={13} />
             Edit
@@ -98,67 +99,67 @@ export default function Profile() {
       </div>
 
       {/* Identity card */}
-      <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-4 space-y-3">
+      <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-3">
         {editing ? (
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] tracking-widest uppercase text-white/30 mb-1">
+              <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
                 Display Name
               </label>
               <input
                 type="text"
                 value={form.display_name ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#D4A44A]/50 placeholder-white/20"
+                className={inputCls}
                 placeholder="Your name"
               />
             </div>
             <div>
-              <label className="block text-[10px] tracking-widest uppercase text-white/30 mb-1">
+              <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
                 Bio
               </label>
               <textarea
                 value={form.bio ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
                 rows={2}
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#D4A44A]/50 placeholder-white/20 resize-none"
+                className={`${inputCls} resize-none`}
                 placeholder="A few words about you"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/30 mb-1">
+                <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
                   Location
                 </label>
                 <input
                   type="text"
                   value={form.location ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#D4A44A]/50 placeholder-white/20"
+                  className={inputCls}
                   placeholder="e.g. Yorkshire"
                 />
               </div>
               <div>
-                <label className="block text-[10px] tracking-widest uppercase text-white/30 mb-1">
+                <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
                   Club
                 </label>
                 <input
                   type="text"
                   value={form.club ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, club: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-[#D4A44A]/50 placeholder-white/20"
+                  className={inputCls}
                   placeholder="e.g. YHFTA"
                 />
               </div>
             </div>
 
-            {error && <p className="text-red-400 text-xs">{error}</p>}
+            {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
 
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleSave}
                 disabled={mutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#D4A44A]/20 border border-[#D4A44A]/30 text-[11px] tracking-widest uppercase text-[#D4A44A] hover:bg-[#D4A44A]/30 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
               >
                 <Check size={13} />
                 {mutation.isPending ? 'Saving…' : 'Save'}
@@ -166,7 +167,7 @@ export default function Profile() {
               <button
                 onClick={cancelEdit}
                 disabled={mutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-white/[0.08] text-[11px] tracking-widest uppercase text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
               >
                 <X size={13} />
                 Cancel
@@ -175,24 +176,24 @@ export default function Profile() {
           </div>
         ) : (
           <>
-            <p className="text-lg font-medium text-white/90">{user?.display_name}</p>
-            {user?.bio && <p className="text-sm text-white/50 leading-relaxed">{user.bio}</p>}
+            <p className="text-lg font-medium text-primary">{user?.display_name}</p>
+            {user?.bio && <p className="text-sm text-secondary leading-relaxed">{user.bio}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {user?.location && (
-                <span className="flex items-center gap-1.5 text-[11px] text-white/35 tracking-wide">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
                   <MapPin size={12} />
                   {user.location}
                 </span>
               )}
               {user?.club && (
-                <span className="flex items-center gap-1.5 text-[11px] text-white/35 tracking-wide">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
                   <Users size={12} />
                   {user.club}
                 </span>
               )}
             </div>
             {!user?.bio && !user?.location && !user?.club && (
-              <p className="text-[11px] text-white/20 tracking-wide">No bio yet — tap Edit to add one.</p>
+              <p className="text-[11px] text-muted tracking-wide">No bio yet — tap Edit to add one.</p>
             )}
           </>
         )}
@@ -200,8 +201,8 @@ export default function Profile() {
 
       {/* Stats */}
       <div>
-        <h2 className="text-[11px] tracking-widest uppercase text-white/40 mb-3">Stats</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Stats</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <StatCard
             label="Best Score"
             value={stats?.best_score != null ? String(stats.best_score) : '—'}
@@ -223,11 +224,11 @@ export default function Profile() {
       {/* Recent cards */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-white/40">Recent Cards</h2>
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">Recent Cards</h2>
           {recentCards.length > 0 && (
             <Link
               to="/scores"
-              className="text-[11px] tracking-widest uppercase text-white/25 hover:text-white/50 transition-colors"
+              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
             >
               See all →
             </Link>
@@ -235,26 +236,26 @@ export default function Profile() {
         </div>
 
         {recentCards.length === 0 ? (
-          <p className="text-sm text-white/25 tracking-wide">No cards logged yet.</p>
+          <p className="text-sm text-muted tracking-wide">No cards logged yet.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {recentCards.map((card) => (
               <Link
                 key={card.id}
                 to="/scores/$id"
                 params={{ id: card.id }}
-                className="flex items-center justify-between p-3 rounded border border-white/[0.06] bg-white/[0.02] hover:border-[#D4A44A]/30 transition-colors"
+                className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
               >
                 <div>
-                  <p className="font-mono text-white/70 text-sm">{card.shot_at}</p>
+                  <p className="font-mono text-secondary text-sm">{card.shot_at}</p>
                   {card.location && (
-                    <p className="text-[11px] text-white/25">{card.location}</p>
+                    <p className="text-[11px] text-muted">{card.location}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 font-mono">
-                  <span className="text-lg font-semibold text-white">{card.total_score}</span>
+                  <span className="text-lg font-semibold text-primary">{card.total_score}</span>
                   {card.x_count > 0 && (
-                    <span className="text-xs text-[#D4A44A]">{card.x_count}X</span>
+                    <span className="text-xs text-[var(--brass)]">{card.x_count}X</span>
                   )}
                 </div>
               </Link>
