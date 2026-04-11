@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <title>SUB12</title>
+  <desc>SUB12 favicon — heavier strokes for small-size legibility</desc>
+  <circle cx="40" cy="40" r="26" stroke="#D4A44A" stroke-width="2.5"/>
+  <circle cx="40" cy="40" r="3"  fill="#D4A44A"/>
+  <line x1="40" y1="6"  x2="40" y2="22" stroke="#D4A44A" stroke-width="2"   stroke-linecap="round"/>
+  <line x1="40" y1="58" x2="40" y2="74" stroke="#D4A44A" stroke-width="2"   stroke-linecap="round"/>
+  <line x1="6"  y1="40" x2="22" y2="40" stroke="#D4A44A" stroke-width="2"   stroke-linecap="round"/>
+  <line x1="58" y1="40" x2="74" y2="40" stroke="#D4A44A" stroke-width="2"   stroke-linecap="round"/>
+</svg>

@@ -30,19 +30,19 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-mono font-bold text-brand-400">sub-12</h1>
-          <p className="mt-2 text-slate-400 text-sm">Sign in to your account</p>
+          <img src="/logo-primary-dark.svg" alt="SUB12" className="h-40 w-auto mx-auto" />
+          <p className="mt-4 text-sm tracking-widest uppercase text-white/40">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm text-red-300">
+            <div className="bg-red-900/20 border border-red-700/40 rounded px-4 py-3 text-sm text-red-300 tracking-wide">
               {error}
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm text-slate-400" htmlFor="email">Email</label>
+          <div className="space-y-1">
+            <label className="text-[11px] tracking-widest uppercase text-white/40" htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
@@ -50,13 +50,13 @@ export default function Login() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="you@example.com"
+              className="w-full bg-white/[0.04] border border-white/10 rounded px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-[#D4A44A] focus:bg-[rgba(212,164,74,0.04)] transition-colors text-sm tracking-wider"
+              placeholder="YOUR EMAIL"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-slate-400" htmlFor="password">Password</label>
+          <div className="space-y-1">
+            <label className="text-[11px] tracking-widest uppercase text-white/40" htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
@@ -64,7 +64,7 @@ export default function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full bg-white/[0.04] border border-white/10 rounded px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-[#D4A44A] focus:bg-[rgba(212,164,74,0.04)] transition-colors text-sm tracking-wider"
               placeholder="••••••••"
             />
           </div>
@@ -72,15 +72,15 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white font-medium rounded-lg py-3 transition-colors"
+            className="w-full bg-[#D4A44A] hover:bg-[#E0B35A] disabled:opacity-50 text-[#0C0C0C] font-medium rounded py-3 transition-colors text-sm tracking-[0.15em] uppercase mt-2"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-500">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-brand-400 hover:text-brand-300">
+        <p className="text-center text-[11px] tracking-widest uppercase text-white/25">
+          No account?{' '}
+          <Link to="/register" className="text-[#D4A44A] hover:text-[#E0B35A] transition-colors">
             Register
           </Link>
         </p>

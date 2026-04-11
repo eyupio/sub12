@@ -3,15 +3,70 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --gunmetal: #0C0C0C;
+    --carbon: #111111;
+    --brass: #D4A44A;
+    --brass-dim: rgba(212, 164, 74, 0.15);
+    --brass-glow: rgba(212, 164, 74, 0.06);
+    --paper: #FFFFFF;
+    --steel: #888888;
+    --range: #2D5A27;
+    --grid-line: rgba(255, 255, 255, 0.03);
+  }
+
   html {
-    /* Smooth scrolling with safe area insets for mobile */
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     padding: env(safe-area-inset-top) env(safe-area-inset-right)
              env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 font-sans;
+    @apply bg-gunmetal text-white font-sans;
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    position: relative;
   }
+
+  /* Subtle scope-grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Radial brass glow from centre */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 140vmax;
+    height: 140vmax;
+    background: radial-gradient(circle, var(--brass-glow) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* All content sits above the background layers */
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@layer utilities {
+  .text-brass   { color: var(--brass); }
+  .bg-brass     { background-color: var(--brass); }
+  .border-brass { border-color: var(--brass); }
+  .text-steel   { color: var(--steel); }
 }

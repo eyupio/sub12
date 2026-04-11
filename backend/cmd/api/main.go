@@ -41,6 +41,11 @@ func main() {
 	defer pool.Close()
 	log.Info().Msg("database connected")
 
+	if err := db.Migrate(cfg.DatabaseURL()); err != nil {
+		log.Fatal().Err(err).Msg("run migrations")
+	}
+	log.Info().Msg("migrations up to date")
+
 	rdb, err := db.ConnectRedis(ctx, cfg.RedisURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to redis")

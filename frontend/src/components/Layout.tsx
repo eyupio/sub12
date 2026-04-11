@@ -10,6 +10,19 @@ const navItems = [
   { to: '/profile', icon: User, label: 'Profile' },
 ] as const
 
+// Minimal crosshair corner mark
+function CornerMark({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 30 30"
+      className={`fixed w-[30px] h-[30px] opacity-[0.08] pointer-events-none z-0 ${className}`}
+    >
+      <line x1="15" y1="0" x2="15" y2="30" stroke="white" strokeWidth="0.5"/>
+      <line x1="0"  y1="15" x2="30" y2="15" stroke="white" strokeWidth="0.5"/>
+    </svg>
+  )
+}
+
 export default function Layout() {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
@@ -24,21 +37,29 @@ export default function Layout() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Corner crosshair decorations */}
+      <CornerMark className="top-5 left-5" />
+      <CornerMark className="top-5 right-5" />
+      <CornerMark className="bottom-5 left-5" />
+      <CornerMark className="bottom-5 right-5" />
+
       {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-        <span className="text-lg font-mono font-bold tracking-tight text-brand-400">
-          sub-12
-        </span>
+      <header className="sticky top-0 z-50 bg-[#111111]/90 backdrop-blur border-b border-white/[0.06] px-4 py-2 flex items-center justify-between">
+        <img
+          src="/logo-horizontal-dark.svg"
+          alt="SUB12"
+          className="h-8 w-auto"
+        />
         <div className="flex items-center gap-3">
           {user && (
-            <span className="text-sm text-slate-400 hidden sm:block">{user.display_name}</span>
+            <span className="text-sm text-steel hidden sm:block tracking-wide">{user.display_name}</span>
           )}
           <button
             onClick={handleLogout}
-            className="text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-white/30 hover:text-white/70 transition-colors"
             aria-label="Sign out"
           >
-            <LogOut size={18} />
+            <LogOut size={17} />
           </button>
         </div>
       </header>
@@ -48,18 +69,18 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {/* Bottom nav — mobile first */}
-      <nav className="sticky bottom-0 z-50 bg-slate-900 border-t border-slate-800">
+      {/* Bottom nav */}
+      <nav className="sticky bottom-0 z-50 bg-[#111111]/90 backdrop-blur border-t border-white/[0.06]">
         <div className="flex justify-around">
           {navItems.map(({ to, icon: Icon, label }) => (
             <Link
               key={to}
               to={to}
-              className="flex flex-col items-center gap-1 px-4 py-3 text-slate-400 hover:text-brand-400 transition-colors"
-              activeProps={{ className: 'flex flex-col items-center gap-1 px-4 py-3 text-brand-400' }}
+              className="flex flex-col items-center gap-1 px-4 py-3 text-white/30 hover:text-[#D4A44A] transition-colors"
+              activeProps={{ className: 'flex flex-col items-center gap-1 px-4 py-3 text-[#D4A44A]' }}
             >
               <Icon size={22} />
-              <span className="text-xs">{label}</span>
+              <span className="text-[10px] tracking-widest uppercase">{label}</span>
             </Link>
           ))}
         </div>

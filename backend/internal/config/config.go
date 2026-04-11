@@ -26,7 +26,7 @@ type Config struct {
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 }
 
-// DSN returns the PostgreSQL connection string.
+// DSN returns the PostgreSQL key=value connection string (for pgxpool).
 func (c *Config) DSN() string {
 	return "host=" + c.DBHost +
 		" port=" + c.DBPort +
@@ -34,6 +34,12 @@ func (c *Config) DSN() string {
 		" user=" + c.DBUser +
 		" password=" + c.DBPassword +
 		" sslmode=disable"
+}
+
+// DatabaseURL returns a postgres:// URL (for golang-migrate).
+func (c *Config) DatabaseURL() string {
+	return "pgx5://" + c.DBUser + ":" + c.DBPassword +
+		"@" + c.DBHost + ":" + c.DBPort + "/" + c.DBName + "?sslmode=disable"
 }
 
 // Load reads configuration from environment variables.

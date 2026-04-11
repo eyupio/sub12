@@ -1,4 +1,4 @@
-.PHONY: run build test migrate-up migrate-down lint tidy
+.PHONY: run build test migrate-up migrate-down lint tidy seed
 
 MIGRATE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 MIGRATIONS_DIR := internal/db/migrations
@@ -35,3 +35,7 @@ migrate-down:
 ## migrate-create: create a new migration (usage: make migrate-create NAME=add_foo)
 migrate-create:
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(NAME)
+
+## seed: load development seed data (dev/admin accounts, password: password123)
+seed:
+	psql "$(MIGRATE_URL)" -f internal/db/seed/seed.sql
