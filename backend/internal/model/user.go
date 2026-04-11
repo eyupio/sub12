@@ -25,3 +25,11 @@ type PublicProfile struct {
 	AvatarURL   *string   `json:"avatar_url,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+// UpdateProfileInput holds the fields a user can change on their own profile.
+type UpdateProfileInput struct {
+	DisplayName *string `json:"display_name"`
+	Bio         *string `json:"bio"`
+	Location    *string `json:"location"`
+	Club        *string `json:"club"`
+}

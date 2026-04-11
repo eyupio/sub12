@@ -15,6 +15,7 @@ import (
 	api "github.com/jnnngs/sub-12/backend/internal/api"
 	"github.com/jnnngs/sub-12/backend/internal/config"
 	"github.com/jnnngs/sub-12/backend/internal/db"
+	"github.com/jnnngs/sub-12/backend/internal/db/seed"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
@@ -46,6 +47,16 @@ func main() {
 	}
 	log.Info().Msg("migrations up to date")
 
+	if cfg.SeedAdmin {
+		if cfg.AdminPassword == "" {
+			log.Fatal().Msg("ADMIN_PASSWORD must be set when SEED_ADMIN=true")
+		}
+		if err := seed.Admin(ctx, pool, cfg.AdminPassword); err != nil {
+			log.Fatal().Err(err).Msg("seed admin user")
+		}
+		log.Info().Msg("admin user seeded")
+	}
+
 	rdb, err := db.ConnectRedis(ctx, cfg.RedisURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("connect to redis")
@@ -69,7 +80,9 @@ func main() {
 	pelletRepo := repository.NewPelletRepository(pool)
 	pelletSvc := service.NewPelletService(pelletRepo)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc)
+	userSvc := service.NewUserService(userRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

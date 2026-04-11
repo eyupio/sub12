@@ -24,6 +24,10 @@ type Config struct {
 
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
+
+	// Seed
+	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
+	AdminPassword string `envconfig:"ADMIN_PASSWORD"`
 }
 
 // DSN returns the PostgreSQL key=value connection string (for pgxpool).

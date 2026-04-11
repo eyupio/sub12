@@ -21,6 +21,9 @@ frontend/.vite/
 frontend/ios/
 frontend/android/
 
+# Docker bind-mount data directories
+data/
+
 # Docker
 *.log
 

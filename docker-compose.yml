@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sub12}"]
       interval: 5s
@@ -22,7 +22,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redisdata:/data
+      - ./data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -33,8 +33,11 @@ services:
     image: ghcr.io/jnnngs/sub-12-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env
-    ports:
-      - "8080:8080"
+    environment:
+      SEED_ADMIN: ${SEED_ADMIN:-false}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    # No host port — the frontend nginx proxies /api/ to this container
+    # internally. Expose 8080 here only if you need direct curl access.
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,7 +51,3 @@ services:
       - "3000:80"
     depends_on:
       - backend
-
-volumes:
-  pgdata:
-  redisdata:

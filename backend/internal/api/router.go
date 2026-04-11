@@ -23,6 +23,7 @@ func NewRouter(
 	stats *service.StatsService,
 	rifles *service.RifleService,
 	pellets *service.PelletService,
+	users *service.UserService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -79,6 +80,11 @@ func NewRouter(
 			r.Get("/pellets", ph.List)
 			r.Patch("/pellets/{id}", ph.Update)
 			r.Delete("/pellets/{id}", ph.Delete)
+
+			// User profiles
+			uh := handler.NewUser(users)
+			r.Patch("/users/me", uh.UpdateMe)
+			r.Get("/users/{id}", uh.GetProfile)
 		})
 	})
 

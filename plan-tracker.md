@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-11 (session 4)
+> Last updated: 2026-04-11 (session 5)
 
 ---
 
@@ -68,9 +68,9 @@
 - [ ] Frontend: league list, league detail + standings table
 
 ### User Profiles
-- [ ] `GET /api/v1/users/:id` — public profile
-- [ ] `PATCH /api/v1/users/me` — update own profile
-- [ ] Frontend: profile page (stats, recent cards, rifles)
+- [x] `GET /api/v1/users/:id` — public profile
+- [x] `PATCH /api/v1/users/me` — update own profile
+- [x] Frontend: profile page (stats, recent cards, edit form for bio/location/club)
 
 ---
 
