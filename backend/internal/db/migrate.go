@@ -27,6 +27,15 @@ func Migrate(dbURL string) error {
 	}
 	defer m.Close()
 
+	// If the database is dirty from a previously failed migration,
+	// force the version so migrations can be re-applied.
+	version, dirty, verr := m.Version()
+	if verr == nil && dirty {
+		if ferr := m.Force(int(version)); ferr != nil {
+			return fmt.Errorf("force dirty version %d: %w", version, ferr)
+		}
+	}
+
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
