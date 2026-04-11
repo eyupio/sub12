@@ -1,11 +1,12 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Package, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Target, Package, Trophy, User, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/scores', icon: Target, label: 'Scores' },
+  { to: '/leagues', icon: Trophy, label: 'Leagues' },
   { to: '/gear', icon: Package, label: 'Gear' },
   { to: '/profile', icon: User, label: 'Profile' },
 ] as const

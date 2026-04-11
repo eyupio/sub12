@@ -65,7 +65,9 @@
 - [x] `GET /api/v1/leagues` — list public leagues (public, no auth)
 - [x] `POST /api/v1/leagues/:id/join` — join a league
 - [x] `GET /api/v1/leagues/:id/standings` — live standings
-- [ ] Frontend: league list, league detail + standings table
+- [x] Frontend: league list (`/leagues`) + create league modal
+- [x] Frontend: league detail + standings table (`/leagues/:id`)
+- [x] Leagues added to bottom nav (Trophy icon)
 
 ### User Profiles
 - [x] `GET /api/v1/users/:id` — public profile
