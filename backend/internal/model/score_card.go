@@ -35,6 +35,19 @@ type CreateScoreCardInput struct {
 	ShotXs      []bool   `json:"shot_xs"`
 }
 
+// UpdateScoreCardInput holds fields a user can change after submission.
+type UpdateScoreCardInput struct {
+	RifleID     *string  `json:"rifle_id"`
+	PelletID    *string  `json:"pellet_id"`
+	ShotAt      string   `json:"shot_at"`
+	Location    *string  `json:"location"`
+	WindMPH     *float64 `json:"wind_mph"`
+	TempCelsius *float64 `json:"temp_celsius"`
+	Notes       *string  `json:"notes"`
+	ShotScores  []int16  `json:"shot_scores"`
+	ShotXs      []bool   `json:"shot_xs"`
+}
+
 // ScoreCardSummary is a lighter struct used in list responses.
 type ScoreCardSummary struct {
 	ID         string    `json:"id"`

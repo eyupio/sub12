@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3 } from 'lucide-react'
+import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
+import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 
@@ -235,14 +236,123 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   )
 }
 
+type Shot = { score: number; x: boolean }
+
+function EditScoreGrid({ shots, onUpdate }: { shots: Shot[]; onUpdate: (shots: Shot[]) => void }) {
+  const [selected, setSelected] = useState<number | null>(null)
+
+  function handleScoreButton(val: number | 'X') {
+    if (selected === null) return
+    const next = [...shots]
+    if (val === 'X') {
+      next[selected] = { score: 10, x: true }
+    } else {
+      next[selected] = { score: val, x: false }
+    }
+    onUpdate(next)
+    if (selected < 24) setSelected(selected + 1)
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-5 gap-2">
+        {shots.map(({ score, x }, i) => {
+          const isSelected = selected === i
+          const label = score === 10 && x ? 'X' : score === 0 ? String(i + 1) : String(score)
+          return (
+            <button
+              key={i}
+              onClick={() => setSelected(isSelected ? null : i)}
+              className={[
+                'aspect-square rounded font-mono font-semibold transition-all select-none flex items-center justify-center text-sm',
+                isSelected ? 'border-2 border-[var(--brass)] ring-2 ring-[var(--brass)]/30 scale-[1.05] z-10' : 'border border-subtle',
+                !isSelected && score === 0 && 'bg-surface text-muted',
+                !isSelected && score === 10 && x && 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]',
+                !isSelected && score === 10 && !x && 'bg-[var(--brass)]/10 border-[var(--brass)]/40 text-[var(--brass)]',
+                !isSelected && score > 0 && score < 10 && 'bg-surface-hover border-strong text-secondary',
+              ].filter(Boolean).join(' ')}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+      {selected !== null && (
+        <div className="space-y-2 bg-surface border border-subtle rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] tracking-widest uppercase text-muted">Shot {selected + 1}</span>
+            <button onClick={() => setSelected(null)} className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary">Done</button>
+          </div>
+          <div className="grid grid-cols-6 gap-1.5">
+            {([0,1,2,3,4,5,6,7,8,9,10,'X'] as const).map(val => {
+              const { score, x: xFlag } = shots[selected]
+              const isActive = val === 'X' ? score === 10 && xFlag : score === (val as number) && !(val === 10 && xFlag)
+              return (
+                <button key={val} onClick={() => handleScoreButton(val as number | 'X')} className={[
+                  'py-2 rounded font-mono text-xs font-semibold transition-colors',
+                  isActive ? 'bg-[var(--brass)] text-inverse' : val === 'X' ? 'bg-[var(--brass)]/10 text-[var(--brass)]' : 'bg-surface-hover text-secondary hover:bg-surface-active',
+                ].join(' ')}>
+                  {val}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
   const [showLightbox, setShowLightbox] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editShots, setEditShots] = useState<Shot[]>([])
+  const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
+  const queryClient = useQueryClient()
+  const currentUser = useAuthStore(s => s.user)
 
   const { data: card, isLoading, isError } = useQuery({
     queryKey: ['score-cards', id],
     queryFn: () => scoreCardApi.get(id),
   })
+
+  const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles(), enabled: editing })
+  const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
+
+  const updateMutation = useMutation({
+    mutationFn: () => scoreCardApi.update(id, {
+      shot_at: editMeta.shot_at,
+      shot_scores: editShots.map(s => s.score),
+      shot_xs: editShots.map(s => s.x),
+      location: editMeta.location || undefined,
+      notes: editMeta.notes || undefined,
+      rifle_id: editMeta.rifle_id || undefined,
+      pellet_id: editMeta.pellet_id || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', id] })
+      queryClient.invalidateQueries({ queryKey: ['score-cards', id, 'audit-trail'] })
+      setEditing(false)
+    },
+  })
+
+  function startEdit() {
+    if (!card) return
+    setEditShots(card.shot_scores.map((score, i) => ({ score, x: card.shot_xs[i] })))
+    setEditMeta({
+      shot_at: card.shot_at,
+      location: card.location ?? '',
+      notes: card.notes ?? '',
+      rifle_id: card.rifle_id ?? '',
+      pellet_id: card.pellet_id ?? '',
+    })
+    setEditing(true)
+  }
+
+  const isOwner = currentUser && card ? currentUser.id === card.user_id : false
+  const editTotalScore = editShots.reduce((a, s) => a + s.score, 0)
+  const editXCount = editShots.filter(s => s.x).length
 
   if (isLoading) {
     return (
@@ -273,14 +383,80 @@ export default function ScoreCardDetail() {
         <Link to="/scores" className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>
           {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
         </div>
+        {isOwner && !editing && (
+          <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
+            <Pencil size={13} /> Edit
+          </button>
+        )}
       </div>
 
+      {/* Edit mode */}
+      {editing && (
+        <div className="space-y-4 border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs tracking-widest uppercase">
+            <AlertCircle size={14} /> Editing will reset verification to pending
+          </div>
+
+          <EditScoreGrid shots={editShots} onUpdate={setEditShots} />
+
+          <div className="flex gap-8 font-mono border-t border-subtle pt-3">
+            <span className="text-muted text-[11px] tracking-widest uppercase">Total <strong className="text-primary ml-2 text-base">{editTotalScore}</strong></span>
+            <span className="text-muted text-[11px] tracking-widest uppercase">X <strong className="text-[var(--brass)] ml-2 text-base">{editXCount}</strong></span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Date</label>
+              <input type="date" value={editMeta.shot_at} onChange={e => setEditMeta(m => ({ ...m, shot_at: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono focus:outline-none focus:border-[var(--brass)]/50" />
+            </div>
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+              <input type="text" value={editMeta.location} onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))} placeholder="Range / club" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
+            </div>
+          </div>
+
+          {(rifleData?.items ?? []).length > 0 && (
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+              <select value={editMeta.rifle_id} onChange={e => setEditMeta(m => ({ ...m, rifle_id: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-[var(--brass)]/50">
+                <option value="">-- none --</option>
+                {(rifleData?.items ?? []).map(r => <option key={r.id} value={r.id}>{r.make} {r.model}</option>)}
+              </select>
+            </div>
+          )}
+
+          {(pelletData?.items ?? []).length > 0 && (
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
+              <select value={editMeta.pellet_id} onChange={e => setEditMeta(m => ({ ...m, pellet_id: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-[var(--brass)]/50">
+                <option value="">-- none --</option>
+                {(pelletData?.items ?? []).map(p => <option key={p.id} value={p.id}>{p.brand} {p.model}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+            <textarea value={editMeta.notes} onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))} rows={2} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted resize-none focus:outline-none focus:border-[var(--brass)]/50" />
+          </div>
+
+          {updateMutation.isError && <p className="text-[var(--error-text)] text-sm">Failed to save changes. Please try again.</p>}
+
+          <div className="flex gap-2">
+            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !editMeta.shot_at} className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="px-4 py-2.5 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop: two-column layout */}
-      <div className="lg:grid lg:grid-cols-2 lg:gap-8">
+      {!editing && <div className="lg:grid lg:grid-cols-2 lg:gap-8">
         {/* Left column: score grid + totals */}
         <div className="space-y-6">
           {/* Score grid */}
@@ -371,7 +547,7 @@ export default function ScoreCardDetail() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Audit Trail */}
       <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />

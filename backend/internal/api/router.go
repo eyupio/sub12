@@ -83,6 +83,7 @@ func NewRouter(
 			r.Post("/score-cards", sc.Create)
 			r.Get("/score-cards", sc.List)
 			r.Get("/score-cards/{id}", sc.Get)
+			r.Patch("/score-cards/{id}", sc.Update)
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
 
 			// Rifles

@@ -13,11 +13,20 @@ var (
 	ErrInvalidCard = errors.New("invalid score card")
 )
 
-type ScoreCardService struct {
-	cards *repository.ScoreCardRepository
+// ScoreCardRepo is implemented by repository.ScoreCardRepository.
+type ScoreCardRepo interface {
+	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
+	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
+	ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.ScoreCardSummary, error)
+	UpdateImageURL(ctx context.Context, id, imageURL string) error
+	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 }
 
-func NewScoreCardService(cards *repository.ScoreCardRepository) *ScoreCardService {
+type ScoreCardService struct {
+	cards ScoreCardRepo
+}
+
+func NewScoreCardService(cards ScoreCardRepo) *ScoreCardService {
 	return &ScoreCardService{cards: cards}
 }
 
@@ -68,6 +77,33 @@ func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit,
 		offset = 0
 	}
 	return s.cards.ListByUser(ctx, userID, limit, offset)
+}
+
+// Update modifies a score card's shots and metadata, resets verification, and
+// clears any existing peer confirmations.
+func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput) (*model.ScoreCard, error) {
+	if len(input.ShotScores) != 25 {
+		return nil, fmt.Errorf("%w: shot_scores must have exactly 25 entries", ErrInvalidCard)
+	}
+	if len(input.ShotXs) != 25 {
+		return nil, fmt.Errorf("%w: shot_xs must have exactly 25 entries", ErrInvalidCard)
+	}
+	if input.ShotAt == "" {
+		return nil, fmt.Errorf("%w: shot_at is required", ErrInvalidCard)
+	}
+
+	var totalScore, xCount int16
+	for i, score := range input.ShotScores {
+		if score < 0 || score > 10 {
+			return nil, fmt.Errorf("%w: shot %d score %d out of range 0-10", ErrInvalidCard, i+1, score)
+		}
+		totalScore += score
+		if input.ShotXs[i] {
+			xCount++
+		}
+	}
+
+	return s.cards.Update(ctx, id, userID, input, totalScore, xCount)
 }
 
 // UpdateImageURL updates the card_image_url for a score card owned by the given user.

@@ -1,10 +1,9 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -28,37 +27,20 @@ func (h *ImageHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit to 10MB
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
-
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "file too large (max 10MB)")
-		return
-	}
-
-	file, header, err := r.FormFile("image")
+	data, contentType, err := parseAndValidateImage(r, "image", 10<<20)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "missing image file")
-		return
-	}
-	defer file.Close()
-
-	// Validate content type
-	contentType := header.Header.Get("Content-Type")
-	switch {
-	case strings.HasPrefix(contentType, "image/jpeg"):
-		contentType = "image/jpeg"
-	case strings.HasPrefix(contentType, "image/png"):
-		contentType = "image/png"
-	case strings.HasPrefix(contentType, "image/webp"):
-		contentType = "image/webp"
-	default:
-		writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
-		return
-	}
-
-	data, err := io.ReadAll(file)
-	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			writeError(w, http.StatusBadRequest, "file too large (max 10MB)")
+			return
+		}
+		if errors.Is(err, ErrMissingFile) {
+			writeError(w, http.StatusBadRequest, "missing image file")
+			return
+		}
+		if errors.Is(err, ErrUnsupportedType) {
+			writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to read image")
 		return
 	}

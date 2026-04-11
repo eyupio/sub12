@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Camera } from 'lucide-react'
+import { Plus, Trash2, Camera, Pencil, Check, X } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -96,6 +96,9 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
 
 function RifleRow({ rifle }: { rifle: Rifle }) {
   const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({ make: rifle.make, model: rifle.model, calibre: rifle.calibre ?? '', power_ftlb: rifle.power_ftlb })
+
   const del = useMutation({
     mutationFn: () => gearApi.deleteRifle(rifle.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
@@ -104,6 +107,50 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
     mutationFn: (file: File) => gearApi.uploadRifleImage(rifle.id, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
   })
+  const updateMutation = useMutation({
+    mutationFn: () => gearApi.updateRifle(rifle.id, {
+      make: form.make,
+      model: form.model,
+      calibre: form.calibre || undefined,
+      power_ftlb: form.power_ftlb,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rifles'] })
+      setEditing(false)
+    },
+  })
+
+  if (editing) {
+    return (
+      <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Make">
+            <input className={inputCls} value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))} />
+          </Field>
+          <Field label="Model">
+            <input className={inputCls} value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Calibre">
+            <input className={inputCls} value={form.calibre} onChange={e => setForm(f => ({ ...f, calibre: e.target.value }))} />
+          </Field>
+          <Field label="Power (ft·lb)">
+            <input className={inputCls} type="number" step="0.01" value={form.power_ftlb ?? ''} onChange={e => setForm(f => ({ ...f, power_ftlb: e.target.value ? Number(e.target.value) : undefined }))} />
+          </Field>
+        </div>
+        {updateMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save. Please try again.</p>}
+        <div className="flex gap-2">
+          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.make || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40">
+            <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+            <X size={13} /> Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
@@ -112,6 +159,13 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
         <p className="text-secondary text-sm font-medium">{rifle.make} {rifle.model}</p>
         <p className="text-[11px] text-muted tracking-wide">{rifle.calibre}{rifle.power_ftlb != null ? ` · ${rifle.power_ftlb} ft·lb` : ''}</p>
       </div>
+      <button
+        onClick={() => { setForm({ make: rifle.make, model: rifle.model, calibre: rifle.calibre ?? '', power_ftlb: rifle.power_ftlb }); setEditing(true) }}
+        className="text-muted hover:text-[var(--brass)] transition-colors"
+        aria-label="Edit rifle"
+      >
+        <Pencil size={15} />
+      </button>
       <button
         onClick={() => { if (window.confirm(`Delete ${rifle.make} ${rifle.model}?`)) del.mutate() }}
         disabled={del.isPending}
@@ -194,6 +248,9 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
 
 function PelletRow({ pellet }: { pellet: Pellet }) {
   const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({ brand: pellet.brand, model: pellet.model, head_size_mm: pellet.head_size_mm, weight_grains: pellet.weight_grains, batch_code: pellet.batch_code ?? '' })
+
   const del = useMutation({
     mutationFn: () => gearApi.deletePellet(pellet.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
@@ -202,6 +259,54 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
     mutationFn: (file: File) => gearApi.uploadPelletImage(pellet.id, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
   })
+  const updateMutation = useMutation({
+    mutationFn: () => gearApi.updatePellet(pellet.id, {
+      brand: form.brand,
+      model: form.model,
+      head_size_mm: form.head_size_mm,
+      weight_grains: form.weight_grains,
+      batch_code: form.batch_code || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pellets'] })
+      setEditing(false)
+    },
+  })
+
+  if (editing) {
+    return (
+      <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Brand">
+            <input className={inputCls} value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
+          </Field>
+          <Field label="Model">
+            <input className={inputCls} value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Head size (mm)">
+            <input className={inputCls} type="number" step="0.01" value={form.head_size_mm ?? ''} onChange={e => setForm(f => ({ ...f, head_size_mm: e.target.value ? Number(e.target.value) : undefined }))} />
+          </Field>
+          <Field label="Weight (grains)">
+            <input className={inputCls} type="number" step="0.01" value={form.weight_grains ?? ''} onChange={e => setForm(f => ({ ...f, weight_grains: e.target.value ? Number(e.target.value) : undefined }))} />
+          </Field>
+        </div>
+        <Field label="Batch code">
+          <input className={inputCls} value={form.batch_code} onChange={e => setForm(f => ({ ...f, batch_code: e.target.value }))} />
+        </Field>
+        {updateMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save. Please try again.</p>}
+        <div className="flex gap-2">
+          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.brand || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40">
+            <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+            <X size={13} /> Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
@@ -216,6 +321,13 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
           ].filter(Boolean).join(' · ')}
         </p>
       </div>
+      <button
+        onClick={() => { setForm({ brand: pellet.brand, model: pellet.model, head_size_mm: pellet.head_size_mm, weight_grains: pellet.weight_grains, batch_code: pellet.batch_code ?? '' }); setEditing(true) }}
+        className="text-muted hover:text-[var(--brass)] transition-colors"
+        aria-label="Edit pellet"
+      >
+        <Pencil size={15} />
+      </button>
       <button
         onClick={() => { if (window.confirm(`Delete ${pellet.brand} ${pellet.model}?`)) del.mutate() }}
         disabled={del.isPending}

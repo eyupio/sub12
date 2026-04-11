@@ -117,6 +117,77 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	return cards, rows.Err()
 }
 
+// Update modifies a score card's shots and metadata, resets verification to
+// pending, and deletes any existing score confirmations — all in one transaction.
+func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+
+	err = tx.QueryRow(ctx, `
+		UPDATE score_cards SET
+			rifle_id    = $3,
+			pellet_id   = $4,
+			shot_at     = $5,
+			location    = $6,
+			wind_mph    = $7,
+			temp_celsius = $8,
+			notes       = $9,
+			shot_scores = $10,
+			shot_xs     = $11,
+			total_score = $12,
+			x_count     = $13,
+			verification = 'pending',
+			updated_at  = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, wind_mph, temp_celsius, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, verification::text, league_round_id,
+			created_at, updated_at
+	`,
+		id, userID,
+		input.RifleID, input.PelletID,
+		input.ShotAt, input.Location, input.WindMPH, input.TempCelsius, input.Notes,
+		pgtype.FlatArray[int16](input.ShotScores),
+		pgtype.FlatArray[bool](input.ShotXs),
+		totalScore, xCount,
+	).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.Verification, &card.LeagueRoundID,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update score card: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+
+	// Clear all peer confirmations so the verification process restarts.
+	_, err = tx.Exec(ctx, `DELETE FROM score_confirmations WHERE score_card_id = $1`, id)
+	if err != nil {
+		return nil, fmt.Errorf("delete confirmations: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return &card, nil
+}
+
 // UpdateImageURL sets the card_image_url for a score card.
 func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL string) error {
 	_, err := r.db.Exec(ctx,

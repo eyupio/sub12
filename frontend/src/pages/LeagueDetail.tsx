@@ -63,9 +63,10 @@ export default function LeagueDetail() {
     queryFn: () => leagueApi.getConfig(id),
   })
 
-  const { data: standings, isLoading: standingsLoading, isError } = useQuery({
+  const { data: standings, isLoading: standingsLoading, isError, error: standingsError, refetch: refetchStandings } = useQuery({
     queryKey: ['leagues', id, 'standings'],
     queryFn: () => leagueApi.standings(id),
+    retry: 2,
   })
 
   const isLoading = leagueLoading || standingsLoading
@@ -224,7 +225,19 @@ export default function LeagueDetail() {
         )}
 
         {isError && (
-          <p className="text-[var(--error-text)] text-sm pt-2">Failed to load standings.</p>
+          <div className="pt-2 space-y-2">
+            <p className="text-[var(--error-text)] text-sm">
+              {standingsError instanceof Error && standingsError.message.includes('401')
+                ? 'Session expired. Please log in again.'
+                : 'Failed to load standings.'}
+            </p>
+            <button
+              onClick={() => refetchStandings()}
+              className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+            >
+              Retry
+            </button>
+          </div>
         )}
 
         {standings && standings.items.length === 0 && (
