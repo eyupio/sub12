@@ -1,0 +1,3 @@
+ALTER TABLE leagues DROP COLUMN IF EXISTS image_url;
+ALTER TABLE pellets DROP COLUMN IF EXISTS image_url;
+ALTER TABLE rifles DROP COLUMN IF EXISTS image_url;

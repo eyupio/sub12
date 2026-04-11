@@ -86,18 +86,20 @@ func NewRouter(
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
 
 			// Rifles
-			rh := handler.NewRifle(rifles)
+			rh := handler.NewRifle(rifles, images)
 			r.Post("/rifles", rh.Create)
 			r.Get("/rifles", rh.List)
 			r.Patch("/rifles/{id}", rh.Update)
 			r.Delete("/rifles/{id}", rh.Delete)
+			r.Post("/rifles/{id}/image", rh.UploadImage)
 
 			// Pellets
-			ph := handler.NewPellet(pellets)
+			ph := handler.NewPellet(pellets, images)
 			r.Post("/pellets", ph.Create)
 			r.Get("/pellets", ph.List)
 			r.Patch("/pellets/{id}", ph.Update)
 			r.Delete("/pellets/{id}", ph.Delete)
+			r.Post("/pellets/{id}/image", ph.UploadImage)
 
 			// User profiles
 			uh := handler.NewUser(users, images)
@@ -106,10 +108,11 @@ func NewRouter(
 			r.Get("/users/{id}", uh.GetProfile)
 
 			// Leagues
-			lh := handler.NewLeague(leagues)
+			lh := handler.NewLeague(leagues, images)
 			r.Post("/leagues", lh.Create)
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Get("/leagues/{id}/standings", lh.Standings)
+			r.Post("/leagues/{id}/image", lh.UploadImage)
 
 			// League config & management
 			r.Get("/leagues/{id}/config", lh.GetConfig)
@@ -135,7 +138,7 @@ func NewRouter(
 		})
 
 		// Public league routes (no auth required)
-		lh := handler.NewLeague(leagues)
+		lh := handler.NewLeague(leagues, images)
 		r.Get("/leagues", lh.List)
 		r.Get("/leagues/{id}", lh.Get)
 	})

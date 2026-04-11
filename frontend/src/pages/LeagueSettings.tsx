@@ -1,21 +1,71 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Users } from 'lucide-react'
-import {
-  leagueApi,
-  LeagueConfig,
-  Season,
-  Round,
-  JoinRequest,
-  LeagueMember,
-} from '../api/leagues'
+import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Camera } from 'lucide-react'
+import { leagueApi, LeagueConfig, League } from '../api/leagues'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2 px-3 rounded transition-colors'
+
+// ---------------------------------------------------------------------------
+// League Image Section
+// ---------------------------------------------------------------------------
+
+function LeagueImageSection({ leagueId, league }: { leagueId: string; league: League }) {
+  const queryClient = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const mutation = useMutation({
+    mutationFn: (file: File) => leagueApi.uploadImage(leagueId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+    },
+  })
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">League Image</h2>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) mutation.mutate(file)
+          e.target.value = ''
+        }}
+      />
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={mutation.isPending}
+          className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50"
+          aria-label="Upload league image"
+        >
+          {league.image_url ? (
+            <img src={league.image_url} alt={league.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-surface-hover flex items-center justify-center">
+              <Camera size={20} className="text-muted" />
+            </div>
+          )}
+        </button>
+        <div className="flex-1">
+          <p className="text-sm text-secondary">
+            {league.image_url ? 'Click to change image' : 'Add a profile picture for this league'}
+          </p>
+          <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
+          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading...</p>}
+          {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">Upload failed. Please try again.</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Config Section
@@ -569,6 +619,7 @@ export default function LeagueSettings() {
 
       <p className="text-xs text-muted">{league.name}</p>
 
+      <LeagueImageSection leagueId={id} league={league} />
       <ConfigSection leagueId={id} config={config} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
       <VerificationSection leagueId={id} config={config} />

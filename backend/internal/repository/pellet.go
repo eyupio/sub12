@@ -24,7 +24,7 @@ func scanPellet(row pgx.Row) (*model.Pellet, error) {
 	err := row.Scan(
 		&p.ID, &p.UserID, &p.Brand, &p.Model,
 		&p.HeadSizeMM, &p.WeightGrains, &p.BatchCode, &p.Notes,
-		&p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+		&p.ImageURL, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (r *PelletRepository) Create(ctx context.Context, userID string, in *model.
 	pellet, err := scanPellet(r.db.QueryRow(ctx, `
 		INSERT INTO pellets (user_id, brand, model, head_size_mm, weight_grains, batch_code, notes)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, is_active, created_at, updated_at
+		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
 	`, userID, in.Brand, in.Model, in.HeadSizeMM, in.WeightGrains, in.BatchCode, in.Notes))
 	if err != nil {
 		return nil, fmt.Errorf("create pellet: %w", err)
@@ -46,7 +46,7 @@ func (r *PelletRepository) Create(ctx context.Context, userID string, in *model.
 
 func (r *PelletRepository) ListByUser(ctx context.Context, userID string, activeOnly bool) ([]*model.Pellet, error) {
 	query := `
-		SELECT id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, is_active, created_at, updated_at
+		SELECT id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
 		FROM pellets WHERE user_id = $1`
 	if activeOnly {
 		query += ` AND is_active = TRUE`
@@ -72,7 +72,7 @@ func (r *PelletRepository) ListByUser(ctx context.Context, userID string, active
 
 func (r *PelletRepository) GetByID(ctx context.Context, id, userID string) (*model.Pellet, error) {
 	pellet, err := scanPellet(r.db.QueryRow(ctx, `
-		SELECT id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, is_active, created_at, updated_at
+		SELECT id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
 		FROM pellets WHERE id = $1 AND user_id = $2
 	`, id, userID))
 	if err != nil {
@@ -93,16 +93,32 @@ func (r *PelletRepository) Update(ctx context.Context, id, userID string, in *mo
 			weight_grains = COALESCE($6, weight_grains),
 			batch_code    = COALESCE($7, batch_code),
 			notes         = COALESCE($8, notes),
-			is_active     = COALESCE($9, is_active),
+			image_url     = COALESCE($9, image_url),
+			is_active     = COALESCE($10, is_active),
 			updated_at    = NOW()
 		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, is_active, created_at, updated_at
-	`, id, userID, in.Brand, in.Model, in.HeadSizeMM, in.WeightGrains, in.BatchCode, in.Notes, in.IsActive))
+		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
+	`, id, userID, in.Brand, in.Model, in.HeadSizeMM, in.WeightGrains, in.BatchCode, in.Notes, in.ImageURL, in.IsActive))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("update pellet: %w", err)
+	}
+	return pellet, nil
+}
+
+func (r *PelletRepository) UpdateImageURL(ctx context.Context, id, userID, imageURL string) (*model.Pellet, error) {
+	pellet, err := scanPellet(r.db.QueryRow(ctx, `
+		UPDATE pellets SET image_url = $3, updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
+	`, id, userID, imageURL))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update pellet image url: %w", err)
 	}
 	return pellet, nil
 }

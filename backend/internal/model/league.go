@@ -8,6 +8,7 @@ type League struct {
 	Description *string   `json:"description,omitempty"`
 	Type        string    `json:"type"`
 	JoinCode    *string   `json:"join_code,omitempty"`
+	ImageURL    *string   `json:"image_url,omitempty"`
 	CreatedBy   string    `json:"created_by"`
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`

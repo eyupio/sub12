@@ -36,10 +36,10 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 	err = tx.QueryRow(ctx, `
 		INSERT INTO leagues (name, description, type, created_by)
 		VALUES ($1, $2, 'public', $3)
-		RETURNING id, name, description, type::text, created_by, created_at
+		RETURNING id, name, description, type::text, image_url, created_by, created_at
 	`, input.Name, input.Description, userID).Scan(
 		&league.ID, &league.Name, &league.Description,
-		&league.Type, &league.CreatedBy, &league.CreatedAt,
+		&league.Type, &league.ImageURL, &league.CreatedBy, &league.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert league: %w", err)
@@ -68,7 +68,7 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 // ListPublic returns all public leagues with their member counts.
 func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.created_by, l.created_at,
+		SELECT l.id, l.name, l.description, l.type::text, l.image_url, l.created_by, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id
@@ -84,7 +84,7 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 	var leagues []*model.League
 	for rows.Next() {
 		var l model.League
-		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.CreatedBy, &l.CreatedAt, &l.MemberCount); err != nil {
+		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.ImageURL, &l.CreatedBy, &l.CreatedAt, &l.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan league: %w", err)
 		}
 		leagues = append(leagues, &l)
@@ -96,13 +96,13 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 func (r *LeagueRepository) GetByID(ctx context.Context, id string) (*model.League, error) {
 	var l model.League
 	err := r.db.QueryRow(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.join_code, l.created_by, l.created_at,
+		SELECT l.id, l.name, l.description, l.type::text, l.join_code, l.image_url, l.created_by, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id
 		WHERE l.id = $1
 		GROUP BY l.id
-	`, id).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.JoinCode, &l.CreatedBy, &l.CreatedAt, &l.MemberCount)
+	`, id).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.JoinCode, &l.ImageURL, &l.CreatedBy, &l.CreatedAt, &l.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -110,6 +110,21 @@ func (r *LeagueRepository) GetByID(ctx context.Context, id string) (*model.Leagu
 		return nil, fmt.Errorf("get league: %w", err)
 	}
 	return &l, nil
+}
+
+// UpdateImageURL sets the image_url for a league.
+func (r *LeagueRepository) UpdateImageURL(ctx context.Context, leagueID, imageURL string) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE leagues SET image_url = $2, updated_at = NOW() WHERE id = $1`,
+		leagueID, imageURL,
+	)
+	if err != nil {
+		return fmt.Errorf("update league image url: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Join adds a user to a league. Returns ErrNotFound if the league doesn't exist,

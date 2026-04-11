@@ -259,6 +259,17 @@ func (s *LeagueService) RegenerateJoinCode(ctx context.Context, leagueID, userID
 }
 
 // ---------------------------------------------------------------------------
+// Image
+// ---------------------------------------------------------------------------
+
+func (s *LeagueService) UpdateImageURL(ctx context.Context, leagueID, userID, imageURL string) error {
+	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+		return err
+	}
+	return s.leagues.UpdateImageURL(ctx, leagueID, imageURL)
+}
+
+// ---------------------------------------------------------------------------
 // Members
 // ---------------------------------------------------------------------------
 

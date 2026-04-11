@@ -8,6 +8,7 @@ export interface Rifle {
   calibre: string
   power_ftlb?: number
   tune_notes?: string
+  image_url?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -22,6 +23,7 @@ export interface Pellet {
   weight_grains?: number
   batch_code?: string
   notes?: string
+  image_url?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -62,4 +64,15 @@ export const gearApi = {
     api.patch<Pellet>(`/pellets/${id}`, payload),
   deletePellet: (id: string) =>
     api.del<void>(`/pellets/${id}`),
+
+  uploadRifleImage: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.upload<Rifle>(`/rifles/${id}/image`, formData)
+  },
+  uploadPelletImage: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.upload<Pellet>(`/pellets/${id}/image`, formData)
+  },
 }

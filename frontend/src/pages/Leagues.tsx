@@ -81,9 +81,16 @@ function LeagueRow({ league }: { league: import('../api/leagues').League }) {
     <Link
       to="/leagues/$id"
       params={{ id: league.id }}
-      className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
+      className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
     >
-      <div className="space-y-0.5 min-w-0">
+      {league.image_url && (
+        <img
+          src={league.image_url}
+          alt={league.name}
+          className="w-9 h-9 rounded-lg object-cover border border-subtle shrink-0"
+        />
+      )}
+      <div className="space-y-0.5 min-w-0 flex-1">
         <p className="text-sm text-secondary font-medium truncate">{league.name}</p>
         {league.description && (
           <p className="text-[11px] text-muted truncate">{league.description}</p>
