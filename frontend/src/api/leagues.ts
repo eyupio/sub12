@@ -6,6 +6,7 @@ export interface League {
   description?: string
   type: string
   join_code?: string
+  image_url?: string
   created_by: string
   member_count: number
   created_at: string
@@ -185,4 +186,10 @@ export const leagueApi = {
 
   rejectScore: (scoreCardId: string, leagueId: string, reason: string) =>
     api.post(`/score-cards/${scoreCardId}/reject`, { league_id: leagueId, reason }),
+
+  uploadImage: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.upload<{ image_url: string }>(`/leagues/${id}/image`, formData)
+  },
 }

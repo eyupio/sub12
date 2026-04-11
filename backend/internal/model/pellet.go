@@ -11,6 +11,7 @@ type Pellet struct {
 	WeightGrains  *float64  `json:"weight_grains,omitempty"`
 	BatchCode     *string   `json:"batch_code,omitempty"`
 	Notes         *string   `json:"notes,omitempty"`
+	ImageURL      *string   `json:"image_url,omitempty"`
 	IsActive      bool      `json:"is_active"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
@@ -32,5 +33,6 @@ type UpdatePelletInput struct {
 	WeightGrains *float64 `json:"weight_grains"`
 	BatchCode    *string  `json:"batch_code"`
 	Notes        *string  `json:"notes"`
+	ImageURL     *string  `json:"image_url"`
 	IsActive     *bool    `json:"is_active"`
 }

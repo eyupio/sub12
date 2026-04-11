@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Camera } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -16,6 +16,40 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
+
+function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpload: (file: File) => void; isPending: boolean }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) onUpload(file)
+          e.target.value = ''
+        }}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isPending}
+        className="relative w-10 h-10 rounded overflow-hidden border border-subtle hover:border-[var(--brass)]/50 transition-colors shrink-0 disabled:opacity-50"
+        aria-label="Upload image"
+      >
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-surface-hover flex items-center justify-center">
+            <Camera size={14} className="text-muted" />
+          </div>
+        )}
+      </button>
+    </>
+  )
+}
 
 // ─── Rifle section ────────────────────────────────────────────────────────────
 
@@ -66,10 +100,15 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
     mutationFn: () => gearApi.deleteRifle(rifle.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
   })
+  const imgMutation = useMutation({
+    mutationFn: (file: File) => gearApi.uploadRifleImage(rifle.id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
+  })
 
   return (
-    <div className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <div>
+    <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
+      <GearImage imageUrl={rifle.image_url} onUpload={file => imgMutation.mutate(file)} isPending={imgMutation.isPending} />
+      <div className="flex-1 min-w-0">
         <p className="text-secondary text-sm font-medium">{rifle.make} {rifle.model}</p>
         <p className="text-[11px] text-muted tracking-wide">{rifle.calibre}{rifle.power_ftlb != null ? ` · ${rifle.power_ftlb} ft·lb` : ''}</p>
       </div>
@@ -159,10 +198,15 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
     mutationFn: () => gearApi.deletePellet(pellet.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
   })
+  const imgMutation = useMutation({
+    mutationFn: (file: File) => gearApi.uploadPelletImage(pellet.id, file),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
+  })
 
   return (
-    <div className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <div>
+    <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
+      <GearImage imageUrl={pellet.image_url} onUpload={file => imgMutation.mutate(file)} isPending={imgMutation.isPending} />
+      <div className="flex-1 min-w-0">
         <p className="text-secondary text-sm font-medium">{pellet.brand} {pellet.model}</p>
         <p className="text-[11px] text-muted tracking-wide">
           {[

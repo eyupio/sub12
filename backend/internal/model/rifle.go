@@ -10,6 +10,7 @@ type Rifle struct {
 	Calibre    string    `json:"calibre"`
 	PowerFtLb  *float64  `json:"power_ftlb,omitempty"`
 	TuneNotes  *string   `json:"tune_notes,omitempty"`
+	ImageURL   *string   `json:"image_url,omitempty"`
 	IsActive   bool      `json:"is_active"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
@@ -29,5 +30,6 @@ type UpdateRifleInput struct {
 	Calibre   *string  `json:"calibre"`
 	PowerFtLb *float64 `json:"power_ftlb"`
 	TuneNotes *string  `json:"tune_notes"`
+	ImageURL  *string  `json:"image_url"`
 	IsActive  *bool    `json:"is_active"`
 }

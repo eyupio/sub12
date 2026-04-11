@@ -30,6 +30,10 @@ func (s *RifleService) List(ctx context.Context, userID string, activeOnly bool)
 	return s.rifles.ListByUser(ctx, userID, activeOnly)
 }
 
+func (s *RifleService) GetByID(ctx context.Context, id, userID string) (*model.Rifle, error) {
+	return s.rifles.GetByID(ctx, id, userID)
+}
+
 func (s *RifleService) Update(ctx context.Context, id, userID string, in *model.UpdateRifleInput) (*model.Rifle, error) {
 	rifle, err := s.rifles.Update(ctx, id, userID, in)
 	if err != nil {
@@ -39,6 +43,10 @@ func (s *RifleService) Update(ctx context.Context, id, userID string, in *model.
 		return nil, err
 	}
 	return rifle, nil
+}
+
+func (s *RifleService) UpdateImageURL(ctx context.Context, id, userID, imageURL string) (*model.Rifle, error) {
+	return s.rifles.UpdateImageURL(ctx, id, userID, imageURL)
 }
 
 func (s *RifleService) Delete(ctx context.Context, id, userID string) error {

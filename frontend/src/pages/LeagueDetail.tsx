@@ -104,6 +104,13 @@ export default function LeagueDetail() {
         <Link to="/leagues" className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
+        {league?.image_url && (
+          <img
+            src={league.image_url}
+            alt={league.name}
+            className="w-10 h-10 rounded-lg object-cover border border-subtle shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0">
           {leagueLoading ? (
             <div className="h-5 w-40 bg-surface rounded animate-pulse" />

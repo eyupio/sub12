@@ -2,21 +2,26 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
 type LeagueHandler struct {
-	svc *service.LeagueService
+	svc    *service.LeagueService
+	images *repository.ImageRepository
 }
 
-func NewLeague(svc *service.LeagueService) *LeagueHandler {
-	return &LeagueHandler{svc: svc}
+func NewLeague(svc *service.LeagueService, images *repository.ImageRepository) *LeagueHandler {
+	return &LeagueHandler{svc: svc, images: images}
 }
 
 // POST /api/v1/leagues
@@ -415,6 +420,72 @@ func (h *LeagueHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"join_code": code})
+}
+
+// ---------------------------------------------------------------------------
+// League image
+// ---------------------------------------------------------------------------
+
+// POST /api/v1/leagues/{id}/image
+func (h *LeagueHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "file too large (max 5MB)")
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "missing image file")
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	switch {
+	case strings.HasPrefix(contentType, "image/jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasPrefix(contentType, "image/png"):
+		contentType = "image/png"
+	case strings.HasPrefix(contentType, "image/webp"):
+		contentType = "image/webp"
+	default:
+		writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+		return
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read image")
+		return
+	}
+
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
+		return
+	}
+
+	imageURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
+	err = h.svc.UpdateImageURL(r.Context(), leagueID, userID, imageURL)
+	if err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update league image")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"image_url": imageURL})
 }
 
 // ---------------------------------------------------------------------------
