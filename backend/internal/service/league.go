@@ -30,6 +30,14 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	return s.leagues.Create(ctx, userID, input)
 }
 
+func (s *LeagueService) GetByID(ctx context.Context, id string) (*model.League, error) {
+	league, err := s.leagues.GetByID(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	return league, err
+}
+
 func (s *LeagueService) ListPublic(ctx context.Context) ([]*model.League, error) {
 	return s.leagues.ListPublic(ctx)
 }

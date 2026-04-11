@@ -29,6 +29,9 @@ export const leagueApi = {
   list: () =>
     api.get<{ items: League[] }>('/leagues'),
 
+  get: (id: string) =>
+    api.get<League>(`/leagues/${id}`),
+
   create: (payload: CreateLeaguePayload) =>
     api.post<League>('/leagues', payload),
 

@@ -60,6 +60,23 @@ func (h *LeagueHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": leagues})
 }
 
+// GET /api/v1/leagues/{id}
+func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+
+	league, err := h.svc.GetByID(r.Context(), leagueID)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to fetch league")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, league)
+}
+
 // POST /api/v1/leagues/{id}/join
 func (h *LeagueHandler) Join(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

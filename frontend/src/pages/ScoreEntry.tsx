@@ -65,8 +65,6 @@ export default function ScoreEntry() {
     },
   })
 
-  const allFilled = shotScores.every(s => s > 0)
-
   const selectCls = 'w-full bg-white/[0.04] border border-white/[0.08] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#D4A44A]/50'
 
   return (
@@ -175,7 +173,7 @@ export default function ScoreEntry() {
 
       {/* Error */}
       {mutation.isError && (
-        <p className="text-red-400 text-sm">{String(mutation.error)}</p>
+        <p className="text-red-400 text-sm">Failed to save score card. Please try again.</p>
       )}
 
       {/* Submit */}
@@ -184,7 +182,7 @@ export default function ScoreEntry() {
         disabled={mutation.isPending || !shotAt}
         className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[#D4A44A] text-black hover:bg-[#e0b45a]"
       >
-        {mutation.isPending ? 'Saving…' : allFilled ? 'Save Card' : 'Save Card'}
+        {mutation.isPending ? 'Saving…' : 'Save Card'}
       </button>
 
       <p className="text-center text-[11px] text-white/20 tracking-widest uppercase">

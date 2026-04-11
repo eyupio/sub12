@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/mail"
 
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
@@ -30,6 +31,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Email == "" || body.Password == "" || body.DisplayName == "" {
 		writeError(w, http.StatusBadRequest, "email, display_name and password are required")
+		return
+	}
+	if _, err := mail.ParseAddress(body.Email); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid email address")
 		return
 	}
 	if len(body.Password) < 8 {

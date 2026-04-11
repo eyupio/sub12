@@ -45,10 +45,17 @@ export default function LeagueDetail() {
   const [joinError, setJoinError] = useState('')
   const [joinSuccess, setJoinSuccess] = useState(false)
 
-  const { data: standings, isLoading, isError } = useQuery({
+  const { data: league, isLoading: leagueLoading } = useQuery({
+    queryKey: ['leagues', id],
+    queryFn: () => leagueApi.get(id),
+  })
+
+  const { data: standings, isLoading: standingsLoading, isError } = useQuery({
     queryKey: ['leagues', id, 'standings'],
     queryFn: () => leagueApi.standings(id),
   })
+
+  const isLoading = leagueLoading || standingsLoading
 
   const joinMutation = useMutation({
     mutationFn: () => leagueApi.join(id),
@@ -75,9 +82,18 @@ export default function LeagueDetail() {
           <ChevronLeft size={20} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-medium tracking-widest uppercase text-white/80 truncate">
-            {isLoading ? <span className="inline-block h-5 w-40 bg-white/[0.06] rounded animate-pulse" /> : 'League'}
-          </h1>
+          {leagueLoading ? (
+            <div className="h-5 w-40 bg-white/[0.06] rounded animate-pulse" />
+          ) : (
+            <>
+              <h1 className="text-lg font-medium tracking-widest uppercase text-white/80 truncate">
+                {league?.name ?? 'League'}
+              </h1>
+              {league?.description && (
+                <p className="text-xs text-white/30 truncate mt-0.5">{league.description}</p>
+              )}
+            </>
+          )}
         </div>
       </div>
 

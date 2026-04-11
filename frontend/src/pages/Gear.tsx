@@ -49,7 +49,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
           <input className={inputCls} type="number" step="0.01" placeholder="11.5" onChange={e => setForm(f => ({ ...f, power_ftlb: e.target.value ? Number(e.target.value) : undefined }))} />
         </Field>
       </div>
-      {mutation.isError && <p className="text-red-400 text-xs">{String(mutation.error)}</p>}
+      {mutation.isError && <p className="text-red-400 text-xs">Failed to save rifle. Please try again.</p>}
       <div className="flex gap-2">
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.make || !form.model} className="flex-1 py-2 rounded bg-[#D4A44A] text-black text-sm font-medium tracking-widest uppercase disabled:opacity-40">
           {mutation.isPending ? 'Saving…' : 'Add Rifle'}
@@ -73,7 +73,12 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
         <p className="text-white/80 text-sm font-medium">{rifle.make} {rifle.model}</p>
         <p className="text-[11px] text-white/30 tracking-wide">{rifle.calibre}{rifle.power_ftlb != null ? ` · ${rifle.power_ftlb} ft·lb` : ''}</p>
       </div>
-      <button onClick={() => del.mutate()} disabled={del.isPending} className="text-white/20 hover:text-red-400 transition-colors" aria-label="Delete rifle">
+      <button
+        onClick={() => { if (window.confirm(`Delete ${rifle.make} ${rifle.model}?`)) del.mutate() }}
+        disabled={del.isPending}
+        className="text-white/20 hover:text-red-400 transition-colors"
+        aria-label="Delete rifle"
+      >
         <Trash2 size={15} />
       </button>
     </div>
@@ -137,7 +142,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
       <Field label="Batch code">
         <input className={inputCls} placeholder="Optional" onChange={e => setForm(f => ({ ...f, batch_code: e.target.value || undefined }))} />
       </Field>
-      {mutation.isError && <p className="text-red-400 text-xs">{String(mutation.error)}</p>}
+      {mutation.isError && <p className="text-red-400 text-xs">Failed to save pellet. Please try again.</p>}
       <div className="flex gap-2">
         <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.brand || !form.model} className="flex-1 py-2 rounded bg-[#D4A44A] text-black text-sm font-medium tracking-widest uppercase disabled:opacity-40">
           {mutation.isPending ? 'Saving…' : 'Add Pellet'}
@@ -167,7 +172,12 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
           ].filter(Boolean).join(' · ')}
         </p>
       </div>
-      <button onClick={() => del.mutate()} disabled={del.isPending} className="text-white/20 hover:text-red-400 transition-colors" aria-label="Delete pellet">
+      <button
+        onClick={() => { if (window.confirm(`Delete ${pellet.brand} ${pellet.model}?`)) del.mutate() }}
+        disabled={del.isPending}
+        className="text-white/20 hover:text-red-400 transition-colors"
+        aria-label="Delete pellet"
+      >
         <Trash2 size={15} />
       </button>
     </div>

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -53,9 +54,15 @@ func NewRouter(
 			r.Use(middleware.Authenticate(auth))
 
 			r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
-				userID, _ := middleware.UserIDFromContext(r.Context())
+				userID, ok := middleware.UserIDFromContext(r.Context())
+				if !ok {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte(`{"error":"unauthorized"}`))
+					return
+				}
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"user_id":"` + userID + `"}`))
+				json.NewEncoder(w).Encode(map[string]string{"user_id": userID})
 			})
 
 			// Stats
@@ -97,6 +104,7 @@ func NewRouter(
 		// Public league routes (no auth required)
 		lh := handler.NewLeague(leagues)
 		r.Get("/leagues", lh.List)
+		r.Get("/leagues/{id}", lh.Get)
 	})
 
 	return r

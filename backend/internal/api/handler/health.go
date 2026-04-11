@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 )
@@ -34,7 +35,6 @@ func (h *healthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.Ping(ctx); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 			"status": "unavailable",
-			"error":  err.Error(),
 		})
 		return
 	}
@@ -49,5 +49,5 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func decodeJSON(r *http.Request, v any) error {
-	return json.NewDecoder(r.Body).Decode(v)
+	return json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(v) // 1 MiB max
 }

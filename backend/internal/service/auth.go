@@ -101,16 +101,23 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 }
 
 // Refresh validates a refresh token and issues a new token pair.
+// New tokens are issued first; the old token is revoked only on success so a
+// Redis/network failure cannot permanently lock the user out.
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenPair, error) {
 	userID, err := s.validateRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
 
-	// Rotate: revoke old, issue new
+	tokens, err := s.issueTokens(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Revoke old token only after the new one is safely stored.
 	s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
 
-	return s.issueTokens(ctx, userID)
+	return tokens, nil
 }
 
 // Logout revokes the refresh token.
