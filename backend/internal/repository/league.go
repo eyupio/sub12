@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -50,6 +52,11 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 		return nil, fmt.Errorf("insert creator as member: %w", err)
 	}
 
+	_, err = tx.Exec(ctx, `INSERT INTO league_configs (league_id) VALUES ($1)`, league.ID)
+	if err != nil {
+		return nil, fmt.Errorf("insert league config: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
@@ -89,13 +96,13 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 func (r *LeagueRepository) GetByID(ctx context.Context, id string) (*model.League, error) {
 	var l model.League
 	err := r.db.QueryRow(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.created_by, l.created_at,
+		SELECT l.id, l.name, l.description, l.type::text, l.join_code, l.created_by, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id
 		WHERE l.id = $1
 		GROUP BY l.id
-	`, id).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.CreatedBy, &l.CreatedAt, &l.MemberCount)
+	`, id).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.JoinCode, &l.CreatedBy, &l.CreatedAt, &l.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -131,17 +138,23 @@ func (r *LeagueRepository) Join(ctx context.Context, leagueID, userID string) er
 	return nil
 }
 
-// Standings returns members of a league ranked by their best score.
-func (r *LeagueRepository) Standings(ctx context.Context, leagueID string) ([]*model.LeagueStanding, error) {
-	rows, err := r.db.Query(ctx, `
+// Standings returns members of a league ranked by their score.
+// scoringRule is "highest" (MAX) or "average" (AVG).
+func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scoringRule string) ([]*model.LeagueStanding, error) {
+	agg := "MAX"
+	if scoringRule == "average" {
+		agg = "AVG"
+	}
+
+	query := fmt.Sprintf(`
 		SELECT
 			u.id,
 			u.display_name,
-			MAX(sc.total_score) AS best_score,
+			%s(sc.total_score::double precision) AS score,
 			(
 				SELECT sc2.x_count
 				FROM score_cards sc2
-				WHERE sc2.user_id = u.id
+				WHERE sc2.user_id = u.id AND sc2.verification = 'verified'
 				ORDER BY sc2.total_score DESC, sc2.x_count DESC
 				LIMIT 1
 			) AS best_x,
@@ -149,11 +162,13 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string) ([]*m
 			lm.joined_at
 		FROM league_members lm
 		JOIN users u ON u.id = lm.user_id
-		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id
+		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id AND sc.verification = 'verified'
 		WHERE lm.league_id = $1
 		GROUP BY u.id, u.display_name, lm.joined_at
-		ORDER BY MAX(sc.total_score) DESC NULLS LAST, lm.joined_at ASC
-	`, leagueID)
+		ORDER BY %s(sc.total_score::double precision) DESC NULLS LAST, lm.joined_at ASC
+	`, agg, agg)
+
+	rows, err := r.db.Query(ctx, query, leagueID)
 	if err != nil {
 		return nil, fmt.Errorf("get standings: %w", err)
 	}
@@ -171,5 +186,495 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string) ([]*m
 		standings = append(standings, &s)
 	}
 	return standings, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Authorization helpers
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) IsAdmin(ctx context.Context, leagueID, userID string) (bool, error) {
+	var isAdmin bool
+	err := r.db.QueryRow(ctx,
+		`SELECT is_admin FROM league_members WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	).Scan(&isAdmin)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check admin: %w", err)
+	}
+	return isAdmin, nil
+}
+
+func (r *LeagueRepository) IsMember(ctx context.Context, leagueID, userID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM league_members WHERE league_id = $1 AND user_id = $2)`,
+		leagueID, userID,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check member: %w", err)
+	}
+	return exists, nil
+}
+
+// ---------------------------------------------------------------------------
+// League config
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) GetConfig(ctx context.Context, leagueID string) (*model.LeagueConfig, error) {
+	var c model.LeagueConfig
+	err := r.db.QueryRow(ctx, `
+		SELECT league_id, starts_on::text, ends_on::text,
+		       max_submissions_per_round, scoring_rule::text, join_policy::text,
+		       require_score_verification, required_confirmations, require_image_upload, updated_at
+		FROM league_configs WHERE league_id = $1
+	`, leagueID).Scan(
+		&c.LeagueID, &c.StartsOn, &c.EndsOn,
+		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
+		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload, &c.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get league config: %w", err)
+	}
+	return &c, nil
+}
+
+func (r *LeagueRepository) UpdateConfig(ctx context.Context, leagueID string, input *model.UpdateLeagueConfigInput) (*model.LeagueConfig, error) {
+	var c model.LeagueConfig
+	err := r.db.QueryRow(ctx, `
+		UPDATE league_configs SET
+			starts_on                  = COALESCE($2::date, starts_on),
+			ends_on                    = COALESCE($3::date, ends_on),
+			max_submissions_per_round  = COALESCE($4, max_submissions_per_round),
+			scoring_rule               = COALESCE($5::scoring_rule, scoring_rule),
+			join_policy                = COALESCE($6::join_policy, join_policy),
+			require_score_verification = COALESCE($7, require_score_verification),
+			required_confirmations     = COALESCE($8, required_confirmations),
+			require_image_upload       = COALESCE($9, require_image_upload),
+			updated_at                 = NOW()
+		WHERE league_id = $1
+		RETURNING league_id, starts_on::text, ends_on::text,
+		          max_submissions_per_round, scoring_rule::text, join_policy::text,
+		          require_score_verification, required_confirmations, require_image_upload, updated_at
+	`, leagueID,
+		input.StartsOn, input.EndsOn, input.MaxSubmissionsPerRound,
+		input.ScoringRule, input.JoinPolicy,
+		input.RequireScoreVerification, input.RequiredConfirmations, input.RequireImageUpload,
+	).Scan(
+		&c.LeagueID, &c.StartsOn, &c.EndsOn,
+		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
+		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload, &c.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update league config: %w", err)
+	}
+	return &c, nil
+}
+
+// ---------------------------------------------------------------------------
+// Seasons & Rounds
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) CreateSeason(ctx context.Context, leagueID string, input *model.CreateSeasonInput) (*model.Season, error) {
+	var s model.Season
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO seasons (league_id, name, starts_on, ends_on)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, league_id, name, starts_on::text, ends_on::text, is_active, created_at
+	`, leagueID, input.Name, input.StartsOn, input.EndsOn).Scan(
+		&s.ID, &s.LeagueID, &s.Name, &s.StartsOn, &s.EndsOn, &s.IsActive, &s.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create season: %w", err)
+	}
+	return &s, nil
+}
+
+func (r *LeagueRepository) ListSeasons(ctx context.Context, leagueID string) ([]*model.Season, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, league_id, name, starts_on::text, ends_on::text, is_active, created_at
+		FROM seasons WHERE league_id = $1 ORDER BY starts_on DESC
+	`, leagueID)
+	if err != nil {
+		return nil, fmt.Errorf("list seasons: %w", err)
+	}
+	defer rows.Close()
+
+	var seasons []*model.Season
+	for rows.Next() {
+		var s model.Season
+		if err := rows.Scan(&s.ID, &s.LeagueID, &s.Name, &s.StartsOn, &s.EndsOn, &s.IsActive, &s.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan season: %w", err)
+		}
+		seasons = append(seasons, &s)
+	}
+	return seasons, rows.Err()
+}
+
+func (r *LeagueRepository) CreateRound(ctx context.Context, seasonID string, input *model.CreateRoundInput) (*model.Round, error) {
+	var rd model.Round
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO rounds (season_id, name, opens_at, closes_at)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, season_id, name, opens_at::text, closes_at::text, created_at
+	`, seasonID, input.Name, input.OpensAt, input.ClosesAt).Scan(
+		&rd.ID, &rd.SeasonID, &rd.Name, &rd.OpensAt, &rd.ClosesAt, &rd.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create round: %w", err)
+	}
+	return &rd, nil
+}
+
+func (r *LeagueRepository) ListRounds(ctx context.Context, seasonID string) ([]*model.Round, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, season_id, name, opens_at::text, closes_at::text, created_at
+		FROM rounds WHERE season_id = $1 ORDER BY opens_at ASC NULLS LAST
+	`, seasonID)
+	if err != nil {
+		return nil, fmt.Errorf("list rounds: %w", err)
+	}
+	defer rows.Close()
+
+	var rounds []*model.Round
+	for rows.Next() {
+		var rd model.Round
+		if err := rows.Scan(&rd.ID, &rd.SeasonID, &rd.Name, &rd.OpensAt, &rd.ClosesAt, &rd.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan round: %w", err)
+		}
+		rounds = append(rounds, &rd)
+	}
+	return rounds, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Join requests
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) CreateJoinRequest(ctx context.Context, leagueID, userID string) (*model.JoinRequest, error) {
+	var jr model.JoinRequest
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO league_join_requests (league_id, user_id)
+		VALUES ($1, $2)
+		RETURNING id, league_id, user_id, status, decided_by, decided_at, created_at
+	`, leagueID, userID).Scan(
+		&jr.ID, &jr.LeagueID, &jr.UserID, &jr.Status, &jr.DecidedBy, &jr.DecidedAt, &jr.CreatedAt,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("create join request: %w", err)
+	}
+	return &jr, nil
+}
+
+func (r *LeagueRepository) ListJoinRequests(ctx context.Context, leagueID, status string) ([]*model.JoinRequest, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT jr.id, jr.league_id, jr.user_id, u.display_name, jr.status, jr.decided_by, jr.decided_at, jr.created_at
+		FROM league_join_requests jr
+		JOIN users u ON u.id = jr.user_id
+		WHERE jr.league_id = $1 AND ($2 = '' OR jr.status = $2)
+		ORDER BY jr.created_at DESC
+	`, leagueID, status)
+	if err != nil {
+		return nil, fmt.Errorf("list join requests: %w", err)
+	}
+	defer rows.Close()
+
+	var requests []*model.JoinRequest
+	for rows.Next() {
+		var jr model.JoinRequest
+		if err := rows.Scan(&jr.ID, &jr.LeagueID, &jr.UserID, &jr.DisplayName, &jr.Status, &jr.DecidedBy, &jr.DecidedAt, &jr.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan join request: %w", err)
+		}
+		requests = append(requests, &jr)
+	}
+	return requests, rows.Err()
+}
+
+func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, requestID, adminID, decision string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var leagueID, userID string
+	err = tx.QueryRow(ctx, `
+		UPDATE league_join_requests
+		SET status = $2, decided_by = $3, decided_at = NOW()
+		WHERE id = $1 AND status = 'pending'
+		RETURNING league_id, user_id
+	`, requestID, decision, adminID).Scan(&leagueID, &userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("update join request: %w", err)
+	}
+
+	if decision == "approved" {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO league_members (league_id, user_id, is_admin)
+			VALUES ($1, $2, false)
+			ON CONFLICT DO NOTHING
+		`, leagueID, userID)
+		if err != nil {
+			return fmt.Errorf("insert member after approval: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *LeagueRepository) JoinWithCode(ctx context.Context, leagueID, userID, code string) error {
+	var match bool
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM leagues WHERE id = $1 AND join_code = $2)`,
+		leagueID, code,
+	).Scan(&match)
+	if err != nil {
+		return fmt.Errorf("verify join code: %w", err)
+	}
+	if !match {
+		return ErrNotFound
+	}
+
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO league_members (league_id, user_id, is_admin) VALUES ($1, $2, false)
+	`, leagueID, userID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrAlreadyMember
+		}
+		return fmt.Errorf("join with code: %w", err)
+	}
+	return nil
+}
+
+func (r *LeagueRepository) RegenerateJoinCode(ctx context.Context, leagueID string) (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate random code: %w", err)
+	}
+	code := hex.EncodeToString(b)
+
+	_, err := r.db.Exec(ctx,
+		`UPDATE leagues SET join_code = $2, updated_at = NOW() WHERE id = $1`,
+		leagueID, code,
+	)
+	if err != nil {
+		return "", fmt.Errorf("update join code: %w", err)
+	}
+	return code, nil
+}
+
+// ---------------------------------------------------------------------------
+// Score confirmations & admin actions
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) ConfirmScore(ctx context.Context, scoreCardID, userID string) (*model.ScoreConfirmation, error) {
+	var sc model.ScoreConfirmation
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO score_confirmations (score_card_id, confirmed_by)
+		VALUES ($1, $2)
+		RETURNING id, score_card_id, confirmed_by, created_at
+	`, scoreCardID, userID).Scan(&sc.ID, &sc.ScoreCardID, &sc.ConfirmedBy, &sc.CreatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("confirm score: %w", err)
+	}
+	return &sc, nil
+}
+
+func (r *LeagueRepository) ListConfirmations(ctx context.Context, scoreCardID string) ([]*model.ScoreConfirmation, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT sc.id, sc.score_card_id, sc.confirmed_by, u.display_name, sc.created_at
+		FROM score_confirmations sc
+		JOIN users u ON u.id = sc.confirmed_by
+		WHERE sc.score_card_id = $1
+		ORDER BY sc.created_at ASC
+	`, scoreCardID)
+	if err != nil {
+		return nil, fmt.Errorf("list confirmations: %w", err)
+	}
+	defer rows.Close()
+
+	var confs []*model.ScoreConfirmation
+	for rows.Next() {
+		var c model.ScoreConfirmation
+		if err := rows.Scan(&c.ID, &c.ScoreCardID, &c.ConfirmedBy, &c.DisplayName, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan confirmation: %w", err)
+		}
+		confs = append(confs, &c)
+	}
+	return confs, rows.Err()
+}
+
+func (r *LeagueRepository) GetConfirmationCount(ctx context.Context, scoreCardID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM score_confirmations WHERE score_card_id = $1`,
+		scoreCardID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count confirmations: %w", err)
+	}
+	return count, nil
+}
+
+func (r *LeagueRepository) AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var oldTotal, oldX int16
+	err = tx.QueryRow(ctx,
+		`SELECT total_score, x_count FROM score_cards WHERE id = $1 FOR UPDATE`,
+		scoreCardID,
+	).Scan(&oldTotal, &oldX)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current score: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason, old_total_score, new_total_score, old_x_count, new_x_count)
+		VALUES ($1, 'amend', $2, $3, $4, $5, $6, $7)
+	`, scoreCardID, adminID, input.Reason, oldTotal, input.NewTotalScore, oldX, input.NewXCount)
+	if err != nil {
+		return fmt.Errorf("insert amend action: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE score_cards SET total_score = $2, x_count = $3, verification = 'verified', updated_at = NOW()
+		WHERE id = $1
+	`, scoreCardID, input.NewTotalScore, input.NewXCount)
+	if err != nil {
+		return fmt.Errorf("update score card: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *LeagueRepository) RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
+		VALUES ($1, 'reject', $2, $3)
+	`, scoreCardID, adminID, input.Reason)
+	if err != nil {
+		return fmt.Errorf("insert reject action: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE score_cards SET verification = 'rejected', updated_at = NOW() WHERE id = $1
+	`, scoreCardID)
+	if err != nil {
+		return fmt.Errorf("update verification: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *LeagueRepository) ListScoreActions(ctx context.Context, scoreCardID string) ([]*model.ScoreCardAction, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT sa.id, sa.score_card_id, sa.action, sa.performed_by, u.display_name,
+		       sa.reason, sa.old_total_score, sa.new_total_score, sa.old_x_count, sa.new_x_count, sa.created_at
+		FROM score_card_actions sa
+		JOIN users u ON u.id = sa.performed_by
+		WHERE sa.score_card_id = $1
+		ORDER BY sa.created_at ASC
+	`, scoreCardID)
+	if err != nil {
+		return nil, fmt.Errorf("list score actions: %w", err)
+	}
+	defer rows.Close()
+
+	var actions []*model.ScoreCardAction
+	for rows.Next() {
+		var a model.ScoreCardAction
+		if err := rows.Scan(&a.ID, &a.ScoreCardID, &a.Action, &a.PerformedBy, &a.DisplayName,
+			&a.Reason, &a.OldTotalScore, &a.NewTotalScore, &a.OldXCount, &a.NewXCount, &a.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan score action: %w", err)
+		}
+		actions = append(actions, &a)
+	}
+	return actions, rows.Err()
+}
+
+func (r *LeagueRepository) UpdateScoreVerification(ctx context.Context, scoreCardID, status string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE score_cards SET verification = $2::verification_status, updated_at = NOW() WHERE id = $1`,
+		scoreCardID, status,
+	)
+	if err != nil {
+		return fmt.Errorf("update verification: %w", err)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Members
+// ---------------------------------------------------------------------------
+
+func (r *LeagueRepository) ListMembers(ctx context.Context, leagueID string) ([]*model.LeagueMember, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT lm.user_id, u.display_name, lm.is_admin, lm.joined_at
+		FROM league_members lm
+		JOIN users u ON u.id = lm.user_id
+		WHERE lm.league_id = $1
+		ORDER BY lm.is_admin DESC, lm.joined_at ASC
+	`, leagueID)
+	if err != nil {
+		return nil, fmt.Errorf("list members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []*model.LeagueMember
+	for rows.Next() {
+		var m model.LeagueMember
+		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.IsAdmin, &m.JoinedAt); err != nil {
+			return nil, fmt.Errorf("scan member: %w", err)
+		}
+		members = append(members, &m)
+	}
+	return members, rows.Err()
+}
+
+// GetScoreCardOwner returns the user_id of a score card.
+func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error) {
+	var userID string
+	err := r.db.QueryRow(ctx, `SELECT user_id FROM score_cards WHERE id = $1`, scoreCardID).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get score card owner: %w", err)
+	}
+	return userID, nil
 }
 
