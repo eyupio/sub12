@@ -110,6 +110,28 @@ func NewRouter(
 			r.Post("/leagues", lh.Create)
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Get("/leagues/{id}/standings", lh.Standings)
+
+			// League config & management
+			r.Get("/leagues/{id}/config", lh.GetConfig)
+			r.Patch("/leagues/{id}/config", lh.UpdateConfig)
+			r.Get("/leagues/{id}/members", lh.ListMembers)
+
+			// Seasons & rounds
+			r.Post("/leagues/{id}/seasons", lh.CreateSeason)
+			r.Get("/leagues/{id}/seasons", lh.ListSeasons)
+			r.Post("/leagues/{id}/seasons/{seasonId}/rounds", lh.CreateRound)
+			r.Get("/leagues/{id}/seasons/{seasonId}/rounds", lh.ListRounds)
+
+			// Join requests (admin)
+			r.Get("/leagues/{id}/join-requests", lh.ListJoinRequests)
+			r.Post("/leagues/{id}/join-requests/{requestId}/decide", lh.DecideJoinRequest)
+			r.Post("/leagues/{id}/join-code", lh.RegenerateJoinCode)
+
+			// Score verification
+			r.Post("/score-cards/{id}/confirmations", lh.ConfirmScore)
+			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
+			r.Post("/score-cards/{id}/amend", lh.AmendScore)
+			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 		})
 
 		// Public league routes (no auth required)

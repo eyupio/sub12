@@ -9,6 +9,7 @@ import ScoreCardDetail from './pages/ScoreCardDetail'
 import Gear from './pages/Gear'
 import Leagues from './pages/Leagues'
 import LeagueDetail from './pages/LeagueDetail'
+import LeagueSettings from './pages/LeagueSettings'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -77,6 +78,12 @@ const leagueDetailRoute = createRoute({
   component: LeagueDetail,
 })
 
+const leagueSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/leagues/$id/settings',
+  component: LeagueSettings,
+})
+
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
@@ -112,6 +119,7 @@ export const routeTree = rootRoute.addChildren([
     gearRoute,
     leaguesRoute,
     leagueDetailRoute,
+    leagueSettingsRoute,
     profileRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute]),
