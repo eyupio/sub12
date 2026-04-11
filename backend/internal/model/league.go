@@ -18,11 +18,11 @@ type CreateLeagueInput struct {
 }
 
 type LeagueStanding struct {
-	Rank      int       `json:"rank"`
-	UserID    string    `json:"user_id"`
-	Username  string    `json:"username"`
-	BestScore *int16    `json:"best_score"`
-	BestX     *int16    `json:"best_x"`
-	CardCount int       `json:"card_count"`
-	JoinedAt  time.Time `json:"joined_at"`
+	Rank        int       `json:"rank"`
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	BestScore   *int16    `json:"best_score"`
+	BestX       *int16    `json:"best_x"`
+	CardCount   int       `json:"card_count"`
+	JoinedAt    time.Time `json:"joined_at"`
 }

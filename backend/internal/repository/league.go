@@ -136,21 +136,23 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string) ([]*m
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			u.id,
-			u.username,
-			MAX(sc.total_score)                          AS best_score,
-			MAX(sc.x_count) FILTER (
-				WHERE sc.total_score = (
-					SELECT MAX(sc2.total_score) FROM score_cards sc2 WHERE sc2.user_id = u.id
-				)
-			)                                            AS best_x,
-			COUNT(sc.id)                                 AS card_count,
+			u.display_name,
+			MAX(sc.total_score) AS best_score,
+			(
+				SELECT sc2.x_count
+				FROM score_cards sc2
+				WHERE sc2.user_id = u.id
+				ORDER BY sc2.total_score DESC, sc2.x_count DESC
+				LIMIT 1
+			) AS best_x,
+			COUNT(sc.id) AS card_count,
 			lm.joined_at
 		FROM league_members lm
 		JOIN users u ON u.id = lm.user_id
 		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id
 		WHERE lm.league_id = $1
-		GROUP BY u.id, u.username, lm.joined_at
-		ORDER BY best_score DESC NULLS LAST, best_x DESC NULLS LAST, lm.joined_at ASC
+		GROUP BY u.id, u.display_name, lm.joined_at
+		ORDER BY MAX(sc.total_score) DESC NULLS LAST, lm.joined_at ASC
 	`, leagueID)
 	if err != nil {
 		return nil, fmt.Errorf("get standings: %w", err)
@@ -161,7 +163,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string) ([]*m
 	rank := 1
 	for rows.Next() {
 		var s model.LeagueStanding
-		if err := rows.Scan(&s.UserID, &s.Username, &s.BestScore, &s.BestX, &s.CardCount, &s.JoinedAt); err != nil {
+		if err := rows.Scan(&s.UserID, &s.DisplayName, &s.BestScore, &s.BestX, &s.CardCount, &s.JoinedAt); err != nil {
 			return nil, fmt.Errorf("scan standing: %w", err)
 		}
 		s.Rank = rank

@@ -18,7 +18,7 @@ function StandingRow({ standing }: { standing: LeagueStanding }) {
         <RankBadge rank={standing.rank} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/80 truncate">{standing.username}</p>
+        <p className="text-sm text-white/80 truncate">{standing.display_name}</p>
         <p className="text-[11px] text-white/25">
           {standing.card_count} card{standing.card_count !== 1 ? 's' : ''}
         </p>
