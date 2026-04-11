@@ -48,24 +48,28 @@ export default function ScoreCardDetail() {
 
       {/* Score grid */}
       <div className="grid grid-cols-5 gap-2">
-        {card.shot_scores.map((score, i) => (
-          <div
-            key={i}
-            className={[
-              'relative aspect-square rounded border font-mono text-sm font-medium flex items-center justify-center',
-              score === 10
-                ? 'bg-[#D4A44A]/10 border-[#D4A44A]/40 text-[#D4A44A]'
-                : score > 0
-                ? 'bg-white/[0.06] border-white/[0.15] text-white/80'
-                : 'bg-white/[0.02] border-white/[0.04] text-white/20',
-            ].join(' ')}
-          >
-            {score}
-            {card.shot_xs[i] && (
-              <span className="absolute top-0.5 right-0.5 text-[8px] font-bold text-[#D4A44A] leading-none">X</span>
-            )}
-          </div>
-        ))}
+        {card.shot_scores.map((score, i) => {
+          const isX = score === 10 && card.shot_xs[i]
+          return (
+            <div
+              key={i}
+              className={[
+                'aspect-square rounded border font-mono font-medium flex items-center justify-center',
+                isX
+                  ? 'bg-[#D4A44A]/15 border-[#D4A44A]/50 text-[#D4A44A]'
+                  : score === 10
+                  ? 'bg-[#D4A44A]/10 border-[#D4A44A]/40 text-[#D4A44A]'
+                  : score > 0
+                  ? 'bg-white/[0.06] border-white/[0.15] text-white/80'
+                  : 'bg-white/[0.02] border-white/[0.04] text-white/20',
+              ].join(' ')}
+            >
+              <span className={isX ? 'text-xl font-bold' : score === 10 ? 'text-base' : 'text-lg'}>
+                {isX ? 'X' : score}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Totals */}
