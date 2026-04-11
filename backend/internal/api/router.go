@@ -11,6 +11,7 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/api/handler"
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/config"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
@@ -26,6 +27,7 @@ func NewRouter(
 	pellets *service.PelletService,
 	users *service.UserService,
 	leagues *service.LeagueService,
+	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -40,10 +42,6 @@ func NewRouter(
 	r.Get("/healthz", h.Liveness)
 	r.Get("/readyz", h.Readiness)
 
-	// Serve uploaded files (public, no auth)
-	uploadsDir := http.Dir(cfg.UploadDir)
-	r.Handle("/uploads/*", http.StripPrefix("/uploads", http.FileServer(uploadsDir)))
-
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public auth routes
@@ -52,6 +50,10 @@ func NewRouter(
 		r.Post("/auth/login", authHandler.Login)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/auth/logout", authHandler.Logout)
+
+		// Public image serving (no auth required)
+		ih := handler.NewImage(images)
+		r.Get("/images/{id}", ih.Serve)
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
@@ -69,12 +71,15 @@ func NewRouter(
 				json.NewEncoder(w).Encode(map[string]string{"user_id": userID})
 			})
 
+			// Images
+			r.Post("/images", ih.Upload)
+
 			// Stats
 			sh := handler.NewStats(stats)
 			r.Get("/users/me/stats", sh.GetMe)
 
 			// Score cards
-			sc := handler.NewScoreCard(scoreCards, cfg.UploadDir)
+			sc := handler.NewScoreCard(scoreCards, images)
 			r.Post("/score-cards", sc.Create)
 			r.Get("/score-cards", sc.List)
 			r.Get("/score-cards/{id}", sc.Get)
@@ -95,8 +100,9 @@ func NewRouter(
 			r.Delete("/pellets/{id}", ph.Delete)
 
 			// User profiles
-			uh := handler.NewUser(users)
+			uh := handler.NewUser(users, images)
 			r.Patch("/users/me", uh.UpdateMe)
+			r.Post("/users/me/avatar", uh.UploadAvatar)
 			r.Get("/users/{id}", uh.GetProfile)
 
 			// Leagues

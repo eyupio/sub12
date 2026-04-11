@@ -2,7 +2,10 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -13,11 +16,12 @@ import (
 )
 
 type UserHandler struct {
-	svc *service.UserService
+	svc    *service.UserService
+	images *repository.ImageRepository
 }
 
-func NewUser(svc *service.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUser(svc *service.UserService, images *repository.ImageRepository) *UserHandler {
+	return &UserHandler{svc: svc, images: images}
 }
 
 // GET /api/v1/users/{id}
@@ -56,6 +60,67 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update profile")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+// POST /api/v1/users/me/avatar
+func (h *UserHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	// Limit to 5MB for avatars
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, "file too large (max 5MB)")
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "missing image file")
+		return
+	}
+	defer file.Close()
+
+	// Validate content type
+	contentType := header.Header.Get("Content-Type")
+	switch {
+	case strings.HasPrefix(contentType, "image/jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasPrefix(contentType, "image/png"):
+		contentType = "image/png"
+	case strings.HasPrefix(contentType, "image/webp"):
+		contentType = "image/webp"
+	default:
+		writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+		return
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read image")
+		return
+	}
+
+	// Store image in database
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
+		return
+	}
+
+	// Update avatar_url on user
+	avatarURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
+	user, err := h.svc.UpdateAvatarURL(r.Context(), userID, avatarURL)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update avatar")
 		return
 	}
 

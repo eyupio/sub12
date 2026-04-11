@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
@@ -14,6 +14,71 @@ function StatCard({ label, value, gold }: { label: string; value: string; gold?:
       <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
         {value}
       </p>
+    </div>
+  )
+}
+
+function AvatarUpload() {
+  const { user, updateUser } = useAuthStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => usersApi.uploadAvatar(file),
+    onSuccess: (updated) => {
+      updateUser({ avatar_url: updated.avatar_url })
+    },
+  })
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) {
+      avatarMutation.mutate(file)
+    }
+  }
+
+  const initials = user?.display_name
+    ?.split(' ')
+    .map(w => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() ?? '?'
+
+  return (
+    <div className="relative group">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={avatarMutation.isPending}
+        className="relative w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors group disabled:opacity-50"
+        aria-label="Change profile picture"
+      >
+        {user?.avatar_url ? (
+          <img
+            src={user.avatar_url}
+            alt={user.display_name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-surface-hover flex items-center justify-center text-muted text-xl lg:text-2xl font-medium">
+            {initials}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <Camera size={20} className="text-white" />
+        </div>
+      </button>
+      {avatarMutation.isPending && (
+        <p className="text-[10px] text-muted mt-1 text-center">Uploading…</p>
+      )}
+      {avatarMutation.isError && (
+        <p className="text-[10px] text-[var(--error-text)] mt-1 text-center">Failed</p>
+      )}
     </div>
   )
 }
@@ -99,104 +164,109 @@ export default function Profile() {
       </div>
 
       {/* Identity card */}
-      <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-3">
-        {editing ? (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
-                Display Name
-              </label>
-              <input
-                type="text"
-                value={form.display_name ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-                className={inputCls}
-                placeholder="Your name"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
-                Bio
-              </label>
-              <textarea
-                value={form.bio ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-                rows={2}
-                className={`${inputCls} resize-none`}
-                placeholder="A few words about you"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={form.location ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  className={inputCls}
-                  placeholder="e.g. Yorkshire"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
-                  Club
-                </label>
-                <input
-                  type="text"
-                  value={form.club ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, club: e.target.value }))}
-                  className={inputCls}
-                  placeholder="e.g. YHFTA"
-                />
-              </div>
-            </div>
+      <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
+        <div className="flex items-start gap-4">
+          <AvatarUpload />
+          <div className="flex-1 min-w-0 space-y-2">
+            {editing ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={form.display_name ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
+                    className={inputCls}
+                    placeholder="Your name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
+                    Bio
+                  </label>
+                  <textarea
+                    value={form.bio ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                    rows={2}
+                    className={`${inputCls} resize-none`}
+                    placeholder="A few words about you"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={form.location ?? ''}
+                      onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                      className={inputCls}
+                      placeholder="e.g. Yorkshire"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
+                      Club
+                    </label>
+                    <input
+                      type="text"
+                      value={form.club ?? ''}
+                      onChange={(e) => setForm((f) => ({ ...f, club: e.target.value }))}
+                      className={inputCls}
+                      placeholder="e.g. YHFTA"
+                    />
+                  </div>
+                </div>
 
-            {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
+                {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
 
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={handleSave}
-                disabled={mutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
-              >
-                <Check size={13} />
-                {mutation.isPending ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                onClick={cancelEdit}
-                disabled={mutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
-              >
-                <X size={13} />
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className="text-lg font-medium text-primary">{user?.display_name}</p>
-            {user?.bio && <p className="text-sm text-secondary leading-relaxed">{user.bio}</p>}
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {user?.location && (
-                <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
-                  <MapPin size={12} />
-                  {user.location}
-                </span>
-              )}
-              {user?.club && (
-                <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
-                  <Users size={12} />
-                  {user.club}
-                </span>
-              )}
-            </div>
-            {!user?.bio && !user?.location && !user?.club && (
-              <p className="text-[11px] text-muted tracking-wide">No bio yet — tap Edit to add one.</p>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSave}
+                    disabled={mutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                  >
+                    <Check size={13} />
+                    {mutation.isPending ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={mutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
+                  >
+                    <X size={13} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-lg font-medium text-primary">{user?.display_name}</p>
+                {user?.bio && <p className="text-sm text-secondary leading-relaxed">{user.bio}</p>}
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {user?.location && (
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
+                      <MapPin size={12} />
+                      {user.location}
+                    </span>
+                  )}
+                  {user?.club && (
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted tracking-wide">
+                      <Users size={12} />
+                      {user.club}
+                    </span>
+                  )}
+                </div>
+                {!user?.bio && !user?.location && !user?.club && (
+                  <p className="text-[11px] text-muted tracking-wide">No bio yet — tap Edit to add one.</p>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Stats */}

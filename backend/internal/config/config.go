@@ -25,9 +25,6 @@ type Config struct {
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 
-	// Uploads
-	UploadDir string `envconfig:"UPLOAD_DIR" default:"./uploads"`
-
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`

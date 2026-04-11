@@ -2,10 +2,9 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -18,12 +17,12 @@ import (
 )
 
 type ScoreCardHandler struct {
-	svc       *service.ScoreCardService
-	uploadDir string
+	svc    *service.ScoreCardService
+	images *repository.ImageRepository
 }
 
-func NewScoreCard(svc *service.ScoreCardService, uploadDir string) *ScoreCardHandler {
-	return &ScoreCardHandler{svc: svc, uploadDir: uploadDir}
+func NewScoreCard(svc *service.ScoreCardService, images *repository.ImageRepository) *ScoreCardHandler {
+	return &ScoreCardHandler{svc: svc, images: images}
 }
 
 // POST /api/v1/score-cards
@@ -125,14 +124,13 @@ func (h *ScoreCardHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 	// Validate content type
 	contentType := header.Header.Get("Content-Type")
-	var ext string
 	switch {
 	case strings.HasPrefix(contentType, "image/jpeg"):
-		ext = ".jpg"
+		contentType = "image/jpeg"
 	case strings.HasPrefix(contentType, "image/png"):
-		ext = ".png"
+		contentType = "image/png"
 	case strings.HasPrefix(contentType, "image/webp"):
-		ext = ".webp"
+		contentType = "image/webp"
 	default:
 		writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
 		return
@@ -149,33 +147,23 @@ func (h *ScoreCardHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create directory if needed
-	dir := filepath.Join(h.uploadDir, "score-cards")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create upload directory")
-		return
-	}
-
-	// Write file
-	filename := cardID + ext
-	filePath := filepath.Join(dir, filename)
-	dst, err := os.Create(filePath)
+	// Read file data
+	data, err := io.ReadAll(file)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save image")
+		writeError(w, http.StatusInternalServerError, "failed to read image")
 		return
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
-		os.Remove(filePath)
-		writeError(w, http.StatusInternalServerError, "failed to write image")
+	// Store image in database
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
 		return
 	}
 
 	// Update card_image_url in DB
-	imageURL := "/uploads/score-cards/" + filename
+	imageURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
 	if err := h.svc.UpdateImageURL(r.Context(), cardID, userID, imageURL); err != nil {
-		os.Remove(filePath)
 		writeError(w, http.StatusInternalServerError, "failed to update score card")
 		return
 	}
