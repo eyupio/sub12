@@ -31,7 +31,7 @@ function applyToDOM(resolved: 'light' | 'dark') {
 
 export const useThemeStore = create<ThemeState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       theme: 'dark',
       setTheme: (theme: Theme) => {
         set({ theme })
@@ -41,9 +41,9 @@ export const useThemeStore = create<ThemeState>()(
     {
       name: 'sub12-theme',
       partialize: (s) => ({ theme: s.theme }),
-      onRehydrate: () => {
+      onRehydrateStorage: () => {
         // After rehydration, apply the theme
-        return (state) => {
+        return (state?: ThemeState) => {
           if (state) {
             applyToDOM(getResolvedTheme(state.theme))
           }
