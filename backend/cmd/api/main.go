@@ -82,7 +82,10 @@ func main() {
 
 	userSvc := service.NewUserService(userRepo)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc)
+	leagueRepo := repository.NewLeagueRepository(pool)
+	leagueSvc := service.NewLeagueService(leagueRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

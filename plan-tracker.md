@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-11 (session 5)
+> Last updated: 2026-04-11 (session 6)
 
 ---
 
@@ -61,10 +61,10 @@
 - [x] Rifle/pellet selectors in score entry (shown when gear exists)
 
 ### Leagues (public only)
-- [ ] `POST /api/v1/leagues` — create a public league
-- [ ] `GET /api/v1/leagues` — list public leagues
-- [ ] `POST /api/v1/leagues/:id/join` — join a league
-- [ ] `GET /api/v1/leagues/:id/standings` — live standings
+- [x] `POST /api/v1/leagues` — create a public league
+- [x] `GET /api/v1/leagues` — list public leagues (public, no auth)
+- [x] `POST /api/v1/leagues/:id/join` — join a league
+- [x] `GET /api/v1/leagues/:id/standings` — live standings
 - [ ] Frontend: league list, league detail + standings table
 
 ### User Profiles
@@ -123,6 +123,15 @@
 | Offline score entry + sync | Not started |
 | `/metrics` endpoint (Prometheus) | Not started |
 | Structured logging with correlation IDs | Partial (zerolog in place, no correlation ID yet) |
+
+---
+
+## SEO
+
+- [x] Primary meta tags (title, description, keywords, robots)
+- [x] Open Graph tags (og:type, og:title, og:description, og:image, og:site_name)
+- [x] Twitter/X Card tags
+- [ ] Dynamic per-page OG tags (needs react-helmet-async or SSR)
 
 ---
 

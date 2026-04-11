@@ -24,6 +24,7 @@ func NewRouter(
 	rifles *service.RifleService,
 	pellets *service.PelletService,
 	users *service.UserService,
+	leagues *service.LeagueService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -85,7 +86,17 @@ func NewRouter(
 			uh := handler.NewUser(users)
 			r.Patch("/users/me", uh.UpdateMe)
 			r.Get("/users/{id}", uh.GetProfile)
+
+			// Leagues
+			lh := handler.NewLeague(leagues)
+			r.Post("/leagues", lh.Create)
+			r.Post("/leagues/{id}/join", lh.Join)
+			r.Get("/leagues/{id}/standings", lh.Standings)
 		})
+
+		// Public league routes (no auth required)
+		lh := handler.NewLeague(leagues)
+		r.Get("/leagues", lh.List)
 	})
 
 	return r
