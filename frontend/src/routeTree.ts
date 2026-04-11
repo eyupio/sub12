@@ -4,6 +4,8 @@ import Layout from './components/Layout'
 import AuthLayout from './components/AuthLayout'
 import Dashboard from './pages/Dashboard'
 import ScoreEntry from './pages/ScoreEntry'
+import ScoreHistory from './pages/ScoreHistory'
+import ScoreCardDetail from './pages/ScoreCardDetail'
 import Leagues from './pages/Leagues'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
@@ -37,10 +39,22 @@ const indexRoute = createRoute({
   component: Dashboard,
 })
 
+const scoreHistoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/scores',
+  component: ScoreHistory,
+})
+
 const scoreEntryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/new',
   component: ScoreEntry,
+})
+
+const scoreCardDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/scores/$id',
+  component: ScoreCardDetail,
 })
 
 const leaguesRoute = createRoute({
@@ -76,6 +90,13 @@ const registerRoute = createRoute({
 })
 
 export const routeTree = rootRoute.addChildren([
-  appRoute.addChildren([indexRoute, scoreEntryRoute, leaguesRoute, profileRoute]),
+  appRoute.addChildren([
+    indexRoute,
+    scoreHistoryRoute,
+    scoreEntryRoute,
+    scoreCardDetailRoute,
+    leaguesRoute,
+    profileRoute,
+  ]),
   authRoute.addChildren([loginRoute, registerRoute]),
 ])

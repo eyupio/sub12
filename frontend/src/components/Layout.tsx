@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/scores/new', icon: Target, label: 'New Score' },
+  { to: '/scores', icon: Target, label: 'Scores' },
   { to: '/leagues', icon: Trophy, label: 'Leagues' },
   { to: '/profile', icon: User, label: 'Profile' },
 ] as const

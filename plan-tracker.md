@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-11 (session 2)
+> Last updated: 2026-04-11 (session 3)
 
 ---
 
@@ -42,12 +42,12 @@
 - [x] API client auto-injects Bearer token; logout revokes refresh token
 
 ### Score Cards
-- [ ] `POST /api/v1/score-cards` — submit a 25-shot card
-- [ ] `GET /api/v1/score-cards` — list own cards (paginated)
-- [ ] `GET /api/v1/score-cards/:id` — card detail
-- [ ] Frontend: score entry screen (25-shot grid, running total, X count)
-- [ ] Frontend: score card detail page
-- [ ] Frontend: personal score history list
+- [x] `POST /api/v1/score-cards` — submit a 25-shot card
+- [x] `GET /api/v1/score-cards` — list own cards (paginated)
+- [x] `GET /api/v1/score-cards/:id` — card detail
+- [x] Frontend: score entry screen (25-shot grid, running total, X count)
+- [x] Frontend: score card detail page
+- [x] Frontend: personal score history list (`/scores`)
 
 ### Personal Stats
 - [ ] `GET /api/v1/users/me/stats` — personal bests, averages, X count totals

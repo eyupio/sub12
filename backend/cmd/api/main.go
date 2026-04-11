@@ -57,7 +57,10 @@ func main() {
 	userRepo := repository.NewUserRepository(pool)
 	authSvc := service.NewAuthService(userRepo, rdb, cfg.JWTSecret, cfg.JWTExpiryHours)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc)
+	scoreCardRepo := repository.NewScoreCardRepository(pool)
+	scoreCardSvc := service.NewScoreCardService(scoreCardRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

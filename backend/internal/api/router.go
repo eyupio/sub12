@@ -14,7 +14,7 @@ import (
 )
 
 // NewRouter builds and returns the application HTTP router.
-func NewRouter(cfg *config.Config, log zerolog.Logger, db handler.Pinger, auth *service.AuthService) http.Handler {
+func NewRouter(cfg *config.Config, log zerolog.Logger, db handler.Pinger, auth *service.AuthService, scoreCards *service.ScoreCardService) http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -41,12 +41,17 @@ func NewRouter(cfg *config.Config, log zerolog.Logger, db handler.Pinger, auth *
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(auth))
 
-			// Placeholder — feature routes added per phase
 			r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
 				userID, _ := middleware.UserIDFromContext(r.Context())
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(`{"user_id":"` + userID + `"}`))
 			})
+
+			// Score cards
+			sc := handler.NewScoreCard(scoreCards)
+			r.Post("/score-cards", sc.Create)
+			r.Get("/score-cards", sc.List)
+			r.Get("/score-cards/{id}", sc.Get)
 		})
 	})
 
