@@ -10,6 +10,7 @@
     --brass: #B8882C;
     --brass-dim: rgba(184, 136, 44, 0.12);
     --brass-glow: rgba(184, 136, 44, 0.03);
+    --brass-pill-bg: #F6EEDC;
     --paper: #0C0C0C;
     --steel: #666666;
     --range: #2D5A27;
@@ -49,6 +50,7 @@
     --brass: #D4A44A;
     --brass-dim: rgba(212, 164, 74, 0.15);
     --brass-glow: rgba(212, 164, 74, 0.06);
+    --brass-pill-bg: #2A2113;
     --paper: #FFFFFF;
     --steel: #888888;
     --range: #2D5A27;

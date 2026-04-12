@@ -110,7 +110,7 @@ function AchievementsSection({ achievements }: { achievements: Achievement[] }) 
             <span
               key={a.id}
               title={a.description}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--brass)]/40 bg-[var(--brass)]/20 text-[var(--brass)] text-[11px] tracking-widest uppercase font-medium"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--brass)]/40 bg-[var(--brass-pill-bg)] text-[var(--brass)] text-[11px] tracking-widest uppercase font-medium"
             >
               {Icon && <Icon size={11} />}
               {a.name}
