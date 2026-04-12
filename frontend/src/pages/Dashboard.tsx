@@ -71,6 +71,12 @@ interface Insight {
 
 type EnrichedRifleStats = RifleStats & { make: string; model: string; image_url?: string; calibre: string }
 
+function isEnrichedRifleStats(
+  rifleStats: EnrichedRifleStats | null,
+): rifleStats is EnrichedRifleStats {
+  return rifleStats !== null
+}
+
 function computeInsights(p: {
   stats: UserStats | undefined
   recentCards: ScoreCardSummary[]
@@ -398,14 +404,14 @@ export default function Dashboard() {
   for (const r of riflesData?.items ?? []) rifleMap.set(r.id, r)
 
   const enrichedRifleStats: EnrichedRifleStats[] = rifleStats
-    .map((rs: RifleStats) => {
+    .map((rs: RifleStats): EnrichedRifleStats | null => {
       const rifle = rifleMap.get(rs.rifle_id)
       return rifle
         ? { ...rs, make: rifle.make, model: rifle.model, image_url: rifle.image_url, calibre: rifle.calibre }
         : null
     })
-    .filter(Boolean)
-    .sort((a: EnrichedRifleStats, b: EnrichedRifleStats) => b.best_score - a.best_score) as EnrichedRifleStats[]
+    .filter(isEnrichedRifleStats)
+    .sort((a, b) => b.best_score - a.best_score)
 
   const initials = user?.display_name
     ?.split(' ')
