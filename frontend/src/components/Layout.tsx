@@ -43,7 +43,7 @@ export default function Layout({ children }: PropsWithChildren) {
       <CornerMark className="bottom-5 left-5 text-muted" />
       <CornerMark className="bottom-5 right-5 text-muted" />
 
-      {/* ── Desktop sidebar ──────────────────────────────── */}
+      {/* \u2500\u2500 Desktop sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-r border-subtle bg-nav backdrop-blur z-40">
         <div className="px-5 py-4 border-b border-subtle">
           <img
@@ -85,7 +85,7 @@ export default function Layout({ children }: PropsWithChildren) {
         </div>
       </aside>
 
-      {/* ── Main content column ──────────────────────────── */}
+      {/* \u2500\u2500 Main content column \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
         <header className="lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 flex items-center justify-between">

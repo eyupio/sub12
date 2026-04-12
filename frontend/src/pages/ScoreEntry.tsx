@@ -44,7 +44,7 @@ export default function ScoreEntry() {
     })
   }
 
-  // Cycle: 0 → 1 → 2 → … → 10 → X → 0
+  // Cycle: 0 \u2192 1 \u2192 2 \u2192 \u2026 \u2192 10 \u2192 X \u2192 0
   function cycleScore(i: number) {
     setShots(prev => {
       const next = [...prev]
@@ -188,15 +188,20 @@ export default function ScoreEntry() {
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-        New Score Card
-      </h1>
+      <div>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+          New Score Card
+        </h1>
+        <p className="text-xs text-muted tracking-wide mt-1">
+          Personal practice card \u2014 not linked to any league
+        </p>
+      </div>
 
       {/* Desktop: two-column layout */}
       <div className="lg:grid lg:grid-cols-2 lg:gap-8">
         {/* Left column: shot grid + input panel */}
         <div className="space-y-6">
-          {/* Shot grid — 5 × 5 */}
+          {/* Shot grid \u2014 5 \u00d7 5 */}
           <div className="grid grid-cols-5 gap-2 lg:gap-3">
             {shots.map(({ score, x }, i) => {
               const isSelected = selectedShot === i
@@ -227,7 +232,7 @@ export default function ScoreEntry() {
             })}
           </div>
 
-          {/* Score input panel — visible when a cell is selected */}
+          {/* Score input panel \u2014 visible when a cell is selected */}
           {selectedShot !== null && (
             <div className="space-y-3 bg-surface border border-subtle rounded-lg p-3">
               <div className="flex items-center justify-between">
@@ -269,7 +274,7 @@ export default function ScoreEntry() {
                 })}
               </div>
               <p className="text-[10px] text-muted text-center">
-                Arrow keys to navigate · type 0–9 or X · Esc to close
+                Arrow keys to navigate \u00b7 type 0\u20139 or X \u00b7 Esc to close
               </p>
             </div>
           )}
@@ -291,7 +296,7 @@ export default function ScoreEntry() {
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
               <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
-                <option value="">— none —</option>
+                <option value="">\u2014 none \u2014</option>
                 {rifles.map(r => (
                   <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
                 ))}
@@ -302,7 +307,7 @@ export default function ScoreEntry() {
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
               <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
-                <option value="">— none —</option>
+                <option value="">\u2014 none \u2014</option>
                 {pellets.map(p => (
                   <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
                 ))}
@@ -334,7 +339,7 @@ export default function ScoreEntry() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
-              placeholder="Conditions, observations…"
+              placeholder="Conditions, observations\u2026"
               className={`${inputCls} placeholder:text-muted resize-none`}
             />
           </div>
@@ -401,12 +406,12 @@ export default function ScoreEntry() {
             disabled={mutation.isPending || !shotAt}
             className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
           >
-            {mutation.isPending ? 'Saving…' : 'Save Card'}
+            {mutation.isPending ? 'Saving\u2026' : 'Save Card'}
           </button>
 
           {selectedShot === null && (
             <p className="text-center text-[11px] text-muted tracking-widest uppercase">
-              Tap a shot to select · tap again to cycle · after 10 → X
+              Tap a shot to select \u00b7 tap again to cycle \u00b7 after 10 \u2192 X
             </p>
           )}
         </div>
