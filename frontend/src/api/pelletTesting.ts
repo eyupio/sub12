@@ -390,12 +390,15 @@ export interface PelletComparisonSide {
   avg_group_mm?: number
   avg_velocity_fps?: number
   avg_velocity_sd?: number
+  consistency?: number
   consistency_score?: number
   groups: PelletTestGroup[]
 }
 
 export interface PelletComparisonData {
   rifle_id: string
+  side_a?: PelletComparisonSide
+  side_b?: PelletComparisonSide
   pellet_a: PelletComparisonSide
   pellet_b: PelletComparisonSide
 }
@@ -403,6 +406,7 @@ export interface PelletComparisonData {
 export interface GroupTimelinePoint {
   test_date: string
   pellet_id: string
+  pellet_name?: string
   pellet_brand: string
   pellet_model: string
   group_size_mm: number

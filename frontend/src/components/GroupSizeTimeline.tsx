@@ -32,8 +32,11 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
     )
   }
 
+  const pelletLabel = (point: GroupTimelinePoint) =>
+    point.pellet_name ?? `${point.pellet_brand} ${point.pellet_model}`
+
   // Group by pellet name to build separate series
-  const pelletNames = [...new Set(points.map((p: GroupTimelinePoint) => p.pellet_name))]
+  const pelletNames = [...new Set(points.map((p: GroupTimelinePoint) => pelletLabel(p)))]
 
   // Build chart data: each date point has a value per pellet
   const dateMap = new Map<string, Record<string, number>>()
@@ -42,10 +45,12 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
     if (!dateMap.has(key)) dateMap.set(key, {})
     const entry = dateMap.get(key)!
     const value = unit === 'moa' ? p.group_size_moa : p.group_size_mm
+    if (value == null) continue
+    const pelletName = pelletLabel(p)
     // For same date + pellet, take the best (smallest) group
-    const existing = entry[p.pellet_name]
+    const existing = entry[pelletName]
     if (existing == null || value < existing) {
-      entry[p.pellet_name] = Number(value.toFixed(3))
+      entry[pelletName] = Number(value.toFixed(3))
     }
   }
 
