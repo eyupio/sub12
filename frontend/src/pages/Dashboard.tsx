@@ -284,7 +284,7 @@ function InsightCard({ icon, title, body, cta, variant = 'default' }: {
 }
 
 function ActivityCard({ card, avgScore, scoreMax, rifleName }: {
-  card: ScoreCardSummaryWithRifle
+  card: ScoreCardSummary
   avgScore?: number
   scoreMax: number
   rifleName?: string
