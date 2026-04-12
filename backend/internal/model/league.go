@@ -17,6 +17,7 @@ type League struct {
 type CreateLeagueInput struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
+	Type        string  `json:"type"` // "public" or "private"; defaults to "public"
 }
 
 type LeagueStanding struct {

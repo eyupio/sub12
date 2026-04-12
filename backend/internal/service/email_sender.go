@@ -72,6 +72,76 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, []byte(msg.String()))
 }
 
+func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, toEmail, displayName, confirmLink string, expiresAt time.Time) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, "email_change_confirm")
+	if err != nil {
+		return fmt.Errorf("load email_change_confirm template: %w", err)
+	}
+	if !tpl.IsEnabled {
+		s.log.Warn().Msg("email_change_confirm template disabled; skipping email send")
+		return nil
+	}
+	payload := map[string]any{
+		"display_name": displayName,
+		"confirm_link": confirmLink,
+		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
+	}
+	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render email_change_confirm subject: %w", err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render email_change_confirm text: %w", err)
+	}
+
+	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("load smtp settings: %w", err)
+	}
+
+	fromName := "Sub-12"
+	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
+		fromName = strings.TrimSpace(*settings.FromName)
+	}
+	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+
+	msg := strings.Builder{}
+	msg.WriteString("From: " + from + "\r\n")
+	msg.WriteString("To: " + toEmail + "\r\n")
+	msg.WriteString("Subject: " + subject + "\r\n")
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(textBody)
+
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, []byte(msg.String()))
+}
+
+func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
+	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("load smtp settings: %w", err)
+	}
+
+	fromName := "Sub-12"
+	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
+		fromName = strings.TrimSpace(*settings.FromName)
+	}
+	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+
+	msg := strings.Builder{}
+	msg.WriteString("From: " + from + "\r\n")
+	msg.WriteString("To: " + settings.FromEmail + "\r\n")
+	msg.WriteString("Subject: Sub-12 SMTP Test\r\n")
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString("This is a test email from Sub-12 to verify your SMTP configuration is working correctly.")
+
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, settings.FromEmail, []byte(msg.String()))
+}
+
 func (s *EmailSenderService) sendSMTP(host string, port int, username, password *string, useTLS, useSTARTTLS bool, from, to string, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", host, port)
 

@@ -15,17 +15,22 @@ import (
 
 type UserHandler struct {
 	svc    *service.UserService
+	social *service.SocialService
 	images *repository.ImageRepository
 }
 
-func NewUser(svc *service.UserService, images *repository.ImageRepository) *UserHandler {
-	return &UserHandler{svc: svc, images: images}
+func NewUser(svc *service.UserService, social *service.SocialService, images *repository.ImageRepository) *UserHandler {
+	return &UserHandler{svc: svc, social: social, images: images}
 }
 
 // GET /api/v1/users/{id}
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	profile, err := h.svc.GetPublicProfile(r.Context(), id)
+
+	// Use viewer ID for follow enrichment; empty string for unauthenticated.
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+
+	profile, err := h.social.GetPublicProfile(r.Context(), id, viewerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "user not found")
@@ -102,6 +107,65 @@ func (h *UserHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	user, err := h.svc.UpdateAvatarURL(r.Context(), userID, avatarURL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update avatar")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+// POST /api/v1/users/me/email
+func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.RequestEmailChange(r.Context(), userID, body.Email); err != nil {
+		if errors.Is(err, service.ErrInvalidEmail) {
+			writeError(w, http.StatusUnprocessableEntity, "invalid email address")
+			return
+		}
+		if errors.Is(err, service.ErrEmailAlreadyInUse) {
+			writeError(w, http.StatusConflict, "email already in use")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to request email change")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "confirmation email sent"})
+}
+
+// POST /api/v1/users/me/email/confirm
+func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	user, err := h.svc.ConfirmEmailChange(r.Context(), body.Token)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidEmailChangeToken) {
+			writeError(w, http.StatusUnprocessableEntity, "invalid or expired token")
+			return
+		}
+		if errors.Is(err, service.ErrEmailAlreadyInUse) {
+			writeError(w, http.StatusConflict, "email already in use")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to confirm email change")
 		return
 	}
 

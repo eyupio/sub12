@@ -9,6 +9,7 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
 
+
 var (
 	ErrInvalidCard = errors.New("invalid score card")
 )
@@ -23,11 +24,13 @@ type ScoreCardRepo interface {
 }
 
 type ScoreCardService struct {
-	cards ScoreCardRepo
+	cards       ScoreCardRepo
+	activity    *ActivityService    // optional; nil disables feed ingestion
+	achievement *AchievementService // optional; nil disables achievement evaluation
 }
 
-func NewScoreCardService(cards ScoreCardRepo) *ScoreCardService {
-	return &ScoreCardService{cards: cards}
+func NewScoreCardService(cards ScoreCardRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
+	return &ScoreCardService{cards: cards, activity: activity, achievement: achievement}
 }
 
 // Create validates the input and persists a new score card.
@@ -53,7 +56,23 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		}
 	}
 
-	return s.cards.Create(ctx, userID, input, totalScore, xCount)
+	card, err := s.cards.Create(ctx, userID, input, totalScore, xCount)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.activity != nil {
+		targetID := card.ID
+		targetType := "score_card"
+		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta)
+	}
+
+	if s.achievement != nil {
+		go s.achievement.EvaluateForScoreCard(context.Background(), userID, card)
+	}
+
+	return card, nil
 }
 
 // GetByID returns a score card owned by the given user.

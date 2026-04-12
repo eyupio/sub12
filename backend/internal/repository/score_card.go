@@ -26,13 +26,18 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 	var shotScores pgtype.FlatArray[int16]
 	var shotXs pgtype.FlatArray[bool]
 
+	verification := "verified"
+	if input.LeagueRoundID != nil {
+		verification = "pending"
+	}
+
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO score_cards (
 			user_id, rifle_id, pellet_id,
 			shot_at, location, wind_mph, temp_celsius, notes,
 			shot_scores, shot_xs, total_score, x_count,
-			verification
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'verified')
+			verification, league_round_id
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::verification_status,$14)
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, wind_mph, temp_celsius, notes,
@@ -45,6 +50,7 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount,
+		verification, input.LeagueRoundID,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
@@ -91,6 +97,50 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 	card.ShotScores = []int16(shotScores)
 	card.ShotXs = []bool(shotXs)
 	return &card, nil
+}
+
+// GetPublicByID retrieves a score card by ID without an ownership check.
+// Used when viewing another user's card (e.g. from comments or the activity feed).
+func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, wind_mph, temp_celsius, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, verification::text, league_round_id,
+			created_at, updated_at
+		FROM score_cards
+		WHERE id = $1
+	`, id).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.Verification, &card.LeagueRoundID,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get public score card: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+	return &card, nil
+}
+
+// GetCardCount returns the total number of score cards for a user.
+func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM score_cards WHERE user_id = $1`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get card count: %w", err)
+	}
+	return count, nil
 }
 
 // ListByUser returns paginated score card summaries for a user, newest first.

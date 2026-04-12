@@ -36,6 +36,18 @@ export interface CreateScoreCardPayload {
   notes?: string
   rifle_id?: string
   pellet_id?: string
+  league_round_id?: string
+}
+
+export interface Comment {
+  id: string
+  card_id: string
+  user_id: string
+  display_name: string
+  avatar_url?: string
+  body: string
+  created_at: string
+  updated_at: string
 }
 
 export const scoreCardApi = {
@@ -59,4 +71,16 @@ export const scoreCardApi = {
     formData.append('image', file)
     return api.upload<{ card_image_url: string }>(`/score-cards/${cardId}/image`, formData)
   },
+
+  listComments: (cardId: string) =>
+    api.get<{ items: Comment[] }>(`/score-cards/${cardId}/comments`),
+
+  createComment: (cardId: string, body: string) =>
+    api.post<Comment>(`/score-cards/${cardId}/comments`, { body }),
+
+  updateComment: (cardId: string, commentId: string, body: string) =>
+    api.patch<Comment>(`/score-cards/${cardId}/comments/${commentId}`, { body }),
+
+  deleteComment: (cardId: string, commentId: string) =>
+    api.del<void>(`/score-cards/${cardId}/comments/${commentId}`),
 }

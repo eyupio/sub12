@@ -25,6 +25,7 @@ export interface LeagueStanding {
 export interface CreateLeaguePayload {
   name: string
   description?: string
+  type?: 'public' | 'private'
 }
 
 export interface LeagueConfig {
@@ -188,6 +189,9 @@ export const leagueApi = {
 
   regenerateJoinCode: (id: string) =>
     api.post<{ join_code: string }>(`/leagues/${id}/join-code`, {}),
+
+  removeMember: (leagueId: string, userId: string) =>
+    api.del<void>(`/leagues/${leagueId}/members/${userId}`),
 
   // Score verification
   confirmScore: (scoreCardId: string, leagueId: string) =>

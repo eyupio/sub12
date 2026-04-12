@@ -8,6 +8,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [type, setType] = useState<'public' | 'private'>('public')
   const [error, setError] = useState('')
 
   const mutation = useMutation({
@@ -23,7 +24,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setError('')
     if (!name.trim()) { setError('Name is required'); return }
-    mutation.mutate({ name: name.trim(), description: description.trim() || undefined })
+    mutation.mutate({ name: name.trim(), description: description.trim() || undefined, type })
   }
 
   return (
@@ -59,6 +60,29 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
               rows={2}
               className="w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors resize-none"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] tracking-widest uppercase text-muted">Visibility</label>
+            <div className="flex gap-3">
+              {(['public', 'private'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setType(opt)}
+                  className={`flex-1 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                    type === opt
+                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      : 'border-subtle text-muted hover:text-secondary'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            {type === 'private' && (
+              <p className="text-[10px] text-muted">An invite code will be generated after creation.</p>
+            )}
           </div>
 
           {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}

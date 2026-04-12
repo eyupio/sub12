@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload } from 'lucide-react'
-import { scoreCardApi } from '../api/scoreCards'
+import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2 } from 'lucide-react'
+import { scoreCardApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
@@ -295,6 +295,171 @@ function EditScoreGrid({ shots, onUpdate }: { shots: Shot[]; onUpdate: (shots: S
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function CommentsSection({ cardId }: { cardId: string }) {
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [newBody, setNewBody] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editBody, setEditBody] = useState('')
+
+  const { data } = useQuery({
+    queryKey: ['score-cards', cardId, 'comments'],
+    queryFn: () => scoreCardApi.listComments(cardId),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () => scoreCardApi.createComment(cardId, newBody.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+      setNewBody('')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) =>
+      scoreCardApi.updateComment(cardId, id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+      setEditingId(null)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => scoreCardApi.deleteComment(cardId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+    },
+  })
+
+  const comments: Comment[] = data?.items ?? []
+
+  function startEdit(c: Comment) {
+    setEditingId(c.id)
+    setEditBody(c.body)
+  }
+
+  const initials = (name: string) =>
+    name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+
+  return (
+    <div className="pt-6 border-t border-subtle space-y-4">
+      <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+        <MessageSquare size={13} />
+        Comments {comments.length > 0 && `(${comments.length})`}
+      </h2>
+
+      {comments.length === 0 && (
+        <p className="text-sm text-muted">No comments yet — be the first.</p>
+      )}
+
+      <div className="space-y-3">
+        {comments.map((c) => (
+          <div key={c.id} className="flex gap-3">
+            {/* Avatar */}
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
+              {c.avatar_url
+                ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
+                : initials(c.display_name)
+              }
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-0.5">
+                <span className="text-xs font-medium text-secondary">{c.display_name}</span>
+                <span className="text-[10px] text-muted">
+                  {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+
+              {editingId === c.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updateMutation.mutate({ id: c.id, body: editBody.trim() })}
+                      disabled={updateMutation.isPending || !editBody.trim()}
+                      className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                    >
+                      {updateMutation.isPending ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="px-2.5 py-1 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm text-secondary leading-relaxed">{c.body}</p>
+                  {currentUser?.id === c.user_id && (
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => startEdit(c)}
+                        className="p-1 text-muted hover:text-secondary transition-colors"
+                        aria-label="Edit comment"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                      <button
+                        onClick={() => deleteMutation.mutate(c.id)}
+                        disabled={deleteMutation.isPending}
+                        className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                        aria-label="Delete comment"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* New comment input */}
+      <div className="flex gap-3 pt-2">
+        <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
+          {currentUser?.avatar_url
+            ? <img src={currentUser.avatar_url} alt={currentUser.display_name} className="w-full h-full object-cover" />
+            : initials(currentUser?.display_name ?? '?')
+          }
+        </div>
+        <div className="flex-1 flex gap-2">
+          <textarea
+            value={newBody}
+            onChange={(e) => setNewBody(e.target.value)}
+            placeholder="Add a comment…"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && newBody.trim()) {
+                e.preventDefault()
+                createMutation.mutate()
+              }
+            }}
+            className="flex-1 bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none placeholder-muted"
+          />
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending || !newBody.trim()}
+            className="p-2 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-40 self-end"
+            aria-label="Post comment"
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -657,6 +822,9 @@ export default function ScoreCardDetail() {
       {card.league_round_id && (
         <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
       )}
+
+      {/* Comments */}
+      <CommentsSection cardId={id} />
 
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (

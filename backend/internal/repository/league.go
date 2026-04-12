@@ -35,9 +35,9 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 	var league model.League
 	err = tx.QueryRow(ctx, `
 		INSERT INTO leagues (name, description, type, created_by)
-		VALUES ($1, $2, 'public', $3)
+		VALUES ($1, $2, COALESCE(NULLIF($3, ''), 'public')::league_type, $4)
 		RETURNING id, name, description, type::text, image_url, created_by, created_at
-	`, input.Name, input.Description, userID).Scan(
+	`, input.Name, input.Description, input.Type, userID).Scan(
 		&league.ID, &league.Name, &league.Description,
 		&league.Type, &league.ImageURL, &league.CreatedBy, &league.CreatedAt,
 	)
@@ -705,6 +705,22 @@ func (r *LeagueRepository) ListMembers(ctx context.Context, leagueID string) ([]
 		members = append(members, &m)
 	}
 	return members, rows.Err()
+}
+
+// RemoveMember removes a non-admin member from a league.
+// Returns ErrNotFound if the member does not exist or is an admin (admins cannot be removed this way).
+func (r *LeagueRepository) RemoveMember(ctx context.Context, leagueID, memberID string) error {
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 AND is_admin = false`,
+		leagueID, memberID,
+	)
+	if err != nil {
+		return fmt.Errorf("remove member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // GetScoreCardOwner returns the user_id of a score card.

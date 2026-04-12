@@ -116,7 +116,11 @@ export default function AdminEmailSettings() {
   const testMutation = useMutation({
     mutationFn: adminEmailApi.testSettings,
     onSuccess: (result) => {
-      setTestResult(`Test succeeded: ${result.message} (${result.host}:${result.port})`)
+      if (result.ok) {
+        setTestResult(`Test succeeded: ${result.message} (${result.host}:${result.port})`)
+      } else {
+        setTestResult(`Test failed: ${result.message} (${result.host}:${result.port})`)
+      }
       setServerError(null)
     },
     onError: (err) => {

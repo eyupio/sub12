@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -15,10 +16,11 @@ import (
 type AdminEmailHandler struct {
 	smtpSvc     *service.SMTPService
 	templateSvc *service.EmailTemplateService
+	emailSender *service.EmailSenderService
 }
 
-func NewAdminEmail(smtpSvc *service.SMTPService, templateSvc *service.EmailTemplateService) *AdminEmailHandler {
-	return &AdminEmailHandler{smtpSvc: smtpSvc, templateSvc: templateSvc}
+func NewAdminEmail(smtpSvc *service.SMTPService, templateSvc *service.EmailTemplateService, emailSender *service.EmailSenderService) *AdminEmailHandler {
+	return &AdminEmailHandler{smtpSvc: smtpSvc, templateSvc: templateSvc, emailSender: emailSender}
 }
 
 // GET /api/v1/admin/email/settings
@@ -73,9 +75,20 @@ func (h *AdminEmailHandler) TestSettings(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, "failed to fetch smtp settings")
 		return
 	}
+
+	if err := h.emailSender.SendTestEmail(r.Context()); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":      false,
+			"message": err.Error(),
+			"host":    settings.Host,
+			"port":    settings.Port,
+		})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
-		"message": "smtp settings loaded",
+		"message": fmt.Sprintf("test email sent to %s", settings.FromEmail),
 		"host":    settings.Host,
 		"port":    settings.Port,
 	})

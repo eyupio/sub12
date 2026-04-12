@@ -143,6 +143,27 @@ func (r *UserRepository) UpdatePasswordHash(ctx context.Context, id, passwordHas
 	return nil
 }
 
+func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) (*model.User, error) {
+	var u model.User
+	err := r.db.QueryRow(ctx, `
+		UPDATE users
+		SET email = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+	`, id, email).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("update email: %w", err)
+	}
+	return &u, nil
+}
+
 // isUniqueViolation checks for PostgreSQL unique constraint error (code 23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

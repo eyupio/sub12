@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine } from 'lucide-react'
 import { leagueApi, LeagueStanding } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 
@@ -46,12 +46,14 @@ function StandingRow({ standing }: { standing: LeagueStanding }) {
 
 export default function LeagueDetail() {
   const { id } = useParams({ from: '/app/leagues/$id' })
+  const search = useSearch({ strict: false }) as Record<string, string>
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
   const [joinError, setJoinError] = useState('')
   const [joinSuccess, setJoinSuccess] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
-  const [joinCode, setJoinCode] = useState('')
+  const [joinCode, setJoinCode] = useState(search?.code ?? '')
+  const [copied, setCopied] = useState(false)
 
   const { data: league, isLoading: leagueLoading } = useQuery({
     queryKey: ['leagues', id],
@@ -213,6 +215,41 @@ export default function LeagueDetail() {
 
       {joinError && (
         <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
+      )}
+
+      {/* Invite link — shown to members when league has an invite code */}
+      {isMember && league?.join_code && (
+        <div className="border border-subtle rounded p-3 bg-surface space-y-1.5">
+          <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-secondary bg-page rounded px-2 py-1.5 truncate font-mono">
+              {`${window.location.origin}/leagues/${id}?code=${league.join_code}`}
+            </code>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/leagues/${id}?code=${league.join_code}`)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="flex-shrink-0 p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors"
+              aria-label="Copy invite link"
+            >
+              {copied ? <Check size={14} className="text-[var(--brass)]" /> : <Copy size={14} />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Submit Score — shown to members */}
+      {(isMember || joinSuccess) && (
+        <Link
+          to="/scores/new"
+          search={{ leagueId: id, roundId: undefined }}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors bg-[var(--brass)] text-inverse hover:opacity-90"
+        >
+          <PenLine size={16} />
+          Submit Score
+        </Link>
       )}
 
       {/* Standings */}

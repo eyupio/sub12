@@ -48,7 +48,21 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidLeague)
 	}
+	if input.Type != "" && input.Type != "public" && input.Type != "private" {
+		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
+	}
 	return s.leagues.Create(ctx, userID, input)
+}
+
+// RemoveMember removes a non-admin member from a league. Only league admins may call this.
+func (s *LeagueService) RemoveMember(ctx context.Context, leagueID, adminID, memberID string) error {
+	if adminID == memberID {
+		return fmt.Errorf("%w: cannot remove yourself", ErrNotAdmin)
+	}
+	if err := s.requireAdmin(ctx, leagueID, adminID); err != nil {
+		return err
+	}
+	return s.leagues.RemoveMember(ctx, leagueID, memberID)
 }
 
 // ListMyLeagues returns leagues the user is a member of, with their rank in each.

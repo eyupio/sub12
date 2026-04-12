@@ -346,6 +346,33 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": members})
 }
 
+// DELETE /api/v1/leagues/{id}/members/{userId}
+func (h *LeagueHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	memberID := chi.URLParam(r, "userId")
+
+	if err := h.svc.RemoveMember(r.Context(), leagueID, userID, memberID); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "member not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to remove member")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------

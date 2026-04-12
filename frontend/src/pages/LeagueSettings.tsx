@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useState, useRef, useEffect } from 'react'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Camera } from 'lucide-react'
+import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Camera, Trash2 } from 'lucide-react'
 import { leagueApi, LeagueConfig, League } from '../api/leagues'
+import { useAuthStore } from '../store/auth'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -540,10 +541,20 @@ function RoundsSection({ leagueId, seasonId }: { leagueId: string; seasonId: str
 // Members Section
 // ---------------------------------------------------------------------------
 
-function MembersSection({ leagueId }: { leagueId: string }) {
+function MembersSection({ leagueId, currentUserId }: { leagueId: string; currentUserId: string }) {
+  const queryClient = useQueryClient()
+
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
     queryFn: () => leagueApi.listMembers(leagueId),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => leagueApi.removeMember(leagueId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'standings'] })
+    },
   })
 
   const members = data?.items ?? []
@@ -565,9 +576,21 @@ function MembersSection({ leagueId }: { leagueId: string }) {
               </span>
             )}
           </div>
-          <span className="text-[11px] text-muted font-mono">
-            {new Date(member.joined_at).toLocaleDateString()}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted font-mono">
+              {new Date(member.joined_at).toLocaleDateString()}
+            </span>
+            {!member.is_admin && member.user_id !== currentUserId && (
+              <button
+                onClick={() => removeMutation.mutate(member.user_id)}
+                disabled={removeMutation.isPending}
+                className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                title="Remove member"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -580,6 +603,8 @@ function MembersSection({ leagueId }: { leagueId: string }) {
 
 export default function LeagueSettings() {
   const { id } = useParams({ from: '/app/leagues/$id/settings' })
+  const navigate = useNavigate()
+  const currentUser = useAuthStore(s => s.user)
 
   const { data: league, isLoading: leagueLoading } = useQuery({
     queryKey: ['leagues', id],
@@ -592,8 +617,15 @@ export default function LeagueSettings() {
   })
 
   const isLoading = leagueLoading || configLoading
+  const isAdmin = !isLoading && league && currentUser ? league.created_by === currentUser.id : null
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isAdmin === false) {
+      navigate({ to: '/leagues/$id', params: { id } })
+    }
+  }, [isAdmin, navigate, id])
+
+  if (isLoading || isAdmin === null) {
     return (
       <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-3xl mx-auto">
         <div className="h-6 w-40 bg-surface rounded animate-pulse" />
@@ -613,6 +645,8 @@ export default function LeagueSettings() {
     )
   }
 
+  if (isAdmin === false) return null
+
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-3xl mx-auto pb-24">
       {/* Header */}
@@ -630,7 +664,7 @@ export default function LeagueSettings() {
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
       <VerificationSection leagueId={id} config={config} />
       <SeasonsSection leagueId={id} />
-      <MembersSection leagueId={id} />
+      <MembersSection leagueId={id} currentUserId={currentUser!.id} />
     </div>
   )
 }

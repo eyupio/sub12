@@ -70,7 +70,17 @@ func main() {
 	passwordResetTokenRepo := repository.NewPasswordResetTokenRepository(pool)
 
 	scoreCardRepo := repository.NewScoreCardRepository(pool)
-	scoreCardSvc := service.NewScoreCardService(scoreCardRepo)
+
+	activityRepo := repository.NewActivityRepository(pool)
+	activitySvc := service.NewActivityService(activityRepo, log.Logger)
+
+	achievementRepo := repository.NewAchievementRepository(pool)
+	achievementSvc := service.NewAchievementService(achievementRepo, scoreCardRepo)
+
+	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, activitySvc, achievementSvc)
+
+	commentRepo := repository.NewCommentRepository(pool)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -80,8 +90,6 @@ func main() {
 
 	pelletRepo := repository.NewPelletRepository(pool)
 	pelletSvc := service.NewPelletService(pelletRepo)
-
-	userSvc := service.NewUserService(userRepo)
 
 	leagueRepo := repository.NewLeagueRepository(pool)
 	leagueSvc := service.NewLeagueService(leagueRepo)
@@ -96,6 +104,10 @@ func main() {
 	emailRenderer := email.NewRenderer()
 	emailTemplateSvc := service.NewEmailTemplateService(emailTemplateRepo, emailRenderer)
 	emailSenderSvc := service.NewEmailSenderService(smtpRepo, emailTemplateRepo, emailRenderer, log.Logger)
+
+	emailChangeTokenRepo := repository.NewEmailChangeTokenRepository(pool)
+	userSvc := service.NewUserService(userRepo, emailChangeTokenRepo, emailSenderSvc, log.Logger, cfg.CORSOrigin)
+
 	authSvc := service.NewAuthService(
 		userRepo,
 		passwordResetTokenRepo,
@@ -110,7 +122,10 @@ func main() {
 
 	imageRepo := repository.NewImageRepository(pool)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, smtpSvc, emailTemplateSvc, imageRepo)
+	socialRepo := repository.NewSocialRepository(pool)
+	socialSvc := service.NewSocialService(socialRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

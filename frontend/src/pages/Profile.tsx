@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users, Camera } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera, Mail } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
 import { usersApi, UpdateProfileInput } from '../api/users'
+import { achievementApi, Achievement } from '../api/achievements'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -87,12 +88,36 @@ function AvatarUpload() {
   )
 }
 
+function AchievementsSection({ achievements }: { achievements: Achievement[] }) {
+  if (achievements.length === 0) return null
+  return (
+    <div>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Achievements</h2>
+      <div className="flex flex-wrap gap-2">
+        {achievements.map((a) => (
+          <span
+            key={a.id}
+            title={a.description}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] text-[11px] tracking-widest uppercase font-medium"
+          >
+            {a.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
   const { user, updateUser } = useAuthStore()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<UpdateProfileInput>({})
   const [error, setError] = useState<string | null>(null)
+  const [emailEditing, setEmailEditing] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailMsg, setEmailMsg] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const { data: stats } = useQuery({
     queryKey: ['stats'],
@@ -102,6 +127,12 @@ export default function Profile() {
   const { data: history } = useQuery({
     queryKey: ['score-cards'],
     queryFn: () => scoreCardApi.list(5, 0),
+  })
+
+  const { data: achievementsData } = useQuery({
+    queryKey: ['achievements', 'me'],
+    queryFn: () => achievementApi.listMine(),
+    enabled: !!user,
   })
 
   const mutation = useMutation({
@@ -120,6 +151,21 @@ export default function Profile() {
     },
     onError: () => {
       setError('Failed to save changes. Please try again.')
+    },
+  })
+
+  const emailChangeMutation = useMutation({
+    mutationFn: (email: string) => usersApi.requestEmailChange(email),
+    onSuccess: (result) => {
+      setEmailMsg(result.message)
+      setEmailError(null)
+      setEmailEditing(false)
+      setNewEmail('')
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Failed to request email change'
+      setEmailError(msg)
+      setEmailMsg(null)
     },
   })
 
@@ -273,6 +319,55 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* Email */}
+      <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mail size={14} className="text-muted" />
+            <p className="text-[10px] tracking-widest uppercase text-muted">Email</p>
+          </div>
+          {!emailEditing && (
+            <button
+              onClick={() => { setEmailEditing(true); setNewEmail(''); setEmailMsg(null); setEmailError(null) }}
+              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            >
+              Change
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-secondary">{user?.email}</p>
+        {emailEditing && (
+          <div className="space-y-2">
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="New email address"
+              className={inputCls}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => emailChangeMutation.mutate(newEmail)}
+                disabled={emailChangeMutation.isPending || !newEmail.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+              >
+                <Check size={13} />
+                {emailChangeMutation.isPending ? 'Sending…' : 'Send Confirmation'}
+              </button>
+              <button
+                onClick={() => { setEmailEditing(false); setEmailError(null) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              >
+                <X size={13} />
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {emailMsg && <p className="text-xs text-[var(--brass)]">{emailMsg}</p>}
+        {emailError && <p className="text-xs text-[var(--error-text)]">{emailError}</p>}
+      </div>
+
       {/* Stats */}
       <div>
         <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Stats</h2>
@@ -294,6 +389,9 @@ export default function Profile() {
           />
         </div>
       </div>
+
+      {/* Achievements */}
+      <AchievementsSection achievements={achievementsData?.items ?? []} />
 
       {/* Recent cards */}
       <div>

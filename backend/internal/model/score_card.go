@@ -24,15 +24,16 @@ type ScoreCard struct {
 }
 
 type CreateScoreCardInput struct {
-	RifleID     *string  `json:"rifle_id"`
-	PelletID    *string  `json:"pellet_id"`
-	ShotAt      string   `json:"shot_at"`
-	Location    *string  `json:"location"`
-	WindMPH     *float64 `json:"wind_mph"`
-	TempCelsius *float64 `json:"temp_celsius"`
-	Notes       *string  `json:"notes"`
-	ShotScores  []int16  `json:"shot_scores"`
-	ShotXs      []bool   `json:"shot_xs"`
+	RifleID       *string  `json:"rifle_id"`
+	PelletID      *string  `json:"pellet_id"`
+	ShotAt        string   `json:"shot_at"`
+	Location      *string  `json:"location"`
+	WindMPH       *float64 `json:"wind_mph"`
+	TempCelsius   *float64 `json:"temp_celsius"`
+	Notes         *string  `json:"notes"`
+	ShotScores    []int16  `json:"shot_scores"`
+	ShotXs        []bool   `json:"shot_xs"`
+	LeagueRoundID *string  `json:"league_round_id"`
 }
 
 // UpdateScoreCardInput holds fields a user can change after submission.
@@ -46,6 +47,26 @@ type UpdateScoreCardInput struct {
 	Notes       *string  `json:"notes"`
 	ShotScores  []int16  `json:"shot_scores"`
 	ShotXs      []bool   `json:"shot_xs"`
+}
+
+// Comment is a user comment on a score card.
+type Comment struct {
+	ID          string    `json:"id"`
+	CardID      string    `json:"card_id"`
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	AvatarURL   *string   `json:"avatar_url,omitempty"`
+	Body        string    `json:"body"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type CreateCommentInput struct {
+	Body string `json:"body"`
+}
+
+type UpdateCommentInput struct {
+	Body string `json:"body"`
 }
 
 // ScoreCardSummary is a lighter struct used in list responses.

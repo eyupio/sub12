@@ -26,10 +26,15 @@ func NewRouter(
 	rifles *service.RifleService,
 	pellets *service.PelletService,
 	users *service.UserService,
+	social *service.SocialService,
 	leagues *service.LeagueService,
 	pelletTests *service.PelletTestService,
+	comments *service.CommentService,
+	activity *service.ActivityService,
+	achievements *service.AchievementService,
 	smtp *service.SMTPService,
 	emailTemplates *service.EmailTemplateService,
+	emailSender *service.EmailSenderService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -47,6 +52,8 @@ func NewRouter(
 
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
+		// Pre-instantiate comment handler so it can be used in both protected and public groups
+		commentH := handler.NewComment(comments)
 		// Public auth routes
 		authHandler := handler.NewAuth(auth)
 		r.Post("/auth/register", authHandler.Register)
@@ -139,10 +146,26 @@ func NewRouter(
 			r.Delete("/pellet-tests/{id}/detections/{detectionId}", pth.DeleteDetection)
 
 			// User profiles
-			uh := handler.NewUser(users, images)
+			uh := handler.NewUser(users, social, images)
 			r.Patch("/users/me", uh.UpdateMe)
 			r.Post("/users/me/avatar", uh.UploadAvatar)
+			r.Post("/users/me/email", uh.RequestEmailChange)
+			r.Post("/users/me/email/confirm", uh.ConfirmEmailChange)
 			r.Get("/users/{id}", uh.GetProfile)
+
+			// Social follows
+			socialH := handler.NewSocial(social)
+			r.Post("/users/{id}/follow", socialH.Follow)
+			r.Delete("/users/{id}/follow", socialH.Unfollow)
+
+			// Score card comments (write operations — auth required)
+			r.Post("/score-cards/{id}/comments", commentH.Create)
+			r.Patch("/score-cards/{id}/comments/{commentId}", commentH.Update)
+			r.Delete("/score-cards/{id}/comments/{commentId}", commentH.Delete)
+
+			// Activity feed
+			activityH := handler.NewActivity(activity)
+			r.Get("/feed", activityH.GetFeed)
 
 			// Leagues
 			lh := handler.NewLeague(leagues, images)
@@ -156,6 +179,7 @@ func NewRouter(
 			r.Get("/leagues/{id}/config", lh.GetConfig)
 			r.Patch("/leagues/{id}/config", lh.UpdateConfig)
 			r.Get("/leagues/{id}/members", lh.ListMembers)
+			r.Delete("/leagues/{id}/members/{userId}", lh.RemoveMember)
 
 			// Seasons & rounds
 			r.Post("/leagues/{id}/seasons", lh.CreateSeason)
@@ -174,8 +198,13 @@ func NewRouter(
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 
+			// Achievements
+			ah := handler.NewAchievement(achievements)
+			r.Get("/users/me/achievements", ah.ListMine)
+			r.Get("/users/{id}/achievements", ah.ListForUser)
+
 			// Admin email settings
-			aeh := handler.NewAdminEmail(smtp, emailTemplates)
+			aeh := handler.NewAdminEmail(smtp, emailTemplates, emailSender)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
 				r.Get("/admin/email/settings", aeh.GetSettings)
@@ -187,6 +216,9 @@ func NewRouter(
 				r.Post("/admin/email/templates/{key}/preview", aeh.PreviewTemplate)
 			})
 		})
+
+		// Public comment read (no auth required)
+		r.Get("/score-cards/{id}/comments", commentH.List)
 
 		// Public league routes (no auth required)
 		lh := handler.NewLeague(leagues, images)

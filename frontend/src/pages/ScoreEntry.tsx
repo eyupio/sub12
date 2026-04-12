@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Camera, Upload, X } from 'lucide-react'
+import { Camera, Upload, X, Trophy } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
+import { leagueApi } from '../api/leagues'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -11,6 +12,9 @@ type Shot = { score: number; x: boolean }
 
 export default function ScoreEntry() {
   const navigate = useNavigate()
+  const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string }
+  const leagueId = search.leagueId
+  const roundIdParam = search.roundId
 
   const [shots, setShots] = useState<Shot[]>(
     Array.from({ length: 25 }, () => ({ score: 0, x: false }))
@@ -31,6 +35,36 @@ export default function ScoreEntry() {
   const rifles = rifleData?.items ?? []
   const pellets = pelletData?.items ?? []
 
+  // League context
+  const { data: league } = useQuery({
+    queryKey: ['leagues', leagueId],
+    queryFn: () => leagueApi.get(leagueId!),
+    enabled: !!leagueId,
+  })
+
+  const { data: seasonsData } = useQuery({
+    queryKey: ['leagues', leagueId, 'seasons'],
+    queryFn: () => leagueApi.listSeasons(leagueId!),
+    enabled: !!leagueId,
+  })
+
+  const activeSeason = seasonsData?.items?.find(s => s.is_active) ?? seasonsData?.items?.[0]
+
+  const { data: roundsData } = useQuery({
+    queryKey: ['leagues', leagueId, 'seasons', activeSeason?.id, 'rounds'],
+    queryFn: () => leagueApi.listRounds(leagueId!, activeSeason!.id),
+    enabled: !!leagueId && !!activeSeason?.id,
+  })
+
+  // Pick the round: use search param, or find the currently open round, or latest
+  const rounds = roundsData?.items ?? []
+  const leagueRoundId = roundIdParam
+    ?? rounds.find(r => {
+      const now = new Date().toISOString()
+      return (!r.opens_at || r.opens_at <= now) && (!r.closes_at || r.closes_at >= now)
+    })?.id
+    ?? rounds[rounds.length - 1]?.id
+
   const shotScores = shots.map(s => s.score)
   const shotXs = shots.map(s => s.x)
   const totalScore = shots.reduce((a, s) => a + s.score, 0)
@@ -44,7 +78,7 @@ export default function ScoreEntry() {
     })
   }
 
-  // Cycle: 0 \u2192 1 \u2192 2 \u2192 \u2026 \u2192 10 \u2192 X \u2192 0
+  // Cycle: 0 → 1 → 2 → … → 10 → X → 0
   function cycleScore(i: number) {
     setShots(prev => {
       const next = [...prev]
@@ -165,6 +199,7 @@ export default function ScoreEntry() {
         notes: notes || undefined,
         rifle_id: rifleId || undefined,
         pellet_id: pelletId || undefined,
+        league_round_id: leagueId ? leagueRoundId : undefined,
       })
       if (imageFile) {
         await scoreCardApi.uploadImage(card.id, imageFile)
@@ -192,16 +227,27 @@ export default function ScoreEntry() {
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
           New Score Card
         </h1>
-        <p className="text-xs text-muted tracking-wide mt-1">
-          Personal practice card \u2014 not linked to any league
-        </p>
+        {league ? (
+          <p className="text-xs text-[var(--brass)] tracking-wide mt-1 flex items-center gap-1.5">
+            <Trophy size={12} />
+            {league.name}
+            {activeSeason && <span className="text-muted"> · {activeSeason.name}</span>}
+            {leagueRoundId && rounds.length > 0 && (
+              <span className="text-muted"> · {rounds.find(r => r.id === leagueRoundId)?.name}</span>
+            )}
+          </p>
+        ) : (
+          <p className="text-xs text-muted tracking-wide mt-1">
+            Personal practice card — not linked to any league
+          </p>
+        )}
       </div>
 
       {/* Desktop: two-column layout */}
       <div className="lg:grid lg:grid-cols-2 lg:gap-8">
         {/* Left column: shot grid + input panel */}
         <div className="space-y-6">
-          {/* Shot grid \u2014 5 \u00d7 5 */}
+          {/* Shot grid — 5×5 */}
           <div className="grid grid-cols-5 gap-2 lg:gap-3">
             {shots.map(({ score, x }, i) => {
               const isSelected = selectedShot === i
@@ -232,7 +278,7 @@ export default function ScoreEntry() {
             })}
           </div>
 
-          {/* Score input panel \u2014 visible when a cell is selected */}
+          {/* Score input panel — visible when a cell is selected */}
           {selectedShot !== null && (
             <div className="space-y-3 bg-surface border border-subtle rounded-lg p-3">
               <div className="flex items-center justify-between">
@@ -274,7 +320,7 @@ export default function ScoreEntry() {
                 })}
               </div>
               <p className="text-[10px] text-muted text-center">
-                Arrow keys to navigate \u00b7 type 0\u20139 or X \u00b7 Esc to close
+                Arrow keys to navigate · type 0–9 or X · Esc to close
               </p>
             </div>
           )}
@@ -296,7 +342,7 @@ export default function ScoreEntry() {
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
               <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
-                <option value="">\u2014 none \u2014</option>
+                <option value="">— none —</option>
                 {rifles.map(r => (
                   <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
                 ))}
@@ -307,7 +353,7 @@ export default function ScoreEntry() {
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
               <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
-                <option value="">\u2014 none \u2014</option>
+                <option value="">— none —</option>
                 {pellets.map(p => (
                   <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
                 ))}
@@ -339,7 +385,7 @@ export default function ScoreEntry() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
-              placeholder="Conditions, observations\u2026"
+              placeholder="Conditions, observations…"
               className={`${inputCls} placeholder:text-muted resize-none`}
             />
           </div>
@@ -406,12 +452,12 @@ export default function ScoreEntry() {
             disabled={mutation.isPending || !shotAt}
             className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
           >
-            {mutation.isPending ? 'Saving\u2026' : 'Save Card'}
+            {mutation.isPending ? 'Saving…' : 'Save Card'}
           </button>
 
           {selectedShot === null && (
             <p className="text-center text-[11px] text-muted tracking-widest uppercase">
-              Tap a shot to select \u00b7 tap again to cycle \u00b7 after 10 \u2192 X
+              Tap a shot to select · tap again to cycle · after 10 → X
             </p>
           )}
         </div>

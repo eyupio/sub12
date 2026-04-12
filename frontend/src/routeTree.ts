@@ -18,10 +18,13 @@ import PelletComparison from './pages/PelletComparison'
 import BatchReport from './pages/BatchReport'
 import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
 import Profile from './pages/Profile'
+import UserProfile from './pages/UserProfile'
+import Feed from './pages/Feed'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import AdminEmailSettings from './pages/AdminEmailSettings'
 import AdminEmailTemplates from './pages/AdminEmailTemplates'
+import ConfirmEmail from './pages/ConfirmEmail'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -61,6 +64,10 @@ const scoreEntryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/new',
   component: ScoreEntry,
+  validateSearch: (search: Record<string, unknown>): { leagueId?: string; roundId?: string } => ({
+    leagueId: (search.leagueId as string) || undefined,
+    roundId: (search.roundId as string) || undefined,
+  }),
 })
 
 const scoreCardDetailRoute = createRoute({
@@ -141,6 +148,18 @@ const profileRoute = createRoute({
   component: Profile,
 })
 
+const userProfileRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/users/$id',
+  component: UserProfile,
+})
+
+const feedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/feed',
+  component: Feed,
+})
+
 
 const adminEmailSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -152,6 +171,15 @@ const adminEmailTemplatesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/email/templates',
   component: AdminEmailTemplates,
+})
+
+const confirmEmailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/confirm-email',
+  component: ConfirmEmail,
+  validateSearch: (search: Record<string, unknown>): { token?: string } => ({
+    token: (search.token as string) || undefined,
+  }),
 })
 
 // Unauthenticated shell (no nav, centred layout)
@@ -192,8 +220,11 @@ export const routeTree = rootRoute.addChildren([
     leagueDetailRoute,
     leagueSettingsRoute,
     profileRoute,
+    userProfileRoute,
+    feedRoute,
     adminEmailSettingsRoute,
     adminEmailTemplatesRoute,
+    confirmEmailRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute]),
 ])
