@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-12 (session 8)
+> Last updated: 2026-04-12 (session 9)
 
 ---
 
@@ -124,15 +124,15 @@
 
 ### Phase PT-3 — Automation & Detection
 
-- [ ] Automatic hole detection (contour/blob/circle detection)
-- [ ] Confidence scoring for automated measurements
-- [ ] Review and correction UI for detected holes
-- [ ] Annotated image generation and storage
-- [ ] Target template presets (known target sizes)
-- [ ] Export / reporting
-- [ ] "Confidence" badges (Single test / Emerging result / Well proven)
-- [ ] Batch/lot performance tracking
-- [ ] Site-wide pellet leaderboard (cross-user, opt-in)
+- [x] Automatic hole detection (contour/blob/circle detection) — client-side Canvas blob detection (`holeDetection.ts`), adaptive thresholding, connected component labeling, circle fitting
+- [x] Confidence scoring for automated measurements — per-hole confidence from circularity, size match, aspect ratio, and contrast
+- [x] Review and correction UI for detected holes — click-to-cycle (pending → confirmed → rejected), confirm/reject all, auto group size recalc
+- [x] Annotated image generation and storage — canvas overlay → PNG blob upload, `pellet_test_detections` table, annotated_image_id on measurements
+- [x] Target template presets (known target sizes) — NSRA 6yd + 10m air rifle presets with ring calibration
+- [x] Export / reporting — JSON export per session (session + groups + confidence badge), download button on detail page
+- [x] "Confidence" badges (Single test / Emerging result / Well proven) — `ConfidenceBadge.tsx` component, backend badge logic (test count + SD)
+- [x] Batch/lot performance tracking — `/pellet-testing/batch-report` page, backend batch aggregation by `batch_code`
+- [x] Site-wide pellet leaderboard (cross-user, opt-in) — `/pellet-leaderboard` public page, `is_public` opt-in flag on sessions
 
 ---
 
@@ -145,16 +145,6 @@
 - [ ] Season archives
 - [ ] Third-party API (key-gated)
 - [ ] Push notifications
-
----
-
-## Phase 4 — Scale
-
-- [ ] Real-time live scoring (WebSockets / SSE)
-- [ ] Score verification / moderation workflow
-- [ ] Multi-discipline support (rimfire, FAC)
-- [ ] Internationalisation
-- [ ] Premium / subscription tier (TBD)
 
 ---
 

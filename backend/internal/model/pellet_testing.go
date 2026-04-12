@@ -26,6 +26,7 @@ type PelletTestSession struct {
 	AverageGroupSizeMM     *float64  `json:"average_group_size_mm,omitempty"`
 	BestGroupSizeMM        *float64  `json:"best_group_size_mm,omitempty"`
 	GroupCount             int       `json:"group_count"`
+	IsPublic               bool      `json:"is_public"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 
@@ -72,6 +73,7 @@ type UpdatePelletTestSessionInput struct {
 	BenchSetup             *string  `json:"bench_setup"`
 	ScopeDetails           *string  `json:"scope_details"`
 	BarometricPressureMbar *float64 `json:"barometric_pressure_mbar"`
+	IsPublic               *bool    `json:"is_public"`
 }
 
 // ── Group ───────────────────────────────────────────────────────────────────────
@@ -181,6 +183,12 @@ type PelletTestMeasurement struct {
 	BboxHeight          *float64  `json:"bbox_height,omitempty"`
 	MeasuredSizeMM      *float64  `json:"measured_size_mm,omitempty"`
 	MeasuredSizeMOA     *float64  `json:"measured_size_moa,omitempty"`
+	DetectionMethod     string    `json:"detection_method"`
+	AnnotatedImageID    *string   `json:"annotated_image_id,omitempty"`
+	DetectedHoleCount   int       `json:"detected_hole_count"`
+	AutoGroupSizeMM     *float64  `json:"auto_group_size_mm,omitempty"`
+	AutoGroupSizeMOA    *float64  `json:"auto_group_size_moa,omitempty"`
+	DetectionConfidence *float64  `json:"detection_confidence,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -244,4 +252,87 @@ type GroupTimelinePoint struct {
 	GroupSizeMM  float64  `json:"group_size_mm"`
 	GroupSizeMOA *float64 `json:"group_size_moa,omitempty"`
 	DistanceM    float64  `json:"distance_m"`
+}
+
+// ── Detection (PT-3) ────────────────────────────────────────────────────────────
+
+type PelletTestDetection struct {
+	ID            string    `json:"id"`
+	MeasurementID string    `json:"measurement_id"`
+	SessionID     string    `json:"session_id"`
+	CenterX       float64   `json:"center_x"`
+	CenterY       float64   `json:"center_y"`
+	RadiusPixels  float64   `json:"radius_pixels"`
+	DiameterMM    *float64  `json:"diameter_mm,omitempty"`
+	Confidence    float64   `json:"confidence"`
+	IsConfirmed   bool      `json:"is_confirmed"`
+	IsRejected    bool      `json:"is_rejected"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type CreateDetectionInput struct {
+	CenterX      float64  `json:"center_x"`
+	CenterY      float64  `json:"center_y"`
+	RadiusPixels float64  `json:"radius_pixels"`
+	DiameterMM   *float64 `json:"diameter_mm"`
+	Confidence   float64  `json:"confidence"`
+}
+
+type CreateDetectionsBatchInput struct {
+	DetectionMethod string                 `json:"detection_method"`
+	Detections      []CreateDetectionInput `json:"detections"`
+}
+
+type UpdateDetectionInput struct {
+	CenterX      *float64 `json:"center_x"`
+	CenterY      *float64 `json:"center_y"`
+	RadiusPixels *float64 `json:"radius_pixels"`
+	IsConfirmed  *bool    `json:"is_confirmed"`
+	IsRejected   *bool    `json:"is_rejected"`
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+// ConfidenceLevel: "single" (1 test), "emerging" (2–4 tests), "proven" (5+ tests, low SD)
+type ConfidenceBadge struct {
+	Level            string   `json:"level"`
+	TestCount        int      `json:"test_count"`
+	ConsistencyScore *float64 `json:"consistency_score,omitempty"`
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+type PublicLeaderboardEntry struct {
+	PelletBrand  string   `json:"pellet_brand"`
+	PelletModel  string   `json:"pellet_model"`
+	HeadSizeMM   *float64 `json:"head_size_mm,omitempty"`
+	WeightGrains *float64 `json:"weight_grains,omitempty"`
+	BestGroupMM  float64  `json:"best_group_mm"`
+	AvgGroupMM   float64  `json:"avg_group_mm"`
+	UserCount    int      `json:"user_count"`
+	TestCount    int      `json:"test_count"`
+	TotalGroups  int      `json:"total_groups"`
+	Rank         int      `json:"rank"`
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+type BatchReportEntry struct {
+	BatchCode   string   `json:"batch_code"`
+	PelletBrand string   `json:"pellet_brand"`
+	PelletModel string   `json:"pellet_model"`
+	TestCount   int      `json:"test_count"`
+	TotalGroups int      `json:"total_groups"`
+	BestGroupMM *float64 `json:"best_group_mm,omitempty"`
+	AvgGroupMM  *float64 `json:"avg_group_mm,omitempty"`
+	Consistency *float64 `json:"consistency_score,omitempty"`
+	LastTested  string   `json:"last_tested"`
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────────
+
+type PelletTestExport struct {
+	Session   *PelletTestSession `json:"session"`
+	Groups    []*PelletTestGroup `json:"groups"`
+	ConfBadge *ConfidenceBadge   `json:"confidence_badge,omitempty"`
 }

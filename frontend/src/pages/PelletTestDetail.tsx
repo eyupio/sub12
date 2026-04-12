@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair } from 'lucide-react'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download } from 'lucide-react'
 import { pelletTestApi, PelletTestGroup, PelletTestImage, type CreateMeasurementPayload } from '../api/pelletTesting'
 import ImageMeasurement from '../components/ImageMeasurement'
+import ConfidenceBadge from '../components/ConfidenceBadge'
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
@@ -35,6 +36,27 @@ export default function PelletTestDetail() {
     queryFn: () => pelletTestApi.get(id!),
     enabled: !!id,
   })
+
+  const { data: badge } = useQuery({
+    queryKey: ['pellet-test-confidence', session?.rifle_id, session?.pellet_id],
+    queryFn: () => pelletTestApi.confidenceBadge(session!.rifle_id, session!.pellet_id),
+    enabled: !!session?.rifle_id && !!session?.pellet_id,
+  })
+
+  const handleExport = async () => {
+    try {
+      const data = await pelletTestApi.exportSession(id!)
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pellet-test-${id}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // silently fail — user can try again
+    }
+  }
 
   const deleteMutation = useMutation({
     mutationFn: () => pelletTestApi.delete(id!),
@@ -137,16 +159,29 @@ export default function PelletTestDetail() {
             <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
               Pellet Test
             </h1>
-            <p className="text-sm text-muted font-mono mt-0.5">{session.test_date}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm text-muted font-mono">{session.test_date}</p>
+              {badge && <ConfidenceBadge badge={badge} />}
+            </div>
           </div>
-          <button
-            onClick={() => { if (window.confirm('Delete this pellet test?')) deleteMutation.mutate() }}
-            disabled={deleteMutation.isPending}
-            className="text-muted hover:text-[var(--error-text)] transition-colors"
-            aria-label="Delete test"
-          >
-            <Trash2 size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="text-muted hover:text-secondary transition-colors"
+              aria-label="Export test data"
+              title="Export as JSON"
+            >
+              <Download size={18} />
+            </button>
+            <button
+              onClick={() => { if (window.confirm('Delete this pellet test?')) deleteMutation.mutate() }}
+              disabled={deleteMutation.isPending}
+              className="text-muted hover:text-[var(--error-text)] transition-colors"
+              aria-label="Delete test"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
       </div>
 

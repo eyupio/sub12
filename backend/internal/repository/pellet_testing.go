@@ -33,7 +33,7 @@ func scanSession(row pgx.Row) (*model.PelletTestSession, error) {
 		&s.VelocityFPS, &s.VelocitySD, &s.ExtremeSpreadFPS,
 		&s.BenchSetup, &s.ScopeDetails, &s.BarometricPressureMbar,
 		&s.AverageGroupSizeMM, &s.BestGroupSizeMM,
-		&s.GroupCount, &s.CreatedAt, &s.UpdatedAt,
+		&s.GroupCount, &s.IsPublic, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ const sessionCols = `id, user_id, rifle_id, pellet_id, test_date, distance_m, di
 	location, wind_mph, temp_celsius, humidity_pct, notes,
 	velocity_fps, velocity_sd, extreme_spread_fps,
 	bench_setup, scope_details, barometric_pressure_mbar,
-	average_group_size_mm, best_group_size_mm, group_count, created_at, updated_at`
+	average_group_size_mm, best_group_size_mm, group_count, is_public, created_at, updated_at`
 
 func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput, distanceM float64) (*model.PelletTestSession, error) {
 	session, err := scanSession(r.db.QueryRow(ctx, `
@@ -168,13 +168,15 @@ func (r *PelletTestRepository) Update(ctx context.Context, id, userID string, in
 			bench_setup             = COALESCE($16, bench_setup),
 			scope_details           = COALESCE($17, scope_details),
 			barometric_pressure_mbar = COALESCE($18, barometric_pressure_mbar),
+			is_public     = COALESCE($19, is_public),
 			updated_at    = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING `+sessionCols+`
 	`, id, userID, in.RifleID, in.PelletID, in.TestDate, distanceM, in.DistanceUnit,
 		in.Location, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
 		in.VelocityFPS, in.VelocitySD, in.ExtremeSpreadFPS,
-		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar))
+		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar,
+		in.IsPublic))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -496,6 +498,8 @@ const measurementCols = `id, image_id, session_id, group_id,
 	ref_center_x, ref_center_y, ref_radius_pixels,
 	bbox_x, bbox_y, bbox_width, bbox_height,
 	measured_size_mm, measured_size_moa,
+	detection_method, annotated_image_id, detected_hole_count,
+	auto_group_size_mm, auto_group_size_moa, detection_confidence,
 	created_at, updated_at`
 
 func scanMeasurement(row pgx.Row) (*model.PelletTestMeasurement, error) {
@@ -507,6 +511,8 @@ func scanMeasurement(row pgx.Row) (*model.PelletTestMeasurement, error) {
 		&m.RefCenterX, &m.RefCenterY, &m.RefRadiusPixels,
 		&m.BboxX, &m.BboxY, &m.BboxWidth, &m.BboxHeight,
 		&m.MeasuredSizeMM, &m.MeasuredSizeMOA,
+		&m.DetectionMethod, &m.AnnotatedImageID, &m.DetectedHoleCount,
+		&m.AutoGroupSizeMM, &m.AutoGroupSizeMOA, &m.DetectionConfidence,
 		&m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
@@ -732,4 +738,253 @@ func (r *PelletTestRepository) GetGroupTimeline(ctx context.Context, userID, rif
 		points = []*model.GroupTimelinePoint{}
 	}
 	return points, rows.Err()
+}
+
+// ── Detections (PT-3) ───────────────────────────────────────────────────────────
+
+func (r *PelletTestRepository) CreateDetectionsBatch(ctx context.Context, measurementID, sessionID string, detections []model.CreateDetectionInput) ([]*model.PelletTestDetection, error) {
+	var results []*model.PelletTestDetection
+	for _, d := range detections {
+		var det model.PelletTestDetection
+		err := r.db.QueryRow(ctx, `
+			INSERT INTO pellet_test_detections (measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence, is_confirmed, is_rejected, created_at
+		`, measurementID, sessionID, d.CenterX, d.CenterY, d.RadiusPixels, d.DiameterMM, d.Confidence).Scan(
+			&det.ID, &det.MeasurementID, &det.SessionID,
+			&det.CenterX, &det.CenterY, &det.RadiusPixels,
+			&det.DiameterMM, &det.Confidence,
+			&det.IsConfirmed, &det.IsRejected, &det.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create detection: %w", err)
+		}
+		results = append(results, &det)
+	}
+	return results, nil
+}
+
+func (r *PelletTestRepository) ListDetections(ctx context.Context, measurementID string) ([]*model.PelletTestDetection, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence, is_confirmed, is_rejected, created_at
+		FROM pellet_test_detections
+		WHERE measurement_id = $1
+		ORDER BY confidence DESC
+	`, measurementID)
+	if err != nil {
+		return nil, fmt.Errorf("list detections: %w", err)
+	}
+	defer rows.Close()
+
+	var detections []*model.PelletTestDetection
+	for rows.Next() {
+		var d model.PelletTestDetection
+		if err := rows.Scan(
+			&d.ID, &d.MeasurementID, &d.SessionID,
+			&d.CenterX, &d.CenterY, &d.RadiusPixels,
+			&d.DiameterMM, &d.Confidence,
+			&d.IsConfirmed, &d.IsRejected, &d.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan detection: %w", err)
+		}
+		detections = append(detections, &d)
+	}
+	return detections, rows.Err()
+}
+
+func (r *PelletTestRepository) UpdateDetection(ctx context.Context, detectionID, sessionID, userID string, in *model.UpdateDetectionInput) (*model.PelletTestDetection, error) {
+	// Verify ownership through session
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pellet_test_sessions WHERE id = $1 AND user_id = $2)`, sessionID, userID).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("verify session: %w", err)
+	}
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	var d model.PelletTestDetection
+	err = r.db.QueryRow(ctx, `
+		UPDATE pellet_test_detections SET
+			center_x      = COALESCE($3, center_x),
+			center_y      = COALESCE($4, center_y),
+			radius_pixels = COALESCE($5, radius_pixels),
+			is_confirmed  = COALESCE($6, is_confirmed),
+			is_rejected   = COALESCE($7, is_rejected)
+		WHERE id = $1 AND session_id = $2
+		RETURNING id, measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence, is_confirmed, is_rejected, created_at
+	`, detectionID, sessionID, in.CenterX, in.CenterY, in.RadiusPixels, in.IsConfirmed, in.IsRejected).Scan(
+		&d.ID, &d.MeasurementID, &d.SessionID,
+		&d.CenterX, &d.CenterY, &d.RadiusPixels,
+		&d.DiameterMM, &d.Confidence,
+		&d.IsConfirmed, &d.IsRejected, &d.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update detection: %w", err)
+	}
+	return &d, nil
+}
+
+func (r *PelletTestRepository) DeleteDetection(ctx context.Context, detectionID, sessionID, userID string) error {
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pellet_test_sessions WHERE id = $1 AND user_id = $2)`, sessionID, userID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("verify session: %w", err)
+	}
+	if !exists {
+		return ErrNotFound
+	}
+
+	tag, err := r.db.Exec(ctx, `DELETE FROM pellet_test_detections WHERE id = $1 AND session_id = $2`, detectionID, sessionID)
+	if err != nil {
+		return fmt.Errorf("delete detection: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *PelletTestRepository) UpdateMeasurementDetectionMeta(ctx context.Context, measurementID string, method string, holeCount int, autoGroupMM, autoGroupMOA, confidence *float64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE pellet_test_measurements SET
+			detection_method     = $2,
+			detected_hole_count  = $3,
+			auto_group_size_mm   = $4,
+			auto_group_size_moa  = $5,
+			detection_confidence = $6,
+			updated_at           = NOW()
+		WHERE id = $1
+	`, measurementID, method, holeCount, autoGroupMM, autoGroupMOA, confidence)
+	if err != nil {
+		return fmt.Errorf("update measurement detection meta: %w", err)
+	}
+	return nil
+}
+
+func (r *PelletTestRepository) SetAnnotatedImage(ctx context.Context, measurementID, imageID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE pellet_test_measurements SET annotated_image_id = $2, updated_at = NOW() WHERE id = $1
+	`, measurementID, imageID)
+	if err != nil {
+		return fmt.Errorf("set annotated image: %w", err)
+	}
+	return nil
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+func (r *PelletTestRepository) GetPublicLeaderboard(ctx context.Context, limit, offset int) ([]*model.PublicLeaderboardEntry, error) {
+	rows, err := r.db.Query(ctx, `
+		WITH ranked AS (
+			SELECT
+				p.brand  AS pellet_brand,
+				p.model  AS pellet_model,
+				p.head_size_mm,
+				p.weight_grains,
+				MIN(s.best_group_size_mm)   AS best_group_mm,
+				AVG(s.average_group_size_mm) AS avg_group_mm,
+				COUNT(DISTINCT s.user_id)::int AS user_count,
+				COUNT(DISTINCT s.id)::int    AS test_count,
+				SUM(s.group_count)::int      AS total_groups
+			FROM pellet_test_sessions s
+			JOIN pellets p ON p.id = s.pellet_id
+			WHERE s.is_public = true AND s.group_count > 0
+			GROUP BY p.brand, p.model, p.head_size_mm, p.weight_grains
+		)
+		SELECT pellet_brand, pellet_model, head_size_mm, weight_grains,
+			best_group_mm, avg_group_mm, user_count, test_count, total_groups,
+			ROW_NUMBER() OVER (ORDER BY best_group_mm ASC, avg_group_mm ASC, test_count DESC)::int AS rank
+		FROM ranked
+		ORDER BY rank
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("get public leaderboard: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*model.PublicLeaderboardEntry
+	for rows.Next() {
+		var e model.PublicLeaderboardEntry
+		if err := rows.Scan(
+			&e.PelletBrand, &e.PelletModel, &e.HeadSizeMM, &e.WeightGrains,
+			&e.BestGroupMM, &e.AvgGroupMM, &e.UserCount, &e.TestCount, &e.TotalGroups,
+			&e.Rank,
+		); err != nil {
+			return nil, fmt.Errorf("scan public leaderboard: %w", err)
+		}
+		entries = append(entries, &e)
+	}
+	return entries, rows.Err()
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+func (r *PelletTestRepository) GetBatchReport(ctx context.Context, userID string, pelletID *string) ([]*model.BatchReportEntry, error) {
+	query := `
+		SELECT
+			COALESCE(p.batch_code, 'N/A') AS batch_code,
+			p.brand, p.model,
+			COUNT(DISTINCT s.id)::int AS test_count,
+			COALESCE(SUM(s.group_count), 0)::int AS total_groups,
+			MIN(s.best_group_size_mm),
+			AVG(s.average_group_size_mm),
+			STDDEV_POP(s.average_group_size_mm),
+			MAX(s.test_date)::text
+		FROM pellet_test_sessions s
+		JOIN pellets p ON p.id = s.pellet_id
+		WHERE s.user_id = $1 AND s.group_count > 0
+	`
+	args := []any{userID}
+	if pelletID != nil {
+		query += ` AND s.pellet_id = $2`
+		args = append(args, *pelletID)
+	}
+	query += `
+		GROUP BY p.batch_code, p.brand, p.model
+		ORDER BY batch_code, MIN(s.best_group_size_mm) ASC
+	`
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get batch report: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*model.BatchReportEntry
+	for rows.Next() {
+		var e model.BatchReportEntry
+		if err := rows.Scan(
+			&e.BatchCode, &e.PelletBrand, &e.PelletModel,
+			&e.TestCount, &e.TotalGroups,
+			&e.BestGroupMM, &e.AvgGroupMM, &e.Consistency,
+			&e.LastTested,
+		); err != nil {
+			return nil, fmt.Errorf("scan batch report: %w", err)
+		}
+		entries = append(entries, &e)
+	}
+	return entries, rows.Err()
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+func (r *PelletTestRepository) GetConfidenceData(ctx context.Context, userID, rifleID, pelletID string) (int, *float64, error) {
+	var testCount int
+	var consistency *float64
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COUNT(DISTINCT s.id)::int,
+			STDDEV_POP(s.average_group_size_mm)
+		FROM pellet_test_sessions s
+		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.group_count > 0
+	`, userID, rifleID, pelletID).Scan(&testCount, &consistency)
+	if err != nil {
+		return 0, nil, fmt.Errorf("get confidence data: %w", err)
+	}
+	return testCount, consistency, nil
 }

@@ -110,11 +110,14 @@ func NewRouter(
 			r.Get("/pellet-tests/stats", pth.Stats)
 			r.Get("/pellet-tests/compare", pth.Compare)
 			r.Get("/pellet-tests/timeline", pth.Timeline)
+			r.Get("/pellet-tests/confidence", pth.ConfidenceBadge)
+			r.Get("/pellet-tests/batch-report", pth.BatchReport)
 			r.Post("/pellet-tests", pth.Create)
 			r.Get("/pellet-tests", pth.List)
 			r.Get("/pellet-tests/{id}", pth.Get)
 			r.Patch("/pellet-tests/{id}", pth.Update)
 			r.Delete("/pellet-tests/{id}", pth.Delete)
+			r.Get("/pellet-tests/{id}/export", pth.Export)
 			r.Post("/pellet-tests/{id}/groups", pth.CreateGroup)
 			r.Patch("/pellet-tests/{id}/groups/{groupId}", pth.UpdateGroup)
 			r.Delete("/pellet-tests/{id}/groups/{groupId}", pth.DeleteGroup)
@@ -124,6 +127,11 @@ func NewRouter(
 			r.Get("/pellet-tests/{id}/images/{imageId}/measurements", pth.GetMeasurements)
 			r.Patch("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}", pth.UpdateMeasurement)
 			r.Delete("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}", pth.DeleteMeasurement)
+			r.Post("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections", pth.CreateDetections)
+			r.Get("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections", pth.ListDetections)
+			r.Post("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/annotate", pth.UploadAnnotatedImage)
+			r.Patch("/pellet-tests/{id}/detections/{detectionId}", pth.UpdateDetection)
+			r.Delete("/pellet-tests/{id}/detections/{detectionId}", pth.DeleteDetection)
 
 			// User profiles
 			uh := handler.NewUser(users, images)
@@ -166,6 +174,10 @@ func NewRouter(
 		lh := handler.NewLeague(leagues, images)
 		r.Get("/leagues", lh.List)
 		r.Get("/leagues/{id}", lh.Get)
+
+		// Public pellet leaderboard (no auth required)
+		pth := handler.NewPelletTest(pelletTests, images)
+		r.Get("/pellet-tests/public-leaderboard", pth.PublicLeaderboard)
 	})
 
 	return r

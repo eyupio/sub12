@@ -26,6 +26,7 @@ export interface PelletTestSession {
   average_group_size_mm?: number
   best_group_size_mm?: number
   group_count: number
+  is_public: boolean
   created_at: string
   updated_at: string
   groups?: PelletTestGroup[]
@@ -141,6 +142,7 @@ export interface UpdatePelletTestPayload {
   bench_setup?: string
   scope_details?: string
   barometric_pressure_mbar?: number
+  is_public?: boolean
 }
 
 export interface CreateGroupPayload {
@@ -177,6 +179,12 @@ export interface PelletTestMeasurement {
   bbox_height?: number
   measured_size_mm?: number
   measured_size_moa?: number
+  detection_method: string
+  annotated_image_id?: string
+  detected_hole_count: number
+  auto_group_size_mm?: number
+  auto_group_size_moa?: number
+  detection_confidence?: number
   created_at: string
   updated_at: string
 }
@@ -204,6 +212,170 @@ export interface UpdateMeasurementPayload {
   bbox_y?: number
   bbox_width?: number
   bbox_height?: number
+}
+
+// ── Detection (PT-3) ────────────────────────────────────────────────────────────
+
+export interface PelletTestDetection {
+  id: string
+  measurement_id: string
+  session_id: string
+  center_x: number
+  center_y: number
+  radius_pixels: number
+  diameter_mm?: number
+  confidence: number
+  is_confirmed: boolean
+  is_rejected: boolean
+  created_at: string
+}
+
+export interface CreateDetectionInput {
+  center_x: number
+  center_y: number
+  radius_pixels: number
+  diameter_mm?: number
+  confidence: number
+}
+
+export interface CreateDetectionsBatchPayload {
+  detection_method: string
+  detections: CreateDetectionInput[]
+}
+
+export interface UpdateDetectionPayload {
+  center_x?: number
+  center_y?: number
+  radius_pixels?: number
+  is_confirmed?: boolean
+  is_rejected?: boolean
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+export interface ConfidenceBadge {
+  level: 'single' | 'emerging' | 'proven'
+  test_count: number
+  consistency_score?: number
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+export interface PublicLeaderboardEntry {
+  pellet_brand: string
+  pellet_model: string
+  head_size_mm?: number
+  weight_grains?: number
+  best_group_mm: number
+  avg_group_mm: number
+  user_count: number
+  test_count: number
+  total_groups: number
+  rank: number
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+export interface BatchReportEntry {
+  batch_code: string
+  pellet_brand: string
+  pellet_model: string
+  test_count: number
+  total_groups: number
+  best_group_mm?: number
+  avg_group_mm?: number
+  consistency_score?: number
+  last_tested: string
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────────
+
+export interface PelletTestExport {
+  session: PelletTestSession
+  groups: PelletTestGroup[]
+  confidence_badge?: ConfidenceBadge
+}
+
+// ── Detection (PT-3) ────────────────────────────────────────────────────────────
+
+export interface PelletTestDetection {
+  id: string
+  measurement_id: string
+  session_id: string
+  center_x: number
+  center_y: number
+  radius_pixels: number
+  diameter_mm?: number
+  confidence: number
+  is_confirmed: boolean
+  is_rejected: boolean
+  created_at: string
+}
+
+export interface CreateDetectionInput {
+  center_x: number
+  center_y: number
+  radius_pixels: number
+  diameter_mm?: number
+  confidence: number
+}
+
+export interface CreateDetectionsBatchPayload {
+  detection_method: string
+  detections: CreateDetectionInput[]
+}
+
+export interface UpdateDetectionPayload {
+  center_x?: number
+  center_y?: number
+  radius_pixels?: number
+  is_confirmed?: boolean
+  is_rejected?: boolean
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+export interface ConfidenceBadge {
+  level: 'single' | 'emerging' | 'proven'
+  test_count: number
+  consistency_score?: number
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+export interface PublicLeaderboardEntry {
+  pellet_brand: string
+  pellet_model: string
+  head_size_mm?: number
+  weight_grains?: number
+  best_group_mm: number
+  avg_group_mm: number
+  user_count: number
+  test_count: number
+  total_groups: number
+  rank: number
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+export interface BatchReportEntry {
+  batch_code: string
+  pellet_brand: string
+  pellet_model: string
+  test_count: number
+  total_groups: number
+  best_group_mm?: number
+  avg_group_mm?: number
+  consistency_score?: number
+  last_tested: string
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────────
+
+export interface PelletTestExport {
+  session: PelletTestSession
+  groups: PelletTestGroup[]
+  confidence_badge?: ConfidenceBadge
 }
 
 // ── Comparison & Timeline ───────────────────────────────────────────────────────
@@ -293,4 +465,37 @@ export const pelletTestApi = {
     api.get<PelletComparisonData>(`/pellet-tests/compare?rifle_id=${rifleId}&pellet_a=${pelletA}&pellet_b=${pelletB}`),
   timeline: (rifleId: string) =>
     api.get<{ items: GroupTimelinePoint[] }>(`/pellet-tests/timeline?rifle_id=${rifleId}`),
+
+  // Detections (PT-3)
+  createDetections: (sessionId: string, imageId: string, measurementId: string, payload: CreateDetectionsBatchPayload) =>
+    api.post<{ items: PelletTestDetection[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/detections`, payload),
+  listDetections: (sessionId: string, imageId: string, measurementId: string) =>
+    api.get<{ items: PelletTestDetection[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/detections`),
+  updateDetection: (sessionId: string, detectionId: string, payload: UpdateDetectionPayload) =>
+    api.patch<PelletTestDetection>(`/pellet-tests/${sessionId}/detections/${detectionId}`, payload),
+  deleteDetection: (sessionId: string, detectionId: string) =>
+    api.del<void>(`/pellet-tests/${sessionId}/detections/${detectionId}`),
+
+  // Annotated image
+  uploadAnnotatedImage: (sessionId: string, imageId: string, measurementId: string, file: Blob) => {
+    const fd = new FormData()
+    fd.append('image', file, 'annotated.png')
+    return api.upload<{ annotated_image_id: string; image_url: string }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/annotate`, fd)
+  },
+
+  // Confidence badge
+  confidenceBadge: (rifleId: string, pelletId: string) =>
+    api.get<ConfidenceBadge>(`/pellet-tests/confidence?rifle_id=${rifleId}&pellet_id=${pelletId}`),
+
+  // Batch report
+  batchReport: (pelletId?: string) =>
+    api.get<{ items: BatchReportEntry[] }>(`/pellet-tests/batch-report${pelletId ? `?pellet_id=${pelletId}` : ''}`),
+
+  // Export
+  exportSession: (id: string) =>
+    api.get<PelletTestExport>(`/pellet-tests/${id}/export`),
+
+  // Public leaderboard (no auth)
+  publicLeaderboard: (limit = 50, offset = 0) =>
+    api.get<{ items: PublicLeaderboardEntry[] }>(`/pellet-tests/public-leaderboard?limit=${limit}&offset=${offset}`),
 }

@@ -50,6 +50,12 @@ export default function PelletTesting() {
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Pellet Testing</h1>
         <div className="flex items-center gap-2">
           <Link
+            to="/pellet-testing/batch-report"
+            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+          >
+            Batches
+          </Link>
+          <Link
             to="/pellet-testing/compare"
             className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
           >
@@ -140,12 +146,20 @@ export default function PelletTesting() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[11px] tracking-widest uppercase text-muted">Leaderboards</h2>
-            <Link
-              to="/pellet-testing/leaderboard"
-              className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              View All →
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/pellet-leaderboard"
+                className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              >
+                Public
+              </Link>
+              <Link
+                to="/pellet-testing/leaderboard"
+                className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+              >
+                View All →
+              </Link>
+            </div>
           </div>
           {rifles.length === 0 ? (
             <Link

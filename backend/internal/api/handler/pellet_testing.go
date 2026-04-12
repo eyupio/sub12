@@ -511,3 +511,250 @@ func (h *PelletTestHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": points})
 }
+
+// ── Detections (PT-3) ───────────────────────────────────────────────────────────
+
+// POST /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections
+func (h *PelletTestHandler) CreateDetections(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	measurementID := chi.URLParam(r, "measurementId")
+
+	var in model.CreateDetectionsBatchInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	detections, err := h.svc.CreateDetections(r.Context(), measurementID, sessionID, userID, &in)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session or measurement not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidMeasurement) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create detections")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"items": detections})
+}
+
+// GET /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections
+func (h *PelletTestHandler) ListDetections(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	measurementID := chi.URLParam(r, "measurementId")
+
+	detections, err := h.svc.ListDetections(r.Context(), measurementID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list detections")
+		return
+	}
+	if detections == nil {
+		detections = []*model.PelletTestDetection{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": detections})
+}
+
+// PATCH /api/v1/pellet-tests/{id}/detections/{detectionId}
+func (h *PelletTestHandler) UpdateDetection(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	detectionID := chi.URLParam(r, "detectionId")
+
+	var in model.UpdateDetectionInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	d, err := h.svc.UpdateDetection(r.Context(), detectionID, sessionID, userID, &in)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "detection not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update detection")
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// DELETE /api/v1/pellet-tests/{id}/detections/{detectionId}
+func (h *PelletTestHandler) DeleteDetection(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	detectionID := chi.URLParam(r, "detectionId")
+
+	if err := h.svc.DeleteDetection(r.Context(), detectionID, sessionID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "detection not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete detection")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Annotated Image ─────────────────────────────────────────────────────────────
+
+// POST /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/annotate
+func (h *PelletTestHandler) UploadAnnotatedImage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	measurementID := chi.URLParam(r, "measurementId")
+
+	data, contentType, err := parseAndValidateImage(r, "image", 10<<20)
+	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			writeError(w, http.StatusBadRequest, "file too large (max 10MB)")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid image")
+		return
+	}
+
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
+		return
+	}
+
+	if err := h.svc.SetAnnotatedImage(r.Context(), measurementID, sessionID, userID, img.ID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to link annotated image")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"annotated_image_id": img.ID, "image_url": "/api/v1/images/" + img.ID})
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+// GET /api/v1/pellet-tests/confidence?rifle_id=X&pellet_id=Y
+func (h *PelletTestHandler) ConfidenceBadge(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	rifleID := r.URL.Query().Get("rifle_id")
+	pelletID := r.URL.Query().Get("pellet_id")
+
+	if rifleID == "" || pelletID == "" {
+		writeError(w, http.StatusBadRequest, "rifle_id and pellet_id are required")
+		return
+	}
+
+	badge, err := h.svc.GetConfidenceBadge(r.Context(), userID, rifleID, pelletID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidPelletTest) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get confidence badge")
+		return
+	}
+	writeJSON(w, http.StatusOK, badge)
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+// GET /api/v1/pellet-tests/batch-report?pellet_id=X (optional)
+func (h *PelletTestHandler) BatchReport(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var pelletID *string
+	if pid := r.URL.Query().Get("pellet_id"); pid != "" {
+		pelletID = &pid
+	}
+
+	entries, err := h.svc.GetBatchReport(r.Context(), userID, pelletID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get batch report")
+		return
+	}
+	if entries == nil {
+		entries = []*model.BatchReportEntry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": entries})
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────────
+
+// GET /api/v1/pellet-tests/{id}/export
+func (h *PelletTestHandler) Export(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+
+	export, err := h.svc.ExportSession(r.Context(), id, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "pellet test not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to export")
+		return
+	}
+	writeJSON(w, http.StatusOK, export)
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+// GET /api/v1/pellet-tests/public-leaderboard
+func (h *PelletTestHandler) PublicLeaderboard(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	offset := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			offset = n
+		}
+	}
+
+	entries, err := h.svc.GetPublicLeaderboard(r.Context(), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get public leaderboard")
+		return
+	}
+	if entries == nil {
+		entries = []*model.PublicLeaderboardEntry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": entries})
+}

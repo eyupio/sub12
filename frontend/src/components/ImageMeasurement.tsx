@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { Circle, Move, Square, RotateCcw, Save, ZoomIn, ZoomOut } from 'lucide-react'
+import { Circle, Move, Square, RotateCcw, Save, ZoomIn, ZoomOut, Crosshair, Check, X } from 'lucide-react'
 import { TARGET_PRESETS, type TargetPreset, type TargetRing } from '../config/targetPresets'
 import { mmToMOA } from '../utils/ballistics'
+import { detectHoles, computeGroupSize, type DetectedHole } from '../utils/holeDetection'
 import type { PelletTestMeasurement, CreateMeasurementPayload } from '../api/pelletTesting'
 
 interface Props {
@@ -11,11 +12,16 @@ interface Props {
   imageId: string
   existingMeasurement?: PelletTestMeasurement
   onSave: (payload: CreateMeasurementPayload) => void
+  onSaveDetections?: (detections: DetectedHole[], annotatedBlob: Blob | null) => void
   onClose: () => void
 }
 
-type Mode = 'idle' | 'calibrate' | 'measure'
+type Mode = 'idle' | 'calibrate' | 'measure' | 'detect_review'
 type DrawState = 'none' | 'drawing'
+
+interface ReviewableHole extends DetectedHole {
+  status: 'pending' | 'confirmed' | 'rejected'
+}
 
 interface Point { x: number; y: number }
 
@@ -23,13 +29,17 @@ const BRASS = '#c9a84c'
 const BRASS_30 = 'rgba(201,168,76,0.3)'
 const GREEN = '#22c55e'
 const GREEN_30 = 'rgba(34,197,94,0.3)'
+const CYAN = '#06b6d4'
+const CYAN_40 = 'rgba(6,182,212,0.4)'
+const RED = '#ef4444'
+const MUTED = 'rgba(148,163,184,0.5)'
 
 const btnCls = 'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium tracking-wider uppercase transition-colors'
 const btnPrimary = `${btnCls} bg-[var(--brass)] text-inverse hover:opacity-90`
 const btnSecondary = `${btnCls} border border-subtle text-secondary hover:bg-surface-hover`
 const selectCls = 'rounded bg-surface border border-subtle px-2 py-1.5 text-xs text-primary focus:border-[var(--brass)]/50 focus:outline-none'
 
-export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurement, onSave, onClose }: Props) {
+export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurement, onSave, onSaveDetections, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
@@ -69,6 +79,12 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
   )
   const [measuredMM, setMeasuredMM] = useState<number | null>(existingMeasurement?.measured_size_mm ?? null)
   const [measuredMOA, setMeasuredMOA] = useState<number | null>(existingMeasurement?.measured_size_moa ?? null)
+
+  // Detection state (PT-3)
+  const [detectedHoles, setDetectedHoles] = useState<ReviewableHole[]>([])
+  const [autoGroupMM, setAutoGroupMM] = useState<number | null>(null)
+  const [autoGroupMOA, setAutoGroupMOA] = useState<number | null>(null)
+  const [detecting, setDetecting] = useState(false)
 
   // Image loaded flag
   const [imageLoaded, setImageLoaded] = useState(false)
@@ -197,8 +213,41 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       ctx.setLineDash([])
     }
 
+    // Draw detected holes (PT-3)
+    for (const hole of detectedHoles) {
+      let color: string
+      let fillColor: string
+      if (hole.status === 'confirmed') {
+        color = GREEN
+        fillColor = GREEN_30
+      } else if (hole.status === 'rejected') {
+        color = RED
+        fillColor = 'rgba(239,68,68,0.15)'
+      } else {
+        color = CYAN
+        fillColor = CYAN_40
+      }
+
+      ctx.beginPath()
+      ctx.arc(hole.centerX, hole.centerY, hole.radiusPixels, 0, Math.PI * 2)
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2 / zoom
+      ctx.stroke()
+      ctx.fillStyle = fillColor
+      ctx.fill()
+
+      // Confidence label
+      if (mode === 'detect_review') {
+        const label = `${Math.round(hole.confidence * 100)}%`
+        ctx.font = `${Math.max(10, 12 / zoom)}px monospace`
+        ctx.fillStyle = color
+        ctx.textAlign = 'center'
+        ctx.fillText(label, hole.centerX, hole.centerY - hole.radiusPixels - 4 / zoom)
+      }
+    }
+
     ctx.restore()
-  }, [canvasSize, pan, zoom, refCircle, bbox, mode, drawState])
+  }, [canvasSize, pan, zoom, refCircle, bbox, mode, drawState, detectedHoles])
 
   useEffect(() => {
     if (imageLoaded) requestAnimationFrame(draw)
@@ -210,6 +259,28 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
     const canvas = canvasRef.current
     if (!canvas) return
     canvas.setPointerCapture(e.pointerId)
+
+    if (mode === 'detect_review') {
+      // Click on a hole to cycle: pending → confirmed → rejected → pending
+      const pt = screenToImage(e.clientX, e.clientY)
+      const hitIdx = detectedHoles.findIndex(h => {
+        const dx = pt.x - h.centerX
+        const dy = pt.y - h.centerY
+        return Math.sqrt(dx * dx + dy * dy) <= h.radiusPixels * 1.5
+      })
+      if (hitIdx >= 0) {
+        setDetectedHoles(prev => {
+          const next = [...prev]
+          const current = next[hitIdx].status
+          next[hitIdx] = {
+            ...next[hitIdx],
+            status: current === 'pending' ? 'confirmed' : current === 'confirmed' ? 'rejected' : 'pending',
+          }
+          return next
+        })
+      }
+      return
+    }
 
     if (mode === 'idle') {
       // Pan mode
@@ -224,7 +295,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
     drawOrigin.current = pt
     drawCurrent.current = pt
     setDrawState('drawing')
-  }, [mode, pan, screenToImage])
+  }, [mode, pan, screenToImage, detectedHoles])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (isPanning) {
@@ -308,12 +379,106 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
 
   // ── Actions ─────────────────────────────────────────────────────────
 
+  const handleAutoDetect = useCallback(() => {
+    const img = imgRef.current
+    if (!img || pixelsPerMM <= 0) return
+
+    setDetecting(true)
+
+    // Use a temporary canvas to get ImageData
+    requestAnimationFrame(() => {
+      const tmpCanvas = document.createElement('canvas')
+      tmpCanvas.width = img.width
+      tmpCanvas.height = img.height
+      const tmpCtx = tmpCanvas.getContext('2d')
+      if (!tmpCtx) { setDetecting(false); return }
+
+      tmpCtx.drawImage(img, 0, 0)
+      const imageData = tmpCtx.getImageData(0, 0, img.width, img.height)
+
+      const holes = detectHoles(imageData, { pixelsPerMM })
+      const reviewable: ReviewableHole[] = holes.map(h => ({ ...h, status: 'pending' as const }))
+      setDetectedHoles(reviewable)
+
+      // Auto-compute group size from detected holes
+      const confirmedOrPending = reviewable.filter(h => h.status !== 'rejected')
+      const gs = computeGroupSize(confirmedOrPending, pixelsPerMM)
+      if (gs) {
+        setAutoGroupMM(gs.groupSizeMM)
+        setAutoGroupMOA(mmToMOA(gs.groupSizeMM, distanceM))
+      }
+
+      setMode('detect_review')
+      setDetecting(false)
+    })
+  }, [pixelsPerMM, distanceM])
+
+  // Recompute auto group size when holes change
+  useEffect(() => {
+    const active = detectedHoles.filter(h => h.status !== 'rejected')
+    if (active.length >= 2 && pixelsPerMM > 0) {
+      const gs = computeGroupSize(active, pixelsPerMM)
+      if (gs) {
+        setAutoGroupMM(gs.groupSizeMM)
+        setAutoGroupMOA(mmToMOA(gs.groupSizeMM, distanceM))
+        return
+      }
+    }
+    setAutoGroupMM(null)
+    setAutoGroupMOA(null)
+  }, [detectedHoles, pixelsPerMM, distanceM])
+
+  const generateAnnotatedBlob = useCallback((): Promise<Blob | null> => {
+    const img = imgRef.current
+    if (!img) return Promise.resolve(null)
+
+    const tmpCanvas = document.createElement('canvas')
+    tmpCanvas.width = img.width
+    tmpCanvas.height = img.height
+    const ctx = tmpCanvas.getContext('2d')
+    if (!ctx) return Promise.resolve(null)
+
+    ctx.drawImage(img, 0, 0)
+
+    // Draw confirmed/pending holes
+    for (const hole of detectedHoles) {
+      if (hole.status === 'rejected') continue
+      ctx.beginPath()
+      ctx.arc(hole.centerX, hole.centerY, hole.radiusPixels, 0, Math.PI * 2)
+      ctx.strokeStyle = hole.status === 'confirmed' ? GREEN : CYAN
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+
+    return new Promise(resolve => {
+      tmpCanvas.toBlob(blob => resolve(blob), 'image/png')
+    })
+  }, [detectedHoles])
+
+  const handleSaveDetections = useCallback(async () => {
+    if (!onSaveDetections) return
+    const active = detectedHoles.filter(h => h.status !== 'rejected')
+    const blob = await generateAnnotatedBlob()
+    onSaveDetections(active, blob)
+  }, [detectedHoles, generateAnnotatedBlob, onSaveDetections])
+
+  const handleConfirmAll = () => {
+    setDetectedHoles(prev => prev.map(h => h.status === 'pending' ? { ...h, status: 'confirmed' as const } : h))
+  }
+
+  const handleRejectAll = () => {
+    setDetectedHoles(prev => prev.map(h => h.status === 'pending' ? { ...h, status: 'rejected' as const } : h))
+  }
+
   const handleReset = () => {
     setRefCircle(null)
     setBbox(null)
     setPixelsPerMM(0)
     setMeasuredMM(null)
     setMeasuredMOA(null)
+    setDetectedHoles([])
+    setAutoGroupMM(null)
+    setAutoGroupMOA(null)
     setMode('idle')
     setDrawState('none')
   }
@@ -409,6 +574,14 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
         >
           <Square size={14} /> Measure
         </button>
+        <button
+          className={mode === 'detect_review' ? btnPrimary : btnSecondary}
+          onClick={handleAutoDetect}
+          disabled={pixelsPerMM <= 0 || detecting}
+          title="Automatically detect pellet holes"
+        >
+          <Crosshair size={14} /> {detecting ? 'Detecting…' : 'Auto Detect'}
+        </button>
         <button className={btnSecondary} onClick={() => setMode('idle')} title="Pan mode">
           <Move size={14} /> Pan
         </button>
@@ -433,6 +606,24 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
         </button>
 
         <div className="flex-1" />
+
+        {/* Detection review controls */}
+        {mode === 'detect_review' && detectedHoles.length > 0 && (
+          <>
+            <button className={btnSecondary} onClick={handleConfirmAll} title="Confirm all pending">
+              <Check size={14} /> Confirm All
+            </button>
+            <button className={btnSecondary} onClick={handleRejectAll} title="Reject all pending">
+              <X size={14} /> Reject All
+            </button>
+            {onSaveDetections && (
+              <button className={btnPrimary} onClick={handleSaveDetections}>
+                <Save size={14} /> Save Detections
+              </button>
+            )}
+            <div className="h-5 w-px bg-subtle" />
+          </>
+        )}
 
         {/* Save / Close */}
         {canSave && (
@@ -461,7 +652,13 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
           <span>Select a target preset and ring, then click Calibrate</span>
         )}
         {mode === 'idle' && refCircle && !bbox && (
-          <span>Calibrated — click Measure to draw bounding box</span>
+          <span>Calibrated — click Measure to draw bounding box, or Auto Detect</span>
+        )}
+
+        {mode === 'detect_review' && (
+          <span className="text-cyan-500">
+            Click holes to cycle: <strong>pending</strong> → <strong className="text-green-500">confirmed</strong> → <strong className="text-red-500">rejected</strong>
+          </span>
         )}
 
         {pixelsPerMM > 0 && (
@@ -474,6 +671,25 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
             </span>
             <span>
               <strong className="font-mono text-[var(--brass)]">{measuredMOA?.toFixed(3)} MOA</strong>
+            </span>
+          </>
+        )}
+
+        {detectedHoles.length > 0 && (
+          <span>
+            Holes: <strong className="font-mono text-cyan-500">
+              {detectedHoles.filter(h => h.status !== 'rejected').length}
+            </strong>
+            <span className="text-muted">/{detectedHoles.length}</span>
+          </span>
+        )}
+        {autoGroupMM !== null && (
+          <>
+            <span>
+              Auto group: <strong className="font-mono text-cyan-500">{autoGroupMM.toFixed(2)} mm</strong>
+            </span>
+            <span>
+              <strong className="font-mono text-cyan-500">{autoGroupMOA?.toFixed(3)} MOA</strong>
             </span>
           </>
         )}

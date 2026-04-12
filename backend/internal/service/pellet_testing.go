@@ -277,3 +277,172 @@ func (s *PelletTestService) GetGroupTimeline(ctx context.Context, userID, rifleI
 	}
 	return s.repo.GetGroupTimeline(ctx, userID, rifleID)
 }
+
+// ── Detections (PT-3) ───────────────────────────────────────────────────────────
+
+func (s *PelletTestService) CreateDetections(ctx context.Context, measurementID, sessionID, userID string, in *model.CreateDetectionsBatchInput) ([]*model.PelletTestDetection, error) {
+	if len(in.Detections) == 0 {
+		return nil, fmt.Errorf("%w: at least one detection is required", ErrInvalidMeasurement)
+	}
+
+	// Verify session ownership
+	_, err := s.repo.GetByID(ctx, sessionID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	detections, err := s.repo.CreateDetectionsBatch(ctx, measurementID, sessionID, in.Detections)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute auto group size from detections (max distance between any two hole centers)
+	autoGroupMM, autoGroupMOA, avgConfidence := s.computeAutoGroupSize(ctx, sessionID, userID, detections)
+
+	holeCount := len(detections)
+	method := in.DetectionMethod
+	if method == "" {
+		method = "auto"
+	}
+
+	if err := s.repo.UpdateMeasurementDetectionMeta(ctx, measurementID, method, holeCount, autoGroupMM, autoGroupMOA, avgConfidence); err != nil {
+		return nil, err
+	}
+
+	return detections, nil
+}
+
+func (s *PelletTestService) computeAutoGroupSize(ctx context.Context, sessionID, userID string, detections []*model.PelletTestDetection) (*float64, *float64, *float64) {
+	if len(detections) < 2 {
+		return nil, nil, nil
+	}
+
+	// Get measurement's pixels_per_mm from session
+	session, err := s.repo.GetByID(ctx, sessionID, userID)
+	if err != nil {
+		return nil, nil, nil
+	}
+
+	// Find max distance between any two centers (CTC max spread = group size)
+	var maxDist float64
+	var totalConf float64
+	for i, a := range detections {
+		totalConf += a.Confidence
+		for j := i + 1; j < len(detections); j++ {
+			b := detections[j]
+			dx := a.CenterX - b.CenterX
+			dy := a.CenterY - b.CenterY
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist > maxDist {
+				maxDist = dist
+			}
+		}
+	}
+
+	avgConf := totalConf / float64(len(detections))
+
+	// We need pixelsPerMM — get it from the measurement details not readily available here
+	// The detections already have diameter_mm set from client, so we can trust those.
+	// For group size, use detections[0].DiameterMM to estimate scale, or just store pixel distance.
+	// Actually, the client sends diameter_mm which was computed using pixelsPerMM.
+	// Let's compute from the first detection's radius and diameter_mm to get scale.
+	if detections[0].DiameterMM != nil && detections[0].RadiusPixels > 0 {
+		ppm := (detections[0].RadiusPixels * 2) / *detections[0].DiameterMM
+		groupMM := maxDist / ppm
+		// Add pellet diameter to get CTC measurement
+		groupMM += *detections[0].DiameterMM
+		groupMOA := calcMOA(groupMM, session.DistanceM)
+		return &groupMM, &groupMOA, &avgConf
+	}
+
+	return nil, nil, &avgConf
+}
+
+func (s *PelletTestService) ListDetections(ctx context.Context, measurementID string) ([]*model.PelletTestDetection, error) {
+	return s.repo.ListDetections(ctx, measurementID)
+}
+
+func (s *PelletTestService) UpdateDetection(ctx context.Context, detectionID, sessionID, userID string, in *model.UpdateDetectionInput) (*model.PelletTestDetection, error) {
+	return s.repo.UpdateDetection(ctx, detectionID, sessionID, userID, in)
+}
+
+func (s *PelletTestService) DeleteDetection(ctx context.Context, detectionID, sessionID, userID string) error {
+	return s.repo.DeleteDetection(ctx, detectionID, sessionID, userID)
+}
+
+// ── Annotated Image ─────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) SetAnnotatedImage(ctx context.Context, measurementID, sessionID, userID, imageID string) error {
+	// Verify ownership
+	_, err := s.repo.GetByID(ctx, sessionID, userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.SetAnnotatedImage(ctx, measurementID, imageID)
+}
+
+// ── Public Leaderboard ──────────────────────────────────────────────────────────
+
+func (s *PelletTestService) GetPublicLeaderboard(ctx context.Context, limit, offset int) ([]*model.PublicLeaderboardEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	return s.repo.GetPublicLeaderboard(ctx, limit, offset)
+}
+
+// ── Batch Report ────────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) GetBatchReport(ctx context.Context, userID string, pelletID *string) ([]*model.BatchReportEntry, error) {
+	return s.repo.GetBatchReport(ctx, userID, pelletID)
+}
+
+// ── Confidence Badge ────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) GetConfidenceBadge(ctx context.Context, userID, rifleID, pelletID string) (*model.ConfidenceBadge, error) {
+	if rifleID == "" || pelletID == "" {
+		return nil, fmt.Errorf("%w: rifle_id and pellet_id are required", ErrInvalidPelletTest)
+	}
+
+	testCount, consistency, err := s.repo.GetConfidenceData(ctx, userID, rifleID, pelletID)
+	if err != nil {
+		return nil, err
+	}
+
+	level := "single"
+	if testCount >= 5 && consistency != nil && *consistency < 1.0 {
+		level = "proven"
+	} else if testCount >= 2 {
+		level = "emerging"
+	}
+
+	return &model.ConfidenceBadge{
+		Level:            level,
+		TestCount:        testCount,
+		ConsistencyScore: consistency,
+	}, nil
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) ExportSession(ctx context.Context, id, userID string) (*model.PelletTestExport, error) {
+	session, err := s.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	export := &model.PelletTestExport{
+		Session: session,
+		Groups:  session.Groups,
+	}
+
+	// Add confidence badge if we have rifle + pellet info
+	badge, err := s.GetConfidenceBadge(ctx, userID, session.RifleID, session.PelletID)
+	if err == nil {
+		export.ConfBadge = badge
+	}
+
+	return export, nil
+}
