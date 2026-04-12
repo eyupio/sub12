@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download } from 'lucide-react'
+import { toast } from '../store/toast'
 import {
   pelletTestApi,
   PelletTestGroup,
@@ -169,7 +170,7 @@ export default function PelletTestDetail() {
   function handleImageSelect(file: File | undefined) {
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('Image must be under 10 MB')
+        toast('Image must be under 10 MB', 'error')
         return
       }
       uploadMutation.mutate(file)
