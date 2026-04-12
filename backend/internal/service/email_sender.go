@@ -38,7 +38,7 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 	payload := map[string]any{
 		"display_name": displayName,
 		"reset_link":   resetLink,
-		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
+		"expires_at":   expiresAt.UTC().Format("2 January 2006 at 15:04 UTC"),
 	}
 	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 	payload := map[string]any{
 		"display_name": displayName,
 		"confirm_link": confirmLink,
-		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
+		"expires_at":   expiresAt.UTC().Format("2 January 2006 at 15:04 UTC"),
 	}
 	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
 	if err != nil {
