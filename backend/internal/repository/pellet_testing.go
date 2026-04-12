@@ -971,6 +971,55 @@ func (r *PelletTestRepository) GetBatchReport(ctx context.Context, userID string
 	return entries, rows.Err()
 }
 
+// ── Combo Analytics ─────────────────────────────────────────────────────────────
+
+func (r *PelletTestRepository) GetComboAnalytics(ctx context.Context, userID string, rifleID *string) ([]*model.ComboPerformanceSummary, error) {
+	query := `
+		SELECT
+			pts.rifle_id,
+			r.make || ' ' || r.model                                        AS rifle_name,
+			pts.pellet_id,
+			p.brand || ' ' || p.model                                       AS pellet_name,
+			MIN(pts.best_group_size_mm)                                     AS best_group_mm,
+			ROUND(AVG(pts.average_group_size_mm)::numeric, 2)               AS avg_group_mm,
+			COUNT(DISTINCT pts.id)::int                                     AS test_count,
+			ROUND(COALESCE(STDDEV_POP(pts.average_group_size_mm), 0)::numeric, 2) AS consistency,
+			MAX(pts.test_date)::text                                        AS last_tested
+		FROM pellet_test_sessions pts
+		JOIN rifles r  ON r.id  = pts.rifle_id
+		JOIN pellets p ON p.id  = pts.pellet_id
+		WHERE pts.user_id = $1
+	`
+	args := []any{userID}
+	if rifleID != nil {
+		query += ` AND pts.rifle_id = $2`
+		args = append(args, *rifleID)
+	}
+	query += `
+		GROUP BY pts.rifle_id, r.make, r.model, pts.pellet_id, p.brand, p.model
+		ORDER BY best_group_mm ASC NULLS LAST
+	`
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get combo analytics: %w", err)
+	}
+	defer rows.Close()
+
+	var combos []*model.ComboPerformanceSummary
+	for rows.Next() {
+		var c model.ComboPerformanceSummary
+		if err := rows.Scan(
+			&c.RifleID, &c.RifleName, &c.PelletID, &c.PelletName,
+			&c.BestGroupMM, &c.AvgGroupMM, &c.TestCount, &c.Consistency, &c.LastTested,
+		); err != nil {
+			return nil, fmt.Errorf("scan combo: %w", err)
+		}
+		combos = append(combos, &c)
+	}
+	return combos, rows.Err()
+}
+
 // ── Confidence Badge ────────────────────────────────────────────────────────────
 
 func (r *PelletTestRepository) GetConfidenceData(ctx context.Context, userID, rifleID, pelletID string) (int, *float64, error) {

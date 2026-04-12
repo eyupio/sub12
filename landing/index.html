@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUB12 — Precision Shooting Platform</title>
+  <meta name="description" content="Track scores, test pellets, compete in leagues, and own your shooting data. The complete precision air rifle companion." />
+  <meta property="og:title" content="SUB12 — Precision Shooting Platform" />
+  <meta property="og:description" content="Score tracking, pellet testing with AI hole detection, leagues, clubs, and analytics. Built for serious shooters." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset & Base ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0C0C0C;
+      --bg-raised:  #111111;
+      --bg-card:    #141414;
+      --bg-card-hi: #181818;
+      --brass:      #D4A44A;
+      --brass-dim:  rgba(212,164,74,0.15);
+      --brass-glow: rgba(212,164,74,0.08);
+      --brass-line: rgba(212,164,74,0.25);
+      --text-1:     #FFFFFF;
+      --text-2:     rgba(255,255,255,0.80);
+      --text-3:     rgba(255,255,255,0.45);
+      --border:     rgba(255,255,255,0.07);
+      --border-hi:  rgba(212,164,74,0.30);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Typography helpers ─────────────────────────────── */
+    .label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--brass);
+      font-weight: 500;
+    }
+    .heading-xl {
+      font-size: clamp(2.6rem, 6vw, 4.8rem);
+      font-weight: 600;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      color: var(--text-1);
+    }
+    .heading-lg {
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--text-1);
+    }
+    .heading-md {
+      font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+      font-weight: 500;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+      color: var(--text-1);
+    }
+    .body-lg  { font-size: 1.05rem; color: var(--text-2); line-height: 1.7; }
+    .body-sm  { font-size: 0.82rem; color: var(--text-3); line-height: 1.6; }
+    .mono     { font-family: 'JetBrains Mono', monospace; }
+    .brass    { color: var(--brass); }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .section   { padding: 96px 0; }
+    .section-sm { padding: 64px 0; }
+
+    /* ── Grid patterns ──────────────────────────────────── */
+    .grid-bg {
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+    .grid-fade-out {
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%);
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%);
+    }
+
+    /* ── Noise texture ──────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+
+    /* ── Nav ────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(12,12,12,0.80);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1120px; margin: 0 auto; padding: 0 24px;
+      height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+    .nav-logo svg { width: 28px; height: 28px; }
+    .nav-wordmark {
+      font-size: 15px; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-1);
+    }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .btn-ghost {
+      padding: 8px 18px;
+      font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-2); text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .btn-ghost:hover { color: var(--brass); border-color: var(--brass-line); }
+    .btn-primary {
+      padding: 9px 22px;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #0C0C0C; background: var(--brass);
+      text-decoration: none; border-radius: 6px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-large {
+      display: inline-block;
+      padding: 16px 40px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+      color: #0C0C0C; background: var(--brass);
+      text-decoration: none; border-radius: 8px;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    }
+    .btn-large:hover {
+      opacity: 0.9; transform: translateY(-2px);
+      box-shadow: 0 16px 48px rgba(212,164,74,0.35);
+    }
+    .btn-outline-lg {
+      display: inline-block;
+      padding: 15px 40px;
+      font-size: 13px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      text-decoration: none; border-radius: 8px;
+      transition: color 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .btn-outline-lg:hover { color: var(--brass); border-color: var(--brass-line); transform: translateY(-1px); }
+
+    /* ── Hero ───────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      min-height: calc(100vh - 64px);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      padding: 80px 24px;
+    }
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(212,164,74,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212,164,74,0.04) 1px, transparent 1px);
+      background-size: 80px 80px;
+      -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 80%);
+      mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 80%);
+    }
+    .hero-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(212,164,74,0.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-content {
+      position: relative; z-index: 2;
+      max-width: 900px; margin: 0 auto;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; gap: 28px;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      background: var(--brass-dim);
+      border: 1px solid var(--brass-line);
+      border-radius: 100px;
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--brass); font-weight: 500;
+      animation: fadeDown 0.6s ease both;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--brass);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .hero-title {
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+    .hero-title span {
+      display: block;
+      background: linear-gradient(135deg, #FFFFFF 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-title .accent {
+      background: linear-gradient(135deg, var(--brass) 0%, #F0C060 60%, var(--brass) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      max-width: 560px;
+      font-size: 1.15rem; color: var(--text-3); line-height: 1.7;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+    .hero-actions {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+      animation: fadeUp 0.7s 0.3s ease both;
+    }
+    .hero-crosshair {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(500px, 80vw); height: min(500px, 80vw);
+      opacity: 0.04; pointer-events: none;
+      animation: spinSlow 120s linear infinite;
+    }
+    .hero-crosshair-inner {
+      width: 100%; height: 100%;
+      animation: spinSlow 60s linear infinite reverse;
+    }
+
+    /* ── Corner marks ───────────────────────────────────── */
+    .corner { position: fixed; width: 16px; height: 16px; z-index: 200; opacity: 0.18; }
+    .corner svg { display: block; }
+    .corner-tl { top: 20px; left: 20px; }
+    .corner-tr { top: 20px; right: 20px; transform: rotate(90deg); }
+    .corner-bl { bottom: 20px; left: 20px; transform: rotate(-90deg); }
+    .corner-br { bottom: 20px; right: 20px; transform: rotate(180deg); }
+
+    /* ── Trust bar ──────────────────────────────────────── */
+    .trust {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+      background: var(--bg-raised);
+    }
+    .trust-inner {
+      max-width: 900px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 32px;
+    }
+    .trust-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase;
+      color: var(--text-3);
+    }
+    .trust-item svg { color: var(--brass); }
+
+    /* ── Section headers ────────────────────────────────── */
+    .section-header { text-align: center; margin-bottom: 56px; }
+    .section-header .label { margin-bottom: 12px; display: block; }
+
+    /* ── Feature cards ──────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at top left, var(--brass-glow), transparent 60%);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .feature-card:hover { border-color: var(--border-hi); background: var(--bg-card-hi); transform: translateY(-2px); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--brass-dim); border: 1px solid var(--brass-line);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; color: var(--brass);
+    }
+    .feature-icon svg { width: 20px; height: 20px; }
+    .feature-title { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
+    .feature-desc  { font-size: 13px; color: var(--text-3); line-height: 1.6; }
+    .feature-new {
+      position: absolute; top: 14px; right: 14px;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--brass); background: var(--brass-dim); border: 1px solid var(--brass-line);
+      border-radius: 4px; padding: 2px 7px;
+    }
+
+    /* ── Spotlight section ──────────────────────────────── */
+    .spotlight {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #111111 0%, #0e0e0e 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .spotlight-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+    @media (max-width: 768px) {
+      .spotlight-grid { grid-template-columns: 1fr; gap: 40px; }
+    }
+    .spotlight-text .label { margin-bottom: 12px; display: block; }
+    .spotlight-text .heading-lg { margin-bottom: 20px; }
+    .spotlight-text .body-lg { margin-bottom: 32px; }
+    .spotlight-bullets { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
+    .spotlight-bullet {
+      display: flex; align-items: flex-start; gap: 12px;
+      font-size: 13px; color: var(--text-2);
+    }
+    .bullet-check {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--brass-dim); border: 1px solid var(--brass-line);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px; color: var(--brass);
+    }
+    .bullet-check svg { width: 11px; height: 11px; }
+
+    /* ── Mockup ─────────────────────────────────────────── */
+    .mockup-frame {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+    }
+    .mockup-titlebar {
+      background: var(--bg-raised);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .mockup-body { padding: 20px; }
+
+    /* ── Score card mockup ──────────────────────────────── */
+    .score-card-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .score-card-header {
+      background: var(--bg-raised);
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .score-card-title { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+    .score-card-val   { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500; color: var(--brass); }
+    .score-grid-mock  { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 16px; }
+    .shot-cell {
+      aspect-ratio: 1;
+      border-radius: 6px; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-2);
+    }
+    .shot-x { background: var(--brass-dim); border-color: var(--brass-line); color: var(--brass); font-weight: 600; }
+    .shot-hi { background: rgba(212,164,74,0.06); }
+
+    /* ── Target analysis mockup ──────────────────────────── */
+    .target-mock {
+      position: relative;
+      background: #1a1a1a;
+      border-radius: 10px;
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .target-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(212,164,74,0.2);
+    }
+    .hole {
+      position: absolute;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: rgba(212,164,74,0.15);
+      border: 1.5px solid rgba(212,164,74,0.6);
+    }
+    .hole::after {
+      content: '';
+      position: absolute; inset: 3px;
+      border-radius: 50%;
+      background: rgba(212,164,74,0.4);
+    }
+    .group-box {
+      position: absolute;
+      border: 1px dashed rgba(212,164,74,0.4);
+      border-radius: 4px;
+    }
+    .group-label {
+      position: absolute; bottom: -22px; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--brass);
+      white-space: nowrap;
+    }
+    .target-center { width: 8px; height: 8px; border-radius: 50%; background: var(--brass); opacity: 0.5; }
+
+    /* ── Stats section ──────────────────────────────────── */
+    .stats-band {
+      background: var(--bg-raised);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 56px 24px;
+    }
+    .stats-inner {
+      max-width: 900px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 24px;
+      text-align: center;
+    }
+    .stat-item {}
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(2.2rem, 4vw, 3rem);
+      font-weight: 500; color: var(--brass);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-3); margin-top: 8px;
+    }
+
+    /* ── Two-col feature ────────────────────────────────── */
+    .two-col {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 48px; align-items: center;
+    }
+    @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; gap: 32px; } }
+    .two-col.reverse { direction: rtl; }
+    .two-col.reverse > * { direction: ltr; }
+
+    /* ── Achievement badges ─────────────────────────────── */
+    .achievements-row {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+      margin-top: 32px;
+    }
+    .achievement-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px;
+      background: var(--brass-dim);
+      border: 1px solid var(--brass-line);
+      border-radius: 100px;
+      font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--brass); font-weight: 500;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .achievement-badge:hover { background: rgba(212,164,74,0.22); transform: translateY(-2px); }
+    .achievement-badge svg { width: 14px; height: 14px; }
+
+    /* ── Analytics mockup ───────────────────────────────── */
+    .chart-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .chart-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chart-title { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+    .chart-val   { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--brass); }
+    .chart-body  { padding: 20px; }
+    .chart-svg   { width: 100%; height: 120px; display: block; }
+
+    /* ── Combo table mockup ─────────────────────────────── */
+    .combo-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .combo-row {
+      display: grid; grid-template-columns: 1fr 1fr 80px 70px;
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+      font-size: 12px; align-items: center; gap: 8px;
+    }
+    .combo-row:last-child { border-bottom: none; }
+    .combo-row.header { background: var(--bg-raised); }
+    .combo-row.header .body-sm { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+    .rank-badge {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+    }
+    .rank-1 { background: var(--brass); color: #0C0C0C; }
+    .rank-2 { background: rgba(255,255,255,0.12); color: var(--text-2); }
+    .rank-3 { background: rgba(255,255,255,0.07); color: var(--text-3); }
+
+    /* ── Activity feed mockup ───────────────────────────── */
+    .feed-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .feed-item {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--brass-dim); border: 1px solid var(--brass-line);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; color: var(--brass); flex-shrink: 0;
+    }
+    .feed-text { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+    .feed-text strong { color: var(--text-1); font-weight: 500; }
+    .feed-text .brass-sm { color: var(--brass); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .feed-time { font-size: 10px; color: var(--text-3); margin-top: 3px; }
+
+    /* ── Club card ──────────────────────────────────────── */
+    .club-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .club-card:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+    .club-avatar {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: var(--brass-dim); border: 1px solid var(--brass-line);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 12px;
+    }
+    .club-name { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+    .club-meta { font-size: 11px; color: var(--text-3); display: flex; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .club-meta span { display: flex; align-items: center; gap: 4px; }
+
+    /* ── PWA section ────────────────────────────────────── */
+    .pwa-devices {
+      display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+    }
+    .device-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 13px; color: var(--text-2);
+      transition: border-color 0.2s;
+    }
+    .device-pill:hover { border-color: var(--border-hi); }
+    .device-pill svg { color: var(--brass); }
+
+    /* ── CTA section ────────────────────────────────────── */
+    .cta-section {
+      text-align: center; position: relative; overflow: hidden;
+    }
+    .cta-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 800px; height: 400px;
+      background: radial-gradient(ellipse, rgba(212,164,74,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-section .heading-lg { margin-bottom: 16px; }
+    .cta-section .body-lg { margin-bottom: 40px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .cta-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+    }
+    .footer-inner {
+      max-width: 1120px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      align-items: center; gap: 20px;
+    }
+    .footer-brand { display: flex; align-items: center; gap: 10px; }
+    .footer-brand svg { width: 22px; height: 22px; }
+    .footer-brand span { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); text-decoration: none; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--brass); }
+    .footer-copy { font-size: 11px; color: var(--text-3); letter-spacing: 0.08em; }
+
+    /* ── Animations ─────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; } to { opacity: 1; }
+    }
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.04; }
+      50%       { opacity: 0.07; }
+    }
+    .hero-crosshair { animation: breathe 8s ease-in-out infinite, spinSlow 120s linear infinite; }
+
+    /* Staggered entrance for feature cards */
+    .feature-card { animation: fadeUp 0.5s ease both; }
+    .feature-card:nth-child(1)  { animation-delay: 0.05s; }
+    .feature-card:nth-child(2)  { animation-delay: 0.10s; }
+    .feature-card:nth-child(3)  { animation-delay: 0.15s; }
+    .feature-card:nth-child(4)  { animation-delay: 0.20s; }
+    .feature-card:nth-child(5)  { animation-delay: 0.25s; }
+    .feature-card:nth-child(6)  { animation-delay: 0.30s; }
+    .feature-card:nth-child(7)  { animation-delay: 0.35s; }
+    .feature-card:nth-child(8)  { animation-delay: 0.40s; }
+    .feature-card:nth-child(9)  { animation-delay: 0.45s; }
+    .feature-card:nth-child(10) { animation-delay: 0.50s; }
+
+    /* ── Divider ─────────────────────────────────────────── */
+    .divider {
+      height: 1px; background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+      margin: 0 24px;
+    }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .nav-logo .nav-wordmark { display: none; }
+      .section { padding: 64px 0; }
+      .hero { min-height: auto; padding: 60px 20px; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .corner { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Corner marks -->
+  <div class="corner corner-tl" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 8V1H8" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="corner corner-tr" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 8V1H8" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="corner corner-bl" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 8V1H8" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="corner corner-br" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 8V1H8" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <!-- ── Navigation ──────────────────────────────────────── -->
+  <nav>
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="35" stroke="#D4A44A" stroke-width="0.5" opacity="0.4"/>
+          <circle cx="40" cy="40" r="26" stroke="#D4A44A" stroke-width="1.5"/>
+          <circle cx="40" cy="40" r="2.5" fill="#D4A44A"/>
+          <line x1="40" y1="6"  x2="40" y2="22" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="40" y1="58" x2="40" y2="74" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="6"  y1="40" x2="22" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="58" y1="40" x2="74" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <span class="nav-wordmark">SUB12</span>
+      </a>
+      <div class="nav-right">
+        <a href="/app" class="btn-ghost">Sign In</a>
+        <a href="/app/register" class="btn-primary">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Hero ──────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-grid" aria-hidden="true"></div>
+    <div class="hero-glow" aria-hidden="true"></div>
+
+    <!-- Large background crosshair -->
+    <svg class="hero-crosshair" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="200" cy="200" r="180" stroke="#D4A44A" stroke-width="0.5"/>
+      <circle cx="200" cy="200" r="140" stroke="#D4A44A" stroke-width="0.8"/>
+      <circle cx="200" cy="200" r="100" stroke="#D4A44A" stroke-width="0.5"/>
+      <circle cx="200" cy="200" r="60"  stroke="#D4A44A" stroke-width="0.8"/>
+      <circle cx="200" cy="200" r="24"  stroke="#D4A44A" stroke-width="0.5"/>
+      <line x1="200" y1="0"   x2="200" y2="176" stroke="#D4A44A" stroke-width="0.6" stroke-dasharray="4 4"/>
+      <line x1="200" y1="224" x2="200" y2="400" stroke="#D4A44A" stroke-width="0.6" stroke-dasharray="4 4"/>
+      <line x1="0"   y1="200" x2="176" y2="200" stroke="#D4A44A" stroke-width="0.6" stroke-dasharray="4 4"/>
+      <line x1="224" y1="200" x2="400" y2="200" stroke="#D4A44A" stroke-width="0.6" stroke-dasharray="4 4"/>
+      <!-- Degree marks -->
+      <line x1="200" y1="20"  x2="200" y2="30"  stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="200" y1="370" x2="200" y2="380" stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="20"  y1="200" x2="30"  y2="200" stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="370" y1="200" x2="380" y2="200" stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="73"  y1="73"  x2="80"  y2="80"  stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="327" y1="73"  x2="320" y2="80"  stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="73"  y1="327" x2="80"  y2="320" stroke="#D4A44A" stroke-width="0.4"/>
+      <line x1="327" y1="327" x2="320" y2="320" stroke="#D4A44A" stroke-width="0.4"/>
+    </svg>
+
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        New — Clubs, Pellet AI, Analytics & More
+      </div>
+
+      <h1 class="heading-xl hero-title">
+        <span>Precision Shooting.</span>
+        <span class="accent">Tracked to the</span>
+        <span class="accent">Millimetre.</span>
+      </h1>
+
+      <p class="hero-sub">
+        Score cards, pellet testing with AI hole detection, leagues, clubs, and deep analytics.
+        The complete companion for serious air rifle shooters.
+      </p>
+
+      <div class="hero-actions">
+        <a href="/app/register" class="btn-large">Create Free Account</a>
+        <a href="/app" class="btn-outline-lg">Sign In</a>
+      </div>
+
+      <p class="body-sm" style="margin-top: -8px;">Free forever &middot; No ads &middot; Your data, your way</p>
+    </div>
+  </section>
+
+  <!-- ── Trust bar ─────────────────────────────────────────── -->
+  <div class="trust">
+    <div class="trust-inner">
+      <span class="trust-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Free to use, forever
+      </span>
+      <span class="trust-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        No advertisements
+      </span>
+      <span class="trust-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Install on any device
+      </span>
+      <span class="trust-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Built by shooters, for shooters
+      </span>
+    </div>
+  </div>
+
+  <!-- ── Features Grid ─────────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="label">Everything you need</span>
+        <h2 class="heading-lg">The complete shooting platform</h2>
+      </div>
+
+      <div class="features-grid">
+
+        <!-- Score tracking -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+          </div>
+          <p class="feature-title">Score Cards</p>
+          <p class="feature-desc">Log every 25-shot group with per-shot scores and X-ring hits. Match conditions, gear, and location on every card.</p>
+        </div>
+
+        <!-- Pellet testing AI -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><circle cx="11" cy="11" r="3"/></svg>
+          </div>
+          <p class="feature-title">AI Hole Detection</p>
+          <p class="feature-desc">Upload a target photo and let the AI automatically detect pellet holes, measure group sizes in millimetres, and track consistency over time.</p>
+        </div>
+
+        <!-- Combo Analytics -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <p class="feature-title">Combo Analytics</p>
+          <p class="feature-desc">Find your best rifle and pellet combination. Cross-reference performance data to identify which combination delivers the tightest groups.</p>
+        </div>
+
+        <!-- Score Trends -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <p class="feature-title">Score Trends</p>
+          <p class="feature-desc">Interactive charts showing your improvement week by week. Filter by rifle to see exactly where your progress is coming from.</p>
+        </div>
+
+        <!-- Clubs -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <p class="feature-title">Shooting Clubs</p>
+          <p class="feature-desc">Create or join your local club. Club leaderboards, member standings, and a shared identity for your shooting community.</p>
+        </div>
+
+        <!-- Achievements -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+          </div>
+          <p class="feature-title">Achievements</p>
+          <p class="feature-desc">Earn badges as you hit milestones — First Card, Century, Perfect Score, Sharpshooter, and more. Show them off on your profile.</p>
+        </div>
+
+        <!-- Leagues -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          </div>
+          <p class="feature-title">Leagues &amp; Competitions</p>
+          <p class="feature-desc">Create private leagues with seasons, rounds, and standings. Score verification, amendments, and a full audit trail.</p>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+          </div>
+          <p class="feature-title">Activity Feed</p>
+          <p class="feature-desc">See what your shooting community is up to. Follow other shooters, celebrate their scores, and stay connected between sessions.</p>
+        </div>
+
+        <!-- Gear management -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <p class="feature-title">Gear Management</p>
+          <p class="feature-desc">Catalogue your rifles and pellets with photos and specifications. Link every score card to the exact gear you used.</p>
+        </div>
+
+        <!-- Pellet testing -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <p class="feature-title">Pellet Testing Sessions</p>
+          <p class="feature-desc">Systematic pellet tests with group size measurements, confidence scoring, batch reporting, and a public leaderboard.</p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="8" y1="16" x2="8" y2="12"/><line x1="12" y1="16" x2="12" y2="8"/><line x1="16" y1="16" x2="16" y2="10"/></svg>
+          </div>
+          <p class="feature-title">Deep Statistics</p>
+          <p class="feature-desc">Personal bests, per-rifle averages, X-count trends, cards logged, and more. Your shooting history becomes your advantage.</p>
+        </div>
+
+        <!-- PWA -->
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <p class="feature-title">Works Everywhere</p>
+          <p class="feature-desc">Phone, tablet, or desktop. Install as an app on iOS, Android, or any desktop browser. Works offline at the range.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Pellet Testing Spotlight ──────────────────────────── -->
+  <section class="spotlight section">
+    <div class="container">
+      <div class="spotlight-grid">
+        <div class="spotlight-text">
+          <span class="label">Pellet Testing — Reimagined</span>
+          <h2 class="heading-lg">Stop guessing.<br>Start measuring.</h2>
+          <p class="body-lg">
+            Take a photo of your target after a group. SUB-12 analyses it automatically — detecting every hole, calculating group size in millimetres, and building a precise performance record for each pellet brand and weight.
+          </p>
+          <div class="spotlight-bullets">
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Automatic hole detection from a single photo</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Group size in millimetres with centre-to-centre accuracy</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Confidence scoring and consistency tracking across sessions</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Batch reports and a public leaderboard for your pellet rankings</span>
+            </div>
+          </div>
+          <a href="/app/register" class="btn-large">Try It Free</a>
+        </div>
+
+        <!-- Target analysis mockup -->
+        <div>
+          <div class="mockup-frame">
+            <div class="mockup-titlebar">
+              <span class="mockup-dot" style="background:#ff5f57"></span>
+              <span class="mockup-dot" style="background:#febc2e"></span>
+              <span class="mockup-dot" style="background:#28c840"></span>
+              <span style="font-size:11px;color:var(--text-3);margin-left:8px;letter-spacing:0.1em;text-transform:uppercase;">Pellet Test — Group Analysis</span>
+            </div>
+            <div class="mockup-body">
+              <!-- Target visual -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div style="background:#1a1a1a;border-radius:10px;aspect-ratio:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                  <!-- Rings -->
+                  <div style="position:absolute;width:85%;height:85%;border-radius:50%;border:1px solid rgba(212,164,74,0.15);"></div>
+                  <div style="position:absolute;width:65%;height:65%;border-radius:50%;border:1px solid rgba(212,164,74,0.20);"></div>
+                  <div style="position:absolute;width:45%;height:45%;border-radius:50%;border:1px solid rgba(212,164,74,0.25);"></div>
+                  <div style="position:absolute;width:26%;height:26%;border-radius:50%;border:1px solid rgba(212,164,74,0.35);"></div>
+                  <!-- Holes -->
+                  <div style="position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(212,164,74,0.15);border:1.5px solid rgba(212,164,74,0.7);top:38%;left:46%;"></div>
+                  <div style="position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(212,164,74,0.15);border:1.5px solid rgba(212,164,74,0.7);top:41%;left:52%;"></div>
+                  <div style="position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(212,164,74,0.15);border:1.5px solid rgba(212,164,74,0.7);top:44%;left:47%;"></div>
+                  <div style="position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(212,164,74,0.15);border:1.5px solid rgba(212,164,74,0.7);top:46%;left:53%;"></div>
+                  <div style="position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(212,164,74,0.15);border:1.5px solid rgba(212,164,74,0.7);top:42%;left:49%;"></div>
+                  <!-- Group box -->
+                  <div style="position:absolute;border:1px dashed rgba(212,164,74,0.5);border-radius:4px;top:35%;left:43%;width:24%;height:16%;"></div>
+                  <div style="position:absolute;top:52%;left:43%;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--brass);white-space:nowrap;">3.2mm</div>
+                  <!-- Centre dot -->
+                  <div style="width:6px;height:6px;border-radius:50%;background:var(--brass);opacity:0.4;"></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
+                  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                    <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px;">Group Size</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;color:var(--brass);">3.2<span style="font-size:12px;opacity:0.7;">mm</span></div>
+                  </div>
+                  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                    <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px;">Shots Detected</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;color:var(--text-1);">5<span style="font-size:12px;color:var(--text-3);"> / 5</span></div>
+                  </div>
+                  <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                    <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px;">Confidence</div>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                        <div style="width:87%;height:100%;background:var(--brass);border-radius:3px;"></div>
+                      </div>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--brass);">87%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Pellet comparison bar -->
+              <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:8px;padding:12px;">
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;">JSB Exact — 4.51mm &middot; 0.535g</div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:10px;color:var(--text-3);width:60px;">Best</span>
+                    <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:72%;height:100%;background:var(--brass);border-radius:3px;"></div></div>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--brass);">3.2mm</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:10px;color:var(--text-3);width:60px;">Average</span>
+                    <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:60%;height:100%;background:rgba(212,164,74,0.4);border-radius:3px;"></div></div>
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-2);">4.1mm</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Score Card mockup section ─────────────────────────── -->
+  <section class="section" style="background:var(--bg-raised);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+    <div class="container">
+      <div class="two-col reverse">
+        <div>
+          <!-- Score card mock -->
+          <div class="mockup-frame">
+            <div class="mockup-titlebar">
+              <span class="mockup-dot" style="background:#ff5f57"></span>
+              <span class="mockup-dot" style="background:#febc2e"></span>
+              <span class="mockup-dot" style="background:#28c840"></span>
+              <span style="font-size:11px;color:var(--text-3);margin-left:8px;letter-spacing:0.1em;text-transform:uppercase;">Score Card — 25 Shots</span>
+            </div>
+            <div class="mockup-body">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div>
+                  <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px;">Total Score</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:500;color:var(--brass);line-height:1;">246</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Personal best &nbsp;↑ 3</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px;">X Count</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:500;color:var(--text-1);line-height:1;">7<span style="color:var(--brass);">X</span></div>
+                </div>
+              </div>
+              <!-- Shot grid 5×5 -->
+              <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:14px;">
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell">9</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell">9</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell shot-x">X</div>
+                <div class="shot-cell shot-hi">10</div>
+                <div class="shot-cell">9</div>
+                <div class="shot-cell shot-hi">10</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <span style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);background:var(--bg-raised);border:1px solid var(--border);border-radius:5px;padding:4px 10px;">HW100 .177</span>
+                <span style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);background:var(--bg-raised);border:1px solid var(--border);border-radius:5px;padding:4px 10px;">JSB Exact 4.51</span>
+                <span style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);background:var(--brass-dim);border:1px solid var(--brass-line);border-radius:5px;padding:4px 10px;">Personal Best</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <span class="label" style="margin-bottom:12px;display:block;">Score Tracking</span>
+          <h2 class="heading-lg" style="margin-bottom:20px;">Every shot.<br>Every session.<br>Every detail.</h2>
+          <p class="body-lg" style="margin-bottom:24px;">Log every 25-shot card with per-shot scores and X-ring hits. Record the rifle, pellet, weather, and location. Every session becomes a data point.</p>
+          <div class="spotlight-bullets" style="margin-bottom:0;">
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>25-shot grid entry with single tap per shot</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>Automatic personal best detection and history</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>Link scores to your exact gear, weather, and conditions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Analytics section ─────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="two-col">
+        <div>
+          <span class="label" style="margin-bottom:12px;display:block;">Analytics</span>
+          <h2 class="heading-lg" style="margin-bottom:20px;">Know exactly what's working.</h2>
+          <p class="body-lg" style="margin-bottom:24px;">Score trends by week or month. Per-rifle breakdowns. Combo analytics that rank every rifle–pellet pairing by group size, consistency, and test count.</p>
+          <div class="spotlight-bullets">
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>Interactive line charts with trend lines and averages</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>Rifle-specific performance comparison</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg></span>
+              <span>Combo ranking by best group, average group, and consistency</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <!-- Trend chart mock -->
+          <div class="chart-mock">
+            <div class="chart-header">
+              <span class="chart-title">Score Trend &mdash; Last 8 Weeks</span>
+              <span class="chart-val">↑ 4.2 pts</span>
+            </div>
+            <div class="chart-body">
+              <svg class="chart-svg" viewBox="0 0 340 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Grid lines -->
+                <line x1="0" y1="25" x2="340" y2="25" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                <line x1="0" y1="50" x2="340" y2="50" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                <line x1="0" y1="75" x2="340" y2="75" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                <!-- Area fill -->
+                <path d="M0,78 L42,70 L85,65 L127,60 L170,52 L212,44 L255,38 L297,30 L340,22 L340,100 L0,100 Z"
+                  fill="url(#areaGrad)" opacity="0.4"/>
+                <!-- Line -->
+                <path d="M0,78 L42,70 L85,65 L127,60 L170,52 L212,44 L255,38 L297,30 L340,22"
+                  fill="none" stroke="#D4A44A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Dots -->
+                <circle cx="0"   cy="78" r="3" fill="#D4A44A"/>
+                <circle cx="42"  cy="70" r="3" fill="#D4A44A"/>
+                <circle cx="85"  cy="65" r="3" fill="#D4A44A"/>
+                <circle cx="127" cy="60" r="3" fill="#D4A44A"/>
+                <circle cx="170" cy="52" r="3" fill="#D4A44A"/>
+                <circle cx="212" cy="44" r="3" fill="#D4A44A"/>
+                <circle cx="255" cy="38" r="3" fill="#D4A44A"/>
+                <circle cx="297" cy="30" r="3" fill="#D4A44A"/>
+                <circle cx="340" cy="22" r="4.5" fill="#D4A44A" stroke="#0C0C0C" stroke-width="2"/>
+                <!-- Labels -->
+                <text x="0"   y="98" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,0.3)">W1</text>
+                <text x="297" y="98" font-family="JetBrains Mono" font-size="8" fill="rgba(255,255,255,0.3)">W8</text>
+                <text x="290" y="18" font-family="JetBrains Mono" font-size="9" fill="#D4A44A">246</text>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#D4A44A" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#D4A44A" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Combo table mock -->
+          <div class="combo-mock">
+            <div class="combo-row header">
+              <span class="body-sm">Rifle</span>
+              <span class="body-sm">Pellet</span>
+              <span class="body-sm" style="text-align:right;">Best</span>
+              <span class="body-sm" style="text-align:right;">±Cons.</span>
+            </div>
+            <div class="combo-row">
+              <span style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;"><span class="rank-badge rank-1">1</span> HW100</span>
+              <span style="font-size:12px;color:var(--text-2);">JSB 4.51</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--brass);text-align:right;">3.2mm</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);text-align:right;">±0.4mm</span>
+            </div>
+            <div class="combo-row">
+              <span style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;"><span class="rank-badge rank-2">2</span> HW100</span>
+              <span style="font-size:12px;color:var(--text-2);">AA 4.52</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-2);text-align:right;">4.1mm</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);text-align:right;">±0.7mm</span>
+            </div>
+            <div class="combo-row">
+              <span style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;"><span class="rank-badge rank-3">3</span> FX Crown</span>
+              <span style="font-size:12px;color:var(--text-2);">JSB 4.51</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-2);text-align:right;">4.8mm</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);text-align:right;">±0.9mm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Clubs & Social ─────────────────────────────────────── -->
+  <section class="section" style="background:var(--bg-raised);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+    <div class="container">
+      <div class="section-header">
+        <span class="label">Community</span>
+        <h2 class="heading-lg">Join your shooting club.<br>Follow your peers.</h2>
+        <p class="body-lg" style="max-width:520px;margin:16px auto 0;">Create or join your local club, see what shooters in your community are achieving, and stay connected between range sessions.</p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:780px;margin:0 auto 40px;">
+        <!-- Club card 1 -->
+        <div class="club-card">
+          <div class="club-avatar">🎯</div>
+          <div class="club-name">Yorkshire HFT Association</div>
+          <p style="font-size:12px;color:var(--text-3);line-height:1.5;">Premier HFT club for Yorkshire shooters. Open to all skill levels.</p>
+          <div class="club-meta">
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brass)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-2);">24</span> members
+            </span>
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brass)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Active
+            </span>
+          </div>
+        </div>
+        <!-- Club card 2 -->
+        <div class="club-card">
+          <div class="club-avatar">🏆</div>
+          <div class="club-name">Midlands Precision Shooters</div>
+          <p style="font-size:12px;color:var(--text-3);line-height:1.5;">Dedicated to FT and HFT. Monthly open competitions welcome.</p>
+          <div class="club-meta">
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brass)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-2);">17</span> members
+            </span>
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brass)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Active
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity feed mock -->
+      <div style="max-width:560px;margin:0 auto;">
+        <div class="feed-mock">
+          <div class="feed-item">
+            <div class="feed-avatar">JW</div>
+            <div>
+              <div class="feed-text"><strong>James W.</strong> logged a new personal best — <span class="brass-sm">249 / 7X</span> with HW100 .177</div>
+              <div class="feed-time">2 minutes ago &middot; Yorkshire HFT</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <div class="feed-avatar" style="background:rgba(255,255,255,0.06);color:var(--text-2);">SC</div>
+            <div>
+              <div class="feed-text"><strong>Sarah C.</strong> completed pellet tests for <span class="brass-sm">JSB Exact 4.51mm</span> &mdash; best group <span class="brass-sm">3.2mm</span></div>
+              <div class="feed-time">14 minutes ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <div class="feed-avatar" style="background:rgba(255,255,255,0.04);color:var(--text-3);">RM</div>
+            <div>
+              <div class="feed-text"><strong>Rob M.</strong> joined <span class="brass-sm">Yorkshire HFT Association</span> and earned the <span class="brass-sm">League Debut</span> badge</div>
+              <div class="feed-time">1 hour ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Achievements ───────────────────────────────────────── -->
+  <section class="section">
+    <div class="container" style="text-align:center;">
+      <span class="label" style="margin-bottom:12px;display:block;">Achievements</span>
+      <h2 class="heading-lg" style="margin-bottom:16px;">Hit milestones.<br>Earn your badges.</h2>
+      <p class="body-lg" style="max-width:480px;margin:0 auto 8px;">Every breakthrough is recognised. Log consistently, shoot precisely, and watch your collection grow.</p>
+
+      <div class="achievements-row">
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+          First Card
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Century
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+          Perfect Score
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Sharp Eye
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+          Sharpshooter
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Dedicated
+        </span>
+        <span class="achievement-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          League Debut
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PWA ───────────────────────────────────────────────── -->
+  <section class="section-sm" style="background:var(--bg-raised);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+    <div class="container" style="text-align:center;">
+      <span class="label" style="margin-bottom:12px;display:block;">Progressive Web App</span>
+      <h2 class="heading-md" style="margin-bottom:12px;">Install on any device. Use at the range.</h2>
+      <p class="body-lg" style="max-width:460px;margin:0 auto 32px;">Add it to your home screen in seconds — no app store required. Works offline when you're at a range with no signal.</p>
+      <div class="pwa-devices">
+        <div class="device-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          iOS &amp; Android
+        </div>
+        <div class="device-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Desktop
+        </div>
+        <div class="device-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          Tablet
+        </div>
+        <div class="device-pill">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          Offline capable
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Final CTA ─────────────────────────────────────────── -->
+  <section class="section cta-section">
+    <div class="cta-glow" aria-hidden="true"></div>
+    <div class="container" style="position:relative;">
+      <!-- Large decorative crosshair -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;opacity:0.03;pointer-events:none;" aria-hidden="true">
+        <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+          <circle cx="200" cy="200" r="190" stroke="#D4A44A" stroke-width="1"/>
+          <circle cx="200" cy="200" r="140" stroke="#D4A44A" stroke-width="1"/>
+          <circle cx="200" cy="200" r="90"  stroke="#D4A44A" stroke-width="1"/>
+          <circle cx="200" cy="200" r="40"  stroke="#D4A44A" stroke-width="1"/>
+          <line x1="200" y1="0"   x2="200" y2="160" stroke="#D4A44A" stroke-width="1"/>
+          <line x1="200" y1="240" x2="200" y2="400" stroke="#D4A44A" stroke-width="1"/>
+          <line x1="0"   y1="200" x2="160" y2="200" stroke="#D4A44A" stroke-width="1"/>
+          <line x1="240" y1="200" x2="400" y2="200" stroke="#D4A44A" stroke-width="1"/>
+        </svg>
+      </div>
+
+      <div style="display:inline-flex;align-items:center;gap:8px;background:var(--brass-dim);border:1px solid var(--brass-line);border-radius:100px;padding:6px 16px;margin-bottom:28px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);font-weight:500;">
+        Free to join &mdash; No credit card needed
+      </div>
+
+      <h2 class="heading-lg" style="margin-bottom:16px;">Ready to shoot smarter?</h2>
+      <p class="body-lg" style="max-width:440px;margin:0 auto 40px;">Join shooters who track every card, test every pellet, and know exactly where their performance stands.</p>
+
+      <div class="cta-actions">
+        <a href="/app/register" class="btn-large">Create Your Free Account</a>
+        <a href="/app" class="btn-outline-lg">Sign In</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="26" stroke="#D4A44A" stroke-width="1.5"/>
+          <circle cx="40" cy="40" r="2.5" fill="#D4A44A"/>
+          <line x1="40" y1="6"  x2="40" y2="22" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="40" y1="58" x2="40" y2="74" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="6"  y1="40" x2="22" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="58" y1="40" x2="74" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <span>SUB12 &mdash; Precision Shooting Platform</span>
+      </div>
+      <div class="footer-links">
+        <a href="/app">App</a>
+        <a href="/app/register">Register</a>
+        <a href="/app/login">Sign In</a>
+      </div>
+      <p class="footer-copy">&copy; 2025 SUB12. Built by shooters.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

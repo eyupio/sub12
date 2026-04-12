@@ -414,6 +414,18 @@ export interface GroupTimelinePoint {
   distance_m: number
 }
 
+export interface ComboPerformanceSummary {
+  rifle_id: string
+  rifle_name: string
+  pellet_id: string
+  pellet_name: string
+  best_group_mm?: number
+  avg_group_mm?: number
+  test_count: number
+  consistency?: number
+  last_tested: string
+}
+
 // ── API ─────────────────────────────────────────────────────────────────────────
 
 export const pelletTestApi = {
@@ -502,4 +514,10 @@ export const pelletTestApi = {
   // Public leaderboard (no auth)
   publicLeaderboard: (limit = 50, offset = 0) =>
     api.get<{ items: PublicLeaderboardEntry[] }>(`/pellet-tests/public-leaderboard?limit=${limit}&offset=${offset}`),
+
+  // Combo analytics
+  comboAnalytics: (rifleId?: string) => {
+    const params = rifleId ? `?rifle_id=${rifleId}` : ''
+    return api.get<{ items: ComboPerformanceSummary[] }>(`/pellet-tests/combo-analytics${params}`)
+  },
 }

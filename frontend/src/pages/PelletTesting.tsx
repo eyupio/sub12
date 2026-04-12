@@ -56,6 +56,12 @@ export default function PelletTesting() {
             Batches
           </Link>
           <Link
+            to="/pellet-testing/combo-analytics"
+            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+          >
+            Combos
+          </Link>
+          <Link
             to="/pellet-testing/compare"
             className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
           >

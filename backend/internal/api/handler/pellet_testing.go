@@ -758,3 +758,28 @@ func (h *PelletTestHandler) PublicLeaderboard(w http.ResponseWriter, r *http.Req
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": entries})
 }
+
+// GET /api/v1/pellet-tests/combo-analytics?rifle_id=<uuid>
+func (h *PelletTestHandler) ComboAnalytics(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var rifleID *string
+	if rid := r.URL.Query().Get("rifle_id"); rid != "" {
+		rifleID = &rid
+	}
+
+	combos, err := h.svc.GetComboAnalytics(r.Context(), userID, rifleID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch combo analytics")
+		return
+	}
+
+	if combos == nil {
+		combos = []*model.ComboPerformanceSummary{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": combos})
+}

@@ -22,3 +22,10 @@ func (s *StatsService) GetUserStats(ctx context.Context, userID string) (*model.
 func (s *StatsService) GetRifleStats(ctx context.Context, userID string) ([]*model.RifleStats, error) {
 	return s.stats.GetRifleStats(ctx, userID)
 }
+
+func (s *StatsService) GetScoreTrends(ctx context.Context, userID, granularity string, rifleID *string) ([]*model.ScoreTrendPoint, error) {
+	if granularity != "week" && granularity != "month" {
+		granularity = "week"
+	}
+	return s.stats.GetScoreTrends(ctx, userID, granularity, rifleID)
+}

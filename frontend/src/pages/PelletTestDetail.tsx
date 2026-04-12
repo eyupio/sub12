@@ -2,7 +2,14 @@ import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download } from 'lucide-react'
-import { pelletTestApi, PelletTestGroup, PelletTestImage, type CreateMeasurementPayload } from '../api/pelletTesting'
+import {
+  pelletTestApi,
+  PelletTestGroup,
+  PelletTestImage,
+  type CreateMeasurementPayload,
+  type PelletTestMeasurement,
+} from '../api/pelletTesting'
+import type { DetectedHole } from '../utils/holeDetection'
 import ImageMeasurement from '../components/ImageMeasurement'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 
@@ -41,6 +48,12 @@ export default function PelletTestDetail() {
     queryKey: ['pellet-test-confidence', session?.rifle_id, session?.pellet_id],
     queryFn: () => pelletTestApi.confidenceBadge(session!.rifle_id, session!.pellet_id),
     enabled: !!session?.rifle_id && !!session?.pellet_id,
+  })
+
+  const { data: measurementsData, isLoading: measurementsLoading } = useQuery({
+    queryKey: ['pellet-tests', id, 'images', measureImage?.id, 'measurements'],
+    queryFn: () => pelletTestApi.getMeasurements(id!, measureImage!.id),
+    enabled: !!id && !!measureImage?.id,
   })
 
   const handleExport = async () => {
@@ -108,8 +121,47 @@ export default function PelletTestDetail() {
   const saveMeasurementMutation = useMutation({
     mutationFn: ({ imageId, payload }: { imageId: string; payload: CreateMeasurementPayload }) =>
       pelletTestApi.createMeasurement(id!, imageId, payload),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
+      setMeasureImage(null)
+    },
+  })
+
+  const saveDetectionsMutation = useMutation({
+    mutationFn: async ({
+      imageId,
+      payload,
+      detections,
+      annotatedBlob,
+    }: {
+      imageId: string
+      payload: CreateMeasurementPayload
+      detections: DetectedHole[]
+      annotatedBlob: Blob | null
+    }) => {
+      const measurement = await pelletTestApi.createMeasurement(id!, imageId, payload)
+
+      await pelletTestApi.createDetections(id!, imageId, measurement.id, {
+        detection_method: 'auto',
+        detections: detections.map(detection => ({
+          center_x: detection.centerX,
+          center_y: detection.centerY,
+          radius_pixels: detection.radiusPixels,
+          diameter_mm: detection.diameterMM,
+          confidence: detection.confidence,
+        })),
+      })
+
+      if (annotatedBlob) {
+        await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
+      }
+
+      return measurement
+    },
+    onSuccess: (_measurement, variables) => {
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
       setMeasureImage(null)
     },
   })
@@ -145,6 +197,10 @@ export default function PelletTestDetail() {
 
   const groups = session.groups ?? []
   const images = session.images ?? []
+  const existingMeasurement: PelletTestMeasurement | undefined =
+    measurementsData?.items && measurementsData.items.length > 0
+      ? measurementsData.items[measurementsData.items.length - 1]
+      : undefined
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
@@ -433,14 +489,30 @@ export default function PelletTestDetail() {
 
       {/* Measurement Modal */}
       {measureImage && session && (
-        <ImageMeasurement
-          imageUrl={measureImage.image_url}
-          distanceM={session.distance_m}
-          sessionId={id!}
-          imageId={measureImage.id}
-          onSave={(payload) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload })}
-          onClose={() => setMeasureImage(null)}
-        />
+        measurementsLoading ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-page">
+            <p className="text-sm text-muted">Loading measurement…</p>
+          </div>
+        ) : (
+          <ImageMeasurement
+            key={`${measureImage.id}:${existingMeasurement?.id ?? 'new'}`}
+            imageUrl={measureImage.image_url}
+            distanceM={session.distance_m}
+            sessionId={id!}
+            imageId={measureImage.id}
+            existingMeasurement={existingMeasurement}
+            onSave={(payload) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload })}
+            onSaveDetections={(payload, detections, annotatedBlob) =>
+              saveDetectionsMutation.mutate({
+                imageId: measureImage.id,
+                payload,
+                detections,
+                annotatedBlob,
+              })
+            }
+            onClose={() => setMeasureImage(null)}
+          />
+        )
       )}
     </div>
   )

@@ -27,6 +27,10 @@ import AdminEmailTemplates from './pages/AdminEmailTemplates'
 import ConfirmEmail from './pages/ConfirmEmail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import Clubs from './pages/Clubs'
+import ClubDetail from './pages/ClubDetail'
+import ScoreTrends from './pages/ScoreTrends'
+import ComboAnalytics from './pages/ComboAnalytics'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -162,6 +166,30 @@ const feedRoute = createRoute({
   component: Feed,
 })
 
+const clubsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/clubs',
+  component: Clubs,
+})
+
+const clubDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/clubs/$id',
+  component: ClubDetail,
+})
+
+const scoreTrendsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/scores/trends',
+  component: ScoreTrends,
+})
+
+const comboAnalyticsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing/combo-analytics',
+  component: ComboAnalytics,
+})
+
 
 const adminEmailSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -226,16 +254,20 @@ export const routeTree = rootRoute.addChildren([
     scoreHistoryRoute,
     scoreEntryRoute,
     scoreCardDetailRoute,
+    scoreTrendsRoute,
     pelletTestingRoute,
     newPelletTestRoute,
     pelletTestDetailRoute,
     pelletTestLeaderboardRoute,
     pelletComparisonRoute,
     batchReportRoute,
+    comboAnalyticsRoute,
     gearRoute,
     leaguesRoute,
     leagueDetailRoute,
     leagueSettingsRoute,
+    clubsRoute,
+    clubDetailRoute,
     profileRoute,
     userProfileRoute,
     feedRoute,

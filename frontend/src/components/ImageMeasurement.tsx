@@ -12,7 +12,7 @@ interface Props {
   imageId: string
   existingMeasurement?: PelletTestMeasurement
   onSave: (payload: CreateMeasurementPayload) => void
-  onSaveDetections?: (detections: DetectedHole[], annotatedBlob: Blob | null) => void
+  onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null) => void
   onClose: () => void
 }
 
@@ -60,7 +60,16 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       ? TARGET_PRESETS.find(p => p.id === existingMeasurement.target_preset) ?? null
       : null
   )
-  const [selectedRing, setSelectedRing] = useState<TargetRing | null>(null)
+  const [selectedRing, setSelectedRing] = useState<TargetRing | null>(() => {
+    if (!existingMeasurement?.target_preset || !existingMeasurement.reference_ring_name) return null
+    const preset = TARGET_PRESETS.find(p => p.id === existingMeasurement.target_preset)
+    return preset?.rings.find(r => r.name === existingMeasurement.reference_ring_name) ?? null
+  })
+  const [referenceDiameterInput, setReferenceDiameterInput] = useState(
+    existingMeasurement?.reference_diameter_mm != null
+      ? String(existingMeasurement.reference_diameter_mm)
+      : ''
+  )
   const [refCircle, setRefCircle] = useState<{ cx: number; cy: number; r: number } | null>(
     existingMeasurement
       ? { cx: existingMeasurement.ref_center_x, cy: existingMeasurement.ref_center_y, r: existingMeasurement.ref_radius_pixels }
@@ -323,7 +332,9 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
     if (drawState !== 'drawing') return
     setDrawState('none')
 
-    if (mode === 'calibrate' && selectedRing) {
+    const referenceDiameterMM = Number(referenceDiameterInput)
+
+    if (mode === 'calibrate' && referenceDiameterMM > 0) {
       const dx = drawCurrent.current.x - drawOrigin.current.x
       const dy = drawCurrent.current.y - drawOrigin.current.y
       const r = Math.sqrt(dx * dx + dy * dy)
@@ -332,7 +343,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       const circle = { cx: drawOrigin.current.x, cy: drawOrigin.current.y, r }
       setRefCircle(circle)
 
-      const ppm = (r * 2) / selectedRing.diameter_mm
+      const ppm = (r * 2) / referenceDiameterMM
       setPixelsPerMM(ppm)
       setMode('measure')
     }
@@ -355,7 +366,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       setMeasuredMOA(moa)
       setMode('idle')
     }
-  }, [isPanning, drawState, mode, selectedRing, pixelsPerMM, distanceM])
+  }, [isPanning, drawState, mode, referenceDiameterInput, pixelsPerMM, distanceM])
 
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -454,12 +465,36 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
     })
   }, [detectedHoles])
 
+  const buildMeasurementPayload = useCallback((): CreateMeasurementPayload | null => {
+    const referenceDiameterMM = Number(referenceDiameterInput)
+    if (!refCircle || pixelsPerMM <= 0 || referenceDiameterMM <= 0) return null
+
+    return {
+      calibration_type: 'target_ring',
+      target_preset: selectedPreset?.id,
+      reference_ring_name: selectedRing?.name,
+      reference_diameter_mm: referenceDiameterMM,
+      reference_pixels: refCircle.r * 2,
+      pixels_per_mm: pixelsPerMM,
+      ref_center_x: refCircle.cx,
+      ref_center_y: refCircle.cy,
+      ref_radius_pixels: refCircle.r,
+      bbox_x: bbox?.x,
+      bbox_y: bbox?.y,
+      bbox_width: bbox?.w,
+      bbox_height: bbox?.h,
+    }
+  }, [bbox, pixelsPerMM, refCircle, referenceDiameterInput, selectedPreset, selectedRing])
+
   const handleSaveDetections = useCallback(async () => {
     if (!onSaveDetections) return
+    const payload = buildMeasurementPayload()
+    if (!payload) return
     const active = detectedHoles.filter(h => h.status !== 'rejected')
+    if (active.length === 0) return
     const blob = await generateAnnotatedBlob()
-    onSaveDetections(active, blob)
-  }, [detectedHoles, generateAnnotatedBlob, onSaveDetections])
+    onSaveDetections(payload, active, blob)
+  }, [buildMeasurementPayload, detectedHoles, generateAnnotatedBlob, onSaveDetections])
 
   const handleConfirmAll = () => {
     setDetectedHoles(prev => prev.map(h => h.status === 'pending' ? { ...h, status: 'confirmed' as const } : h))
@@ -483,28 +518,13 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
   }
 
   const handleSave = () => {
-    if (!refCircle || pixelsPerMM <= 0) return
-
-    const payload: CreateMeasurementPayload = {
-      calibration_type: 'target_ring',
-      target_preset: selectedPreset?.id,
-      reference_ring_name: selectedRing?.name,
-      reference_diameter_mm: selectedRing?.diameter_mm ?? 0,
-      reference_pixels: refCircle.r * 2,
-      pixels_per_mm: pixelsPerMM,
-      ref_center_x: refCircle.cx,
-      ref_center_y: refCircle.cy,
-      ref_radius_pixels: refCircle.r,
-      bbox_x: bbox?.x,
-      bbox_y: bbox?.y,
-      bbox_width: bbox?.w,
-      bbox_height: bbox?.h,
-    }
+    const payload = buildMeasurementPayload()
+    if (!payload) return
     onSave(payload)
   }
 
   const startCalibrate = () => {
-    if (!selectedPreset || !selectedRing) return
+    if (!(Number(referenceDiameterInput) > 0)) return
     setMode('calibrate')
   }
 
@@ -543,6 +563,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
             onChange={e => {
               const ring = selectedPreset.rings.find(r => r.name === e.target.value)
               setSelectedRing(ring ?? null)
+              setReferenceDiameterInput(ring ? String(ring.diameter_mm) : '')
             }}
           >
             <option value="">Select ring…</option>
@@ -554,13 +575,24 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
           </select>
         )}
 
+        <input
+          type="number"
+          min="0.1"
+          step="0.1"
+          className={`${selectCls} w-32`}
+          value={referenceDiameterInput}
+          onChange={e => setReferenceDiameterInput(e.target.value)}
+          placeholder="Ref mm"
+          title="Reference diameter in mm. Example: 140 for a 14cm target."
+        />
+
         <div className="h-5 w-px bg-subtle" />
 
         {/* Mode buttons */}
         <button
           className={mode === 'calibrate' ? btnPrimary : btnSecondary}
           onClick={startCalibrate}
-          disabled={!selectedPreset || !selectedRing}
+          disabled={!(Number(referenceDiameterInput) > 0)}
           title="Draw circle on reference ring"
         >
           <Circle size={14} /> Calibrate
@@ -616,7 +648,11 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
               <X size={14} /> Reject All
             </button>
             {onSaveDetections && (
-              <button className={btnPrimary} onClick={handleSaveDetections}>
+              <button
+                className={btnPrimary}
+                onClick={handleSaveDetections}
+                disabled={detectedHoles.every(h => h.status === 'rejected')}
+              >
                 <Save size={14} /> Save Detections
               </button>
             )}
@@ -639,7 +675,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       <div className="flex flex-wrap items-center gap-4 border-b border-subtle px-3 py-1.5 bg-surface text-xs text-muted">
         {mode === 'calibrate' && (
           <span className="text-[var(--success-text)]">
-            Click center of the <strong>{selectedRing?.name}</strong> and drag to its edge
+            Click center of the <strong>{selectedRing?.name ?? 'reference circle'}</strong> and drag to its edge
           </span>
         )}
         {mode === 'measure' && (
@@ -648,7 +684,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
           </span>
         )}
         {mode === 'idle' && !refCircle && (
-          <span>Select a target preset and ring, then click Calibrate</span>
+          <span>Select a preset/ring or enter a custom diameter in mm, then click Calibrate</span>
         )}
         {mode === 'idle' && refCircle && !bbox && (
           <span>Calibrated — click Measure to draw bounding box, or Auto Detect</span>
@@ -662,6 +698,9 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
 
         {pixelsPerMM > 0 && (
           <span>Scale: <strong className="font-mono">{pixelsPerMM.toFixed(2)}</strong> px/mm</span>
+        )}
+        {Number(referenceDiameterInput) > 0 && (
+          <span>Reference: <strong className="font-mono">{Number(referenceDiameterInput).toFixed(1)} mm</strong></span>
         )}
         {measuredMM !== null && (
           <>

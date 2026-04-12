@@ -125,7 +125,10 @@ func main() {
 	socialRepo := repository.NewSocialRepository(pool)
 	socialSvc := service.NewSocialService(socialRepo)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, imageRepo)
+	clubRepo := repository.NewClubRepository(pool)
+	clubSvc := service.NewClubService(clubRepo)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

@@ -153,9 +153,9 @@
 
 ## Phase 3 — Analytics & Growth (After Phase 2)
 
-- [ ] Score trend analytics (time-series for scores and consistency)
-- [ ] Pellet/rifle combo analytics (cross-session performance insights)
-- [ ] Club pages and club-level dashboards
+- [x] Score trend analytics (time-series for scores and consistency)
+- [x] Pellet/rifle combo analytics (cross-session performance insights)
+- [x] Club pages and club-level dashboards
 - [ ] Season archives and historical comparisons
 - [ ] Third-party API (key-gated)
 - [ ] Push notifications

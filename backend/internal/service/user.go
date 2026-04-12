@@ -93,11 +93,7 @@ func (s *UserService) RequestEmailChange(ctx context.Context, userID, newEmail s
 		return ErrEmailAlreadyInUse
 	}
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
-		return err
-	}
-
-	user, err := s.users.GetByID(ctx, userID)
-	if err != nil {
+		s.log.Error().Err(err).Str("user_id", userID).Msg("email_change: lookup new email failed")
 		return err
 	}
 
@@ -109,12 +105,21 @@ func (s *UserService) RequestEmailChange(ctx context.Context, userID, newEmail s
 	expiresAt := time.Now().Add(emailChangeTTL)
 
 	if err := s.emailChangeTokens.Create(ctx, userID, newEmail, tokenHash, expiresAt); err != nil {
+		s.log.Error().Err(err).Str("user_id", userID).Msg("email_change: create token failed")
 		return err
+	}
+
+	// Fetch display name for the confirmation email; fall back to the email address.
+	displayName := newEmail
+	if user, err := s.users.GetByID(ctx, userID); err == nil {
+		displayName = user.DisplayName
+	} else {
+		s.log.Warn().Err(err).Str("user_id", userID).Msg("email_change: could not fetch display name, using email as fallback")
 	}
 
 	confirmLink := s.buildConfirmLink(token)
 	if s.emailSender != nil {
-		if err := s.emailSender.SendEmailChangeConfirmation(ctx, newEmail, user.DisplayName, confirmLink, expiresAt); err != nil {
+		if err := s.emailSender.SendEmailChangeConfirmation(ctx, newEmail, displayName, confirmLink, expiresAt); err != nil {
 			s.log.Error().Err(err).Str("event", "email_change_send_failed").Str("user_id", userID).Msg("audit")
 		}
 	}

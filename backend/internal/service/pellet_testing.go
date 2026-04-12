@@ -427,6 +427,10 @@ func (s *PelletTestService) GetConfidenceBadge(ctx context.Context, userID, rifl
 
 // ── Export ───────────────────────────────────────────────────────────────────────
 
+func (s *PelletTestService) GetComboAnalytics(ctx context.Context, userID string, rifleID *string) ([]*model.ComboPerformanceSummary, error) {
+	return s.repo.GetComboAnalytics(ctx, userID, rifleID)
+}
+
 func (s *PelletTestService) ExportSession(ctx context.Context, id, userID string) (*model.PelletTestExport, error) {
 	session, err := s.repo.GetByID(ctx, id, userID)
 	if err != nil {

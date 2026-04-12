@@ -62,3 +62,33 @@ func (r *StatsRepository) GetRifleStats(ctx context.Context, userID string) ([]*
 	}
 	return stats, rows.Err()
 }
+
+func (r *StatsRepository) GetScoreTrends(ctx context.Context, userID, granularity string, rifleID *string) ([]*model.ScoreTrendPoint, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			DATE_TRUNC($2, shot_at)::date::text            AS period,
+			ROUND(AVG(total_score)::numeric, 2)             AS avg_score,
+			MAX(total_score)::smallint                      AS best_score,
+			ROUND(COALESCE(STDDEV_POP(total_score), 0)::numeric, 2) AS std_dev,
+			COUNT(*)::int                                   AS card_count
+		FROM score_cards
+		WHERE user_id = $1
+		  AND ($3::UUID IS NULL OR rifle_id = $3)
+		GROUP BY DATE_TRUNC($2, shot_at)
+		ORDER BY period
+	`, userID, granularity, rifleID)
+	if err != nil {
+		return nil, fmt.Errorf("get score trends: %w", err)
+	}
+	defer rows.Close()
+
+	var points []*model.ScoreTrendPoint
+	for rows.Next() {
+		var p model.ScoreTrendPoint
+		if err := rows.Scan(&p.Period, &p.AvgScore, &p.BestScore, &p.StdDev, &p.CardCount); err != nil {
+			return nil, fmt.Errorf("scan trend point: %w", err)
+		}
+		points = append(points, &p)
+	}
+	return points, rows.Err()
+}

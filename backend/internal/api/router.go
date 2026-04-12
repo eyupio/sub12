@@ -35,6 +35,7 @@ func NewRouter(
 	smtp *service.SMTPService,
 	emailTemplates *service.EmailTemplateService,
 	emailSender *service.EmailSenderService,
+	clubs *service.ClubService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -91,6 +92,7 @@ func NewRouter(
 			sh := handler.NewStats(stats)
 			r.Get("/users/me/stats", sh.GetMe)
 			r.Get("/users/me/rifle-stats", sh.GetRifleStats)
+			r.Get("/users/me/score-trends", sh.GetScoreTrends)
 
 			// Score cards
 			sc := handler.NewScoreCard(scoreCards, images)
@@ -124,6 +126,7 @@ func NewRouter(
 			r.Get("/pellet-tests/timeline", pth.Timeline)
 			r.Get("/pellet-tests/confidence", pth.ConfidenceBadge)
 			r.Get("/pellet-tests/batch-report", pth.BatchReport)
+			r.Get("/pellet-tests/combo-analytics", pth.ComboAnalytics)
 			r.Post("/pellet-tests", pth.Create)
 			r.Get("/pellet-tests", pth.List)
 			r.Get("/pellet-tests/{id}", pth.Get)
@@ -200,6 +203,14 @@ func NewRouter(
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 
+			// Clubs (auth-required operations)
+			clh := handler.NewClub(clubs, images)
+			r.Post("/clubs", clh.Create)
+			r.Post("/clubs/{id}/join", clh.Join)
+			r.Get("/clubs/{id}/members", clh.ListMembers)
+			r.Delete("/clubs/{id}/members/{userId}", clh.RemoveMember)
+			r.Post("/clubs/{id}/image", clh.UploadImage)
+
 			// Achievements
 			ah := handler.NewAchievement(achievements)
 			r.Get("/users/me/achievements", ah.ListMine)
@@ -230,6 +241,12 @@ func NewRouter(
 		// Public pellet leaderboard (no auth required)
 		pth := handler.NewPelletTest(pelletTests, images)
 		r.Get("/pellet-tests/public-leaderboard", pth.PublicLeaderboard)
+
+		// Public club routes (no auth required; viewer context optional)
+		clh := handler.NewClub(clubs, images)
+		r.Get("/clubs", clh.List)
+		r.Get("/clubs/{id}", clh.GetByID)
+		r.Get("/clubs/{id}/standings", clh.GetStandings)
 	})
 
 	return r

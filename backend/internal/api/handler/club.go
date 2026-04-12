@@ -1,0 +1,203 @@
+package handler
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
+	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
+	"github.com/jnnngs/sub-12/backend/internal/service"
+)
+
+type ClubHandler struct {
+	svc    *service.ClubService
+	images *repository.ImageRepository
+}
+
+func NewClub(svc *service.ClubService, images *repository.ImageRepository) *ClubHandler {
+	return &ClubHandler{svc: svc, images: images}
+}
+
+// GET /api/v1/clubs
+func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
+	clubs, err := h.svc.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list clubs")
+		return
+	}
+	if clubs == nil {
+		clubs = []*model.Club{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": clubs})
+}
+
+// GET /api/v1/clubs/{id}
+func (h *ClubHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	clubID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+
+	club, err := h.svc.GetByID(r.Context(), clubID, viewerID)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get club")
+		return
+	}
+	writeJSON(w, http.StatusOK, club)
+}
+
+// POST /api/v1/clubs
+func (h *ClubHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input model.CreateClubInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	club, err := h.svc.Create(r.Context(), userID, &input)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidClub) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create club")
+		return
+	}
+	writeJSON(w, http.StatusCreated, club)
+}
+
+// POST /api/v1/clubs/{id}/join
+func (h *ClubHandler) Join(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	err := h.svc.Join(r.Context(), clubID, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrClubAlreadyMember) {
+			writeError(w, http.StatusConflict, "already a member of this club")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to join club")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"joined": true})
+}
+
+// GET /api/v1/clubs/{id}/members
+func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	members, err := h.svc.ListMembers(r.Context(), clubID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list members")
+		return
+	}
+	if members == nil {
+		members = []*model.ClubMember{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": members})
+}
+
+// GET /api/v1/clubs/{id}/standings
+func (h *ClubHandler) GetStandings(w http.ResponseWriter, r *http.Request) {
+	clubID := chi.URLParam(r, "id")
+	standings, err := h.svc.GetStandings(r.Context(), clubID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get standings")
+		return
+	}
+	if standings == nil {
+		standings = []*model.ClubStanding{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": standings})
+}
+
+// DELETE /api/v1/clubs/{id}/members/{userId}
+func (h *ClubHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	targetID := chi.URLParam(r, "userId")
+
+	if err := h.svc.RemoveMember(r.Context(), clubID, requesterID, targetID); err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to remove member")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /api/v1/clubs/{id}/image
+func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	data, contentType, err := parseAndValidateImage(r, "image", 5<<20)
+	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			writeError(w, http.StatusBadRequest, "file too large (max 5MB)")
+			return
+		}
+		if errors.Is(err, ErrMissingFile) {
+			writeError(w, http.StatusBadRequest, "missing image file")
+			return
+		}
+		if errors.Is(err, ErrUnsupportedType) {
+			writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to read image")
+		return
+	}
+
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
+		return
+	}
+
+	imageURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
+	if err := h.svc.UpdateImageURL(r.Context(), clubID, userID, imageURL); err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update club image")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"image_url": imageURL})
+}

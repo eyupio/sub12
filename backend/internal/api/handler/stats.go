@@ -52,3 +52,33 @@ func (h *StatsHandler) GetRifleStats(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": stats})
 }
+
+// GET /api/v1/users/me/score-trends?period=week&rifle_id=<uuid>
+func (h *StatsHandler) GetScoreTrends(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "week"
+	}
+
+	var rifleID *string
+	if rid := r.URL.Query().Get("rifle_id"); rid != "" {
+		rifleID = &rid
+	}
+
+	points, err := h.svc.GetScoreTrends(r.Context(), userID, period, rifleID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch score trends")
+		return
+	}
+
+	if points == nil {
+		points = []*model.ScoreTrendPoint{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": points})
+}

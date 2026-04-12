@@ -50,13 +50,21 @@ export default function ScoreHistory() {
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">My Cards</h1>
-        <Link
-          to="/scores/new"
-          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-        >
-          <Plus size={14} />
-          New
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/scores/trends"
+            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            Trends →
+          </Link>
+          <Link
+            to="/scores/new"
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+          >
+            <Plus size={14} />
+            New
+          </Link>
+        </div>
       </div>
 
       {/* Segmented control */}

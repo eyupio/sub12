@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
@@ -13,6 +13,7 @@ const baseNavItems = [
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
+  { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
 ] as const
