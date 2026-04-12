@@ -285,7 +285,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
       setMeasuredMOA(moa)
       setMode('idle')
     }
-  }, [isPanning, drawState, mode, selectedRing, pixelsPerMM, distanceM, draw])
+  }, [isPanning, drawState, mode, selectedRing, pixelsPerMM, distanceM])
 
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
