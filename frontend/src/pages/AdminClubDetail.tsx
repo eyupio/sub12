@@ -56,7 +56,7 @@ function ConfirmDeleteModal({ club, onConfirm, onCancel, isPending }: {
 }
 
 export default function AdminClubDetail() {
-  const { id } = useParams({ from: '/admin/clubs/$id' })
+  const { id } = useParams({ from: '/app/admin/clubs/$id' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -70,14 +70,16 @@ export default function AdminClubDetail() {
   const { data: club, isLoading, error } = useQuery({
     queryKey: ['admin-club', id],
     queryFn: () => adminClubsApi.get(id),
-    onSuccess: (c) => {
-      const n = c.name
-      const d = c.description ?? ''
-      setName(n)
-      setDescription(d)
-      setSavedSnapshot(JSON.stringify({ name: n, description: d }))
-    },
   })
+
+  useEffect(() => {
+    if (!club) return
+    const n = club.name
+    const d = club.description ?? ''
+    setName(n)
+    setDescription(d)
+    setSavedSnapshot(JSON.stringify({ name: n, description: d }))
+  }, [club])
 
   const { data: membersData } = useQuery({
     queryKey: ['admin-club-members', id],

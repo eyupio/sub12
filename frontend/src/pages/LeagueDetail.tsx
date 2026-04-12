@@ -300,11 +300,11 @@ export default function LeagueDetail() {
           <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs text-secondary bg-page rounded px-2 py-1.5 truncate font-mono">
-              {`${window.location.origin}/leagues/${leagueId}?code=${encodeURIComponent(league.join_code)}`}
+              {`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`}
             </code>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId}?code=${encodeURIComponent(league.join_code)}`)
+                navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}

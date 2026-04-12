@@ -56,7 +56,7 @@ function ConfirmDeleteModal({ league, onConfirm, onCancel, isPending }: {
 }
 
 export default function AdminLeagueDetail() {
-  const { id } = useParams({ from: '/admin/leagues/$id' })
+  const { id } = useParams({ from: '/app/admin/leagues/$id' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -70,14 +70,16 @@ export default function AdminLeagueDetail() {
   const { data: league, isLoading, error } = useQuery({
     queryKey: ['admin-league', id],
     queryFn: () => adminLeaguesApi.get(id),
-    onSuccess: (l) => {
-      const n = l.name
-      const d = l.description ?? ''
-      setName(n)
-      setDescription(d)
-      setSavedSnapshot(JSON.stringify({ name: n, description: d }))
-    },
   })
+
+  useEffect(() => {
+    if (!league) return
+    const n = league.name
+    const d = league.description ?? ''
+    setName(n)
+    setDescription(d)
+    setSavedSnapshot(JSON.stringify({ name: n, description: d }))
+  }, [league])
 
   const { data: membersData } = useQuery({
     queryKey: ['admin-league-members', id],

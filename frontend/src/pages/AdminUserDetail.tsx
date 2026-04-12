@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, X } from 'lucide-react'
@@ -56,7 +56,7 @@ function ConfirmDeleteModal({ user, onConfirm, onCancel, isPending }: {
 }
 
 export default function AdminUserDetail() {
-  const { id } = useParams({ from: '/admin/users/$id' })
+  const { id } = useParams({ from: '/app/admin/users/$id' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
@@ -69,8 +69,12 @@ export default function AdminUserDetail() {
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['admin-user', id],
     queryFn: () => adminUsersApi.get(id),
-    onSuccess: (u) => setSelectedRole(u.role),
   })
+
+  useEffect(() => {
+    if (!user) return
+    setSelectedRole(user.role)
+  }, [user])
 
   const roleMutation = useMutation({
     mutationFn: () => adminUsersApi.updateRole(id, selectedRole),
@@ -116,7 +120,7 @@ export default function AdminUserDetail() {
     )
   }
 
-  const isSelf = currentUser?.user_id === id
+  const isSelf = currentUser?.id === id
 
   return (
     <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-6">
