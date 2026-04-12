@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Camera, Trash2 } from 'lucide-react'
 import { leagueApi, LeagueConfig, League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -38,7 +39,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
           const file = e.target.files?.[0]
           if (file) {
             if (file.size > 5 * 1024 * 1024) {
-              alert('Image must be under 5 MB')
+              toast('Image must be under 5 MB', 'error')
             } else {
               mutation.mutate(file)
             }
