@@ -32,6 +32,10 @@ function AvatarUpload() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be under 5 MB')
+        return
+      }
       avatarMutation.mutate(file)
     }
   }

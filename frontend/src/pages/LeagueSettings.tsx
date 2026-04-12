@@ -35,7 +35,13 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0]
-          if (file) mutation.mutate(file)
+          if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+              alert('Image must be under 5 MB')
+            } else {
+              mutation.mutate(file)
+            }
+          }
           e.target.value = ''
         }}
       />

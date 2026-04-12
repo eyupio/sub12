@@ -1,8 +1,10 @@
+import { PropsWithChildren } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Package, Trophy, User, LogOut, Sun, Moon, Monitor } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
+import { CornerMark } from './CornerMark'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -36,20 +38,7 @@ function ThemeToggle() {
   )
 }
 
-// Minimal crosshair corner mark
-function CornerMark({ className }: { className: string }) {
-  return (
-    <svg
-      viewBox="0 0 30 30"
-      className={`fixed w-[30px] h-[30px] opacity-[0.08] pointer-events-none z-0 ${className}`}
-    >
-      <line x1="15" y1="0" x2="15" y2="30" stroke="currentColor" strokeWidth="0.5"/>
-      <line x1="0"  y1="15" x2="30" y2="15" stroke="currentColor" strokeWidth="0.5"/>
-    </svg>
-  )
-}
-
-export default function Layout() {
+export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
   const theme = useThemeStore((s) => s.theme)
@@ -144,7 +133,7 @@ export default function Layout() {
 
         {/* Page content */}
         <main className="flex-1 overflow-auto">
-          <Outlet />
+          {children ?? <Outlet />}
         </main>
 
         {/* Mobile bottom nav */}
