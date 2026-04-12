@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
 import { CornerMark } from './CornerMark'
+import { ThemeToggle } from './ThemeToggle'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,30 +15,6 @@ const navItems = [
   { to: '/gear', icon: Package, label: 'Gear' },
   { to: '/profile', icon: User, label: 'Profile' },
 ] as const
-
-function ThemeToggle() {
-  const { theme, setTheme } = useThemeStore()
-
-  function cycle() {
-    if (theme === 'dark') setTheme('light')
-    else if (theme === 'light') setTheme('system')
-    else setTheme('dark')
-  }
-
-  const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
-  const title = theme === 'dark' ? 'Dark mode' : theme === 'light' ? 'Light mode' : 'System theme'
-
-  return (
-    <button
-      onClick={cycle}
-      className="text-muted hover:text-secondary transition-colors"
-      aria-label={title}
-      title={title}
-    >
-      <Icon size={17} />
-    </button>
-  )
-}
 
 export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
