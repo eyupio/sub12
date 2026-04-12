@@ -78,14 +78,39 @@
 
 ## Phase 2 — Community
 
-- [ ] Private leagues (invite codes)
-- [ ] Social follow / unfollow
+### Phase 2A — League Access & Governance
+
+**Goal:** Complete league participation controls, moderation, and league administration foundations.
+
+- [x] League join policies (open / approval / invite), invite flows, and approval join path
+- [x] Join request moderation UI/actions (`JoinRequestsList`)
+- [x] League configuration/admin controls (scoring rule, verification flags)
+- [x] Season management (`SeasonsSection`)
+- [x] Round management (`RoundsSection`)
+- [x] League image upload support
+
+### Phase 2B — Score Verification & Media
+
+**Goal:** Support evidence-backed scoring with verification actions and attached media.
+
+- [x] Score verification actions in score card detail
+- [x] Score verification audit trail surfaced in UI/API
+- [x] Score card image upload path (client + API integration)
+
+### Phase 2C — Social Layer
+
+**Goal:** Add user-to-user and card-level social interactions around league and score activity.
+
+- [ ] Social follow / unfollow graph
 - [ ] Activity feed (followed shooters + leagues)
-- [ ] Score card comments
-- [ ] Score card image upload (S3-compatible storage)
+- [ ] Score card comments/threading
+
+### Phase 2D — Recognition & Distribution
+
+**Goal:** Add progression systems and complete mobile distribution pipeline.
+
 - [ ] Achievements / badges engine
-- [ ] League admin tools (approve scores, manage members, rounds)
-- [ ] Mobile app builds (Capacitor iOS + Android)
+- [ ] Mobile app store packaging/release workflow
 
 ---
 
