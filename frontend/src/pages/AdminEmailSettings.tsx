@@ -43,7 +43,14 @@ export default function AdminEmailSettings() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-email-settings'],
-    queryFn: adminEmailApi.getSettings,
+    queryFn: async () => {
+      try {
+        return await adminEmailApi.getSettings()
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('API error 404')) return null
+        throw err
+      }
+    },
     retry: false,
   })
 
