@@ -23,9 +23,9 @@
     --border-subtle: rgba(0, 0, 0, 0.10);
     --border-strong: rgba(0, 0, 0, 0.18);
 
-    --surface: rgba(0, 0, 0, 0.03);
-    --surface-hover: rgba(0, 0, 0, 0.06);
-    --surface-active: rgba(0, 0, 0, 0.08);
+    --surface: rgba(255, 255, 255, 0.18);
+    --surface-hover: rgba(255, 255, 255, 0.24);
+    --surface-active: rgba(255, 255, 255, 0.30);
 
     --nav-bg: rgba(255, 255, 255, 0.92);
     --overlay-bg: rgba(0, 0, 0, 0.40);
@@ -62,9 +62,9 @@
     --border-subtle: rgba(255, 255, 255, 0.06);
     --border-strong: rgba(255, 255, 255, 0.12);
 
-    --surface: rgba(255, 255, 255, 0.03);
-    --surface-hover: rgba(255, 255, 255, 0.06);
-    --surface-active: rgba(255, 255, 255, 0.10);
+    --surface: rgba(17, 17, 17, 0.35);
+    --surface-hover: rgba(17, 17, 17, 0.48);
+    --surface-active: rgba(17, 17, 17, 0.62);
 
     --nav-bg: rgba(17, 17, 17, 0.92);
     --overlay-bg: rgba(0, 0, 0, 0.60);
@@ -147,7 +147,7 @@
   .bg-surface-active { background-color: var(--surface-active); }
   .bg-nav           { background-color: var(--nav-bg); }
   .bg-page          { background-color: var(--gunmetal); }
-  .bg-card          { background-color: var(--carbon); }
+  .bg-card          { background-color: var(--surface); }
 
   .border-subtle { border-color: var(--border-subtle); }
   .border-strong { border-color: var(--border-strong); }
