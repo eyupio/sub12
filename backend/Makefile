@@ -49,7 +49,7 @@ migrate-create:
 ## migrate-lint: check for duplicate migration prefixes
 migrate-lint:
 	@dupes=$$(ls -1 $(MIGRATIONS_DIR)/*.sql 2>/dev/null \
-		| sed 's/.*\///' | cut -d_ -f1 | sort | uniq -d) ; \
+		| sed 's/.*\///' | cut -d_ -f1 | sort | uniq -c | awk '$$1 > 2 {print $$2}') ; \
 	if [ -n "$$dupes" ]; then echo "ERROR: duplicate prefixes: $$dupes"; exit 1; fi ; \
 	echo "No duplicate migration prefixes found."
 

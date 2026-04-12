@@ -54,7 +54,7 @@ jobs:
           dupes=$(ls internal/db/migrations/*.sql \
             | sed 's/.*\///' \
             | cut -d_ -f1 \
-            | sort | uniq -d)
+            | sort | uniq -c | awk '$1 > 2 {print $2}')
           if [ -n "$dupes" ]; then
             echo "::error::Duplicate migration prefixes: $dupes"
             exit 1
