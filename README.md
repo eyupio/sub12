@@ -79,3 +79,18 @@ cd backend && make migrate-up
 # Roll back last migration
 cd backend && make migrate-down
 ```
+
+## Mobile keyboard + navigation policy
+
+For mobile shell layout consistency, SUB-12 uses this focused-input behavior:
+
+- Keep the app content scrollable and resized above the on-screen keyboard.
+- Temporarily hide the mobile header and bottom navigation while the keyboard is open.
+- Restore header/nav immediately after the keyboard closes.
+
+Implementation details:
+
+- `frontend/src/components/Layout.tsx` detects keyboard-open state on small screens via `window.visualViewport` height changes and toggles mobile header/bottom nav visibility.
+- `frontend/capacitor.config.ts` sets Capacitor Keyboard plugin `resize: "body"` (with `resizeOnFullScreen: true`) so content reflows instead of being obscured.
+
+If you adjust shell navigation, spacing, or keyboard behavior, preserve this policy so focused inputs remain usable on iOS and Android.

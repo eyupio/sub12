@@ -1,4 +1,4 @@
-import { PropsWithChildren } from 'react'
+import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
@@ -20,6 +20,30 @@ export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
   const theme = useThemeStore((s) => s.theme)
+  const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return
+
+    const viewport = window.visualViewport
+    const smallScreen = () => window.matchMedia('(max-width: 1023px)').matches
+
+    const updateKeyboardState = () => {
+      if (!smallScreen()) {
+        setIsMobileKeyboardOpen(false)
+        return
+      }
+
+      const viewportShrink = window.innerHeight - viewport.height
+      const keyboardVisibleThreshold = 120
+      setIsMobileKeyboardOpen(viewportShrink > keyboardVisibleThreshold)
+    }
+
+    updateKeyboardState()
+    viewport.addEventListener('resize', updateKeyboardState)
+
+    return () => viewport.removeEventListener('resize', updateKeyboardState)
+  }, [])
 
   // Resolve effective theme for logo selection
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -88,7 +112,7 @@ export default function Layout({ children }: PropsWithChildren) {
       {/* ── Main content column ──────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
-        <header className="lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 flex items-center justify-between">
+        <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
           <img
             src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
             alt="SUB12"
@@ -110,12 +134,12 @@ export default function Layout({ children }: PropsWithChildren) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto pb-[var(--mobile-nav-offset)] lg:pb-0">
+        <main className={`flex-1 overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
           {children ?? <Outlet />}
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden">
+        <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-6 w-full min-h-[var(--mobile-nav-offset)]">
             {navItems.map(({ to, icon: Icon, label, mobileLabel }) => (
               <Link
