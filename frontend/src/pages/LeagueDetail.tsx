@@ -40,34 +40,6 @@ function LeagueScoreRow({ score }: { score: LeagueScore }) {
   )
 }
 
-function VerificationDot({ status }: { status: string }) {
-  if (status === 'verified') return <CheckCircle size={14} className="text-[var(--success-text)] shrink-0" />
-  if (status === 'rejected') return <XCircle size={14} className="text-[var(--error-text)] shrink-0" />
-  return <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
-}
-
-function LeagueScoreRow({ score }: { score: LeagueScore }) {
-  return (
-    <Link
-      to="/scores/$id"
-      params={{ id: score.id }}
-      className="flex items-center justify-between py-3 border-b border-subtle last:border-0"
-    >
-      <div className="min-w-0">
-        <p className="text-sm text-secondary truncate">{score.display_name}</p>
-        <p className="text-[11px] text-muted font-mono">{score.shot_at}</p>
-      </div>
-      <div className="flex items-center gap-3 font-mono shrink-0">
-        <VerificationDot status={score.verification} />
-        <span className="text-lg font-semibold text-primary">{score.total_score}</span>
-        {score.x_count > 0 && (
-          <span className="text-sm text-[var(--brass)]">{score.x_count}X</span>
-        )}
-      </div>
-    </Link>
-  )
-}
-
 function StandingRow({ standing }: { standing: LeagueStanding }) {
   return (
     <div className="flex items-center gap-3 py-3 border-b border-subtle last:border-0">
