@@ -49,6 +49,17 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
+      - name: Lint migrations (no duplicate prefixes)
+        run: |
+          dupes=$(ls internal/db/migrations/*.sql \
+            | sed 's/.*\///' \
+            | cut -d_ -f1 \
+            | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate migration prefixes: $dupes"
+            exit 1
+          fi
+
       - name: Vet
         run: go vet ./...
 

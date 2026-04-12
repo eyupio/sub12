@@ -28,10 +28,11 @@ func Migrate(dbURL string) error {
 	defer m.Close()
 
 	// If the database is dirty from a previously failed migration,
-	// roll back to the previous version so the failed migration is retried.
+	// force-set the version to itself (clearing the dirty flag) so the
+	// idempotent migration SQL can be retried cleanly.
 	version, dirty, verr := m.Version()
 	if verr == nil && dirty {
-		if ferr := m.Force(int(version) - 1); ferr != nil {
+		if ferr := m.Force(int(version)); ferr != nil {
 			return fmt.Errorf("force dirty version %d: %w", version, ferr)
 		}
 	}

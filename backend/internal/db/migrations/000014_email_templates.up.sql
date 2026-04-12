@@ -14,14 +14,14 @@ VALUES
         'forgot_password',
         'Reset your Sub-12 password',
         '<p>Hello {{.display_name}},</p><p>Use this link to reset your password: <a href="{{.reset_link}}">Reset password</a>.</p>',
-        'Hello {{.display_name}},\n\nUse this link to reset your password: {{.reset_link}}',
+        E'Hello {{.display_name}},\n\nUse this link to reset your password: {{.reset_link}}',
         TRUE
     ),
     (
         'welcome',
         'Welcome to Sub-12, {{.display_name}}!',
-        '<p>Welcome to Sub-12, {{.display_name}}!</p><p>We\'re glad to have you.</p>',
-        'Welcome to Sub-12, {{.display_name}}!\nWe\'re glad to have you.',
+        '<p>Welcome to Sub-12, {{.display_name}}!</p><p>We''re glad to have you.</p>',
+        E'Welcome to Sub-12, {{.display_name}}!\nWe''re glad to have you.',
         TRUE
     ),
     (

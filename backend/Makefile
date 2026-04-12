@@ -37,8 +37,21 @@ migrate-down:
 	migrate -path $(MIGRATIONS_DIR) -database "$(MIGRATE_URL)" down 1
 
 ## migrate-create: create a new migration (usage: make migrate-create NAME=add_foo)
+## Auto-detects the next sequence number to prevent duplicate prefixes.
 migrate-create:
-	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(NAME)
+	@NEXT=$$(ls -1 $(MIGRATIONS_DIR)/*.sql 2>/dev/null \
+		| sed 's/.*\///' | cut -d_ -f1 | sort -n | tail -1 \
+		| awk '{printf "%06d", $$1+1}') ; \
+	if [ -z "$$NEXT" ]; then NEXT="000001"; fi ; \
+	echo "Creating migration $$NEXT\_$(NAME)" ; \
+	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq -digits 6 $(NAME)
+
+## migrate-lint: check for duplicate migration prefixes
+migrate-lint:
+	@dupes=$$(ls -1 $(MIGRATIONS_DIR)/*.sql 2>/dev/null \
+		| sed 's/.*\///' | cut -d_ -f1 | sort | uniq -d) ; \
+	if [ -n "$$dupes" ]; then echo "ERROR: duplicate prefixes: $$dupes"; exit 1; fi ; \
+	echo "No duplicate migration prefixes found."
 
 ## seed: load development seed data (dev/admin accounts, password: password123)
 seed:
