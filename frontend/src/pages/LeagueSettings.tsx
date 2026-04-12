@@ -60,7 +60,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
           {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading...</p>}
-          {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">Upload failed. Please try again.</p>}
+          {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">{mutation.error instanceof Error ? mutation.error.message : 'Upload failed. Please try again.'}</p>}
         </div>
       </div>
     </div>
