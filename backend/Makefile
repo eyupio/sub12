@@ -1,5 +1,9 @@
 .PHONY: run build test migrate-up migrate-down lint tidy seed
 
+# Load .env so DB_USER, DB_PASSWORD etc. are available to make targets.
+-include ../.env
+export
+
 MIGRATE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 MIGRATIONS_DIR := internal/db/migrations
 

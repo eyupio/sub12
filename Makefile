@@ -1,8 +1,9 @@
 .PHONY: dev up down logs build
 
 ## dev: start infrastructure (postgres + redis) for local development
+## Uses .env if present; docker-compose.dev.yml already has safe defaults.
 dev:
-	docker compose -f docker-compose.dev.yml --env-file .env up -d
+	docker compose -f docker-compose.dev.yml $(if $(wildcard .env),--env-file .env,) up -d
 	@echo "Postgres on :5432, Redis on :6379"
 	@echo "Run 'cd backend && make run' and 'cd frontend && npm run dev'"
 
