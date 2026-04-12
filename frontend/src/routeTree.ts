@@ -2,7 +2,7 @@ import { createRootRoute, createRoute, redirect } from '@tanstack/react-router'
 import { useAuthStore } from './store/auth'
 import Layout from './components/Layout'
 import AuthLayout from './components/AuthLayout'
-import Dashboard from './pages/Dashboard'
+import IndexPage from './pages/IndexPage'
 import ScoreEntry from './pages/ScoreEntry'
 import ScoreHistory from './pages/ScoreHistory'
 import ScoreCardDetail from './pages/ScoreCardDetail'
@@ -37,9 +37,9 @@ const appRoute = createRoute({
 })
 
 const indexRoute = createRoute({
-  getParentRoute: () => appRoute,
+  getParentRoute: () => rootRoute,
   path: '/',
-  component: Dashboard,
+  component: IndexPage,
 })
 
 const scoreHistoryRoute = createRoute({
@@ -111,8 +111,8 @@ const registerRoute = createRoute({
 })
 
 export const routeTree = rootRoute.addChildren([
+  indexRoute,
   appRoute.addChildren([
-    indexRoute,
     scoreHistoryRoute,
     scoreEntryRoute,
     scoreCardDetailRoute,

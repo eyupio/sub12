@@ -29,7 +29,13 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0]
-          if (file) onUpload(file)
+          if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+              alert('Image must be under 5 MB')
+            } else {
+              onUpload(file)
+            }
+          }
           e.target.value = ''
         }}
       />

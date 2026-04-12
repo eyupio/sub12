@@ -82,6 +82,10 @@ export default function ScoreEntry() {
 
   function handleImageSelect(file: File | undefined) {
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Image must be under 10 MB')
+        return
+      }
       setImageFile(file)
       setImagePreview(URL.createObjectURL(file))
     }
