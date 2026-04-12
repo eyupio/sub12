@@ -11,6 +11,7 @@ import (
 )
 
 var ErrInvalidPelletTest = errors.New("invalid pellet test")
+var ErrInvalidMeasurement = errors.New("invalid measurement")
 
 type PelletTestService struct {
 	repo *repository.PelletTestRepository
@@ -174,4 +175,105 @@ func (s *PelletTestService) GetLeaderboard(ctx context.Context, userID, rifleID 
 
 func (s *PelletTestService) GetStats(ctx context.Context, userID string) (*model.PelletTestStats, error) {
 	return s.repo.GetStats(ctx, userID)
+}
+
+// ── Measurements ────────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) CreateMeasurement(ctx context.Context, sessionID, userID, imageID string, in *model.CreatePelletTestMeasurementInput) (*model.PelletTestMeasurement, error) {
+	if in.PixelsPerMM <= 0 {
+		return nil, fmt.Errorf("%w: pixels_per_mm must be positive", ErrInvalidMeasurement)
+	}
+	if in.ReferenceDiameterMM <= 0 {
+		return nil, fmt.Errorf("%w: reference_diameter_mm must be positive", ErrInvalidMeasurement)
+	}
+
+	// Compute measured size from bounding box if bbox is provided
+	if in.BboxWidth != nil && in.BboxHeight != nil {
+		diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
+		sizeMM := diag / in.PixelsPerMM
+		in.MeasuredSizeMM = &sizeMM
+
+		// Calculate MOA from session distance
+		session, err := s.repo.GetByID(ctx, sessionID, userID)
+		if err != nil {
+			return nil, err
+		}
+		moa := calcMOA(sizeMM, session.DistanceM)
+		in.MeasuredSizeMOA = &moa
+	}
+
+	return s.repo.CreateMeasurement(ctx, sessionID, userID, imageID, in)
+}
+
+func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imageID string) ([]*model.PelletTestMeasurement, error) {
+	return s.repo.GetMeasurementsByImage(ctx, sessionID, imageID)
+}
+
+func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID, sessionID, userID string, in *model.UpdatePelletTestMeasurementInput) (*model.PelletTestMeasurement, error) {
+	// Recompute measured size if bbox updated
+	if in.BboxWidth != nil && in.BboxHeight != nil {
+		// Need the measurement's pixels_per_mm — fetch existing measurement
+		existing, err := s.repo.GetMeasurementsByImage(ctx, sessionID, "")
+		if err != nil {
+			return nil, err
+		}
+		var found *model.PelletTestMeasurement
+		for _, m := range existing {
+			if m.ID == measurementID {
+				found = m
+				break
+			}
+		}
+		if found != nil {
+			diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
+			sizeMM := diag / found.PixelsPerMM
+			in.MeasuredSizeMM = &sizeMM
+
+			session, err := s.repo.GetByID(ctx, sessionID, userID)
+			if err != nil {
+				return nil, err
+			}
+			moa := calcMOA(sizeMM, session.DistanceM)
+			in.MeasuredSizeMOA = &moa
+		}
+	}
+
+	return s.repo.UpdateMeasurement(ctx, measurementID, sessionID, userID, in)
+}
+
+func (s *PelletTestService) DeleteMeasurement(ctx context.Context, measurementID, sessionID, userID string) error {
+	return s.repo.DeleteMeasurement(ctx, measurementID, sessionID, userID)
+}
+
+// ── Comparison ──────────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) GetComparison(ctx context.Context, userID, rifleID, pelletAID, pelletBID string) (*model.PelletComparisonData, error) {
+	if rifleID == "" || pelletAID == "" || pelletBID == "" {
+		return nil, fmt.Errorf("%w: rifle_id, pellet_a, and pellet_b are required", ErrInvalidPelletTest)
+	}
+
+	sideA, err := s.repo.GetComparisonSide(ctx, userID, rifleID, pelletAID)
+	if err != nil {
+		return nil, fmt.Errorf("pellet A: %w", err)
+	}
+
+	sideB, err := s.repo.GetComparisonSide(ctx, userID, rifleID, pelletBID)
+	if err != nil {
+		return nil, fmt.Errorf("pellet B: %w", err)
+	}
+
+	return &model.PelletComparisonData{
+		RifleID: rifleID,
+		PelletA: sideA,
+		PelletB: sideB,
+	}, nil
+}
+
+// ── Timeline ────────────────────────────────────────────────────────────────────
+
+func (s *PelletTestService) GetGroupTimeline(ctx context.Context, userID, rifleID string) ([]*model.GroupTimelinePoint, error) {
+	if rifleID == "" {
+		return nil, fmt.Errorf("%w: rifle_id is required", ErrInvalidPelletTest)
+	}
+	return s.repo.GetGroupTimeline(ctx, userID, rifleID)
 }

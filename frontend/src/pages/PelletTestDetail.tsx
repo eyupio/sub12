@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check } from 'lucide-react'
-import { pelletTestApi, PelletTestGroup, PelletTestImage } from '../api/pelletTesting'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair } from 'lucide-react'
+import { pelletTestApi, PelletTestGroup, PelletTestImage, type CreateMeasurementPayload } from '../api/pelletTesting'
+import ImageMeasurement from '../components/ImageMeasurement'
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
@@ -25,6 +26,9 @@ export default function PelletTestDetail() {
   const [newGroupNotes, setNewGroupNotes] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // Measurement modal state
+  const [measureImage, setMeasureImage] = useState<PelletTestImage | null>(null)
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -76,6 +80,15 @@ export default function PelletTestDetail() {
     mutationFn: (imageId: string) => pelletTestApi.deleteImage(id!, imageId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
+    },
+  })
+
+  const saveMeasurementMutation = useMutation({
+    mutationFn: ({ imageId, payload }: { imageId: string; payload: CreateMeasurementPayload }) =>
+      pelletTestApi.createMeasurement(id!, imageId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
+      setMeasureImage(null)
     },
   })
 
@@ -200,11 +213,56 @@ export default function PelletTestDetail() {
               <p className="text-secondary font-mono">{session.humidity_pct}%</p>
             </div>
           )}
+          {session.barometric_pressure_mbar != null && (
+            <div>
+              <span className="text-muted text-[10px] tracking-wide uppercase">Pressure</span>
+              <p className="text-secondary font-mono">{session.barometric_pressure_mbar} mbar</p>
+            </div>
+          )}
+          {session.bench_setup && (
+            <div>
+              <span className="text-muted text-[10px] tracking-wide uppercase">Bench Setup</span>
+              <p className="text-secondary">{session.bench_setup}</p>
+            </div>
+          )}
+          {session.scope_details && (
+            <div>
+              <span className="text-muted text-[10px] tracking-wide uppercase">Scope</span>
+              <p className="text-secondary">{session.scope_details}</p>
+            </div>
+          )}
         </div>
         {session.notes && (
           <p className="text-sm text-muted mt-2 border-t border-subtle pt-2">{session.notes}</p>
         )}
       </div>
+
+      {/* Velocity / Chrono */}
+      {(session.velocity_fps != null || session.velocity_sd != null || session.extreme_spread_fps != null) && (
+        <div className="p-3 lg:p-4 rounded border border-subtle bg-surface">
+          <p className="text-[10px] tracking-widest uppercase text-muted mb-2">Chronograph</p>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            {session.velocity_fps != null && (
+              <div>
+                <span className="text-muted text-[10px] tracking-wide uppercase">Avg FPS</span>
+                <p className="text-secondary font-mono">{session.velocity_fps}</p>
+              </div>
+            )}
+            {session.velocity_sd != null && (
+              <div>
+                <span className="text-muted text-[10px] tracking-wide uppercase">SD</span>
+                <p className="text-secondary font-mono">{session.velocity_sd}</p>
+              </div>
+            )}
+            {session.extreme_spread_fps != null && (
+              <div>
+                <span className="text-muted text-[10px] tracking-wide uppercase">ES</span>
+                <p className="text-secondary font-mono">{session.extreme_spread_fps} fps</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {session.group_count > 0 && (
@@ -306,8 +364,16 @@ export default function PelletTestDetail() {
         {images.length > 0 && (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             {images.map((img: PelletTestImage) => (
-              <div key={img.id} className="relative">
-                <img src={img.image_url} alt="" className="rounded border border-subtle w-full aspect-square object-cover" />
+              <div key={img.id} className="relative group">
+                <img src={img.image_url} alt="" className="rounded border border-subtle w-full aspect-square object-cover cursor-pointer" onClick={() => setMeasureImage(img)} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMeasureImage(img) }}
+                  className="absolute bottom-1 left-1 bg-page/80 backdrop-blur rounded-full p-1 text-[var(--brass)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Measure image"
+                  title="Open measurement tool"
+                >
+                  <Crosshair size={14} />
+                </button>
                 <button
                   onClick={() => { if (window.confirm('Remove this photo?')) deleteImageMutation.mutate(img.id) }}
                   className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
@@ -329,6 +395,18 @@ export default function PelletTestDetail() {
           </button>
         </div>
       </div>
+
+      {/* Measurement Modal */}
+      {measureImage && session && (
+        <ImageMeasurement
+          imageUrl={measureImage.image_url}
+          distanceM={session.distance_m}
+          sessionId={id!}
+          imageId={measureImage.id}
+          onSave={(payload) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload })}
+          onClose={() => setMeasureImage(null)}
+        />
+      )}
     </div>
   )
 }

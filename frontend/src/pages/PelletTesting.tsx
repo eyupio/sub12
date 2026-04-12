@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trophy, ChevronRight, Crosshair } from 'lucide-react'
+import { Plus, Trophy, ChevronRight, Crosshair, ArrowLeftRight } from 'lucide-react'
 import { pelletTestApi, PelletTestSessionSummary } from '../api/pelletTesting'
 import { gearApi, Rifle } from '../api/gear'
+import GroupSizeTimeline from '../components/GroupSizeTimeline'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -47,13 +48,22 @@ export default function PelletTesting() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Pellet Testing</h1>
-        <Link
+        <div className="flex items-center gap-2">
+          <Link
+            to="/pellet-testing/compare"
+            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+          >
+            <ArrowLeftRight size={14} />
+            Compare
+          </Link>
+          <Link
           to="/pellet-testing/new"
           className="flex items-center gap-1.5 px-4 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase hover:opacity-90 transition-opacity"
         >
           <Plus size={14} />
           New Test
         </Link>
+        </div>
       </div>
 
       {/* Stats grid */}
@@ -153,6 +163,13 @@ export default function PelletTesting() {
           )}
         </div>
       </div>
+
+      {/* Group Size Timeline */}
+      {rifles.length > 0 && (
+        <div className="p-4 rounded border border-subtle bg-surface">
+          <GroupSizeTimeline rifleId={rifles[0].id} />
+        </div>
+      )}
     </div>
   )
 }

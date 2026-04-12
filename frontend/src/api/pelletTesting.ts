@@ -17,6 +17,12 @@ export interface PelletTestSession {
   temp_celsius?: number
   humidity_pct?: number
   notes?: string
+  velocity_fps?: number
+  velocity_sd?: number
+  extreme_spread_fps?: number
+  bench_setup?: string
+  scope_details?: string
+  barometric_pressure_mbar?: number
   average_group_size_mm?: number
   best_group_size_mm?: number
   group_count: number
@@ -110,6 +116,12 @@ export interface CreatePelletTestPayload {
   temp_celsius?: number
   humidity_pct?: number
   notes?: string
+  velocity_fps?: number
+  velocity_sd?: number
+  extreme_spread_fps?: number
+  bench_setup?: string
+  scope_details?: string
+  barometric_pressure_mbar?: number
 }
 
 export interface UpdatePelletTestPayload {
@@ -123,6 +135,12 @@ export interface UpdatePelletTestPayload {
   temp_celsius?: number
   humidity_pct?: number
   notes?: string
+  velocity_fps?: number
+  velocity_sd?: number
+  extreme_spread_fps?: number
+  bench_setup?: string
+  scope_details?: string
+  barometric_pressure_mbar?: number
 }
 
 export interface CreateGroupPayload {
@@ -135,6 +153,89 @@ export interface UpdateGroupPayload {
   shot_count?: number
   group_size_mm?: number
   notes?: string
+}
+
+// ── Measurement ─────────────────────────────────────────────────────────────────
+
+export interface PelletTestMeasurement {
+  id: string
+  image_id: string
+  session_id: string
+  group_id?: string
+  calibration_type: string
+  target_preset?: string
+  reference_ring_name?: string
+  reference_diameter_mm: number
+  reference_pixels: number
+  pixels_per_mm: number
+  ref_center_x: number
+  ref_center_y: number
+  ref_radius_pixels: number
+  bbox_x?: number
+  bbox_y?: number
+  bbox_width?: number
+  bbox_height?: number
+  measured_size_mm?: number
+  measured_size_moa?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateMeasurementPayload {
+  group_id?: string
+  calibration_type: string
+  target_preset?: string
+  reference_ring_name?: string
+  reference_diameter_mm: number
+  reference_pixels: number
+  pixels_per_mm: number
+  ref_center_x: number
+  ref_center_y: number
+  ref_radius_pixels: number
+  bbox_x?: number
+  bbox_y?: number
+  bbox_width?: number
+  bbox_height?: number
+}
+
+export interface UpdateMeasurementPayload {
+  group_id?: string
+  bbox_x?: number
+  bbox_y?: number
+  bbox_width?: number
+  bbox_height?: number
+}
+
+// ── Comparison & Timeline ───────────────────────────────────────────────────────
+
+export interface PelletComparisonSide {
+  pellet_id: string
+  pellet_brand: string
+  pellet_model: string
+  test_count: number
+  total_groups: number
+  best_group_mm?: number
+  avg_group_mm?: number
+  avg_velocity_fps?: number
+  avg_velocity_sd?: number
+  consistency_score?: number
+  groups: PelletTestGroup[]
+}
+
+export interface PelletComparisonData {
+  rifle_id: string
+  pellet_a: PelletComparisonSide
+  pellet_b: PelletComparisonSide
+}
+
+export interface GroupTimelinePoint {
+  test_date: string
+  pellet_id: string
+  pellet_brand: string
+  pellet_model: string
+  group_size_mm: number
+  group_size_moa?: number
+  distance_m: number
 }
 
 // ── API ─────────────────────────────────────────────────────────────────────────
@@ -176,4 +277,20 @@ export const pelletTestApi = {
     api.get<{ items: PelletLeaderboardEntry[] }>(`/pellet-tests/leaderboard?rifle_id=${rifleId}`),
   stats: () =>
     api.get<PelletTestStats>('/pellet-tests/stats'),
+
+  // Measurements
+  createMeasurement: (sessionId: string, imageId: string, payload: CreateMeasurementPayload) =>
+    api.post<PelletTestMeasurement>(`/pellet-tests/${sessionId}/images/${imageId}/measurements`, payload),
+  getMeasurements: (sessionId: string, imageId: string) =>
+    api.get<{ items: PelletTestMeasurement[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements`),
+  updateMeasurement: (sessionId: string, imageId: string, measurementId: string, payload: UpdateMeasurementPayload) =>
+    api.patch<PelletTestMeasurement>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}`, payload),
+  deleteMeasurement: (sessionId: string, imageId: string, measurementId: string) =>
+    api.del<void>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}`),
+
+  // Comparison & Timeline
+  compare: (rifleId: string, pelletA: string, pelletB: string) =>
+    api.get<PelletComparisonData>(`/pellet-tests/compare?rifle_id=${rifleId}&pellet_a=${pelletA}&pellet_b=${pelletB}`),
+  timeline: (rifleId: string) =>
+    api.get<{ items: GroupTimelinePoint[] }>(`/pellet-tests/timeline?rifle_id=${rifleId}`),
 }

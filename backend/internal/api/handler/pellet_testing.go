@@ -348,3 +348,166 @@ func (h *PelletTestHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, stats)
 }
+
+// ── Measurements ────────────────────────────────────────────────────────────────
+
+// POST /api/v1/pellet-tests/{id}/images/{imageId}/measurements
+func (h *PelletTestHandler) CreateMeasurement(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	imageID := chi.URLParam(r, "imageId")
+
+	var in model.CreatePelletTestMeasurementInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	m, err := h.svc.CreateMeasurement(r.Context(), sessionID, userID, imageID, &in)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session or image not found")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidMeasurement) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create measurement")
+		return
+	}
+	writeJSON(w, http.StatusCreated, m)
+}
+
+// GET /api/v1/pellet-tests/{id}/images/{imageId}/measurements
+func (h *PelletTestHandler) GetMeasurements(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	imageID := chi.URLParam(r, "imageId")
+
+	measurements, err := h.svc.GetMeasurements(r.Context(), sessionID, imageID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get measurements")
+		return
+	}
+	if measurements == nil {
+		measurements = []*model.PelletTestMeasurement{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": measurements})
+}
+
+// PATCH /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}
+func (h *PelletTestHandler) UpdateMeasurement(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	measurementID := chi.URLParam(r, "measurementId")
+
+	var in model.UpdatePelletTestMeasurementInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	m, err := h.svc.UpdateMeasurement(r.Context(), measurementID, sessionID, userID, &in)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "measurement not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update measurement")
+		return
+	}
+	writeJSON(w, http.StatusOK, m)
+}
+
+// DELETE /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}
+func (h *PelletTestHandler) DeleteMeasurement(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	measurementID := chi.URLParam(r, "measurementId")
+
+	if err := h.svc.DeleteMeasurement(r.Context(), measurementID, sessionID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "measurement not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete measurement")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Comparison & Timeline ───────────────────────────────────────────────────────
+
+// GET /api/v1/pellet-tests/compare?rifle_id=X&pellet_a=Y&pellet_b=Z
+func (h *PelletTestHandler) Compare(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	rifleID := r.URL.Query().Get("rifle_id")
+	pelletA := r.URL.Query().Get("pellet_a")
+	pelletB := r.URL.Query().Get("pellet_b")
+
+	if rifleID == "" || pelletA == "" || pelletB == "" {
+		writeError(w, http.StatusBadRequest, "rifle_id, pellet_a, and pellet_b query parameters are required")
+		return
+	}
+
+	data, err := h.svc.GetComparison(r.Context(), userID, rifleID, pelletA, pelletB)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "no data found for one or both pellets")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidPelletTest) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get comparison")
+		return
+	}
+	writeJSON(w, http.StatusOK, data)
+}
+
+// GET /api/v1/pellet-tests/timeline?rifle_id=X
+func (h *PelletTestHandler) Timeline(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	rifleID := r.URL.Query().Get("rifle_id")
+	if rifleID == "" {
+		writeError(w, http.StatusBadRequest, "rifle_id query parameter is required")
+		return
+	}
+
+	points, err := h.svc.GetGroupTimeline(r.Context(), userID, rifleID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidPelletTest) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get timeline")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": points})
+}

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Camera, Upload, X } from 'lucide-react'
+import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { pelletTestApi } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 
@@ -50,6 +50,18 @@ export default function NewPelletTest() {
   const [tempCelsius, setTempCelsius] = useState('')
   const [humidityPct, setHumidityPct] = useState('')
   const [notes, setNotes] = useState('')
+
+  // Velocity / Chronograph
+  const [velocityFps, setVelocityFps] = useState('')
+  const [velocitySd, setVelocitySd] = useState('')
+  const [extremeSpreadFps, setExtremeSpreadFps] = useState('')
+  const [showChrono, setShowChrono] = useState(false)
+
+  // Advanced conditions
+  const [benchSetup, setBenchSetup] = useState('')
+  const [scopeDetails, setScopeDetails] = useState('')
+  const [barometricPressure, setBarometricPressure] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Groups
   const [nextKey, setNextKey] = useState(2)
@@ -132,6 +144,12 @@ export default function NewPelletTest() {
         temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
         humidity_pct: humidityPct ? Number(humidityPct) : undefined,
         notes: notes || undefined,
+        velocity_fps: velocityFps ? Number(velocityFps) : undefined,
+        velocity_sd: velocitySd ? Number(velocitySd) : undefined,
+        extreme_spread_fps: extremeSpreadFps ? Number(extremeSpreadFps) : undefined,
+        bench_setup: benchSetup || undefined,
+        scope_details: scopeDetails || undefined,
+        barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
       })
 
       // Create groups
@@ -269,6 +287,52 @@ export default function NewPelletTest() {
           <Field label="Notes">
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Conditions, observations…" className={`${inputCls} placeholder:text-muted resize-none`} />
           </Field>
+
+          {/* Chronograph Data */}
+          <button
+            type="button"
+            onClick={() => setShowChrono(v => !v)}
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            {showChrono ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            Chronograph Data
+          </button>
+          {showChrono && (
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Velocity (fps)">
+                <input type="number" step="0.1" value={velocityFps} onChange={e => setVelocityFps(e.target.value)} placeholder="—" className={inputCls} />
+              </Field>
+              <Field label="SD">
+                <input type="number" step="0.01" value={velocitySd} onChange={e => setVelocitySd(e.target.value)} placeholder="—" className={inputCls} />
+              </Field>
+              <Field label="ES (fps)">
+                <input type="number" step="0.1" value={extremeSpreadFps} onChange={e => setExtremeSpreadFps(e.target.value)} placeholder="—" className={inputCls} />
+              </Field>
+            </div>
+          )}
+
+          {/* Advanced Conditions */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            Advanced Conditions
+          </button>
+          {showAdvanced && (
+            <div className="space-y-3">
+              <Field label="Bench / Rest Setup">
+                <input type="text" value={benchSetup} onChange={e => setBenchSetup(e.target.value)} placeholder="Front rest, rear bag…" className={`${inputCls} placeholder:text-muted`} />
+              </Field>
+              <Field label="Scope Details">
+                <input type="text" value={scopeDetails} onChange={e => setScopeDetails(e.target.value)} placeholder="MTC Viper Pro 10×44, 40× mag…" className={`${inputCls} placeholder:text-muted`} />
+              </Field>
+              <Field label="Barometric Pressure (mbar)">
+                <input type="number" step="0.1" value={barometricPressure} onChange={e => setBarometricPressure(e.target.value)} placeholder="—" className={inputCls} />
+              </Field>
+            </div>
+          )}
         </div>
 
         {/* Right column: groups + images + submit */}

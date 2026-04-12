@@ -108,6 +108,8 @@ func NewRouter(
 			pth := handler.NewPelletTest(pelletTests, images)
 			r.Get("/pellet-tests/leaderboard", pth.Leaderboard)
 			r.Get("/pellet-tests/stats", pth.Stats)
+			r.Get("/pellet-tests/compare", pth.Compare)
+			r.Get("/pellet-tests/timeline", pth.Timeline)
 			r.Post("/pellet-tests", pth.Create)
 			r.Get("/pellet-tests", pth.List)
 			r.Get("/pellet-tests/{id}", pth.Get)
@@ -118,6 +120,10 @@ func NewRouter(
 			r.Delete("/pellet-tests/{id}/groups/{groupId}", pth.DeleteGroup)
 			r.Post("/pellet-tests/{id}/images", pth.UploadImage)
 			r.Delete("/pellet-tests/{id}/images/{imageId}", pth.DeleteImage)
+			r.Post("/pellet-tests/{id}/images/{imageId}/measurements", pth.CreateMeasurement)
+			r.Get("/pellet-tests/{id}/images/{imageId}/measurements", pth.GetMeasurements)
+			r.Patch("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}", pth.UpdateMeasurement)
+			r.Delete("/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}", pth.DeleteMeasurement)
 
 			// User profiles
 			uh := handler.NewUser(users, images)

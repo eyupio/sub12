@@ -14,6 +14,7 @@ import PelletTesting from './pages/PelletTesting'
 import NewPelletTest from './pages/NewPelletTest'
 import PelletTestDetail from './pages/PelletTestDetail'
 import PelletTestLeaderboard from './pages/PelletTestLeaderboard'
+import PelletComparison from './pages/PelletComparison'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -112,6 +113,12 @@ const pelletTestLeaderboardRoute = createRoute({
   component: PelletTestLeaderboard,
 })
 
+const pelletComparisonRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing/compare',
+  component: PelletComparison,
+})
+
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
@@ -148,6 +155,7 @@ export const routeTree = rootRoute.addChildren([
     newPelletTestRoute,
     pelletTestDetailRoute,
     pelletTestLeaderboardRoute,
+    pelletComparisonRoute,
     gearRoute,
     leaguesRoute,
     leagueDetailRoute,

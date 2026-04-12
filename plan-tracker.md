@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-12 (session 7)
+> Last updated: 2026-04-12 (session 8)
 
 ---
 
@@ -112,15 +112,15 @@
 
 ### Phase PT-2 — Assisted Measurement
 
-- [ ] Image calibration tools (canvas-based draw/annotate)
-- [ ] Draw bounding box around group area
-- [ ] Calibration line / reference ring for pixel-to-mm conversion
-- [ ] PelletImageMeasurement model + storage (calibration data)
-- [ ] Pellet comparison view (A vs B on same rifle)
-- [ ] Velocity / SD / spread fields on sessions
-- [ ] Advanced conditions (bench setup, scope, pressure)
-- [ ] Group size by pellet timeline chart
-- [ ] Distance-normalized comparisons
+- [x] Image calibration tools (canvas-based draw/annotate) — `ImageMeasurement.tsx` with raw HTML5 Canvas
+- [x] Draw bounding box around group area — bbox drawing mode with live mm/MOA readout
+- [x] Calibration line / reference ring for pixel-to-mm conversion — NSRA target ring presets (6yd + 10m)
+- [x] PelletImageMeasurement model + storage (calibration data) — migration 000009, full CRUD
+- [x] Pellet comparison view (A vs B on same rifle) — `PelletComparison.tsx` at `/pellet-testing/compare`
+- [x] Velocity / SD / spread fields on sessions — collapsible Chronograph Data section
+- [x] Advanced conditions (bench setup, scope, pressure) — collapsible Advanced Conditions section
+- [x] Group size by pellet timeline chart — `GroupSizeTimeline.tsx` with Recharts, mm/MOA toggle
+- [x] Distance-normalized comparisons — `ballistics.ts` utility (normalizeGroupToDistance, mmToMOA)
 
 ### Phase PT-3 — Automation & Detection
 

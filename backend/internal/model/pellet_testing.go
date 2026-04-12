@@ -5,23 +5,29 @@ import "time"
 // ── Session ─────────────────────────────────────────────────────────────────────
 
 type PelletTestSession struct {
-	ID                 string    `json:"id"`
-	UserID             string    `json:"user_id"`
-	RifleID            string    `json:"rifle_id"`
-	PelletID           string    `json:"pellet_id"`
-	TestDate           string    `json:"test_date"`
-	DistanceM          float64   `json:"distance_m"`
-	DistanceUnit       string    `json:"distance_unit"`
-	Location           *string   `json:"location,omitempty"`
-	WindMPH            *float64  `json:"wind_mph,omitempty"`
-	TempCelsius        *float64  `json:"temp_celsius,omitempty"`
-	HumidityPct        *float64  `json:"humidity_pct,omitempty"`
-	Notes              *string   `json:"notes,omitempty"`
-	AverageGroupSizeMM *float64  `json:"average_group_size_mm,omitempty"`
-	BestGroupSizeMM    *float64  `json:"best_group_size_mm,omitempty"`
-	GroupCount         int       `json:"group_count"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                     string    `json:"id"`
+	UserID                 string    `json:"user_id"`
+	RifleID                string    `json:"rifle_id"`
+	PelletID               string    `json:"pellet_id"`
+	TestDate               string    `json:"test_date"`
+	DistanceM              float64   `json:"distance_m"`
+	DistanceUnit           string    `json:"distance_unit"`
+	Location               *string   `json:"location,omitempty"`
+	WindMPH                *float64  `json:"wind_mph,omitempty"`
+	TempCelsius            *float64  `json:"temp_celsius,omitempty"`
+	HumidityPct            *float64  `json:"humidity_pct,omitempty"`
+	Notes                  *string   `json:"notes,omitempty"`
+	VelocityFPS            *float64  `json:"velocity_fps,omitempty"`
+	VelocitySD             *float64  `json:"velocity_sd,omitempty"`
+	ExtremeSpreadFPS       *float64  `json:"extreme_spread_fps,omitempty"`
+	BenchSetup             *string   `json:"bench_setup,omitempty"`
+	ScopeDetails           *string   `json:"scope_details,omitempty"`
+	BarometricPressureMbar *float64  `json:"barometric_pressure_mbar,omitempty"`
+	AverageGroupSizeMM     *float64  `json:"average_group_size_mm,omitempty"`
+	BestGroupSizeMM        *float64  `json:"best_group_size_mm,omitempty"`
+	GroupCount             int       `json:"group_count"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 
 	// Joined data (populated on detail fetches)
 	Groups []*PelletTestGroup `json:"groups,omitempty"`
@@ -31,29 +37,41 @@ type PelletTestSession struct {
 }
 
 type CreatePelletTestSessionInput struct {
-	RifleID       string   `json:"rifle_id"`
-	PelletID      string   `json:"pellet_id"`
-	TestDate      string   `json:"test_date"`
-	DistanceValue float64  `json:"distance_value"`
-	DistanceUnit  string   `json:"distance_unit"`
-	Location      *string  `json:"location"`
-	WindMPH       *float64 `json:"wind_mph"`
-	TempCelsius   *float64 `json:"temp_celsius"`
-	HumidityPct   *float64 `json:"humidity_pct"`
-	Notes         *string  `json:"notes"`
+	RifleID                string   `json:"rifle_id"`
+	PelletID               string   `json:"pellet_id"`
+	TestDate               string   `json:"test_date"`
+	DistanceValue          float64  `json:"distance_value"`
+	DistanceUnit           string   `json:"distance_unit"`
+	Location               *string  `json:"location"`
+	WindMPH                *float64 `json:"wind_mph"`
+	TempCelsius            *float64 `json:"temp_celsius"`
+	HumidityPct            *float64 `json:"humidity_pct"`
+	Notes                  *string  `json:"notes"`
+	VelocityFPS            *float64 `json:"velocity_fps"`
+	VelocitySD             *float64 `json:"velocity_sd"`
+	ExtremeSpreadFPS       *float64 `json:"extreme_spread_fps"`
+	BenchSetup             *string  `json:"bench_setup"`
+	ScopeDetails           *string  `json:"scope_details"`
+	BarometricPressureMbar *float64 `json:"barometric_pressure_mbar"`
 }
 
 type UpdatePelletTestSessionInput struct {
-	RifleID       *string  `json:"rifle_id"`
-	PelletID      *string  `json:"pellet_id"`
-	TestDate      *string  `json:"test_date"`
-	DistanceValue *float64 `json:"distance_value"`
-	DistanceUnit  *string  `json:"distance_unit"`
-	Location      *string  `json:"location"`
-	WindMPH       *float64 `json:"wind_mph"`
-	TempCelsius   *float64 `json:"temp_celsius"`
-	HumidityPct   *float64 `json:"humidity_pct"`
-	Notes         *string  `json:"notes"`
+	RifleID                *string  `json:"rifle_id"`
+	PelletID               *string  `json:"pellet_id"`
+	TestDate               *string  `json:"test_date"`
+	DistanceValue          *float64 `json:"distance_value"`
+	DistanceUnit           *string  `json:"distance_unit"`
+	Location               *string  `json:"location"`
+	WindMPH                *float64 `json:"wind_mph"`
+	TempCelsius            *float64 `json:"temp_celsius"`
+	HumidityPct            *float64 `json:"humidity_pct"`
+	Notes                  *string  `json:"notes"`
+	VelocityFPS            *float64 `json:"velocity_fps"`
+	VelocitySD             *float64 `json:"velocity_sd"`
+	ExtremeSpreadFPS       *float64 `json:"extreme_spread_fps"`
+	BenchSetup             *string  `json:"bench_setup"`
+	ScopeDetails           *string  `json:"scope_details"`
+	BarometricPressureMbar *float64 `json:"barometric_pressure_mbar"`
 }
 
 // ── Group ───────────────────────────────────────────────────────────────────────
@@ -71,10 +89,10 @@ type PelletTestGroup struct {
 }
 
 type CreatePelletTestGroupInput struct {
-	ShotCount   int      `json:"shot_count"`
-	GroupSizeMM float64  `json:"group_size_mm"`
+	ShotCount    int      `json:"shot_count"`
+	GroupSizeMM  float64  `json:"group_size_mm"`
 	GroupSizeMOA *float64 `json:"-"`
-	Notes       *string  `json:"notes"`
+	Notes        *string  `json:"notes"`
 }
 
 type UpdatePelletTestGroupInput struct {
@@ -139,4 +157,91 @@ type PelletTestStats struct {
 	BestGroupMM      *float64 `json:"best_group_mm,omitempty"`
 	AvgGroupMM       *float64 `json:"avg_group_mm,omitempty"`
 	MostTestedPellet *string  `json:"most_tested_pellet,omitempty"`
+}
+
+// ── Measurement ─────────────────────────────────────────────────────────────────
+
+type PelletTestMeasurement struct {
+	ID                  string    `json:"id"`
+	ImageID             string    `json:"image_id"`
+	SessionID           string    `json:"session_id"`
+	GroupID             *string   `json:"group_id,omitempty"`
+	CalibrationType     string    `json:"calibration_type"`
+	TargetPreset        *string   `json:"target_preset,omitempty"`
+	ReferenceRingName   *string   `json:"reference_ring_name,omitempty"`
+	ReferenceDiameterMM float64   `json:"reference_diameter_mm"`
+	ReferencePixels     float64   `json:"reference_pixels"`
+	PixelsPerMM         float64   `json:"pixels_per_mm"`
+	RefCenterX          float64   `json:"ref_center_x"`
+	RefCenterY          float64   `json:"ref_center_y"`
+	RefRadiusPixels     float64   `json:"ref_radius_pixels"`
+	BboxX               *float64  `json:"bbox_x,omitempty"`
+	BboxY               *float64  `json:"bbox_y,omitempty"`
+	BboxWidth           *float64  `json:"bbox_width,omitempty"`
+	BboxHeight          *float64  `json:"bbox_height,omitempty"`
+	MeasuredSizeMM      *float64  `json:"measured_size_mm,omitempty"`
+	MeasuredSizeMOA     *float64  `json:"measured_size_moa,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+type CreatePelletTestMeasurementInput struct {
+	GroupID             *string  `json:"group_id"`
+	CalibrationType     string   `json:"calibration_type"`
+	TargetPreset        *string  `json:"target_preset"`
+	ReferenceRingName   *string  `json:"reference_ring_name"`
+	ReferenceDiameterMM float64  `json:"reference_diameter_mm"`
+	ReferencePixels     float64  `json:"reference_pixels"`
+	PixelsPerMM         float64  `json:"pixels_per_mm"`
+	RefCenterX          float64  `json:"ref_center_x"`
+	RefCenterY          float64  `json:"ref_center_y"`
+	RefRadiusPixels     float64  `json:"ref_radius_pixels"`
+	BboxX               *float64 `json:"bbox_x"`
+	BboxY               *float64 `json:"bbox_y"`
+	BboxWidth           *float64 `json:"bbox_width"`
+	BboxHeight          *float64 `json:"bbox_height"`
+	MeasuredSizeMM      *float64 `json:"-"`
+	MeasuredSizeMOA     *float64 `json:"-"`
+}
+
+type UpdatePelletTestMeasurementInput struct {
+	GroupID         *string  `json:"group_id"`
+	BboxX           *float64 `json:"bbox_x"`
+	BboxY           *float64 `json:"bbox_y"`
+	BboxWidth       *float64 `json:"bbox_width"`
+	BboxHeight      *float64 `json:"bbox_height"`
+	MeasuredSizeMM  *float64 `json:"-"`
+	MeasuredSizeMOA *float64 `json:"-"`
+}
+
+// ── Comparison & Timeline ───────────────────────────────────────────────────────
+
+type PelletComparisonData struct {
+	RifleID string                `json:"rifle_id"`
+	PelletA *PelletComparisonSide `json:"pellet_a"`
+	PelletB *PelletComparisonSide `json:"pellet_b"`
+}
+
+type PelletComparisonSide struct {
+	PelletID    string             `json:"pellet_id"`
+	PelletBrand string             `json:"pellet_brand"`
+	PelletModel string             `json:"pellet_model"`
+	TestCount   int                `json:"test_count"`
+	TotalGroups int                `json:"total_groups"`
+	BestGroupMM *float64           `json:"best_group_mm,omitempty"`
+	AvgGroupMM  *float64           `json:"avg_group_mm,omitempty"`
+	AvgVelocity *float64           `json:"avg_velocity_fps,omitempty"`
+	AvgSD       *float64           `json:"avg_velocity_sd,omitempty"`
+	Consistency *float64           `json:"consistency_score,omitempty"`
+	Groups      []*PelletTestGroup `json:"groups"`
+}
+
+type GroupTimelinePoint struct {
+	TestDate     string   `json:"test_date"`
+	PelletID     string   `json:"pellet_id"`
+	PelletBrand  string   `json:"pellet_brand"`
+	PelletModel  string   `json:"pellet_model"`
+	GroupSizeMM  float64  `json:"group_size_mm"`
+	GroupSizeMOA *float64 `json:"group_size_moa,omitempty"`
+	DistanceM    float64  `json:"distance_m"`
 }
