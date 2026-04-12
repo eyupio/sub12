@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine } from 'lucide-react'
-import { leagueApi, LeagueStanding } from '../api/leagues'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 
 function RankBadge({ rank }: { rank: number }) {
@@ -10,6 +10,62 @@ function RankBadge({ rank }: { rank: number }) {
   if (rank === 2) return <span className="text-secondary font-mono text-sm font-semibold">2nd</span>
   if (rank === 3) return <span className="text-amber-700 dark:text-amber-600 font-mono text-sm font-semibold">3rd</span>
   return <span className="font-mono text-sm text-muted">{rank}th</span>
+}
+
+function VerificationDot({ status }: { status: string }) {
+  if (status === 'verified') return <CheckCircle size={14} className="text-[var(--success-text)] shrink-0" />
+  if (status === 'rejected') return <XCircle size={14} className="text-[var(--error-text)] shrink-0" />
+  return <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+}
+
+function LeagueScoreRow({ score }: { score: LeagueScore }) {
+  return (
+    <Link
+      to="/scores/$id"
+      params={{ id: score.id }}
+      className="flex items-center justify-between py-3 border-b border-subtle last:border-0"
+    >
+      <div className="min-w-0">
+        <p className="text-sm text-secondary truncate">{score.display_name}</p>
+        <p className="text-[11px] text-muted font-mono">{score.shot_at}</p>
+      </div>
+      <div className="flex items-center gap-3 font-mono shrink-0">
+        <VerificationDot status={score.verification} />
+        <span className="text-lg font-semibold text-primary">{score.total_score}</span>
+        {score.x_count > 0 && (
+          <span className="text-sm text-[var(--brass)]">{score.x_count}X</span>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+function VerificationDot({ status }: { status: string }) {
+  if (status === 'verified') return <CheckCircle size={14} className="text-[var(--success-text)] shrink-0" />
+  if (status === 'rejected') return <XCircle size={14} className="text-[var(--error-text)] shrink-0" />
+  return <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+}
+
+function LeagueScoreRow({ score }: { score: LeagueScore }) {
+  return (
+    <Link
+      to="/scores/$id"
+      params={{ id: score.id }}
+      className="flex items-center justify-between py-3 border-b border-subtle last:border-0"
+    >
+      <div className="min-w-0">
+        <p className="text-sm text-secondary truncate">{score.display_name}</p>
+        <p className="text-[11px] text-muted font-mono">{score.shot_at}</p>
+      </div>
+      <div className="flex items-center gap-3 font-mono shrink-0">
+        <VerificationDot status={score.verification} />
+        <span className="text-lg font-semibold text-primary">{score.total_score}</span>
+        {score.x_count > 0 && (
+          <span className="text-sm text-[var(--brass)]">{score.x_count}X</span>
+        )}
+      </div>
+    </Link>
+  )
 }
 
 function StandingRow({ standing }: { standing: LeagueStanding }) {
@@ -75,6 +131,11 @@ export default function LeagueDetail() {
     queryKey: ['leagues', id, 'standings'],
     queryFn: () => leagueApi.standings(id),
     retry: 2,
+  })
+
+  const { data: scoresData, isLoading: scoresLoading } = useQuery({
+    queryKey: ['leagues', id, 'scores'],
+    queryFn: () => leagueApi.listScores(id),
   })
 
   const isLoading = leagueLoading || standingsLoading
@@ -295,6 +356,33 @@ export default function LeagueDetail() {
           <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
             {standings.items.map(standing => (
               <StandingRow key={standing.user_id} standing={standing} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Submitted Scores */}
+      <div className="space-y-1">
+        <h2 className="text-[11px] tracking-widest uppercase text-muted">Submitted Scores</h2>
+
+        {scoresLoading && (
+          <div className="space-y-px pt-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-12 bg-surface rounded animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {scoresData && scoresData.items.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-muted text-sm tracking-widest uppercase">No scores submitted yet</p>
+          </div>
+        )}
+
+        {scoresData && scoresData.items.length > 0 && (
+          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
+            {scoresData.items.map(score => (
+              <LeagueScoreRow key={score.id} score={score} />
             ))}
           </div>
         )}

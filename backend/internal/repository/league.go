@@ -57,6 +57,25 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 		return nil, fmt.Errorf("insert league config: %w", err)
 	}
 
+	// Auto-create a default season and round so scores can be submitted immediately.
+	var seasonID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO seasons (league_id, name, starts_on)
+		VALUES ($1, 'General', CURRENT_DATE)
+		RETURNING id
+	`, league.ID).Scan(&seasonID)
+	if err != nil {
+		return nil, fmt.Errorf("insert default season: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO rounds (season_id, name)
+		VALUES ($1, 'Submissions')
+	`, seasonID)
+	if err != nil {
+		return nil, fmt.Errorf("insert default round: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
@@ -397,6 +416,94 @@ func (r *LeagueRepository) ListRounds(ctx context.Context, seasonID string) ([]*
 	return rounds, rows.Err()
 }
 
+// GetOrCreateDefaultRound returns a round ID for this league, creating a
+// default "General" season and "Submissions" round if none exist.
+func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID string) (string, error) {
+	// Try to find an existing round for this league.
+	var roundID string
+	err := r.db.QueryRow(ctx, `
+		SELECT rd.id
+		FROM rounds rd
+		JOIN seasons s ON s.id = rd.season_id
+		WHERE s.league_id = $1
+		ORDER BY rd.created_at ASC
+		LIMIT 1
+	`, leagueID).Scan(&roundID)
+	if err == nil {
+		return roundID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("find existing round: %w", err)
+	}
+
+	// No rounds exist — create default season + round in a transaction.
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var seasonID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO seasons (league_id, name, starts_on)
+		VALUES ($1, 'General', CURRENT_DATE)
+		RETURNING id
+	`, leagueID).Scan(&seasonID)
+	if err != nil {
+		return "", fmt.Errorf("insert default season: %w", err)
+	}
+
+	err = tx.QueryRow(ctx, `
+		INSERT INTO rounds (season_id, name)
+		VALUES ($1, 'Submissions')
+		RETURNING id
+	`, seasonID).Scan(&roundID)
+	if err != nil {
+		return "", fmt.Errorf("insert default round: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("commit tx: %w", err)
+	}
+	return roundID, nil
+}
+
+// ListScores returns score cards submitted to a league (linked via rounds),
+// enriched with the submitter's display name. Newest first.
+func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limit, offset int) ([]*model.LeagueScore, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT sc.id, sc.user_id, u.display_name,
+		       sc.shot_at::text, sc.total_score, sc.x_count,
+		       sc.verification::text, sc.created_at
+		FROM score_cards sc
+		JOIN rounds rd ON rd.id = sc.league_round_id
+		JOIN seasons s  ON s.id  = rd.season_id
+		JOIN users u    ON u.id  = sc.user_id
+		WHERE s.league_id = $1
+		ORDER BY sc.shot_at DESC, sc.created_at DESC
+		LIMIT $2 OFFSET $3
+	`, leagueID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list league scores: %w", err)
+	}
+	defer rows.Close()
+
+	var scores []*model.LeagueScore
+	for rows.Next() {
+		var s model.LeagueScore
+		if err := rows.Scan(&s.ID, &s.UserID, &s.DisplayName,
+			&s.ShotAt, &s.TotalScore, &s.XCount,
+			&s.Verification, &s.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan league score: %w", err)
+		}
+		scores = append(scores, &s)
+	}
+	return scores, rows.Err()
+}
+
 // ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------
@@ -735,4 +842,3 @@ func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID st
 	}
 	return userID, nil
 }
-

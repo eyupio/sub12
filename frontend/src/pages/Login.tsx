@@ -85,6 +85,12 @@ export default function Login() {
         </form>
 
         <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+          <Link to="/forgot-password" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
+            Forgot password?
+          </Link>
+        </p>
+
+        <p className="text-center text-[11px] tracking-widest uppercase text-muted">
           No account?{' '}
           <Link to="/register" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
             Register

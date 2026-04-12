@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -324,6 +325,46 @@ func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
 		rounds = []*model.Round{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": rounds})
+}
+
+// POST /api/v1/leagues/{id}/ensure-round
+func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+
+	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to ensure default round")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"round_id": roundID})
+}
+
+// GET /api/v1/leagues/{id}/scores
+func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	scores, err := h.svc.ListScores(r.Context(), leagueID, limit, offset)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list league scores")
+		return
+	}
+
+	if scores == nil {
+		scores = []*model.LeagueScore{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": scores})
 }
 
 // ---------------------------------------------------------------------------

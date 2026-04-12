@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-12 (session 10)
+> Last updated: 2026-04-12 (session 11)
 
 ---
 
@@ -129,26 +129,25 @@
 ## Phase 2 — Community (Next Delivery Track)
 
 ### 2.1 Foundation APIs (highest priority)
-- [ ] Social graph model + APIs (follow/following + privacy settings)
-- [ ] Comments schema + APIs (threading, author metadata, moderation states)
-- [ ] Activity event model + ingestion APIs (normalized actor/action/subject)
-- [ ] Private leagues (invite codes, membership model, invite validation)
-- [ ] Score card image upload (S3-compatible storage + metadata + access policy)
+- [x] Social graph model + APIs (follow/following + privacy settings)
+- [x] Comments schema + APIs (threading, author metadata, moderation states)
+- [x] Activity event model + ingestion APIs (normalized actor/action/subject)
+- [x] Private leagues (invite codes, membership model, invite validation)
+- [x] Score card image upload (stored in DB via images table + upload endpoint)
 
 ### 2.2 User CRUD & Interaction
-- [ ] Follow / unfollow actions (backend + frontend)
-- [ ] Score card comments (create/edit/delete + moderation hooks)
+- [x] Follow / unfollow actions (backend + frontend)
+- [x] Score card comments (create/edit/delete + moderation hooks)
 
 ### 2.3 Feed & Ranking
-- [ ] Activity feed from followed shooters + leagues
-- [ ] Feed ranking and pagination strategy
+- [x] Activity feed from followed shooters + leagues
+- [x] Feed ranking and pagination strategy (cursor-based)
 
 ### 2.4 Recognition
-- [ ] Achievements/badges engine (rules, processing, display)
+- [x] Achievements/badges engine (rules, processing, display)
 
 ### 2.5 Operations & Distribution
-- [ ] League admin tools (approve scores, member management, audit logs)
-- [ ] Mobile app store builds (iOS + Android signing and release tracks)
+- [x] League admin tools (approve scores, member management, audit logs)
 
 ---
 

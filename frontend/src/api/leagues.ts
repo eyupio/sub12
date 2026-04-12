@@ -123,6 +123,17 @@ export interface ScoreCardAction {
   created_at: string
 }
 
+export interface LeagueScore {
+  id: string
+  user_id: string
+  display_name: string
+  shot_at: string
+  total_score: number
+  x_count: number
+  verification: string
+  created_at: string
+}
+
 export interface MyLeagueSummary {
   id: string
   name: string
@@ -205,6 +216,13 @@ export const leagueApi = {
 
   rejectScore: (scoreCardId: string, leagueId: string, reason: string) =>
     api.post(`/score-cards/${scoreCardId}/reject`, { league_id: leagueId, reason }),
+
+  // League scores
+  listScores: (id: string, limit = 50, offset = 0) =>
+    api.get<{ items: LeagueScore[] }>(`/leagues/${id}/scores?limit=${limit}&offset=${offset}`),
+
+  ensureDefaultRound: (id: string) =>
+    api.post<{ round_id: string }>(`/leagues/${id}/ensure-round`, {}),
 
   uploadImage: (id: string, file: File) => {
     const formData = new FormData()

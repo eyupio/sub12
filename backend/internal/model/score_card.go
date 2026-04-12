@@ -80,3 +80,16 @@ type ScoreCardSummary struct {
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+// LeagueScore is a score card summary enriched with the submitter's display name,
+// used when listing all scores for a league.
+type LeagueScore struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	DisplayName  string    `json:"display_name"`
+	ShotAt       string    `json:"shot_at"`
+	TotalScore   int16     `json:"total_score"`
+	XCount       int16     `json:"x_count"`
+	Verification string    `json:"verification"`
+	CreatedAt    time.Time `json:"created_at"`
+}

@@ -10,27 +10,28 @@ import (
 )
 
 var (
-	ErrLeagueNotFound  = errors.New("league not found")
-	ErrAlreadyMember   = errors.New("already a member of this league")
-	ErrInvalidLeague   = errors.New("invalid league")
-	ErrNotAdmin        = errors.New("not a league admin")
-	ErrNotMember       = errors.New("not a league member")
-	ErrInvalidConfig   = errors.New("invalid league config")
-	ErrInvalidSeason   = errors.New("invalid season")
-	ErrInvalidRound    = errors.New("invalid round")
-	ErrInvalidJoinCode = errors.New("invalid join code")
-	ErrPendingRequest  = errors.New("join request already pending")
+	ErrLeagueNotFound   = errors.New("league not found")
+	ErrAlreadyMember    = errors.New("already a member of this league")
+	ErrInvalidLeague    = errors.New("invalid league")
+	ErrNotAdmin         = errors.New("not a league admin")
+	ErrNotMember        = errors.New("not a league member")
+	ErrInvalidConfig    = errors.New("invalid league config")
+	ErrInvalidSeason    = errors.New("invalid season")
+	ErrInvalidRound     = errors.New("invalid round")
+	ErrInvalidJoinCode  = errors.New("invalid join code")
+	ErrPendingRequest   = errors.New("join request already pending")
 	ErrAlreadyConfirmed = errors.New("already confirmed this score")
 	ErrCannotConfirmOwn = errors.New("cannot confirm your own score")
 	ErrReasonRequired   = errors.New("reason is required for rejection")
 )
 
 type LeagueService struct {
-	leagues *repository.LeagueRepository
+	leagues  *repository.LeagueRepository
+	activity *ActivityService // nil disables feed ingestion
 }
 
-func NewLeagueService(leagues *repository.LeagueRepository) *LeagueService {
-	return &LeagueService{leagues: leagues}
+func NewLeagueService(leagues *repository.LeagueRepository, activity *ActivityService) *LeagueService {
+	return &LeagueService{leagues: leagues, activity: activity}
 }
 
 func (s *LeagueService) requireAdmin(ctx context.Context, leagueID, userID string) error {
@@ -137,6 +138,10 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		if err != nil {
 			return false, false, err
 		}
+		if s.activity != nil {
+			lid, tt := leagueID, "league"
+			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil)
+		}
 		return true, false, nil
 
 	case "invite_code":
@@ -152,6 +157,10 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		}
 		if err != nil {
 			return false, false, err
+		}
+		if s.activity != nil {
+			lid, tt := leagueID, "league"
+			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil)
 		}
 		return true, false, nil
 
@@ -262,6 +271,31 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 
 func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*model.Round, error) {
 	return s.leagues.ListRounds(ctx, seasonID)
+}
+
+// EnsureDefaultRound guarantees that the league has at least one round,
+// creating a default season+round if necessary. Returns the round ID.
+func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID string) (string, error) {
+	_, err := s.leagues.GetByID(ctx, leagueID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return "", ErrLeagueNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return s.leagues.GetOrCreateDefaultRound(ctx, leagueID)
+}
+
+// ListScores returns score cards submitted to a league, newest first.
+func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, offset int) ([]*model.LeagueScore, error) {
+	_, err := s.leagues.GetByID(ctx, leagueID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.leagues.ListScores(ctx, leagueID, limit, offset)
 }
 
 // ---------------------------------------------------------------------------

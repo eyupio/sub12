@@ -25,6 +25,8 @@ import Register from './pages/Register'
 import AdminEmailSettings from './pages/AdminEmailSettings'
 import AdminEmailTemplates from './pages/AdminEmailTemplates'
 import ConfirmEmail from './pages/ConfirmEmail'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -202,6 +204,21 @@ const registerRoute = createRoute({
   component: Register,
 })
 
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => authRoute,
+  path: '/forgot-password',
+  component: ForgotPassword,
+})
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => authRoute,
+  path: '/reset-password',
+  component: ResetPassword,
+  validateSearch: (search: Record<string, unknown>): { token?: string } => ({
+    token: (search.token as string) || undefined,
+  }),
+})
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   publicPelletLeaderboardRoute,
@@ -226,5 +243,5 @@ export const routeTree = rootRoute.addChildren([
     adminEmailTemplatesRoute,
     confirmEmailRoute,
   ]),
-  authRoute.addChildren([loginRoute, registerRoute]),
+  authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
 ])

@@ -92,7 +92,7 @@ func main() {
 	pelletSvc := service.NewPelletService(pelletRepo)
 
 	leagueRepo := repository.NewLeagueRepository(pool)
-	leagueSvc := service.NewLeagueService(leagueRepo)
+	leagueSvc := service.NewLeagueService(leagueRepo, activitySvc)
 
 	pelletTestRepo := repository.NewPelletTestRepository(pool)
 	pelletTestSvc := service.NewPelletTestService(pelletTestRepo)

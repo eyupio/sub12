@@ -56,7 +56,14 @@ export default function ScoreEntry() {
     enabled: !!leagueId && !!activeSeason?.id,
   })
 
-  // Pick the round: use search param, or find the currently open round, or latest
+  // Ensure a default round exists for the league (handles legacy leagues with no seasons).
+  const { data: ensuredRound } = useQuery({
+    queryKey: ['leagues', leagueId, 'ensure-round'],
+    queryFn: () => leagueApi.ensureDefaultRound(leagueId!),
+    enabled: !!leagueId && seasonsData !== undefined && (!activeSeason || (roundsData !== undefined && (roundsData?.items ?? []).length === 0)),
+  })
+
+  // Pick the round: use search param, or find the currently open round, or latest, or ensured default
   const rounds = roundsData?.items ?? []
   const leagueRoundId = roundIdParam
     ?? rounds.find(r => {
@@ -64,6 +71,7 @@ export default function ScoreEntry() {
       return (!r.opens_at || r.opens_at <= now) && (!r.closes_at || r.closes_at >= now)
     })?.id
     ?? rounds[rounds.length - 1]?.id
+    ?? ensuredRound?.round_id
 
   const shotScores = shots.map(s => s.score)
   const shotXs = shots.map(s => s.x)
