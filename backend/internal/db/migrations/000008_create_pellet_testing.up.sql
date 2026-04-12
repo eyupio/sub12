@@ -1,6 +1,6 @@
 -- Pellet Testing feature: sessions, groups, and images
 
-CREATE TABLE pellet_test_sessions (
+CREATE TABLE IF NOT EXISTS pellet_test_sessions (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     rifle_id              UUID NOT NULL REFERENCES rifles(id) ON DELETE CASCADE,
@@ -20,12 +20,12 @@ CREATE TABLE pellet_test_sessions (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pts_user     ON pellet_test_sessions (user_id);
-CREATE INDEX idx_pts_rifle    ON pellet_test_sessions (rifle_id);
-CREATE INDEX idx_pts_pellet   ON pellet_test_sessions (pellet_id);
-CREATE INDEX idx_pts_rifle_pellet ON pellet_test_sessions (rifle_id, pellet_id);
+CREATE INDEX IF NOT EXISTS idx_pts_user     ON pellet_test_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_pts_rifle    ON pellet_test_sessions (rifle_id);
+CREATE INDEX IF NOT EXISTS idx_pts_pellet   ON pellet_test_sessions (pellet_id);
+CREATE INDEX IF NOT EXISTS idx_pts_rifle_pellet ON pellet_test_sessions (rifle_id, pellet_id);
 
-CREATE TABLE pellet_test_groups (
+CREATE TABLE IF NOT EXISTS pellet_test_groups (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id    UUID NOT NULL REFERENCES pellet_test_sessions(id) ON DELETE CASCADE,
     group_number  INTEGER NOT NULL,
@@ -38,9 +38,9 @@ CREATE TABLE pellet_test_groups (
     UNIQUE (session_id, group_number)
 );
 
-CREATE INDEX idx_ptg_session ON pellet_test_groups (session_id);
+CREATE INDEX IF NOT EXISTS idx_ptg_session ON pellet_test_groups (session_id);
 
-CREATE TABLE pellet_test_images (
+CREATE TABLE IF NOT EXISTS pellet_test_images (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES pellet_test_sessions(id) ON DELETE CASCADE,
     group_id   UUID REFERENCES pellet_test_groups(id) ON DELETE SET NULL,
@@ -49,4 +49,4 @@ CREATE TABLE pellet_test_images (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pti_session ON pellet_test_images (session_id);
+CREATE INDEX IF NOT EXISTS idx_pti_session ON pellet_test_images (session_id);

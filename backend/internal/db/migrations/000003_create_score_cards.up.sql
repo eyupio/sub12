@@ -1,6 +1,9 @@
-CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'rejected');
+DO $$ BEGIN
+    CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE score_cards (
+CREATE TABLE IF NOT EXISTS score_cards (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     rifle_id        UUID REFERENCES rifles(id) ON DELETE SET NULL,
@@ -33,12 +36,12 @@ CREATE TABLE score_cards (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_score_cards_user     ON score_cards (user_id);
-CREATE INDEX idx_score_cards_shot_at  ON score_cards (shot_at DESC);
-CREATE INDEX idx_score_cards_total    ON score_cards (total_score DESC);
+CREATE INDEX IF NOT EXISTS idx_score_cards_user     ON score_cards (user_id);
+CREATE INDEX IF NOT EXISTS idx_score_cards_shot_at  ON score_cards (shot_at DESC);
+CREATE INDEX IF NOT EXISTS idx_score_cards_total    ON score_cards (total_score DESC);
 
 -- Comments on score cards
-CREATE TABLE score_card_comments (
+CREATE TABLE IF NOT EXISTS score_card_comments (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     card_id     UUID NOT NULL REFERENCES score_cards(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -46,4 +49,4 @@ CREATE TABLE score_card_comments (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_comments_card ON score_card_comments (card_id);
+CREATE INDEX IF NOT EXISTS idx_comments_card ON score_card_comments (card_id);

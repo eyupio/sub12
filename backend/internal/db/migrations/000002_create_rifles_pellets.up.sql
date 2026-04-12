@@ -1,4 +1,4 @@
-CREATE TABLE rifles (
+CREATE TABLE IF NOT EXISTS rifles (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     make        TEXT NOT NULL,
@@ -11,9 +11,9 @@ CREATE TABLE rifles (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_rifles_user ON rifles (user_id);
+CREATE INDEX IF NOT EXISTS idx_rifles_user ON rifles (user_id);
 
-CREATE TABLE pellets (
+CREATE TABLE IF NOT EXISTS pellets (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     brand       TEXT NOT NULL,
@@ -27,4 +27,4 @@ CREATE TABLE pellets (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pellets_user ON pellets (user_id);
+CREATE INDEX IF NOT EXISTS idx_pellets_user ON pellets (user_id);

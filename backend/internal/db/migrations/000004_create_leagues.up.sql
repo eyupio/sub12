@@ -1,6 +1,9 @@
-CREATE TYPE league_type AS ENUM ('public', 'private');
+DO $$ BEGIN
+    CREATE TYPE league_type AS ENUM ('public', 'private');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TABLE leagues (
+CREATE TABLE IF NOT EXISTS leagues (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL,
     description TEXT,
@@ -11,9 +14,9 @@ CREATE TABLE leagues (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_leagues_type ON leagues (type);
+CREATE INDEX IF NOT EXISTS idx_leagues_type ON leagues (type);
 
-CREATE TABLE league_members (
+CREATE TABLE IF NOT EXISTS league_members (
     league_id   UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     is_admin    BOOLEAN NOT NULL DEFAULT FALSE,
@@ -21,7 +24,7 @@ CREATE TABLE league_members (
     PRIMARY KEY (league_id, user_id)
 );
 
-CREATE TABLE seasons (
+CREATE TABLE IF NOT EXISTS seasons (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id   UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
@@ -31,7 +34,7 @@ CREATE TABLE seasons (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE rounds (
+CREATE TABLE IF NOT EXISTS rounds (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     season_id   UUID NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
@@ -41,12 +44,15 @@ CREATE TABLE rounds (
 );
 
 -- Back-fill the FK from score_cards to rounds
-ALTER TABLE score_cards
-    ADD CONSTRAINT fk_score_cards_round
-    FOREIGN KEY (league_round_id) REFERENCES rounds(id) ON DELETE SET NULL;
+DO $$ BEGIN
+    ALTER TABLE score_cards
+        ADD CONSTRAINT fk_score_cards_round
+        FOREIGN KEY (league_round_id) REFERENCES rounds(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Activity feed
-CREATE TABLE activities (
+CREATE TABLE IF NOT EXISTS activities (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type        TEXT NOT NULL,              -- 'score_posted', 'pb', 'joined_league', etc.
@@ -56,5 +62,5 @@ CREATE TABLE activities (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_activities_user       ON activities (user_id, created_at DESC);
-CREATE INDEX idx_activities_created_at ON activities (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_user       ON activities (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_created_at ON activities (created_at DESC);

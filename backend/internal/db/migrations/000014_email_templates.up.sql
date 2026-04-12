@@ -1,4 +1,4 @@
-CREATE TABLE email_templates (
+CREATE TABLE IF NOT EXISTS email_templates (
     key               TEXT PRIMARY KEY,
     subject_template  TEXT NOT NULL,
     html_template     TEXT NOT NULL,

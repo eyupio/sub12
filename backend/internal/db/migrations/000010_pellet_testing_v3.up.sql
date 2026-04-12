@@ -2,7 +2,7 @@
 
 -- ── Detected holes from automatic or manual identification ──────────────────
 
-CREATE TABLE pellet_test_detections (
+CREATE TABLE IF NOT EXISTS pellet_test_detections (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     measurement_id  UUID NOT NULL REFERENCES pellet_test_measurements(id) ON DELETE CASCADE,
     session_id      UUID NOT NULL REFERENCES pellet_test_sessions(id) ON DELETE CASCADE,
@@ -16,22 +16,22 @@ CREATE TABLE pellet_test_detections (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ptd_measurement ON pellet_test_detections (measurement_id);
-CREATE INDEX idx_ptd_session     ON pellet_test_detections (session_id);
+CREATE INDEX IF NOT EXISTS idx_ptd_measurement ON pellet_test_detections (measurement_id);
+CREATE INDEX IF NOT EXISTS idx_ptd_session     ON pellet_test_detections (session_id);
 
 -- ── Detection metadata on measurements ──────────────────────────────────────
 
 ALTER TABLE pellet_test_measurements
-    ADD COLUMN detection_method      TEXT NOT NULL DEFAULT 'manual',
-    ADD COLUMN annotated_image_id    UUID REFERENCES images(id) ON DELETE SET NULL,
-    ADD COLUMN detected_hole_count   INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN auto_group_size_mm    NUMERIC(8,3),
-    ADD COLUMN auto_group_size_moa   NUMERIC(8,4),
-    ADD COLUMN detection_confidence  NUMERIC(5,4);
+    ADD COLUMN IF NOT EXISTS detection_method      TEXT NOT NULL DEFAULT 'manual',
+    ADD COLUMN IF NOT EXISTS annotated_image_id    UUID REFERENCES images(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS detected_hole_count   INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS auto_group_size_mm    NUMERIC(8,3),
+    ADD COLUMN IF NOT EXISTS auto_group_size_moa   NUMERIC(8,4),
+    ADD COLUMN IF NOT EXISTS detection_confidence  NUMERIC(5,4);
 
 -- ── Opt-in public visibility for cross-user leaderboard ─────────────────────
 
 ALTER TABLE pellet_test_sessions
-    ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT false;
+    ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
 
-CREATE INDEX idx_pts_public ON pellet_test_sessions (is_public) WHERE is_public = true;
+CREATE INDEX IF NOT EXISTS idx_pts_public ON pellet_test_sessions (is_public) WHERE is_public = true;

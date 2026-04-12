@@ -1,12 +1,17 @@
 ALTER TABLE users
-ADD COLUMN role TEXT NOT NULL DEFAULT 'user'
-CHECK (role IN ('user', 'admin'));
+ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
+
+-- Add CHECK constraint idempotently
+DO $$ BEGIN
+    ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'admin'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 UPDATE users
 SET role = 'admin'
 WHERE LOWER(email) = 'admin@sub12.local';
 
-CREATE TABLE smtp_settings (
+CREATE TABLE IF NOT EXISTS smtp_settings (
     id                  SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     host                TEXT NOT NULL,
     port                INTEGER NOT NULL,

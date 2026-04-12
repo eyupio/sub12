@@ -2,18 +2,18 @@
 
 -- Add velocity / chronograph fields to sessions
 ALTER TABLE pellet_test_sessions
-    ADD COLUMN velocity_fps            NUMERIC(6,1),
-    ADD COLUMN velocity_sd             NUMERIC(5,2),
-    ADD COLUMN extreme_spread_fps      NUMERIC(6,1);
+    ADD COLUMN IF NOT EXISTS velocity_fps            NUMERIC(6,1),
+    ADD COLUMN IF NOT EXISTS velocity_sd             NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS extreme_spread_fps      NUMERIC(6,1);
 
 -- Add advanced condition fields to sessions
 ALTER TABLE pellet_test_sessions
-    ADD COLUMN bench_setup             TEXT,
-    ADD COLUMN scope_details           TEXT,
-    ADD COLUMN barometric_pressure_mbar NUMERIC(6,1);
+    ADD COLUMN IF NOT EXISTS bench_setup             TEXT,
+    ADD COLUMN IF NOT EXISTS scope_details           TEXT,
+    ADD COLUMN IF NOT EXISTS barometric_pressure_mbar NUMERIC(6,1);
 
 -- Image-based measurements (calibration + bounding box)
-CREATE TABLE pellet_test_measurements (
+CREATE TABLE IF NOT EXISTS pellet_test_measurements (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     image_id              UUID NOT NULL REFERENCES pellet_test_images(id) ON DELETE CASCADE,
     session_id            UUID NOT NULL REFERENCES pellet_test_sessions(id) ON DELETE CASCADE,
@@ -46,5 +46,5 @@ CREATE TABLE pellet_test_measurements (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ptm_image   ON pellet_test_measurements (image_id);
-CREATE INDEX idx_ptm_session ON pellet_test_measurements (session_id);
+CREATE INDEX IF NOT EXISTS idx_ptm_image   ON pellet_test_measurements (image_id);
+CREATE INDEX IF NOT EXISTS idx_ptm_session ON pellet_test_measurements (session_id);
