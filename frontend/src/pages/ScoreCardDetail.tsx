@@ -91,7 +91,6 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
     <div className="space-y-4 border-t border-subtle pt-4">
       <h3 className="text-[11px] tracking-widest uppercase text-muted">Verification Audit Trail</h3>
 
-      {/* Confirmations */}
       {confirmations.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[11px] tracking-widest uppercase text-muted">Confirmations</p>
@@ -107,7 +106,6 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         </div>
       )}
 
-      {/* Admin actions */}
       {actions.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[11px] tracking-widest uppercase text-muted">Admin Actions</p>
@@ -120,7 +118,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
                   <XCircle size={13} className="text-[var(--error-text)]" />
                 )}
                 <span className="text-sm text-secondary">
-                  {action.display_name} — <span className="uppercase text-[11px]">{action.action}</span>
+                  {action.display_name} \u2014 <span className="uppercase text-[11px]">{action.action}</span>
                 </span>
                 <span className="text-muted text-[11px] font-mono ml-auto">
                   {new Date(action.created_at).toLocaleDateString()}
@@ -146,7 +144,6 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         <p className="text-muted text-xs">No verification activity yet.</p>
       )}
 
-      {/* Confirm button (for non-owners) */}
       {!isOwnScore && (
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -177,7 +174,6 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         </div>
       )}
 
-      {/* Admin actions: Amend / Reject */}
       <div className="flex gap-2">
         <button
           onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
@@ -384,7 +380,12 @@ export default function ScoreCardDetail() {
           <ChevronLeft size={20} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>
+            <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
+              {card.league_round_id ? 'League' : 'Personal'}
+            </span>
+          </div>
           {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
         </div>
         {isOwner && !editing && (
@@ -397,9 +398,11 @@ export default function ScoreCardDetail() {
       {/* Edit mode */}
       {editing && (
         <div className="space-y-4 border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
-          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs tracking-widest uppercase">
-            <AlertCircle size={14} /> Editing will reset verification to pending
-          </div>
+          {card.league_round_id && (
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs tracking-widest uppercase">
+              <AlertCircle size={14} /> Editing will reset verification to pending
+            </div>
+          )}
 
           <EditScoreGrid shots={editShots} onUpdate={setEditShots} />
 
@@ -459,7 +462,6 @@ export default function ScoreCardDetail() {
       {!editing && <div className="lg:grid lg:grid-cols-2 lg:gap-8">
         {/* Left column: score grid + totals */}
         <div className="space-y-6">
-          {/* Score grid */}
           <div className="grid grid-cols-5 gap-2 lg:gap-3">
             {card.shot_scores.map((score, i) => {
               const isX = score === 10 && card.shot_xs[i]
@@ -485,7 +487,6 @@ export default function ScoreCardDetail() {
             })}
           </div>
 
-          {/* Totals */}
           <div className="flex gap-8 font-mono border-t border-subtle pt-4">
             <div>
               <p className="text-[11px] tracking-widest uppercase text-muted">Total</p>
@@ -506,7 +507,6 @@ export default function ScoreCardDetail() {
 
         {/* Right column: metadata + photo */}
         <div className="space-y-4 mt-6 lg:mt-0">
-          {/* Metadata */}
           <div className="space-y-2 text-sm border-t lg:border-t-0 border-subtle pt-4 lg:pt-0">
             {card.wind_mph != null && (
               <div className="flex justify-between">
@@ -526,13 +526,14 @@ export default function ScoreCardDetail() {
                 <p className="text-secondary text-sm leading-relaxed">{card.notes}</p>
               </div>
             )}
-            <div className="flex justify-between pt-1">
-              <span className="text-muted tracking-widest uppercase text-[11px]">Verification</span>
-              <VerificationBadge status={card.verification} />
-            </div>
+            {card.league_round_id && (
+              <div className="flex justify-between pt-1">
+                <span className="text-muted tracking-widest uppercase text-[11px]">Verification</span>
+                <VerificationBadge status={card.verification} />
+              </div>
+            )}
           </div>
 
-          {/* Score card photo */}
           {card.card_image_url && (
             <div className="pt-4 border-t border-subtle">
               <p className="text-[11px] tracking-widest uppercase text-muted mb-2">Score Card Photo</p>
@@ -549,8 +550,10 @@ export default function ScoreCardDetail() {
         </div>
       </div>}
 
-      {/* Audit Trail */}
-      <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
+      {/* Audit Trail \u2014 only shown for league cards */}
+      {card.league_round_id && (
+        <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
+      )}
 
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (

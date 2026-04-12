@@ -23,12 +23,12 @@ func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateS
 	m.createCalled = true
 	m.lastTotal = total
 	m.lastXCount = xCount
-	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "pending"}, nil
+	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "verified"}, nil
 }
 func (m *mockScoreCardRepo) GetByID(_ context.Context, _, _ string) (*model.ScoreCard, error) {
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
-func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int) ([]*model.ScoreCardSummary, error) {
+func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ string) ([]*model.ScoreCardSummary, error) {
 	return nil, nil
 }
 func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _ string) error { return nil }

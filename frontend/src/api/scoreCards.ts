@@ -6,6 +6,8 @@ export interface ScoreCardSummary {
   total_score: number
   x_count: number
   location?: string
+  verification: string
+  league_round_id?: string
   created_at: string
 }
 
@@ -40,8 +42,11 @@ export const scoreCardApi = {
   create: (payload: CreateScoreCardPayload) =>
     api.post<ScoreCard>('/score-cards', payload),
 
-  list: (limit = 20, offset = 0) =>
-    api.get<{ items: ScoreCardSummary[] }>(`/score-cards?limit=${limit}&offset=${offset}`),
+  list: (limit = 20, offset = 0, scope?: 'personal' | 'league') => {
+    let url = `/score-cards?limit=${limit}&offset=${offset}`
+    if (scope) url += `&scope=${scope}`
+    return api.get<{ items: ScoreCardSummary[] }>(url)
+  },
 
   get: (id: string) =>
     api.get<ScoreCard>(`/score-cards/${id}`),
