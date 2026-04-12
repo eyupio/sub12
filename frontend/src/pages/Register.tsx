@@ -1,4 +1,5 @@
 import { useState, FormEvent } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
@@ -15,6 +16,7 @@ export default function Register() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -50,7 +52,7 @@ export default function Register() {
           )}
 
           <div className="space-y-1">
-            <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="displayName">Display name</label>
+            <label className="text-xs tracking-wide text-muted" htmlFor="displayName">Display name</label>
             <input
               id="displayName"
               type="text"
@@ -59,12 +61,12 @@ export default function Register() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               className={inputCls}
-              placeholder="JOHN SMITH"
+              placeholder="Jane Smith"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="email">Email</label>
+            <label className="text-xs tracking-wide text-muted" htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
@@ -73,23 +75,34 @@ export default function Register() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={inputCls}
-              placeholder="YOUR EMAIL"
+              placeholder="you@example.com"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputCls}
-              placeholder="MIN 8 CHARACTERS"
-            />
+          <div className="space-y-1.5">
+            <label className="text-xs tracking-wide text-muted" htmlFor="password">Password</label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${inputCls} pr-10`}
+                placeholder="Choose a password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p className="text-xs text-muted">Must be at least 8 characters</p>
           </div>
 
           <button
