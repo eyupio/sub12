@@ -1,22 +1,30 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-12 (session 9)
+> Last updated: 2026-04-12 (session 10)
+
+---
+
+## Product Snapshot
+
+**Current maturity:** MVP complete for core scoring, leagues, gear, profiles, and pellet testing (including assisted measurement + automated detection).
+
+**Current focus:** Community foundation + quality hardening.
 
 ---
 
 ## Open Decisions
 
-| # | Question | Status |
-|---|---|---|
-| 1 | Final brand name and domain | **TBD** — working name: sub-12 |
-| 2 | Cross-platform strategy | **Decided** — PWA (React + Vite) + Capacitor |
-| 3 | Score verification workflow | **TBD** — trust-based vs image-based vs admin |
-| 4 | Monetisation model | **TBD** |
-| 5 | Integration with UKBR25 / club spreadsheets | **TBD** |
+| # | Decision | Status | Next action |
+|---|---|---|---|
+| 1 | Final brand name and domain | In progress (working name: **sub-12**) | Shortlist 3 names + domain checks, then select one |
+| 2 | Cross-platform strategy | **Decided** (PWA + Capacitor) | Continue with current approach |
+| 3 | Score verification workflow | In progress | Pilot trust-based first, then add optional image verification |
+| 4 | Monetisation model | Not started | Define free vs paid feature boundary |
+| 5 | UKBR25 / club spreadsheet integration | Not started | Collect sample spreadsheets and map required fields |
 
 ---
 
-## Phase 1 — MVP
+## Phase 1 — MVP (Completed)
 
 **Goal:** Core product usable by a single shooter to log cards and join a public league.
 
@@ -36,7 +44,7 @@
 ### Authentication
 - [x] Email/password registration and login
 - [x] JWT access tokens + Redis-backed refresh tokens (30-day, rotated on use)
-- [ ] Google OAuth 2.0
+- [ ] Google OAuth 2.0 (remaining)
 - [x] Auth middleware for protected routes (Bearer JWT validation)
 - [x] Frontend: login/register pages, Zustand auth store (persisted), protected routes
 - [x] API client auto-injects Bearer token; logout revokes refresh token
@@ -60,7 +68,7 @@
 - [x] Gear nav item (replaces Leagues stub in bottom nav)
 - [x] Rifle/pellet selectors in score entry (shown when gear exists)
 
-### Leagues (public only)
+### Leagues (Public)
 - [x] `POST /api/v1/leagues` — create a public league
 - [x] `GET /api/v1/leagues` — list public leagues (public, no auth)
 - [x] `POST /api/v1/leagues/:id/join` — join a league
@@ -76,85 +84,80 @@
 
 ---
 
-## Phase 2 — Community
+## Pellet Testing (Completed)
 
-### Stage 2.1 — Foundation Data Models & APIs
-- [ ] Social graph model + APIs (followers/following relationships, privacy controls)
-- [ ] Comments schema + APIs (threading support, author metadata, moderation states)
-- [ ] Activity event model + ingestion APIs (normalized event types, actor/subject references)
-- [ ] Private leagues (invite codes, membership model, invite validation)
-- [ ] Score card image upload (S3-compatible storage, metadata persistence, access policy)
-
-### Stage 2.2 — User-Facing CRUD
-- [ ] Social follow / unfollow (backend action + endpoint + frontend interactions)
-- [ ] Score card comments (create/edit/delete UI + backend CRUD + basic moderation hooks)
-
-### Stage 2.3 — Feed Aggregation & Ranking
-- [ ] Activity feed (followed shooters + leagues, aggregation pipeline + ranking/query endpoints)
-
-### Stage 2.4 — Recognition Layer
-- [ ] Achievements / badges engine (rules/scoring signals + award processing + display surfaces)
-
-### Stage 2.5 — Community Operations & Distribution
-- [ ] League admin tools (approve scores, manage members, rounds; admin/mod tooling + audit logging)
-- [ ] Mobile app builds (Capacitor iOS + Android, signing + release tracks + store distribution)
-
----
-
-## Pellet Testing Feature
-
-### Phase PT-1 — MVP (Stage 1)
-
-**Goal:** Complete pellet testing system with session logging, group tracking, image uploads, leaderboard, and dashboard integration.
-
-- [x] Database migration (pellet_test_sessions, pellet_test_groups, pellet_test_images tables)
+### PT-1 — MVP
+- [x] Database migration (`pellet_test_sessions`, `pellet_test_groups`, `pellet_test_images`)
 - [x] Backend: model, repository, service, handler (full CRUD + leaderboard + stats)
 - [x] 12 API endpoints wired into router + DI
 - [x] Frontend: API module with typed interfaces
-- [x] Frontend: Pellet Testing dashboard page (stats, recent tests, leaderboard preview)
-- [x] Frontend: New Pellet Test form (rifle/pellet select, distance, conditions, groups, images)
-- [x] Frontend: Pellet Test detail page (view/edit/delete, groups, images)
-- [x] Frontend: Pellet Leaderboard page (per-rifle pellet rankings)
+- [x] Frontend: dashboard page (stats, recent tests, leaderboard preview)
+- [x] Frontend: new test form (rifle/pellet select, distance, conditions, groups, images)
+- [x] Frontend: detail page (view/edit/delete, groups, images)
+- [x] Frontend: leaderboard page (per-rifle pellet rankings)
 - [x] Navigation: "Testing" item added to sidebar/bottom nav
-- [x] Dashboard: Pellet Testing summary widget
+- [x] Dashboard: pellet testing summary widget
 - [x] Manual group size entry (mm + auto MOA calculation)
 - [x] Distance normalization (meters/yards → canonical meters)
 - [x] Leaderboard ranking logic (best group → avg → test count + consistency score)
 - [x] Inline "Add Pellet" in test creation form
 
-### Phase PT-2 — Assisted Measurement
+### PT-2 — Assisted Measurement
+- [x] Image calibration tools — `ImageMeasurement.tsx` (HTML5 Canvas)
+- [x] Bounding box drawing with live mm/MOA readout
+- [x] Calibration line / reference ring presets (NSRA 6yd + 10m)
+- [x] `PelletImageMeasurement` model + migration `000009` + CRUD
+- [x] Pellet comparison view — `PelletComparison.tsx` at `/pellet-testing/compare`
+- [x] Velocity / SD / spread fields on sessions
+- [x] Advanced conditions fields (bench setup, scope, pressure)
+- [x] Group size timeline chart — `GroupSizeTimeline.tsx` with mm/MOA toggle
+- [x] Distance-normalized comparisons — `ballistics.ts` utilities
 
-- [x] Image calibration tools (canvas-based draw/annotate) — `ImageMeasurement.tsx` with raw HTML5 Canvas
-- [x] Draw bounding box around group area — bbox drawing mode with live mm/MOA readout
-- [x] Calibration line / reference ring for pixel-to-mm conversion — NSRA target ring presets (6yd + 10m)
-- [x] PelletImageMeasurement model + storage (calibration data) — migration 000009, full CRUD
-- [x] Pellet comparison view (A vs B on same rifle) — `PelletComparison.tsx` at `/pellet-testing/compare`
-- [x] Velocity / SD / spread fields on sessions — collapsible Chronograph Data section
-- [x] Advanced conditions (bench setup, scope, pressure) — collapsible Advanced Conditions section
-- [x] Group size by pellet timeline chart — `GroupSizeTimeline.tsx` with Recharts, mm/MOA toggle
-- [x] Distance-normalized comparisons — `ballistics.ts` utility (normalizeGroupToDistance, mmToMOA)
-
-### Phase PT-3 — Automation & Detection
-
-- [x] Automatic hole detection (contour/blob/circle detection) — client-side Canvas blob detection (`holeDetection.ts`), adaptive thresholding, connected component labeling, circle fitting
-- [x] Confidence scoring for automated measurements — per-hole confidence from circularity, size match, aspect ratio, and contrast
-- [x] Review and correction UI for detected holes — click-to-cycle (pending → confirmed → rejected), confirm/reject all, auto group size recalc
-- [x] Annotated image generation and storage — canvas overlay → PNG blob upload, `pellet_test_detections` table, annotated_image_id on measurements
-- [x] Target template presets (known target sizes) — NSRA 6yd + 10m air rifle presets with ring calibration
-- [x] Export / reporting — JSON export per session (session + groups + confidence badge), download button on detail page
-- [x] "Confidence" badges (Single test / Emerging result / Well proven) — `ConfidenceBadge.tsx` component, backend badge logic (test count + SD)
-- [x] Batch/lot performance tracking — `/pellet-testing/batch-report` page, backend batch aggregation by `batch_code`
-- [x] Site-wide pellet leaderboard (cross-user, opt-in) — `/pellet-leaderboard` public page, `is_public` opt-in flag on sessions
+### PT-3 — Detection & Automation
+- [x] Automatic hole detection (`holeDetection.ts`) with adaptive thresholding
+- [x] Per-hole confidence scoring
+- [x] Review/correction UI (confirm/reject flows + auto recalculation)
+- [x] Annotated image generation/storage (`pellet_test_detections`, `annotated_image_id`)
+- [x] Target template presets (NSRA 6yd + 10m)
+- [x] Session export/reporting (JSON download)
+- [x] Confidence badges (`ConfidenceBadge.tsx` + backend logic)
+- [x] Batch/lot performance tracking (`/pellet-testing/batch-report`)
+- [x] Site-wide pellet leaderboard (`/pellet-leaderboard`, opt-in visibility)
 
 ---
 
-## Phase 3 — Analytics & Growth
+## Phase 2 — Community (Next Delivery Track)
 
-- [ ] Pellet/rifle combo performance analytics
-- [ ] Trend charts (score over time)
-- [ ] Group size tracking (CTC mm)
-- [ ] Club pages
-- [ ] Season archives
+### 2.1 Foundation APIs (highest priority)
+- [ ] Social graph model + APIs (follow/following + privacy settings)
+- [ ] Comments schema + APIs (threading, author metadata, moderation states)
+- [ ] Activity event model + ingestion APIs (normalized actor/action/subject)
+- [ ] Private leagues (invite codes, membership model, invite validation)
+- [ ] Score card image upload (S3-compatible storage + metadata + access policy)
+
+### 2.2 User CRUD & Interaction
+- [ ] Follow / unfollow actions (backend + frontend)
+- [ ] Score card comments (create/edit/delete + moderation hooks)
+
+### 2.3 Feed & Ranking
+- [ ] Activity feed from followed shooters + leagues
+- [ ] Feed ranking and pagination strategy
+
+### 2.4 Recognition
+- [ ] Achievements/badges engine (rules, processing, display)
+
+### 2.5 Operations & Distribution
+- [ ] League admin tools (approve scores, member management, audit logs)
+- [ ] Mobile app store builds (iOS + Android signing and release tracks)
+
+---
+
+## Phase 3 — Analytics & Growth (After Phase 2)
+
+- [ ] Score trend analytics (time-series for scores and consistency)
+- [ ] Pellet/rifle combo analytics (cross-session performance insights)
+- [ ] Club pages and club-level dashboards
+- [ ] Season archives and historical comparisons
 - [ ] Third-party API (key-gated)
 - [ ] Push notifications
 
@@ -162,27 +165,27 @@
 
 ## Non-Functional Checklist
 
-| Requirement | Status |
-|---|---|
-| API response < 200ms | Not measured yet |
-| Initial page load < 3s | Not measured yet |
-| Backend test coverage > 80% | 0% (scaffold only) |
-| E2E tests for critical flows | Not started |
-| OWASP / security review | Not started |
-| GDPR compliance | Not started |
-| WCAG 2.1 AA | Not started |
-| Offline score entry + sync | Not started |
-| `/metrics` endpoint (Prometheus) | Not started |
-| Structured logging with correlation IDs | Partial (zerolog in place, no correlation ID yet) |
+| Requirement | Status | Next action |
+|---|---|---|
+| API response < 200ms | Not measured | Add latency instrumentation and baseline report |
+| Initial page load < 3s | Not measured | Capture Lighthouse baseline and optimize largest bundles |
+| Backend test coverage > 80% | Low / below target | Add service + handler tests and enforce threshold in CI |
+| E2E tests for critical flows | Not started | Add Playwright smoke paths for auth, scoring, leagues |
+| OWASP / security review | Not started | Run dependency + auth/session threat review |
+| GDPR compliance | Not started | Define data retention/export/deletion policies |
+| WCAG 2.1 AA | Not started | Perform accessibility audit and fix contrast/keyboard gaps |
+| Offline score entry + sync | Not started | Define conflict resolution and queued sync protocol |
+| `/metrics` endpoint (Prometheus) | Not started | Add metrics middleware and scrape endpoint |
+| Correlation IDs in logs | Partial | Inject request IDs through middleware + structured fields |
 
 ---
 
 ## SEO
 
 - [x] Primary meta tags (title, description, keywords, robots)
-- [x] Open Graph tags (og:type, og:title, og:description, og:image, og:site_name)
-- [x] Twitter/X Card tags
-- [ ] Dynamic per-page OG tags (needs react-helmet-async or SSR)
+- [x] Open Graph tags (`og:type`, `og:title`, `og:description`, `og:image`, `og:site_name`)
+- [x] Twitter/X card tags
+- [ ] Dynamic per-page OG tags (needs `react-helmet-async` or SSR)
 
 ---
 
