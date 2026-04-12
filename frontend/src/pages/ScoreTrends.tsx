@@ -161,12 +161,16 @@ export default function ScoreTrends() {
                 <Tooltip
                   contentStyle={{ background: 'var(--color-bg-surface, #1a1a1a)', border: '1px solid var(--color-border-subtle, #333)', borderRadius: 6, fontSize: 11 }}
                   labelStyle={{ color: 'var(--color-text-muted, #888)' }}
-                  formatter={(value, name: string) => {
-                    if (name === 'upper' || name === 'lower') return null
-                    const v = value as number
-                    if (name === 'avg') return [v.toFixed(1), 'Avg Score']
-                    if (name === 'best') return [v, 'Best Score']
-                    return [v, name]
+                  formatter={(value, name) => {
+                    if (name == null || name === 'upper' || name === 'lower' || value == null) {
+                      return null
+                    }
+
+                    const numericValue = typeof value === 'number' ? value : Number(value)
+
+                    if (name === 'avg') return [numericValue.toFixed(1), 'Avg Score']
+                    if (name === 'best') return [numericValue, 'Best Score']
+                    return [numericValue, String(name)]
                   }}
                 />
                 {/* ±σ band */}
