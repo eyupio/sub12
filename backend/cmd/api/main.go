@@ -85,9 +85,12 @@ func main() {
 	leagueRepo := repository.NewLeagueRepository(pool)
 	leagueSvc := service.NewLeagueService(leagueRepo)
 
+	pelletTestRepo := repository.NewPelletTestRepository(pool)
+	pelletTestSvc := service.NewPelletTestService(pelletTestRepo)
+
 	imageRepo := repository.NewImageRepository(pool)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

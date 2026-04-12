@@ -27,6 +27,7 @@ func NewRouter(
 	pellets *service.PelletService,
 	users *service.UserService,
 	leagues *service.LeagueService,
+	pelletTests *service.PelletTestService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -102,6 +103,21 @@ func NewRouter(
 			r.Patch("/pellets/{id}", ph.Update)
 			r.Delete("/pellets/{id}", ph.Delete)
 			r.Post("/pellets/{id}/image", ph.UploadImage)
+
+			// Pellet tests
+			pth := handler.NewPelletTest(pelletTests, images)
+			r.Get("/pellet-tests/leaderboard", pth.Leaderboard)
+			r.Get("/pellet-tests/stats", pth.Stats)
+			r.Post("/pellet-tests", pth.Create)
+			r.Get("/pellet-tests", pth.List)
+			r.Get("/pellet-tests/{id}", pth.Get)
+			r.Patch("/pellet-tests/{id}", pth.Update)
+			r.Delete("/pellet-tests/{id}", pth.Delete)
+			r.Post("/pellet-tests/{id}/groups", pth.CreateGroup)
+			r.Patch("/pellet-tests/{id}/groups/{groupId}", pth.UpdateGroup)
+			r.Delete("/pellet-tests/{id}/groups/{groupId}", pth.DeleteGroup)
+			r.Post("/pellet-tests/{id}/images", pth.UploadImage)
+			r.Delete("/pellet-tests/{id}/images/{imageId}", pth.DeleteImage)
 
 			// User profiles
 			uh := handler.NewUser(users, images)

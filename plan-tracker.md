@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-11 (session 6)
+> Last updated: 2026-04-12 (session 7)
 
 ---
 
@@ -86,6 +86,53 @@
 - [ ] Achievements / badges engine
 - [ ] League admin tools (approve scores, manage members, rounds)
 - [ ] Mobile app builds (Capacitor iOS + Android)
+
+---
+
+## Pellet Testing Feature
+
+### Phase PT-1 — MVP (Stage 1)
+
+**Goal:** Complete pellet testing system with session logging, group tracking, image uploads, leaderboard, and dashboard integration.
+
+- [x] Database migration (pellet_test_sessions, pellet_test_groups, pellet_test_images tables)
+- [x] Backend: model, repository, service, handler (full CRUD + leaderboard + stats)
+- [x] 12 API endpoints wired into router + DI
+- [x] Frontend: API module with typed interfaces
+- [x] Frontend: Pellet Testing dashboard page (stats, recent tests, leaderboard preview)
+- [x] Frontend: New Pellet Test form (rifle/pellet select, distance, conditions, groups, images)
+- [x] Frontend: Pellet Test detail page (view/edit/delete, groups, images)
+- [x] Frontend: Pellet Leaderboard page (per-rifle pellet rankings)
+- [x] Navigation: "Testing" item added to sidebar/bottom nav
+- [x] Dashboard: Pellet Testing summary widget
+- [x] Manual group size entry (mm + auto MOA calculation)
+- [x] Distance normalization (meters/yards → canonical meters)
+- [x] Leaderboard ranking logic (best group → avg → test count + consistency score)
+- [x] Inline "Add Pellet" in test creation form
+
+### Phase PT-2 — Assisted Measurement
+
+- [ ] Image calibration tools (canvas-based draw/annotate)
+- [ ] Draw bounding box around group area
+- [ ] Calibration line / reference ring for pixel-to-mm conversion
+- [ ] PelletImageMeasurement model + storage (calibration data)
+- [ ] Pellet comparison view (A vs B on same rifle)
+- [ ] Velocity / SD / spread fields on sessions
+- [ ] Advanced conditions (bench setup, scope, pressure)
+- [ ] Group size by pellet timeline chart
+- [ ] Distance-normalized comparisons
+
+### Phase PT-3 — Automation & Detection
+
+- [ ] Automatic hole detection (contour/blob/circle detection)
+- [ ] Confidence scoring for automated measurements
+- [ ] Review and correction UI for detected holes
+- [ ] Annotated image generation and storage
+- [ ] Target template presets (known target sizes)
+- [ ] Export / reporting
+- [ ] "Confidence" badges (Single test / Emerging result / Well proven)
+- [ ] Batch/lot performance tracking
+- [ ] Site-wide pellet leaderboard (cross-user, opt-in)
 
 ---
 
