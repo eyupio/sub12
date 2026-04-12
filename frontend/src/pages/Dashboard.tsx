@@ -72,14 +72,9 @@ interface Insight {
 
 type EnrichedRifleStats = RifleStats & { make: string; model: string; image_url?: string; calibre: string }
 
-// ScoreCardSummary doesn't declare rifle_id but the Go model returns it on list items
-interface ScoreCardSummaryWithRifle extends ScoreCardSummary {
-  rifle_id?: string
-}
-
 function computeInsights(p: {
   stats: UserStats | undefined
-  recentCards: ScoreCardSummaryWithRifle[]
+  recentCards: ScoreCardSummary[]
   rifles: Rifle[]
   rifleStats: RifleStats[]
   enrichedRifleStats: EnrichedRifleStats[]
@@ -187,14 +182,15 @@ function computeInsights(p: {
     p.stats?.avg_score != null
   ) {
     const last3 = p.recentCards.slice(0, 3)
-    const allAbove = last3.every(c => c.total_score > p.stats!.avg_score!)
+    const avg = p.stats.avg_score
+    const allAbove = last3.every(c => c.total_score > avg)
     if (allAbove) {
       const lowest = Math.min(...last3.map(c => c.total_score))
       insights.push({
         id: 'positive-trend',
         icon: <TrendingUp size={16} />,
         title: "You're above average for 3 in a row",
-        body: `Your last three cards are all above your rolling average (${p.stats.avg_score.toFixed(1)}). Lowest was ${lowest} — you're trending up.`,
+        body: `Your last three cards are all above your rolling average (${avg.toFixed(1)}). Lowest was ${lowest} — you're trending up.`,
         cta: { label: 'View trends', to: '/scores/trends' },
         variant: 'highlight',
       })
@@ -474,13 +470,18 @@ export default function Dashboard() {
     queryFn: () => pelletTestApi.stats(),
   })
 
-  const recentCards = (history?.items ?? []) as ScoreCardSummaryWithRifle[]
+  const recentCards = history?.items ?? []
   const rifles = riflesData?.items?.filter((r: Rifle) => r.is_active) ?? []
   const rifleStats = rifleStatsData?.items ?? []
   const myLeagues = myLeaguesData?.items ?? []
 
   const rifleMap = new Map<string, Rifle>()
   for (const r of riflesData?.items ?? []) rifleMap.set(r.id, r)
+
+  const getRifleName = (id: string | undefined) => {
+    const r = id ? rifleMap.get(id) : undefined
+    return r ? `${r.make} ${r.model}` : undefined
+  }
 
   const enrichedRifleStats: EnrichedRifleStats[] = rifleStats
     .flatMap((rs: RifleStats): EnrichedRifleStats[] => {
@@ -777,9 +778,7 @@ export default function Dashboard() {
                 card={card}
                 avgScore={stats?.avg_score}
                 scoreMax={scoreMax}
-                rifleName={card.rifle_id
-                  ? (() => { const r = rifleMap.get(card.rifle_id!); return r ? `${r.make} ${r.model}` : undefined })()
-                  : undefined}
+                rifleName={getRifleName(card.rifle_id)}
               />
             ))}
             {stats && stats.cards_logged > 5 && (

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/smtp"
 	"strings"
@@ -109,7 +110,7 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 }
 
 func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
-	boundary := "=_sub12_boundary"
+	boundary := fmt.Sprintf("=_sub12_%x", rand.Int63())
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
 	msg.WriteString("To: " + to + "\r\n")
@@ -154,7 +155,7 @@ func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
 }
 
 func (s *EmailSenderService) sendSMTP(host string, port int, username, password *string, useTLS, useSTARTTLS bool, from, to string, msg []byte) error {
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 
 	if !useTLS && !useSTARTTLS {
 		var auth smtp.Auth
@@ -179,6 +180,7 @@ func (s *EmailSenderService) sendSMTP(host string, port int, username, password 
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
+		conn.Close()
 		return fmt.Errorf("new smtp client: %w", err)
 	}
 	defer client.Quit()

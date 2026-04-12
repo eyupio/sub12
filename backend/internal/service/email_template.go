@@ -107,6 +107,8 @@ func requiredPlaceholders(key string) []string {
 	switch {
 	case key == "forgot_password":
 		return []string{"reset_link"}
+	case key == "email_change_confirm":
+		return []string{"confirm_link", "expires_at"}
 	case key == "welcome":
 		return []string{"display_name"}
 	case strings.HasPrefix(key, "notification_"):

@@ -6,6 +6,7 @@ export interface ScoreCardSummary {
   total_score: number
   x_count: number
   location?: string
+  rifle_id?: string
   verification: string
   league_round_id?: string
   created_at: string
