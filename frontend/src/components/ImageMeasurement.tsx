@@ -32,7 +32,6 @@ const GREEN_30 = 'rgba(34,197,94,0.3)'
 const CYAN = '#06b6d4'
 const CYAN_40 = 'rgba(6,182,212,0.4)'
 const RED = '#ef4444'
-const MUTED = 'rgba(148,163,184,0.5)'
 
 const btnCls = 'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium tracking-wider uppercase transition-colors'
 const btnPrimary = `${btnCls} bg-[var(--brass)] text-inverse hover:opacity-90`

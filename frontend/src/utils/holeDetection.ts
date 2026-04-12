@@ -78,7 +78,6 @@ export function detectHoles(imageData: ImageData, options: DetectionOptions): De
 
   // 4. Connected component labeling
   const labels = connectedComponents(binary, width, height)
-  const maxLabel = labels.reduce((m, v) => Math.max(m, v), 0)
 
   // 5. Compute blob properties
   const blobs: Map<number, { sumX: number; sumY: number; count: number; minX: number; maxX: number; minY: number; maxY: number; sumGray: number }> = new Map()
