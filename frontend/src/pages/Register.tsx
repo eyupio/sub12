@@ -38,7 +38,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <img src={isDark ? '/logo-primary-dark.svg' : '/logo-primary-dark.svg'} alt="SUB12" className="h-40 w-auto mx-auto" />
+          <img src={isDark ? '/logo-primary-dark.svg' : '/logo-primary-light.svg'} alt="SUB12" className="h-40 w-auto mx-auto" />
           <p className="mt-4 text-sm tracking-widest uppercase text-muted">Create your account</p>
         </div>
 

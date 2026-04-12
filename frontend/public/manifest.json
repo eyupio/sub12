@@ -1,7 +1,7 @@
 {
-  "name": "sub-12 Benchrest",
-  "short_name": "sub-12",
-  "description": "Score tracking for UK airgun benchrest shooters",
+  "name": "SUB12",
+  "short_name": "SUB12",
+  "description": "Track scores, manage gear, and compete in leagues. The platform for precision airgun shooters.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

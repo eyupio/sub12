@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'uk.sub12.benchrest',
+  appId: 'uk.sub12.app',
   appName: 'sub-12',
   webDir: 'dist',
   server: {
