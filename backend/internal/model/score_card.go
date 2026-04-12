@@ -50,10 +50,12 @@ type UpdateScoreCardInput struct {
 
 // ScoreCardSummary is a lighter struct used in list responses.
 type ScoreCardSummary struct {
-	ID         string    `json:"id"`
-	ShotAt     string    `json:"shot_at"`
-	TotalScore int16     `json:"total_score"`
-	XCount     int16     `json:"x_count"`
-	Location   *string   `json:"location,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	ShotAt        string    `json:"shot_at"`
+	TotalScore    int16     `json:"total_score"`
+	XCount        int16     `json:"x_count"`
+	Location      *string   `json:"location,omitempty"`
+	Verification  string    `json:"verification"`
+	LeagueRoundID *string   `json:"league_round_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }

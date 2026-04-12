@@ -60,8 +60,9 @@ func (h *ScoreCardHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	scope := r.URL.Query().Get("scope")
 
-	cards, err := h.svc.ListByUser(r.Context(), userID, limit, offset)
+	cards, err := h.svc.ListByUser(r.Context(), userID, limit, offset, scope)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list score cards")
 		return
