@@ -3,14 +3,17 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -20,31 +23,48 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidToken       = errors.New("invalid or expired token")
+	ErrInvalidResetToken  = errors.New("invalid or expired reset token")
 )
 
 const (
 	refreshTokenTTL  = 30 * 24 * time.Hour
 	refreshKeyPrefix = "refresh:"
+	userTokensPrefix = "user_refresh:"
 )
 
 type AuthService struct {
-	users     *repository.UserRepository
-	redis     *redis.Client
-	jwtSecret []byte
-	jwtExpiry time.Duration
+	users               *repository.UserRepository
+	passwordResetTokens *repository.PasswordResetTokenRepository
+	redis               *redis.Client
+	emailSender         *EmailSenderService
+	log                 zerolog.Logger
+	jwtSecret           []byte
+	jwtExpiry           time.Duration
+	passwordResetTTL    time.Duration
+	passwordResetURL    string
 }
 
 func NewAuthService(
 	users *repository.UserRepository,
+	passwordResetTokens *repository.PasswordResetTokenRepository,
 	rdb *redis.Client,
+	emailSender *EmailSenderService,
+	log zerolog.Logger,
 	jwtSecret string,
 	jwtExpiryHours int,
+	passwordResetTTLMinutes int,
+	passwordResetURL string,
 ) *AuthService {
 	return &AuthService{
-		users:     users,
-		redis:     rdb,
-		jwtSecret: []byte(jwtSecret),
-		jwtExpiry: time.Duration(jwtExpiryHours) * time.Hour,
+		users:               users,
+		passwordResetTokens: passwordResetTokens,
+		redis:               rdb,
+		emailSender:         emailSender,
+		log:                 log,
+		jwtSecret:           []byte(jwtSecret),
+		jwtExpiry:           time.Duration(jwtExpiryHours) * time.Hour,
+		passwordResetTTL:    time.Duration(passwordResetTTLMinutes) * time.Minute,
+		passwordResetURL:    strings.TrimSpace(passwordResetURL),
 	}
 }
 
@@ -105,6 +125,65 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 	return user, tokens, nil
 }
 
+// RequestPasswordReset records a reset token and sends a reset email if the account exists.
+// It should be used with a generic success response to prevent account enumeration.
+func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	s.log.Info().Str("event", "password_reset_requested").Str("email", normalizedEmail).Msg("audit")
+
+	user, err := s.users.GetByEmail(ctx, normalizedEmail)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	token, err := generateToken()
+	if err != nil {
+		return fmt.Errorf("generate reset token: %w", err)
+	}
+	tokenHash := hashToken(token)
+	expiresAt := time.Now().Add(s.passwordResetTTL)
+	if err := s.passwordResetTokens.Create(ctx, user.ID, tokenHash, expiresAt); err != nil {
+		return err
+	}
+
+	resetLink := s.buildResetLink(token)
+	if s.emailSender != nil {
+		if err := s.emailSender.SendForgotPassword(ctx, user.Email, user.DisplayName, resetLink, expiresAt); err != nil {
+			s.log.Error().Err(err).Str("event", "password_reset_email_failed").Str("user_id", user.ID).Msg("audit")
+		}
+	}
+
+	return nil
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	userID, err := s.passwordResetTokens.Consume(ctx, hashToken(strings.TrimSpace(token)))
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.log.Warn().Str("event", "password_reset_failed").Msg("audit")
+			return ErrInvalidResetToken
+		}
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	if err := s.users.UpdatePasswordHash(ctx, userID, string(hash)); err != nil {
+		return err
+	}
+	if err := s.invalidateAllRefreshTokens(ctx, userID); err != nil {
+		return err
+	}
+
+	s.log.Info().Str("event", "password_reset_completed").Str("user_id", userID).Msg("audit")
+	return nil
+}
+
 // Refresh validates a refresh token and issues a new token pair.
 // New tokens are issued first; the old token is revoked only on success so a
 // Redis/network failure cannot permanently lock the user out.
@@ -121,13 +200,21 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 
 	// Revoke old token only after the new one is safely stored.
 	s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
+	s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
 
 	return tokens, nil
 }
 
 // Logout revokes the refresh token.
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
+	if refreshToken == "" {
+		return
+	}
+	userID, _ := s.validateRefreshToken(ctx, refreshToken)
 	s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
+	if userID != "" {
+		s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
+	}
 }
 
 // ValidateAccessToken parses and validates a JWT, returning the user ID.
@@ -182,6 +269,8 @@ func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPai
 	if err := s.redis.Set(ctx, refreshKeyPrefix+refreshToken, userID, refreshTokenTTL).Err(); err != nil {
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
+	s.redis.SAdd(ctx, userTokensPrefix+userID, refreshToken)
+	s.redis.Expire(ctx, userTokensPrefix+userID, refreshTokenTTL)
 
 	return &TokenPair{
 		AccessToken:  accessToken,
@@ -196,6 +285,40 @@ func (s *AuthService) validateRefreshToken(ctx context.Context, token string) (s
 		return "", err
 	}
 	return userID, nil
+}
+
+func (s *AuthService) invalidateAllRefreshTokens(ctx context.Context, userID string) error {
+	tokens, err := s.redis.SMembers(ctx, userTokensPrefix+userID).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return fmt.Errorf("load user refresh tokens: %w", err)
+	}
+
+	if len(tokens) > 0 {
+		keys := make([]string, 0, len(tokens))
+		for _, token := range tokens {
+			keys = append(keys, refreshKeyPrefix+token)
+		}
+		s.redis.Del(ctx, keys...)
+	}
+	s.redis.Del(ctx, userTokensPrefix+userID)
+	return nil
+}
+
+func (s *AuthService) buildResetLink(token string) string {
+	base := s.passwordResetURL
+	if base == "" {
+		base = "http://localhost:5173/reset-password"
+	}
+	sep := "?"
+	if strings.Contains(base, "?") {
+		sep = "&"
+	}
+	return base + sep + "token=" + url.QueryEscape(token)
+}
+
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func generateToken() (string, error) {

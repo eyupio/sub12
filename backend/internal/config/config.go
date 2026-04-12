@@ -23,8 +23,10 @@ type Config struct {
 	RedisURL string `envconfig:"REDIS_URL" default:"redis://localhost:6379"`
 
 	// Auth
-	JWTSecret      string `envconfig:"JWT_SECRET" required:"true"`
-	JWTExpiryHours int    `envconfig:"JWT_EXPIRY_HOURS" default:"24"`
+	JWTSecret               string `envconfig:"JWT_SECRET" required:"true"`
+	JWTExpiryHours          int    `envconfig:"JWT_EXPIRY_HOURS" default:"24"`
+	PasswordResetTTLMinutes int    `envconfig:"PASSWORD_RESET_TTL_MINUTES" default:"60"`
+	PasswordResetURL        string `envconfig:"PASSWORD_RESET_URL" default:"http://localhost:5173/reset-password"`
 
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
