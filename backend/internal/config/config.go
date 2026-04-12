@@ -1,6 +1,10 @@
 package config
 
-import "github.com/kelseyhightower/envconfig"
+import (
+	"net/url"
+
+	"github.com/kelseyhightower/envconfig"
+)
 
 // Config holds all application configuration read from environment variables.
 type Config struct {
@@ -40,10 +44,16 @@ func (c *Config) DSN() string {
 		" sslmode=disable"
 }
 
-// DatabaseURL returns a postgres:// URL (for golang-migrate).
+// DatabaseURL returns a pgx5:// URL (for golang-migrate).
 func (c *Config) DatabaseURL() string {
-	return "pgx5://" + c.DBUser + ":" + c.DBPassword +
-		"@" + c.DBHost + ":" + c.DBPort + "/" + c.DBName + "?sslmode=disable"
+	u := url.URL{
+		Scheme:   "pgx5",
+		User:     url.UserPassword(c.DBUser, c.DBPassword),
+		Host:     c.DBHost + ":" + c.DBPort,
+		Path:     c.DBName,
+		RawQuery: "sslmode=disable",
+	}
+	return u.String()
 }
 
 // Load reads configuration from environment variables.
