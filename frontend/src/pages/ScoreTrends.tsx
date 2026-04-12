@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Area, ComposedChart,
 } from 'recharts'
 import { ChevronLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
@@ -161,11 +161,12 @@ export default function ScoreTrends() {
                 <Tooltip
                   contentStyle={{ background: 'var(--color-bg-surface, #1a1a1a)', border: '1px solid var(--color-border-subtle, #333)', borderRadius: 6, fontSize: 11 }}
                   labelStyle={{ color: 'var(--color-text-muted, #888)' }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value, name: string) => {
                     if (name === 'upper' || name === 'lower') return null
-                    if (name === 'avg') return [value.toFixed(1), 'Avg Score']
-                    if (name === 'best') return [value, 'Best Score']
-                    return [value, name]
+                    const v = value as number
+                    if (name === 'avg') return [v.toFixed(1), 'Avg Score']
+                    if (name === 'best') return [v, 'Best Score']
+                    return [v, name]
                   }}
                 />
                 {/* ±σ band */}
