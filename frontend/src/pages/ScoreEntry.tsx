@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Camera, Upload, X, Trophy } from 'lucide-react'
+import { Camera, Upload, X, Trophy, HelpCircle } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
+import { toast } from '../store/toast'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 
@@ -27,6 +28,9 @@ export default function ScoreEntry() {
   const [pelletId, setPelletId] = useState<string>('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [showHelp, setShowHelp] = useState(() => {
+    try { return !localStorage.getItem('sub12-score-help-seen') } catch { /* localStorage unavailable */ return true }
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -125,7 +129,7 @@ export default function ScoreEntry() {
   function handleImageSelect(file: File | undefined) {
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('Image must be under 10 MB')
+        toast('Image must be under 10 MB', 'error')
         return
       }
       setImageFile(file)
@@ -215,6 +219,7 @@ export default function ScoreEntry() {
       return card
     },
     onSuccess: (card) => {
+      toast('Score card saved', 'success')
       navigate({ to: '/scores/$id', params: { id: card.id } })
     },
   })
@@ -232,9 +237,19 @@ export default function ScoreEntry() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
       <div>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-          New Score Card
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+            New Score Card
+          </h1>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="text-muted hover:text-[var(--brass)] transition-colors"
+            aria-label="How to enter scores"
+            title="How to enter scores"
+          >
+            <HelpCircle size={18} />
+          </button>
+        </div>
         {league ? (
           <p className="text-xs text-[var(--brass)] tracking-wide mt-1 flex items-center gap-1.5">
             <Trophy size={12} />
@@ -264,6 +279,7 @@ export default function ScoreEntry() {
                 <button
                   key={i}
                   onClick={() => handleCellClick(i)}
+                  aria-label={`Shot ${i + 1}: ${score === 0 ? 'not entered' : score === 10 && x ? 'X (inner ten)' : String(score)}`}
                   className={[
                     'relative aspect-square rounded font-mono font-semibold transition-all select-none flex items-center justify-center',
                     isSelected
@@ -290,12 +306,12 @@ export default function ScoreEntry() {
           {selectedShot !== null && (
             <div className="space-y-3 bg-surface border border-subtle rounded-lg p-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] tracking-widest uppercase text-muted">
+                <span className="text-xs tracking-wide text-muted">
                   Shot {selectedShot + 1}
                 </span>
                 <button
                   onClick={() => setSelectedShot(null)}
-                  className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                  className="text-xs tracking-wide text-muted hover:text-secondary transition-colors"
                 >
                   Done
                 </button>
@@ -327,49 +343,53 @@ export default function ScoreEntry() {
                   )
                 })}
               </div>
-              <p className="text-[10px] text-muted text-center">
-                Arrow keys to navigate · type 0–9 or X · Esc to close
+              <p className="text-xs text-muted text-center hidden lg:block">
+                Arrow keys to navigate · type 0-9 or X · Esc to deselect
               </p>
             </div>
           )}
 
           {/* Running totals */}
           <div className="flex gap-8 font-mono text-sm border-t border-subtle pt-4">
-            <span className="text-muted tracking-widest uppercase text-[11px]">
+            <span className="text-muted tracking-wide text-xs">
               Total <strong className="text-primary ml-2 text-base">{totalScore}</strong>
             </span>
-            <span className="text-muted tracking-widest uppercase text-[11px]">
-              X <strong className="text-[var(--brass)] ml-2 text-base">{xCount}</strong>
+            <span className="text-muted tracking-wide text-xs">
+              X count <strong className="text-[var(--brass)] ml-2 text-base">{xCount}</strong>
             </span>
           </div>
         </div>
 
         {/* Right column: metadata + photo + submit */}
         <div className="space-y-3 mt-6 lg:mt-0">
-          {rifles.length > 0 && (
-            <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+          <div>
+            <label className="block text-xs tracking-wide text-muted mb-1">Rifle</label>
+            {rifles.length > 0 ? (
               <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
                 <option value="">— none —</option>
                 {rifles.map(r => (
                   <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
                 ))}
               </select>
-            </div>
-          )}
-          {pellets.length > 0 && (
-            <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
+            ) : (
+              <p className="text-xs text-muted py-2">No rifles yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs tracking-wide text-muted mb-1">Pellet</label>
+            {pellets.length > 0 ? (
               <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
                 <option value="">— none —</option>
                 {pellets.map(p => (
                   <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
                 ))}
               </select>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted py-2">No pellets yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
+            )}
+          </div>
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Date</label>
+            <label className="block text-xs tracking-wide text-muted mb-1">Date</label>
             <input
               type="date"
               value={shotAt}
@@ -378,7 +398,7 @@ export default function ScoreEntry() {
             />
           </div>
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+            <label className="block text-xs tracking-wide text-muted mb-1">Location</label>
             <input
               type="text"
               value={location}
@@ -388,7 +408,7 @@ export default function ScoreEntry() {
             />
           </div>
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+            <label className="block text-xs tracking-wide text-muted mb-1">Notes</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -400,7 +420,7 @@ export default function ScoreEntry() {
 
           {/* Photo upload */}
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Score Card Photo</label>
+            <label className="block text-xs tracking-wide text-muted mb-1">Score card photo</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -463,13 +483,48 @@ export default function ScoreEntry() {
             {mutation.isPending ? 'Saving…' : 'Save Card'}
           </button>
 
-          {selectedShot === null && (
-            <p className="text-center text-[11px] text-muted tracking-widest uppercase">
-              Tap a shot to select · tap again to cycle · after 10 → X
-            </p>
-          )}
+          <p className="text-center text-xs text-muted tracking-wide">
+            {selectedShot === null
+              ? 'Tap a shot cell to select it, then use the buttons to set the score'
+              : 'Use number buttons below, or arrow keys to navigate between shots'}
+          </p>
         </div>
       </div>
+
+      {/* Help overlay */}
+      {showHelp && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setShowHelp(false); try { localStorage.setItem('sub12-score-help-seen', '1') } catch { /* localStorage unavailable */ } }} />
+          <div className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4">
+            <h3 className="text-sm font-medium text-primary">How to enter scores</h3>
+            <div className="space-y-3 text-sm text-secondary">
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brass)]/15 text-[var(--brass)] flex items-center justify-center text-xs font-semibold">1</span>
+                <p><strong>Tap a cell</strong> in the 5x5 grid to select a shot position</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brass)]/15 text-[var(--brass)] flex items-center justify-center text-xs font-semibold">2</span>
+                <p><strong>Set the score</strong> using the number buttons (0-10) that appear below the grid</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brass)]/15 text-[var(--brass)] flex items-center justify-center text-xs font-semibold">3</span>
+                <p><strong>X means a perfect 10</strong> that also hit the centre dot (inner ten). Tap "X" for these</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brass)]/15 text-[var(--brass)] flex items-center justify-center text-xs font-semibold">4</span>
+                <p>The cursor <strong>auto-advances</strong> to the next shot after each entry</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted">On desktop: use arrow keys to navigate, number keys to score, X for inner ten.</p>
+            <button
+              onClick={() => { setShowHelp(false); try { localStorage.setItem('sub12-score-help-seen', '1') } catch { /* localStorage unavailable */ } }}
+              className="w-full py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
