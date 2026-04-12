@@ -483,14 +483,13 @@ export default function Dashboard() {
   for (const r of riflesData?.items ?? []) rifleMap.set(r.id, r)
 
   const enrichedRifleStats: EnrichedRifleStats[] = rifleStats
-    .map((rs: RifleStats) => {
+    .flatMap((rs: RifleStats): EnrichedRifleStats[] => {
       const rifle = rifleMap.get(rs.rifle_id)
       return rifle
-        ? { ...rs, make: rifle.make, model: rifle.model, image_url: rifle.image_url, calibre: rifle.calibre }
-        : null
+        ? [{ ...rs, make: rifle.make, model: rifle.model, image_url: rifle.image_url, calibre: rifle.calibre }]
+        : []
     })
-    .filter(Boolean)
-    .sort((a: EnrichedRifleStats, b: EnrichedRifleStats) => b.best_score - a.best_score) as EnrichedRifleStats[]
+    .sort((a, b) => b.best_score - a.best_score)
 
   const initials = user?.display_name
     ?.split(' ')
