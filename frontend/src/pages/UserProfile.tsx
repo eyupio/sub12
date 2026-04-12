@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from '@tanstack/react-router'
+import { useParams, useRouter } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, MapPin, Users, UserPlus, UserMinus } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
@@ -27,7 +27,7 @@ function AchievementsSection({ achievements }: { achievements: Achievement[] }) 
 
 export default function UserProfile() {
   const { id } = useParams({ strict: false })
-  const navigate = useNavigate()
+  const router = useRouter()
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
 
@@ -64,7 +64,7 @@ export default function UserProfile() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-2xl mx-auto">
       {/* Back */}
       <button
-        onClick={() => navigate({ to: -1 as any })}
+        onClick={() => router.history.back()}
         className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
       >
         <ChevronLeft size={14} />
