@@ -110,13 +110,13 @@ export default function Layout({ children }: PropsWithChildren) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-[var(--mobile-nav-offset)] lg:pb-0">
           {children ?? <Outlet />}
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="lg:hidden sticky bottom-0 z-50 bg-nav backdrop-blur border-t border-subtle">
-          <div className="flex justify-around">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle">
+          <div className="flex justify-around min-h-[var(--mobile-nav-offset)]">
             {navItems.map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
