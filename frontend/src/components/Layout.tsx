@@ -53,7 +53,7 @@ export default function Layout({ children }: PropsWithChildren) {
       try { await authApi.logout(refreshToken) } catch { /* best effort */ }
     }
     clearAuth()
-    navigate({ to: '/login' })
+    navigate({ to: '/' })
   }
 
   const navLinkBase = 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-hover transition-colors text-sm tracking-wide'
