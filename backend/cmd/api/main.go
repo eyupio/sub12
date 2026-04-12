@@ -16,6 +16,7 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/config"
 	"github.com/jnnngs/sub-12/backend/internal/db"
 	"github.com/jnnngs/sub-12/backend/internal/db/seed"
+	"github.com/jnnngs/sub-12/backend/internal/email"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
@@ -91,9 +92,13 @@ func main() {
 	smtpRepo := repository.NewSMTPRepository(pool)
 	smtpSvc := service.NewSMTPService(smtpRepo)
 
+	emailTemplateRepo := repository.NewEmailTemplateRepository(pool)
+	emailRenderer := email.NewRenderer()
+	emailTemplateSvc := service.NewEmailTemplateService(emailTemplateRepo, emailRenderer)
+
 	imageRepo := repository.NewImageRepository(pool)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, smtpSvc, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, smtpSvc, emailTemplateSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

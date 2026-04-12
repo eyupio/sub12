@@ -29,6 +29,7 @@ func NewRouter(
 	leagues *service.LeagueService,
 	pelletTests *service.PelletTestService,
 	smtp *service.SMTPService,
+	emailTemplates *service.EmailTemplateService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -172,12 +173,16 @@ func NewRouter(
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 
 			// Admin email settings
-			aeh := handler.NewAdminEmail(smtp)
+			aeh := handler.NewAdminEmail(smtp, emailTemplates)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
 				r.Get("/admin/email/settings", aeh.GetSettings)
 				r.Patch("/admin/email/settings", aeh.PatchSettings)
 				r.Post("/admin/email/settings/test", aeh.TestSettings)
+				r.Get("/admin/email/templates", aeh.ListTemplates)
+				r.Get("/admin/email/templates/{key}", aeh.GetTemplate)
+				r.Patch("/admin/email/templates/{key}", aeh.PatchTemplate)
+				r.Post("/admin/email/templates/{key}/preview", aeh.PreviewTemplate)
 			})
 		})
 
