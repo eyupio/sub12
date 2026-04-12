@@ -1,14 +1,16 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Camera, Pencil, Check, X } from 'lucide-react'
+import { Plus, Trash2, Camera, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
+import { toast } from '../store/toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
+      <label className="block text-xs tracking-wide text-muted mb-1">{label}</label>
       {children}
     </div>
   )
@@ -31,7 +33,7 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
           const file = e.target.files?.[0]
           if (file) {
             if (file.size > 5 * 1024 * 1024) {
-              alert('Image must be under 5 MB')
+              toast('Image must be under 5 MB', 'error')
             } else {
               onUpload(file)
             }
@@ -52,6 +54,11 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
             <Camera size={14} className="text-muted" />
           </div>
         )}
+        {isPending && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Loader2 size={16} className="text-white animate-spin" />
+          </div>
+        )}
       </button>
     </>
   )
@@ -67,6 +74,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
     mutationFn: () => gearApi.createRifle(form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rifles'] })
+      toast('Rifle added', 'success')
       onDone()
     },
   })
@@ -103,11 +111,12 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
 function RifleRow({ rifle }: { rifle: Rifle }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState({ make: rifle.make, model: rifle.model, calibre: rifle.calibre ?? '', power_ftlb: rifle.power_ftlb })
 
   const del = useMutation({
     mutationFn: () => gearApi.deleteRifle(rifle.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['rifles'] }); toast('Rifle deleted', 'success') },
   })
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadRifleImage(rifle.id, file),
@@ -122,6 +131,7 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rifles'] })
+      toast('Rifle updated', 'success')
       setEditing(false)
     },
   })
@@ -173,13 +183,20 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
         <Pencil size={15} />
       </button>
       <button
-        onClick={() => { if (window.confirm(`Delete ${rifle.make} ${rifle.model}?`)) del.mutate() }}
+        onClick={() => setConfirmDelete(true)}
         disabled={del.isPending}
         className="text-muted hover:text-[var(--error-text)] transition-colors"
         aria-label="Delete rifle"
       >
         <Trash2 size={15} />
       </button>
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete ${rifle.make} ${rifle.model}?`}
+        message="This rifle will be removed from your gear list. Score cards linked to it will keep their data."
+        onConfirm={() => { setConfirmDelete(false); del.mutate() }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }
@@ -216,6 +233,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
     mutationFn: () => gearApi.createPellet(form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellets'] })
+      toast('Pellet added', 'success')
       onDone()
     },
   })
@@ -255,11 +273,12 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
 function PelletRow({ pellet }: { pellet: Pellet }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState({ brand: pellet.brand, model: pellet.model, head_size_mm: pellet.head_size_mm, weight_grains: pellet.weight_grains, batch_code: pellet.batch_code ?? '' })
 
   const del = useMutation({
     mutationFn: () => gearApi.deletePellet(pellet.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pellets'] }); toast('Pellet deleted', 'success') },
   })
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadPelletImage(pellet.id, file),
@@ -275,6 +294,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellets'] })
+      toast('Pellet updated', 'success')
       setEditing(false)
     },
   })
@@ -335,13 +355,20 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
         <Pencil size={15} />
       </button>
       <button
-        onClick={() => { if (window.confirm(`Delete ${pellet.brand} ${pellet.model}?`)) del.mutate() }}
+        onClick={() => setConfirmDelete(true)}
         disabled={del.isPending}
         className="text-muted hover:text-[var(--error-text)] transition-colors"
         aria-label="Delete pellet"
       >
         <Trash2 size={15} />
       </button>
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete ${pellet.brand} ${pellet.model}?`}
+        message="This pellet will be removed from your gear list. Score cards and test data linked to it will keep their data."
+        onConfirm={() => { setConfirmDelete(false); del.mutate() }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }
