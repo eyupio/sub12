@@ -2,13 +2,14 @@
 -- Run with: make seed
 -- Password for all accounts: password123
 
-INSERT INTO users (id, email, display_name, password_hash, bio, location, club)
+INSERT INTO users (id, email, display_name, password_hash, role, bio, location, club)
 VALUES
   (
     'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     'dev@sub12.local',
     'Dev User',
     '$2a$10$QhEUGN1nA5kRjb/J0zYQCuWY2KDnfemdmpDbfqSZPdXLbU63aN7x.',
+    'user',
     'Test account for development',
     'Yorkshire',
     'Test Range'
@@ -18,6 +19,7 @@ VALUES
     'admin@sub12.local',
     'Admin',
     '$2a$10$QhEUGN1nA5kRjb/J0zYQCuWY2KDnfemdmpDbfqSZPdXLbU63aN7x.',
+    'admin',
     'Platform administrator',
     'Yorkshire',
     NULL

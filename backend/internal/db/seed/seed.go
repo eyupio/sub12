@@ -17,9 +17,9 @@ func Admin(ctx context.Context, db *pgxpool.Pool, password string) error {
 	}
 
 	_, err = db.Exec(ctx, `
-		INSERT INTO users (email, display_name, password_hash, bio, location)
-		VALUES ('admin@sub12.local', 'Admin', $1, 'Platform administrator', 'Yorkshire')
-		ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW()
+		INSERT INTO users (email, display_name, password_hash, role, bio, location)
+		VALUES ('admin@sub12.local', 'Admin', $1, 'admin', 'Platform administrator', 'Yorkshire')
+		ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'admin', updated_at = NOW()
 	`, string(hash))
 	if err != nil {
 		return fmt.Errorf("upsert admin user: %w", err)

@@ -17,7 +17,7 @@ var (
 type ScoreCardRepo interface {
 	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
-	ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.ScoreCardSummary, error)
+	ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 }
@@ -69,14 +69,18 @@ func (s *ScoreCardService) GetByID(ctx context.Context, id, userID string) (*mod
 }
 
 // ListByUser returns paginated summaries for the requesting user.
-func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.ScoreCardSummary, error) {
+// scope filters results: "personal", "league", or "" (all).
+func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	return s.cards.ListByUser(ctx, userID, limit, offset)
+	if scope != "" && scope != "personal" && scope != "league" {
+		scope = ""
+	}
+	return s.cards.ListByUser(ctx, userID, limit, offset, scope)
 }
 
 // Update modifies a score card's shots and metadata, resets verification, and

@@ -30,8 +30,9 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		INSERT INTO score_cards (
 			user_id, rifle_id, pellet_id,
 			shot_at, location, wind_mph, temp_celsius, notes,
-			shot_scores, shot_xs, total_score, x_count
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			shot_scores, shot_xs, total_score, x_count,
+			verification
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'verified')
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, wind_mph, temp_celsius, notes,
@@ -93,14 +94,27 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 }
 
 // ListByUser returns paginated score card summaries for a user, newest first.
-func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.ScoreCardSummary, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT id, shot_at::text, total_score, x_count, location, created_at
+// scope filters results: "personal" (no league), "league" (has league), or "" (all).
+func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error) {
+	query := `
+		SELECT id, shot_at::text, total_score, x_count, location,
+		       verification::text, league_round_id, created_at
 		FROM score_cards
 		WHERE user_id = $1
-		ORDER BY shot_at DESC, created_at DESC
-		LIMIT $2 OFFSET $3
-	`, userID, limit, offset)
+	`
+	args := []any{userID}
+
+	switch scope {
+	case "personal":
+		query += ` AND league_round_id IS NULL`
+	case "league":
+		query += ` AND league_round_id IS NOT NULL`
+	}
+
+	query += ` ORDER BY shot_at DESC, created_at DESC LIMIT $2 OFFSET $3`
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list score cards: %w", err)
 	}
@@ -109,7 +123,8 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	var cards []*model.ScoreCardSummary
 	for rows.Next() {
 		var c model.ScoreCardSummary
-		if err := rows.Scan(&c.ID, &c.ShotAt, &c.TotalScore, &c.XCount, &c.Location, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.ShotAt, &c.TotalScore, &c.XCount, &c.Location,
+			&c.Verification, &c.LeagueRoundID, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan score card summary: %w", err)
 		}
 		cards = append(cards, &c)
@@ -143,7 +158,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			shot_xs     = $11,
 			total_score = $12,
 			x_count     = $13,
-			verification = 'pending',
+			verification = CASE WHEN league_round_id IS NULL THEN 'verified'::verification_status ELSE 'pending'::verification_status END,
 			updated_at  = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING

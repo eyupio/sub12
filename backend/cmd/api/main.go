@@ -88,9 +88,12 @@ func main() {
 	pelletTestRepo := repository.NewPelletTestRepository(pool)
 	pelletTestSvc := service.NewPelletTestService(pelletTestRepo)
 
+	smtpRepo := repository.NewSMTPRepository(pool)
+	smtpSvc := service.NewSMTPService(smtpRepo)
+
 	imageRepo := repository.NewImageRepository(pool)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, leagueSvc, pelletTestSvc, smtpSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

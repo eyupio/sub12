@@ -23,15 +23,15 @@ var (
 )
 
 const (
-	refreshTokenTTL = 30 * 24 * time.Hour
+	refreshTokenTTL  = 30 * 24 * time.Hour
 	refreshKeyPrefix = "refresh:"
 )
 
 type AuthService struct {
-	users      *repository.UserRepository
-	redis      *redis.Client
-	jwtSecret  []byte
-	jwtExpiry  time.Duration
+	users     *repository.UserRepository
+	redis     *redis.Client
+	jwtSecret []byte
+	jwtExpiry time.Duration
 }
 
 func NewAuthService(
@@ -52,6 +52,11 @@ type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"` // seconds
+}
+
+type AuthPrincipal struct {
+	UserID string
+	Role   string
 }
 
 // Register creates a new user and returns a token pair.
@@ -126,31 +131,42 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
 }
 
 // ValidateAccessToken parses and validates a JWT, returning the user ID.
-func (s *AuthService) ValidateAccessToken(tokenStr string) (string, error) {
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+func (s *AuthService) ValidateAccessToken(tokenStr string) (*AuthPrincipal, error) {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return s.jwtSecret, nil
 	}, jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
-		return "", ErrInvalidToken
+		return nil, ErrInvalidToken
 	}
 
-	sub, err := token.Claims.GetSubject()
-	if err != nil {
-		return "", ErrInvalidToken
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return nil, ErrInvalidToken
 	}
-	return sub, nil
+
+	role, _ := claims["role"].(string)
+	if role == "" {
+		role = "user"
+	}
+
+	return &AuthPrincipal{UserID: sub, Role: role}, nil
 }
 
 func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPair, error) {
 	// Access token (JWT)
 	now := time.Now()
-	claims := jwt.RegisteredClaims{
-		Subject:   userID,
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(s.jwtExpiry)),
+	claims := jwt.MapClaims{
+		"sub": userID,
+		"iat": now.Unix(),
+		"exp": now.Add(s.jwtExpiry).Unix(),
+	}
+	user, err := s.users.GetByID(ctx, userID)
+	if err == nil && user.Role != "" {
+		claims["role"] = user.Role
 	}
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.jwtSecret)
 	if err != nil {

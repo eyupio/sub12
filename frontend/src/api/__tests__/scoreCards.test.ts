@@ -63,6 +63,24 @@ describe('scoreCardApi', () => {
     expect(result.items).toHaveLength(2)
   })
 
+  it('list with scope passes query parameter', async () => {
+    const body = { items: [{ id: '1' }] }
+    globalThis.fetch = mockFetch(200, body)
+
+    await scoreCardApi.list(20, 0, 'personal')
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(call[0]).toContain('scope=personal')
+  })
+
+  it('list with league scope passes query parameter', async () => {
+    const body = { items: [] }
+    globalThis.fetch = mockFetch(200, body)
+
+    await scoreCardApi.list(20, 0, 'league')
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(call[0]).toContain('scope=league')
+  })
+
   it('get fetches single card by id', async () => {
     const card = { id: 'xyz', total_score: 100 }
     globalThis.fetch = mockFetch(200, card)
