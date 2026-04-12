@@ -28,6 +28,7 @@ func NewRouter(
 	users *service.UserService,
 	leagues *service.LeagueService,
 	pelletTests *service.PelletTestService,
+	smtp *service.SMTPService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -61,15 +62,16 @@ func NewRouter(
 			r.Use(middleware.Authenticate(auth))
 
 			r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
-				userID, ok := middleware.UserIDFromContext(r.Context())
-				if !ok {
+				userID, okID := middleware.UserIDFromContext(r.Context())
+				role, okRole := middleware.UserRoleFromContext(r.Context())
+				if !okID || !okRole {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusUnauthorized)
 					w.Write([]byte(`{"error":"unauthorized"}`))
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]string{"user_id": userID})
+				json.NewEncoder(w).Encode(map[string]string{"user_id": userID, "role": role})
 			})
 
 			// Images
@@ -168,6 +170,15 @@ func NewRouter(
 			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
+
+			// Admin email settings
+			aeh := handler.NewAdminEmail(smtp)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.RequireAdmin)
+				r.Get("/admin/email/settings", aeh.GetSettings)
+				r.Patch("/admin/email/settings", aeh.PatchSettings)
+				r.Post("/admin/email/settings/test", aeh.TestSettings)
+			})
 		})
 
 		// Public league routes (no auth required)

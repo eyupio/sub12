@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS smtp_settings;
+
+ALTER TABLE users
+DROP COLUMN IF EXISTS role;
