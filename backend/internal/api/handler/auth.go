@@ -115,6 +115,56 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /api/v1/auth/forgot-password
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if _, err := mail.ParseAddress(body.Email); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid email address")
+		return
+	}
+	_ = h.auth.RequestPasswordReset(r.Context(), body.Email)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"message": "If an account exists for that email, a reset link has been sent.",
+	})
+}
+
+// POST /api/v1/auth/reset-password
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.Token == "" || body.NewPassword == "" {
+		writeError(w, http.StatusBadRequest, "token and new_password are required")
+		return
+	}
+	if len(body.NewPassword) < 8 {
+		writeError(w, http.StatusBadRequest, "new_password must be at least 8 characters")
+		return
+	}
+
+	if err := h.auth.ResetPassword(r.Context(), body.Token, body.NewPassword); err != nil {
+		if errors.Is(err, service.ErrInvalidResetToken) {
+			writeError(w, http.StatusBadRequest, "invalid or expired reset token")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to reset password")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }

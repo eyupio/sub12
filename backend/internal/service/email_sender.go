@@ -1,0 +1,140 @@
+package service
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
+	"net/smtp"
+	"strings"
+	"time"
+
+	"github.com/rs/zerolog"
+
+	"github.com/jnnngs/sub-12/backend/internal/email"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
+)
+
+type EmailSenderService struct {
+	smtpRepo     *repository.SMTPRepository
+	templateRepo *repository.EmailTemplateRepository
+	renderer     *email.Renderer
+	log          zerolog.Logger
+}
+
+func NewEmailSenderService(smtpRepo *repository.SMTPRepository, templateRepo *repository.EmailTemplateRepository, renderer *email.Renderer, log zerolog.Logger) *EmailSenderService {
+	return &EmailSenderService{smtpRepo: smtpRepo, templateRepo: templateRepo, renderer: renderer, log: log}
+}
+
+func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, displayName, resetLink string, expiresAt time.Time) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, "forgot_password")
+	if err != nil {
+		return fmt.Errorf("load forgot_password template: %w", err)
+	}
+	if !tpl.IsEnabled {
+		s.log.Warn().Msg("forgot_password template disabled; skipping email send")
+		return nil
+	}
+	payload := map[string]any{
+		"display_name": displayName,
+		"reset_link":   resetLink,
+		"expires_at":   expiresAt.UTC().Format(time.RFC3339),
+	}
+	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render forgot_password subject: %w", err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render forgot_password text: %w", err)
+	}
+
+	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("load smtp settings: %w", err)
+	}
+
+	fromName := "Sub-12"
+	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
+		fromName = strings.TrimSpace(*settings.FromName)
+	}
+	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+
+	msg := strings.Builder{}
+	msg.WriteString("From: " + from + "\r\n")
+	msg.WriteString("To: " + toEmail + "\r\n")
+	msg.WriteString("Subject: " + subject + "\r\n")
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(textBody)
+
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, []byte(msg.String()))
+}
+
+func (s *EmailSenderService) sendSMTP(host string, port int, username, password *string, useTLS, useSTARTTLS bool, from, to string, msg []byte) error {
+	addr := fmt.Sprintf("%s:%d", host, port)
+
+	if !useTLS && !useSTARTTLS {
+		var auth smtp.Auth
+		if username != nil && *username != "" && password != nil {
+			auth = smtp.PlainAuth("", *username, *password, host)
+		}
+		return smtp.SendMail(addr, auth, from, []string{to}, msg)
+	}
+
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("dial smtp: %w", err)
+	}
+
+	if useTLS {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+		if err := tlsConn.Handshake(); err != nil {
+			return fmt.Errorf("smtp tls handshake: %w", err)
+		}
+		conn = tlsConn
+	}
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("new smtp client: %w", err)
+	}
+	defer client.Quit()
+
+	if useSTARTTLS {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			return fmt.Errorf("smtp server does not support STARTTLS")
+		}
+		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+			return fmt.Errorf("starttls: %w", err)
+		}
+	}
+
+	if username != nil && *username != "" && password != nil {
+		auth := smtp.PlainAuth("", *username, *password, host)
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return fmt.Errorf("smtp auth: %w", err)
+			}
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("smtp mail from: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt to: %w", err)
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		return fmt.Errorf("smtp write message: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp finalize message: %w", err)
+	}
+	return nil
+}

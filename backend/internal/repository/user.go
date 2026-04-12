@@ -128,6 +128,21 @@ func (r *UserRepository) UpdateAvatarURL(ctx context.Context, id, avatarURL stri
 	return &u, nil
 }
 
+func (r *UserRepository) UpdatePasswordHash(ctx context.Context, id, passwordHash string) error {
+	ct, err := r.db.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $2, updated_at = NOW()
+		WHERE id = $1
+	`, id, passwordHash)
+	if err != nil {
+		return fmt.Errorf("update password hash: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // isUniqueViolation checks for PostgreSQL unique constraint error (code 23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

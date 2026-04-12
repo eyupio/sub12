@@ -67,7 +67,7 @@ func main() {
 
 	// Repositories & services
 	userRepo := repository.NewUserRepository(pool)
-	authSvc := service.NewAuthService(userRepo, rdb, cfg.JWTSecret, cfg.JWTExpiryHours)
+	passwordResetTokenRepo := repository.NewPasswordResetTokenRepository(pool)
 
 	scoreCardRepo := repository.NewScoreCardRepository(pool)
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo)
@@ -95,6 +95,18 @@ func main() {
 	emailTemplateRepo := repository.NewEmailTemplateRepository(pool)
 	emailRenderer := email.NewRenderer()
 	emailTemplateSvc := service.NewEmailTemplateService(emailTemplateRepo, emailRenderer)
+	emailSenderSvc := service.NewEmailSenderService(smtpRepo, emailTemplateRepo, emailRenderer, log.Logger)
+	authSvc := service.NewAuthService(
+		userRepo,
+		passwordResetTokenRepo,
+		rdb,
+		emailSenderSvc,
+		log.Logger,
+		cfg.JWTSecret,
+		cfg.JWTExpiryHours,
+		cfg.PasswordResetTTLMinutes,
+		cfg.PasswordResetURL,
+	)
 
 	imageRepo := repository.NewImageRepository(pool)
 
