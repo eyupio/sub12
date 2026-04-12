@@ -1,9 +1,15 @@
 -- Enums for league configuration
-CREATE TYPE scoring_rule AS ENUM ('highest', 'average');
-CREATE TYPE join_policy  AS ENUM ('open', 'invite_code', 'approval');
+DO $$ BEGIN
+    CREATE TYPE scoring_rule AS ENUM ('highest', 'average');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+    CREATE TYPE join_policy  AS ENUM ('open', 'invite_code', 'approval');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- League configuration (1-to-1 with leagues)
-CREATE TABLE league_configs (
+CREATE TABLE IF NOT EXISTS league_configs (
     league_id                  UUID PRIMARY KEY REFERENCES leagues(id) ON DELETE CASCADE,
     starts_on                  DATE,
     ends_on                    DATE,
@@ -17,7 +23,7 @@ CREATE TABLE league_configs (
 );
 
 -- Join requests for approval-based leagues
-CREATE TABLE league_join_requests (
+CREATE TABLE IF NOT EXISTS league_join_requests (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     league_id   UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
     user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -28,10 +34,10 @@ CREATE TABLE league_join_requests (
     UNIQUE (league_id, user_id)
 );
 
-CREATE INDEX idx_join_requests_league_status ON league_join_requests (league_id, status);
+CREATE INDEX IF NOT EXISTS idx_join_requests_league_status ON league_join_requests (league_id, status);
 
 -- Peer verification of score cards
-CREATE TABLE score_confirmations (
+CREATE TABLE IF NOT EXISTS score_confirmations (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     score_card_id UUID NOT NULL REFERENCES score_cards(id) ON DELETE CASCADE,
     confirmed_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -39,10 +45,10 @@ CREATE TABLE score_confirmations (
     UNIQUE (score_card_id, confirmed_by)
 );
 
-CREATE INDEX idx_score_confirmations_card ON score_confirmations (score_card_id);
+CREATE INDEX IF NOT EXISTS idx_score_confirmations_card ON score_confirmations (score_card_id);
 
 -- Admin audit trail for score card amendments / rejections
-CREATE TABLE score_card_actions (
+CREATE TABLE IF NOT EXISTS score_card_actions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     score_card_id   UUID NOT NULL REFERENCES score_cards(id) ON DELETE CASCADE,
     action          TEXT NOT NULL CHECK (action IN ('amend','reject')),
@@ -55,7 +61,7 @@ CREATE TABLE score_card_actions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_score_card_actions_card ON score_card_actions (score_card_id);
+CREATE INDEX IF NOT EXISTS idx_score_card_actions_card ON score_card_actions (score_card_id);
 
 -- Seed default config for all existing leagues
 INSERT INTO league_configs (league_id)
