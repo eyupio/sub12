@@ -142,11 +142,12 @@ export default function AdminEmailSettings() {
     setFormErrors(errors)
     if (errors.length > 0) return
 
+    const sendPassword = form.updatePassword || !hasPersistedPassword
     saveMutation.mutate({
       host: form.host.trim(),
       port: Number(form.port),
       username: form.username.trim() || undefined,
-      password_encrypted: form.updatePassword ? form.password : undefined,
+      password_encrypted: sendPassword ? form.password || undefined : undefined,
       from_email: form.from_email.trim(),
       from_name: form.from_name.trim() || undefined,
       use_tls: form.use_tls,
