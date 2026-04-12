@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil } from 'lucide-react'
+import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
@@ -305,6 +305,10 @@ export default function ScoreCardDetail() {
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
 
@@ -317,24 +321,50 @@ export default function ScoreCardDetail() {
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
 
   const updateMutation = useMutation({
-    mutationFn: () => scoreCardApi.update(id, {
-      shot_at: editMeta.shot_at,
-      shot_scores: editShots.map(s => s.score),
-      shot_xs: editShots.map(s => s.x),
-      location: editMeta.location || undefined,
-      notes: editMeta.notes || undefined,
-      rifle_id: editMeta.rifle_id || undefined,
-      pellet_id: editMeta.pellet_id || undefined,
-    }),
+    mutationFn: async () => {
+      const updated = await scoreCardApi.update(id, {
+        shot_at: editMeta.shot_at,
+        shot_scores: editShots.map(s => s.score),
+        shot_xs: editShots.map(s => s.x),
+        location: editMeta.location || undefined,
+        notes: editMeta.notes || undefined,
+        rifle_id: editMeta.rifle_id || undefined,
+        pellet_id: editMeta.pellet_id || undefined,
+      })
+      if (imageFile) {
+        await scoreCardApi.uploadImage(id, imageFile)
+      }
+      return updated
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['score-cards', id] })
       queryClient.invalidateQueries({ queryKey: ['score-cards', id, 'audit-trail'] })
+      clearImage()
       setEditing(false)
     },
   })
 
+  function handleImageSelect(file: File | undefined) {
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be under 10 MB')
+      return
+    }
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  function clearImage() {
+    setImageFile(null)
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+      setImagePreview(null)
+    }
+  }
+
   function startEdit() {
     if (!card) return
+    clearImage()
     setEditShots(card.shot_scores.map((score, i) => ({ score, x: card.shot_xs[i] })))
     setEditMeta({
       shot_at: card.shot_at,
@@ -445,6 +475,79 @@ export default function ScoreCardDetail() {
           <div>
             <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
             <textarea value={editMeta.notes} onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))} rows={2} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted resize-none focus:outline-none focus:border-[var(--brass)]/50" />
+          </div>
+
+          {/* Photo upload / replace */}
+          <div>
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Score Card Photo</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleImageSelect(e.target.files?.[0])}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleImageSelect(e.target.files?.[0])}
+            />
+            {imagePreview ? (
+              <div className="relative">
+                <img src={imagePreview} alt="New score card photo" className="rounded border border-subtle max-h-48 w-full object-contain bg-surface" />
+                <button
+                  onClick={clearImage}
+                  className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+                  aria-label="Remove new photo"
+                >
+                  <XIcon size={16} />
+                </button>
+              </div>
+            ) : card.card_image_url ? (
+              <div className="space-y-2">
+                <img src={card.card_image_url} alt="Current score card photo" className="rounded border border-subtle max-h-48 w-full object-contain bg-surface opacity-60" />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-2.5 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                  >
+                    <Upload size={16} />
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-2.5 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                  >
+                    <Camera size={16} />
+                    Camera
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                >
+                  <Upload size={16} />
+                  Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                >
+                  <Camera size={16} />
+                  Camera
+                </button>
+              </div>
+            )}
           </div>
 
           {updateMutation.isError && <p className="text-[var(--error-text)] text-sm">Failed to save changes. Please try again.</p>}
