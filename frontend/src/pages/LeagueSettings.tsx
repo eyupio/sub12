@@ -589,7 +589,7 @@ export default function LeagueSettings() {
 
   if (isLoading) {
     return (
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
+      <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-3xl mx-auto">
         <div className="h-6 w-40 bg-surface rounded animate-pulse" />
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-32 bg-surface rounded animate-pulse" />
@@ -608,7 +608,7 @@ export default function LeagueSettings() {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+    <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-3xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/leagues/$id" params={{ id }} className="text-muted hover:text-secondary transition-colors">

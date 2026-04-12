@@ -49,6 +49,26 @@ func (h *LeagueHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, league)
 }
 
+// GET /api/v1/users/me/leagues
+func (h *LeagueHandler) ListMyLeagues(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagues, err := h.svc.ListMyLeagues(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list my leagues")
+		return
+	}
+
+	if leagues == nil {
+		leagues = []*model.MyLeagueSummary{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": leagues})
+}
+
 // GET /api/v1/leagues
 func (h *LeagueHandler) List(w http.ResponseWriter, r *http.Request) {
 	leagues, err := h.svc.ListPublic(r.Context())

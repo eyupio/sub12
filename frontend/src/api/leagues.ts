@@ -122,7 +122,22 @@ export interface ScoreCardAction {
   created_at: string
 }
 
+export interface MyLeagueSummary {
+  id: string
+  name: string
+  description?: string
+  image_url?: string
+  member_count: number
+  user_rank: number
+  starts_on?: string
+  ends_on?: string
+}
+
 export const leagueApi = {
+  // My leagues (dashboard)
+  listMine: () =>
+    api.get<{ items: MyLeagueSummary[] }>('/users/me/leagues'),
+
   // Core league CRUD
   list: () =>
     api.get<{ items: League[] }>('/leagues'),

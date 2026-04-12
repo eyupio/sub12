@@ -18,3 +18,7 @@ func NewStatsService(stats *repository.StatsRepository) *StatsService {
 func (s *StatsService) GetUserStats(ctx context.Context, userID string) (*model.UserStats, error) {
 	return s.stats.GetUserStats(ctx, userID)
 }
+
+func (s *StatsService) GetRifleStats(ctx context.Context, userID string) ([]*model.RifleStats, error) {
+	return s.stats.GetRifleStats(ctx, userID)
+}
