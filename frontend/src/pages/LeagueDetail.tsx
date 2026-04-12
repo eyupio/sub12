@@ -26,9 +26,9 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function VerificationDot({ status }: { status: string }) {
-  if (status === 'verified') return <CheckCircle size={14} className="text-[var(--success-text)] shrink-0" />
-  if (status === 'rejected') return <XCircle size={14} className="text-[var(--error-text)] shrink-0" />
-  return <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+  if (status === 'verified') return <span title="Verified by league admin"><CheckCircle size={14} className="text-[var(--success-text)] shrink-0" /></span>
+  if (status === 'rejected') return <span title="Rejected by league admin"><XCircle size={14} className="text-[var(--error-text)] shrink-0" /></span>
+  return <span title="Pending review by league admin"><AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" /></span>
 }
 
 function LeagueScoreRow({ score }: { score: LeagueScore }) {
