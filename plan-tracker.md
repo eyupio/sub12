@@ -78,39 +78,26 @@
 
 ## Phase 2 — Community
 
-### Phase 2A — League Access & Governance
+### Stage 2.1 — Foundation Data Models & APIs
+- [ ] Social graph model + APIs (followers/following relationships, privacy controls)
+- [ ] Comments schema + APIs (threading support, author metadata, moderation states)
+- [ ] Activity event model + ingestion APIs (normalized event types, actor/subject references)
+- [ ] Private leagues (invite codes, membership model, invite validation)
+- [ ] Score card image upload (S3-compatible storage, metadata persistence, access policy)
 
-**Goal:** Complete league participation controls, moderation, and league administration foundations.
+### Stage 2.2 — User-Facing CRUD
+- [ ] Social follow / unfollow (backend action + endpoint + frontend interactions)
+- [ ] Score card comments (create/edit/delete UI + backend CRUD + basic moderation hooks)
 
-- [x] League join policies (open / approval / invite), invite flows, and approval join path
-- [x] Join request moderation UI/actions (`JoinRequestsList`)
-- [x] League configuration/admin controls (scoring rule, verification flags)
-- [x] Season management (`SeasonsSection`)
-- [x] Round management (`RoundsSection`)
-- [x] League image upload support
+### Stage 2.3 — Feed Aggregation & Ranking
+- [ ] Activity feed (followed shooters + leagues, aggregation pipeline + ranking/query endpoints)
 
-### Phase 2B — Score Verification & Media
+### Stage 2.4 — Recognition Layer
+- [ ] Achievements / badges engine (rules/scoring signals + award processing + display surfaces)
 
-**Goal:** Support evidence-backed scoring with verification actions and attached media.
-
-- [x] Score verification actions in score card detail
-- [x] Score verification audit trail surfaced in UI/API
-- [x] Score card image upload path (client + API integration)
-
-### Phase 2C — Social Layer
-
-**Goal:** Add user-to-user and card-level social interactions around league and score activity.
-
-- [ ] Social follow / unfollow graph
-- [ ] Activity feed (followed shooters + leagues)
-- [ ] Score card comments/threading
-
-### Phase 2D — Recognition & Distribution
-
-**Goal:** Add progression systems and complete mobile distribution pipeline.
-
-- [ ] Achievements / badges engine
-- [ ] Mobile app store packaging/release workflow
+### Stage 2.5 — Community Operations & Distribution
+- [ ] League admin tools (approve scores, manage members, rounds; admin/mod tooling + audit logging)
+- [ ] Mobile app builds (Capacitor iOS + Android, signing + release tracks + store distribution)
 
 ---
 
