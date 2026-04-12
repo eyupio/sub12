@@ -63,6 +63,12 @@ export default function LeagueDetail() {
     queryFn: () => leagueApi.getConfig(id),
   })
 
+  const { data: members } = useQuery({
+    queryKey: ['leagues', id, 'members'],
+    queryFn: () => leagueApi.listMembers(id),
+    enabled: !!currentUser,
+  })
+
   const { data: standings, isLoading: standingsLoading, isError, error: standingsError, refetch: refetchStandings } = useQuery({
     queryKey: ['leagues', id, 'standings'],
     queryFn: () => leagueApi.standings(id),
@@ -71,6 +77,7 @@ export default function LeagueDetail() {
 
   const isLoading = leagueLoading || standingsLoading
   const isAdmin = currentUser && league ? league.created_by === currentUser.id : false
+  const isMember = currentUser && members ? members.items.some(m => m.user_id === currentUser.id) : false
 
   const joinMutation = useMutation({
     mutationFn: () => leagueApi.join(id, joinCode || undefined),
@@ -83,6 +90,7 @@ export default function LeagueDetail() {
       setJoinError('')
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', id, 'standings'] })
+      queryClient.invalidateQueries({ queryKey: ['leagues', id, 'members'] })
     },
     onError: (err: Error) => {
       if (err.message.includes('409')) {
@@ -139,7 +147,7 @@ export default function LeagueDetail() {
       </div>
 
       {/* Join action */}
-      {!joinSuccess && !joinPending && (
+      {!isMember && !joinSuccess && !joinPending && (
         <div className="border border-subtle rounded p-3 lg:p-4 bg-surface space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-muted text-xs tracking-widest uppercase">
@@ -189,10 +197,10 @@ export default function LeagueDetail() {
         </div>
       )}
 
-      {joinSuccess && (
+      {(joinSuccess || isMember) && (
         <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 lg:p-4 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
           <Trophy size={14} />
-          You've joined this league
+          You're a member of this league
         </div>
       )}
 
