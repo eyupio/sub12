@@ -20,6 +20,8 @@ import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import AdminEmailSettings from './pages/AdminEmailSettings'
+import AdminEmailTemplates from './pages/AdminEmailTemplates'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -139,6 +141,19 @@ const profileRoute = createRoute({
   component: Profile,
 })
 
+
+const adminEmailSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/email/settings',
+  component: AdminEmailSettings,
+})
+
+const adminEmailTemplatesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/email/templates',
+  component: AdminEmailTemplates,
+})
+
 // Unauthenticated shell (no nav, centred layout)
 const authRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -177,6 +192,8 @@ export const routeTree = rootRoute.addChildren([
     leagueDetailRoute,
     leagueSettingsRoute,
     profileRoute,
+    adminEmailSettingsRoute,
+    adminEmailTemplatesRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute]),
 ])

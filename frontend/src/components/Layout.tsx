@@ -1,13 +1,13 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
 import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
 
-const navItems = [
+const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
@@ -16,11 +16,17 @@ const navItems = [
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
 ] as const
 
+const adminNavItems = [
+  { to: '/admin/email/settings', icon: Mail, label: 'Email Admin', mobileLabel: 'Email' },
+] as const
+
 export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
   const theme = useThemeStore((s) => s.theme)
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
+  const isAdmin = user?.role === 'admin'
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
@@ -140,7 +146,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
         {/* Mobile bottom nav */}
         <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
-          <div className="grid grid-cols-6 w-full min-h-[var(--mobile-nav-offset)]">
+          <div className="grid w-full min-h-[var(--mobile-nav-offset)]" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
             {navItems.map(({ to, icon: Icon, label, mobileLabel }) => (
               <Link
                 key={to}
