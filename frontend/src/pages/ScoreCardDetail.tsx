@@ -6,6 +6,7 @@ import { scoreCardApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -512,7 +513,7 @@ export default function ScoreCardDetail() {
   function handleImageSelect(file: File | undefined) {
     if (!file) return
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image must be under 10 MB')
+      toast('Image must be under 10 MB', 'error')
       return
     }
     setImageFile(file)
