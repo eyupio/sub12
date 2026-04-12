@@ -197,10 +197,10 @@ export default function LeagueDetail() {
         </div>
       )}
 
-      {(joinSuccess || isMember) && (
+      {joinSuccess && (
         <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 lg:p-4 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
           <Trophy size={14} />
-          You're a member of this league
+          You've joined this league
         </div>
       )}
 
