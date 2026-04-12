@@ -6,3 +6,10 @@ type UserStats struct {
 	BestXCount  *int16   `json:"best_x_count,omitempty"`
 	AvgScore    *float64 `json:"avg_score,omitempty"`
 }
+
+type RifleStats struct {
+	RifleID    string `json:"rifle_id"`
+	BestScore  int16  `json:"best_score"`
+	BestXCount int16  `json:"best_x_count"`
+	CardCount  int    `json:"card_count"`
+}

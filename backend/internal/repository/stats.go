@@ -38,3 +38,27 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 	}
 	return &stats, nil
 }
+
+func (r *StatsRepository) GetRifleStats(ctx context.Context, userID string) ([]*model.RifleStats, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT rifle_id, MAX(total_score) AS best_score,
+		       MAX(x_count) AS best_x_count, COUNT(*)::int AS card_count
+		FROM score_cards
+		WHERE user_id = $1 AND rifle_id IS NOT NULL
+		GROUP BY rifle_id
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get rifle stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []*model.RifleStats
+	for rows.Next() {
+		var s model.RifleStats
+		if err := rows.Scan(&s.RifleID, &s.BestScore, &s.BestXCount, &s.CardCount); err != nil {
+			return nil, fmt.Errorf("scan rifle stats: %w", err)
+		}
+		stats = append(stats, &s)
+	}
+	return stats, rows.Err()
+}

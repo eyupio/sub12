@@ -51,6 +51,30 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	return s.leagues.Create(ctx, userID, input)
 }
 
+// ListMyLeagues returns leagues the user is a member of, with their rank in each.
+func (s *LeagueService) ListMyLeagues(ctx context.Context, userID string) ([]*model.MyLeagueSummary, error) {
+	leagues, err := s.leagues.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, l := range leagues {
+		standings, err := s.Standings(ctx, l.ID)
+		if err != nil {
+			// If standings fail, leave rank as 0 (unknown)
+			continue
+		}
+		for _, st := range standings {
+			if st.UserID == userID {
+				l.UserRank = st.Rank
+				break
+			}
+		}
+	}
+
+	return leagues, nil
+}
+
 func (s *LeagueService) GetByID(ctx context.Context, id string) (*model.League, error) {
 	league, err := s.leagues.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {

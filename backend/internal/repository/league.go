@@ -92,6 +92,33 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 	return leagues, rows.Err()
 }
 
+// ListByUser returns leagues the given user is a member of, with member count and config dates.
+func (r *LeagueRepository) ListByUser(ctx context.Context, userID string) ([]*model.MyLeagueSummary, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT l.id, l.name, l.description, l.image_url,
+		       (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count,
+		       lc.starts_on::text, lc.ends_on::text
+		FROM leagues l
+		JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $1
+		LEFT JOIN league_configs lc ON lc.league_id = l.id
+		ORDER BY l.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list leagues by user: %w", err)
+	}
+	defer rows.Close()
+
+	var leagues []*model.MyLeagueSummary
+	for rows.Next() {
+		var l model.MyLeagueSummary
+		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.ImageURL, &l.MemberCount, &l.StartsOn, &l.EndsOn); err != nil {
+			return nil, fmt.Errorf("scan league summary: %w", err)
+		}
+		leagues = append(leagues, &l)
+	}
+	return leagues, rows.Err()
+}
+
 // GetByID returns a single league with member count.
 func (r *LeagueRepository) GetByID(ctx context.Context, id string) (*model.League, error) {
 	var l model.League

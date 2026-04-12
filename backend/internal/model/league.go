@@ -136,3 +136,14 @@ type LeagueMember struct {
 	IsAdmin     bool      `json:"is_admin"`
 	JoinedAt    time.Time `json:"joined_at"`
 }
+
+type MyLeagueSummary struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+	MemberCount int     `json:"member_count"`
+	UserRank    int     `json:"user_rank"`
+	StartsOn    *string `json:"starts_on,omitempty"`
+	EndsOn      *string `json:"ends_on,omitempty"`
+}

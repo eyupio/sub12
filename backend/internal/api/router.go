@@ -77,6 +77,7 @@ func NewRouter(
 			// Stats
 			sh := handler.NewStats(stats)
 			r.Get("/users/me/stats", sh.GetMe)
+			r.Get("/users/me/rifle-stats", sh.GetRifleStats)
 
 			// Score cards
 			sc := handler.NewScoreCard(scoreCards, images)
@@ -110,6 +111,7 @@ func NewRouter(
 
 			// Leagues
 			lh := handler.NewLeague(leagues, images)
+			r.Get("/users/me/leagues", lh.ListMyLeagues)
 			r.Post("/leagues", lh.Create)
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Get("/leagues/{id}/standings", lh.Standings)
