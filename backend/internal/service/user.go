@@ -22,6 +22,8 @@ var (
 	ErrInvalidEmail            = errors.New("invalid email address")
 	ErrEmailAlreadyInUse       = errors.New("email already in use")
 	ErrInvalidEmailChangeToken = errors.New("invalid or expired email change token")
+	ErrInvalidRole             = errors.New("role must be 'user' or 'admin'")
+	ErrCannotTargetSelf        = errors.New("cannot perform this action on your own account")
 )
 
 const emailChangeTTL = 24 * time.Hour
@@ -149,6 +151,39 @@ func (s *UserService) ConfirmEmailChange(ctx context.Context, token string) (*mo
 
 	s.log.Info().Str("event", "email_changed").Str("user_id", userID).Str("new_email", newEmail).Msg("audit")
 	return user, nil
+}
+
+// AdminListUsers returns a paginated list of all users with a total count.
+func (s *UserService) AdminListUsers(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
+	return s.users.ListAll(ctx, limit, offset)
+}
+
+// AdminGetUser returns the full user record (including email) by ID.
+func (s *UserService) AdminGetUser(ctx context.Context, id string) (*model.AdminUser, error) {
+	return s.users.GetAdminByID(ctx, id)
+}
+
+// AdminUpdateRole changes a user's role. The caller may not change their own role.
+func (s *UserService) AdminUpdateRole(ctx context.Context, callerID, targetID, role string) (*model.AdminUser, error) {
+	if role != "user" && role != "admin" {
+		return nil, ErrInvalidRole
+	}
+	if callerID == targetID {
+		return nil, ErrCannotTargetSelf
+	}
+	u, err := s.users.UpdateRole(ctx, targetID, role)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, repository.ErrNotFound
+	}
+	return u, err
+}
+
+// AdminDeleteUser permanently deletes a user. The caller may not delete their own account.
+func (s *UserService) AdminDeleteUser(ctx context.Context, callerID, targetID string) error {
+	if callerID == targetID {
+		return ErrCannotTargetSelf
+	}
+	return s.users.Delete(ctx, targetID)
 }
 
 func (s *UserService) buildConfirmLink(token string) string {

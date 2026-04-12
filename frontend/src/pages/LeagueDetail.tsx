@@ -1,9 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function parseLeagueRouteId(rawId: string): { leagueId: string | null; inviteCode: string } {
+  const [candidateId, rawQuery = ''] = rawId.split('?', 2)
+  const leagueId = uuidPattern.test(candidateId) ? candidateId : null
+  const inviteCode = new URLSearchParams(rawQuery).get('code')?.trim() ?? ''
+  return { leagueId, inviteCode }
+}
+
+function normalizeInviteCode(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <span className="text-[var(--brass)] font-mono text-sm font-semibold">1st</span>
@@ -73,41 +86,51 @@ function StandingRow({ standing }: { standing: LeagueStanding }) {
 }
 
 export default function LeagueDetail() {
-  const { id } = useParams({ from: '/app/leagues/$id' })
-  const search = useSearch({ strict: false }) as Record<string, string>
+  const { id: rawId } = useParams({ from: '/app/leagues/$id' })
+  const search = useSearch({ strict: false }) as Record<string, unknown>
+  const { leagueId, inviteCode } = parseLeagueRouteId(rawId)
+  const initialJoinCode = normalizeInviteCode(search?.code) || inviteCode
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
   const [joinError, setJoinError] = useState('')
   const [joinSuccess, setJoinSuccess] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
-  const [joinCode, setJoinCode] = useState(search?.code ?? '')
+  const [joinCode, setJoinCode] = useState(initialJoinCode)
   const [copied, setCopied] = useState(false)
 
+  useEffect(() => {
+    setJoinCode(initialJoinCode)
+  }, [initialJoinCode])
+
   const { data: league, isLoading: leagueLoading } = useQuery({
-    queryKey: ['leagues', id],
-    queryFn: () => leagueApi.get(id),
+    queryKey: ['leagues', leagueId ?? 'invalid'],
+    queryFn: () => leagueApi.get(leagueId!),
+    enabled: !!leagueId,
   })
 
   const { data: config } = useQuery({
-    queryKey: ['leagues', id, 'config'],
-    queryFn: () => leagueApi.getConfig(id),
+    queryKey: ['leagues', leagueId ?? 'invalid', 'config'],
+    queryFn: () => leagueApi.getConfig(leagueId!),
+    enabled: !!leagueId,
   })
 
   const { data: members } = useQuery({
-    queryKey: ['leagues', id, 'members'],
-    queryFn: () => leagueApi.listMembers(id),
-    enabled: !!currentUser,
+    queryKey: ['leagues', leagueId ?? 'invalid', 'members'],
+    queryFn: () => leagueApi.listMembers(leagueId!),
+    enabled: !!currentUser && !!leagueId,
   })
 
   const { data: standings, isLoading: standingsLoading, isError, error: standingsError, refetch: refetchStandings } = useQuery({
-    queryKey: ['leagues', id, 'standings'],
-    queryFn: () => leagueApi.standings(id),
+    queryKey: ['leagues', leagueId ?? 'invalid', 'standings'],
+    queryFn: () => leagueApi.standings(leagueId!),
     retry: 2,
+    enabled: !!leagueId,
   })
 
   const { data: scoresData, isLoading: scoresLoading } = useQuery({
-    queryKey: ['leagues', id, 'scores'],
-    queryFn: () => leagueApi.listScores(id),
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores'],
+    queryFn: () => leagueApi.listScores(leagueId!),
+    enabled: !!leagueId,
   })
 
   const isLoading = leagueLoading || standingsLoading
@@ -115,7 +138,10 @@ export default function LeagueDetail() {
   const isMember = currentUser && members ? members.items.some(m => m.user_id === currentUser.id) : false
 
   const joinMutation = useMutation({
-    mutationFn: () => leagueApi.join(id, joinCode || undefined),
+    mutationFn: async () => {
+      if (!leagueId) throw new Error('Invalid league link.')
+      return leagueApi.join(leagueId, joinCode || undefined)
+    },
     onSuccess: (data) => {
       if (data.pending) {
         setJoinPending(true)
@@ -124,8 +150,10 @@ export default function LeagueDetail() {
       }
       setJoinError('')
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
-      queryClient.invalidateQueries({ queryKey: ['leagues', id, 'standings'] })
-      queryClient.invalidateQueries({ queryKey: ['leagues', id, 'members'] })
+      if (leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'standings'] })
+        queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      }
     },
     onError: (err: Error) => {
       if (err.message.includes('409')) {
@@ -140,6 +168,22 @@ export default function LeagueDetail() {
 
   const joinPolicy = config?.join_policy ?? 'open'
   const scoringRule = config?.scoring_rule ?? 'highest'
+
+  if (!leagueId) {
+    return (
+      <div className="p-4 lg:p-8 max-w-lg mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Link to="/leagues" className="text-muted hover:text-secondary transition-colors">
+            <ChevronLeft size={20} />
+          </Link>
+          <h1 className="text-lg font-medium tracking-widest uppercase text-secondary">Invalid League Link</h1>
+        </div>
+        <p className="text-sm text-muted">
+          This invite link is malformed. Open the league again from the app or ask for a fresh invite link.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
@@ -170,9 +214,9 @@ export default function LeagueDetail() {
           )}
         </div>
         {isAdmin && (
-          <Link
-            to="/leagues/$id/settings"
-            params={{ id }}
+            <Link
+              to="/leagues/$id/settings"
+            params={{ id: leagueId }}
             className="text-muted hover:text-[var(--brass)] transition-colors"
             title="League Settings"
           >
@@ -256,11 +300,11 @@ export default function LeagueDetail() {
           <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs text-secondary bg-page rounded px-2 py-1.5 truncate font-mono">
-              {`${window.location.origin}/leagues/${id}?code=${league.join_code}`}
+              {`${window.location.origin}/leagues/${leagueId}?code=${encodeURIComponent(league.join_code)}`}
             </code>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/leagues/${id}?code=${league.join_code}`)
+                navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId}?code=${encodeURIComponent(league.join_code)}`)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}
@@ -277,7 +321,7 @@ export default function LeagueDetail() {
       {(isMember || joinSuccess) && (
         <Link
           to="/scores/new"
-          search={{ leagueId: id, roundId: undefined }}
+          search={{ leagueId, roundId: undefined }}
           className="flex items-center justify-center gap-2 w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors bg-[var(--brass)] text-inverse hover:opacity-90"
         >
           <PenLine size={16} />

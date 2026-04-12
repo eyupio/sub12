@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -19,8 +20,18 @@ type LeagueHandler struct {
 	images *repository.ImageRepository
 }
 
+var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+
 func NewLeague(svc *service.LeagueService, images *repository.ImageRepository) *LeagueHandler {
 	return &LeagueHandler{svc: svc, images: images}
+}
+
+func isUUID(value string) bool {
+	return uuidPattern.MatchString(value)
+}
+
+func writeInvalidUUIDError(w http.ResponseWriter, label string) {
+	writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid %s", label))
 }
 
 // POST /api/v1/leagues
@@ -87,6 +98,10 @@ func (h *LeagueHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}
 func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	league, err := h.svc.GetByID(r.Context(), leagueID)
 	if err != nil {
@@ -110,6 +125,10 @@ func (h *LeagueHandler) Join(w http.ResponseWriter, r *http.Request) {
 	}
 
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	var body struct {
 		JoinCode string `json:"join_code"`
@@ -149,6 +168,10 @@ func (h *LeagueHandler) Join(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}/standings
 func (h *LeagueHandler) Standings(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	standings, err := h.svc.Standings(r.Context(), leagueID)
 	if err != nil {
@@ -173,6 +196,10 @@ func (h *LeagueHandler) Standings(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}/config
 func (h *LeagueHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	cfg, err := h.svc.GetConfig(r.Context(), leagueID)
 	if err != nil {
@@ -196,6 +223,10 @@ func (h *LeagueHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	var input model.UpdateLeagueConfigInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -237,6 +268,10 @@ func (h *LeagueHandler) CreateSeason(w http.ResponseWriter, r *http.Request) {
 	}
 
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	var input model.CreateSeasonInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -264,6 +299,10 @@ func (h *LeagueHandler) CreateSeason(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}/seasons
 func (h *LeagueHandler) ListSeasons(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	seasons, err := h.svc.ListSeasons(r.Context(), leagueID)
 	if err != nil {
@@ -287,6 +326,14 @@ func (h *LeagueHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 
 	leagueID := chi.URLParam(r, "id")
 	seasonID := chi.URLParam(r, "seasonId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(seasonID) {
+		writeInvalidUUIDError(w, "season id")
+		return
+	}
 
 	var input model.CreateRoundInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -314,6 +361,10 @@ func (h *LeagueHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}/seasons/{seasonId}/rounds
 func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
 	seasonID := chi.URLParam(r, "seasonId")
+	if !isUUID(seasonID) {
+		writeInvalidUUIDError(w, "season id")
+		return
+	}
 
 	rounds, err := h.svc.ListRounds(r.Context(), seasonID)
 	if err != nil {
@@ -330,6 +381,10 @@ func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/leagues/{id}/ensure-round
 func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID)
 	if err != nil {
@@ -347,6 +402,10 @@ func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Reques
 // GET /api/v1/leagues/{id}/scores
 func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -374,6 +433,10 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/leagues/{id}/members
 func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	members, err := h.svc.ListMembers(r.Context(), leagueID)
 	if err != nil {
@@ -397,6 +460,14 @@ func (h *LeagueHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 
 	leagueID := chi.URLParam(r, "id")
 	memberID := chi.URLParam(r, "userId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(memberID) {
+		writeInvalidUUIDError(w, "member id")
+		return
+	}
 
 	if err := h.svc.RemoveMember(r.Context(), leagueID, userID, memberID); err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
@@ -428,6 +499,10 @@ func (h *LeagueHandler) ListJoinRequests(w http.ResponseWriter, r *http.Request)
 
 	leagueID := chi.URLParam(r, "id")
 	status := r.URL.Query().Get("status")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	requests, err := h.svc.ListJoinRequests(r.Context(), leagueID, userID, status)
 	if err != nil {
@@ -455,6 +530,14 @@ func (h *LeagueHandler) DecideJoinRequest(w http.ResponseWriter, r *http.Request
 
 	leagueID := chi.URLParam(r, "id")
 	requestID := chi.URLParam(r, "requestId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(requestID) {
+		writeInvalidUUIDError(w, "join request id")
+		return
+	}
 
 	var body struct {
 		Decision string `json:"decision"`
@@ -494,6 +577,10 @@ func (h *LeagueHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Reques
 	}
 
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	code, err := h.svc.RegenerateJoinCode(r.Context(), leagueID, userID)
 	if err != nil {
@@ -521,6 +608,10 @@ func (h *LeagueHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 
 	data, contentType, err := parseAndValidateImage(r, "image", 5<<20)
 	if err != nil {
@@ -573,12 +664,20 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
 
 	var body struct {
 		LeagueID string `json:"league_id"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !isUUID(body.LeagueID) {
+		writeInvalidUUIDError(w, "league id")
 		return
 	}
 
@@ -610,6 +709,10 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/score-cards/{id}/audit-trail
 func (h *LeagueHandler) GetScoreAuditTrail(w http.ResponseWriter, r *http.Request) {
 	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
 
 	confs, actions, err := h.svc.GetScoreAuditTrail(r.Context(), scoreCardID)
 	if err != nil {
@@ -635,10 +738,18 @@ func (h *LeagueHandler) AmendScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
 
 	var input model.AmendScoreInput
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !isUUID(input.LeagueID) {
+		writeInvalidUUIDError(w, "league id")
 		return
 	}
 
@@ -664,10 +775,18 @@ func (h *LeagueHandler) RejectScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
 
 	var input model.RejectScoreInput
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !isUUID(input.LeagueID) {
+		writeInvalidUUIDError(w, "league id")
 		return
 	}
 

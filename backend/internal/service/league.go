@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -430,4 +431,35 @@ func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID stri
 		return nil, nil, err
 	}
 	return confs, actions, nil
+}
+
+// AdminListLeagues returns all leagues regardless of type.
+func (s *LeagueService) AdminListLeagues(ctx context.Context) ([]*model.League, error) {
+	return s.leagues.ListAll(ctx)
+}
+
+// AdminUpdateLeague applies a partial update to any league without ownership checks.
+func (s *LeagueService) AdminUpdateLeague(ctx context.Context, id string, in *model.UpdateLeagueInput) (*model.League, error) {
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, fmt.Errorf("%w: name cannot be blank", ErrInvalidLeague)
+	}
+	l, err := s.leagues.AdminUpdate(ctx, id, in)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	return l, err
+}
+
+// AdminDeleteLeague removes a league without ownership checks.
+func (s *LeagueService) AdminDeleteLeague(ctx context.Context, id string) error {
+	err := s.leagues.AdminDelete(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	return err
+}
+
+// AdminRemoveMember removes a league member without checking league admin status.
+func (s *LeagueService) AdminRemoveMember(ctx context.Context, leagueID, userID string) error {
+	return s.leagues.AdminRemoveMember(ctx, leagueID, userID)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -86,4 +87,26 @@ func (s *ClubService) UpdateImageURL(ctx context.Context, clubID, requesterID, u
 		return ErrClubNotAdmin
 	}
 	return s.repo.UpdateImageURL(ctx, clubID, url)
+}
+
+// AdminUpdateClub applies a partial update to any club without ownership checks.
+func (s *ClubService) AdminUpdateClub(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, ErrInvalidClub
+	}
+	club, err := s.repo.AdminUpdate(ctx, id, in)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrClubNotFound, err)
+	}
+	return club, nil
+}
+
+// AdminDeleteClub removes a club without ownership checks.
+func (s *ClubService) AdminDeleteClub(ctx context.Context, id string) error {
+	return s.repo.AdminDelete(ctx, id)
+}
+
+// AdminRemoveMember removes a club member without checking club admin status.
+func (s *ClubService) AdminRemoveMember(ctx context.Context, clubID, userID string) error {
+	return s.repo.RemoveMember(ctx, clubID, userID)
 }

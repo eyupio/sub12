@@ -47,6 +47,11 @@ export default function ForgotPassword() {
             >
               Back to Sign In
             </Link>
+            <p className="text-[11px] tracking-widest uppercase text-muted">
+              <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
+                ← Back to Home
+              </Link>
+            </p>
           </div>
         ) : (
           <>
@@ -84,6 +89,12 @@ export default function ForgotPassword() {
               Remember your password?{' '}
               <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
                 Sign In
+              </Link>
+            </p>
+
+            <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+              <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
+                ← Back to Home
               </Link>
             </p>
           </>

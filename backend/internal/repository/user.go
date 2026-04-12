@@ -164,6 +164,86 @@ func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) (*mo
 	return &u, nil
 }
 
+// ListAll returns a paginated list of all users for admin use, plus the total count.
+func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
+	var total int
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+		FROM users
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list all users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*model.AdminUser
+	for rows.Next() {
+		var u model.AdminUser
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
+			&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+			&u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan admin user: %w", err)
+		}
+		users = append(users, &u)
+	}
+	return users, total, rows.Err()
+}
+
+// GetAdminByID returns the full user record (including email) for admin use.
+func (r *UserRepository) GetAdminByID(ctx context.Context, id string) (*model.AdminUser, error) {
+	var u model.AdminUser
+	err := r.db.QueryRow(ctx, `
+		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+		FROM users WHERE id = $1
+	`, id).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get admin user by id: %w", err)
+	}
+	return &u, nil
+}
+
+// UpdateRole sets a user's role and returns the updated record.
+func (r *UserRepository) UpdateRole(ctx context.Context, id, role string) (*model.AdminUser, error) {
+	var u model.AdminUser
+	err := r.db.QueryRow(ctx, `
+		UPDATE users SET role = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+	`, id, role).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update user role: %w", err)
+	}
+	return &u, nil
+}
+
+// Delete removes a user by ID.
+func (r *UserRepository) Delete(ctx context.Context, id string) error {
+	ct, err := r.db.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // isUniqueViolation checks for PostgreSQL unique constraint error (code 23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

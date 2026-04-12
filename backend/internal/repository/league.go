@@ -173,6 +173,73 @@ func (r *LeagueRepository) UpdateImageURL(ctx context.Context, leagueID, imageUR
 	return nil
 }
 
+// ListAll returns all leagues (public and private) with member counts for admin use.
+func (r *LeagueRepository) ListAll(ctx context.Context) ([]*model.League, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT l.id, l.name, l.description, l.type::text, l.image_url, l.created_by, l.created_at,
+		       COUNT(lm.user_id) AS member_count
+		FROM leagues l
+		LEFT JOIN league_members lm ON lm.league_id = l.id
+		GROUP BY l.id
+		ORDER BY l.created_at DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list all leagues: %w", err)
+	}
+	defer rows.Close()
+
+	var leagues []*model.League
+	for rows.Next() {
+		var l model.League
+		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.ImageURL, &l.CreatedBy, &l.CreatedAt, &l.MemberCount); err != nil {
+			return nil, fmt.Errorf("scan league: %w", err)
+		}
+		leagues = append(leagues, &l)
+	}
+	return leagues, rows.Err()
+}
+
+// AdminUpdate applies a partial update (name/description) to any league.
+func (r *LeagueRepository) AdminUpdate(ctx context.Context, id string, in *model.UpdateLeagueInput) (*model.League, error) {
+	var l model.League
+	err := r.db.QueryRow(ctx, `
+		UPDATE leagues
+		SET name        = COALESCE($2, name),
+		    description = COALESCE($3, description),
+		    updated_at  = NOW()
+		WHERE id = $1
+		RETURNING id, name, description, type::text, image_url, created_by, created_at,
+		          (SELECT COUNT(*) FROM league_members WHERE league_id = $1)::int
+	`, id, in.Name, in.Description).Scan(
+		&l.ID, &l.Name, &l.Description, &l.Type, &l.ImageURL, &l.CreatedBy, &l.CreatedAt, &l.MemberCount,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("admin update league: %w", err)
+	}
+	return &l, nil
+}
+
+// AdminDelete removes a league by ID.
+func (r *LeagueRepository) AdminDelete(ctx context.Context, id string) error {
+	ct, err := r.db.Exec(ctx, `DELETE FROM leagues WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete league: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// AdminRemoveMember removes a member from a league without checking admin status.
+func (r *LeagueRepository) AdminRemoveMember(ctx context.Context, leagueID, userID string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2`, leagueID, userID)
+	return err
+}
+
 // Join adds a user to a league. Returns ErrNotFound if the league doesn't exist,
 // ErrAlreadyMember if the user is already in it.
 func (r *LeagueRepository) Join(ctx context.Context, leagueID, userID string) error {

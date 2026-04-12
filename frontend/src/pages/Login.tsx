@@ -96,6 +96,12 @@ export default function Login() {
             Register
           </Link>
         </p>
+
+        <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+          <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
+            ← Back to Home
+          </Link>
+        </p>
       </div>
     </div>
   )

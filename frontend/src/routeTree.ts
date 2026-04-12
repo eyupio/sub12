@@ -24,6 +24,12 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import AdminEmailSettings from './pages/AdminEmailSettings'
 import AdminEmailTemplates from './pages/AdminEmailTemplates'
+import AdminUsers from './pages/AdminUsers'
+import AdminUserDetail from './pages/AdminUserDetail'
+import AdminLeagues from './pages/AdminLeagues'
+import AdminLeagueDetail from './pages/AdminLeagueDetail'
+import AdminClubs from './pages/AdminClubs'
+import AdminClubDetail from './pages/AdminClubDetail'
 import ConfirmEmail from './pages/ConfirmEmail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -203,6 +209,42 @@ const adminEmailTemplatesRoute = createRoute({
   component: AdminEmailTemplates,
 })
 
+const adminUsersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/users',
+  component: AdminUsers,
+})
+
+const adminUserDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/users/$id',
+  component: AdminUserDetail,
+})
+
+const adminLeaguesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/leagues',
+  component: AdminLeagues,
+})
+
+const adminLeagueDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/leagues/$id',
+  component: AdminLeagueDetail,
+})
+
+const adminClubsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/clubs',
+  component: AdminClubs,
+})
+
+const adminClubDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/clubs/$id',
+  component: AdminClubDetail,
+})
+
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
@@ -273,6 +315,12 @@ export const routeTree = rootRoute.addChildren([
     feedRoute,
     adminEmailSettingsRoute,
     adminEmailTemplatesRoute,
+    adminUsersRoute,
+    adminUserDetailRoute,
+    adminLeaguesRoute,
+    adminLeagueDetailRoute,
+    adminClubsRoute,
+    adminClubDetailRoute,
     confirmEmailRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),

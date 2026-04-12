@@ -254,3 +254,38 @@ func (r *ClubRepository) UpdateImageURL(ctx context.Context, clubID, url string)
 	`, url, clubID)
 	return err
 }
+
+// AdminUpdate applies a partial update (name/description) to any club.
+func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
+	var club model.Club
+	err := r.db.QueryRow(ctx, `
+		UPDATE clubs
+		SET name        = COALESCE($2, name),
+		    description = COALESCE($3, description),
+		    updated_at  = NOW()
+		WHERE id = $1
+		RETURNING id, name, description, image_url, join_code, created_by,
+		          created_at::text, updated_at::text,
+		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
+	`, id, in.Name, in.Description).Scan(
+		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.MemberCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("admin update club: %w", err)
+	}
+	return &club, nil
+}
+
+// AdminDelete removes a club by ID.
+func (r *ClubRepository) AdminDelete(ctx context.Context, id string) error {
+	ct, err := r.db.Exec(ctx, `DELETE FROM clubs WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete club: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("club not found")
+	}
+	return nil
+}

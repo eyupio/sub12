@@ -216,10 +216,12 @@ func NewRouter(
 			r.Get("/users/me/achievements", ah.ListMine)
 			r.Get("/users/{id}/achievements", ah.ListForUser)
 
-			// Admin email settings
-			aeh := handler.NewAdminEmail(smtp, emailTemplates, emailSender)
+			// Admin routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
+
+				// Email settings
+				aeh := handler.NewAdminEmail(smtp, emailTemplates, emailSender)
 				r.Get("/admin/email/settings", aeh.GetSettings)
 				r.Patch("/admin/email/settings", aeh.PatchSettings)
 				r.Post("/admin/email/settings/test", aeh.TestSettings)
@@ -227,6 +229,31 @@ func NewRouter(
 				r.Get("/admin/email/templates/{key}", aeh.GetTemplate)
 				r.Patch("/admin/email/templates/{key}", aeh.PatchTemplate)
 				r.Post("/admin/email/templates/{key}/preview", aeh.PreviewTemplate)
+
+				// User management
+				auh := handler.NewAdminUsers(users)
+				r.Get("/admin/users", auh.List)
+				r.Get("/admin/users/{id}", auh.Get)
+				r.Patch("/admin/users/{id}/role", auh.UpdateRole)
+				r.Delete("/admin/users/{id}", auh.Delete)
+
+				// League management
+				alh := handler.NewAdminLeagues(leagues)
+				r.Get("/admin/leagues", alh.List)
+				r.Get("/admin/leagues/{id}", alh.Get)
+				r.Patch("/admin/leagues/{id}", alh.Update)
+				r.Delete("/admin/leagues/{id}", alh.Delete)
+				r.Get("/admin/leagues/{id}/members", alh.ListMembers)
+				r.Delete("/admin/leagues/{id}/members/{userId}", alh.RemoveMember)
+
+				// Club management
+				ach := handler.NewAdminClubs(clubs)
+				r.Get("/admin/clubs", ach.List)
+				r.Get("/admin/clubs/{id}", ach.Get)
+				r.Patch("/admin/clubs/{id}", ach.Update)
+				r.Delete("/admin/clubs/{id}", ach.Delete)
+				r.Get("/admin/clubs/{id}/members", ach.ListMembers)
+				r.Delete("/admin/clubs/{id}/members/{userId}", ach.RemoveMember)
 			})
 		})
 
