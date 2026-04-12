@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { pelletTestApi } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
+import { toast } from '../store/toast'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -39,7 +40,6 @@ export default function NewPelletTest() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  // Form state
   const [rifleId, setRifleId] = useState('')
   const [pelletId, setPelletId] = useState('')
   const [testDate, setTestDate] = useState(today())
@@ -50,36 +50,25 @@ export default function NewPelletTest() {
   const [tempCelsius, setTempCelsius] = useState('')
   const [humidityPct, setHumidityPct] = useState('')
   const [notes, setNotes] = useState('')
-
-  // Velocity / Chronograph
   const [velocityFps, setVelocityFps] = useState('')
   const [velocitySd, setVelocitySd] = useState('')
   const [extremeSpreadFps, setExtremeSpreadFps] = useState('')
   const [showChrono, setShowChrono] = useState(false)
-
-  // Advanced conditions
   const [benchSetup, setBenchSetup] = useState('')
   const [scopeDetails, setScopeDetails] = useState('')
   const [barometricPressure, setBarometricPressure] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
-
-  // Groups
   const [nextKey, setNextKey] = useState(2)
   const [groups, setGroups] = useState<GroupRow[]>([
     { key: 1, shotCount: 5, groupSizeMM: '', notes: '' },
   ])
-
-  // Images
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
-
-  // Inline add pellet
   const [showAddPellet, setShowAddPellet] = useState(false)
   const [newPellet, setNewPellet] = useState<CreatePelletPayload>({ brand: '', model: '' })
 
-  // Data
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
   const rifles = rifleData?.items ?? []
@@ -95,7 +84,6 @@ export default function NewPelletTest() {
     },
   })
 
-  // Computed distance in meters for MOA preview
   const distM = distanceValue ? distanceToMeters(Number(distanceValue), distanceUnit) : 0
 
   function addGroup() {
@@ -114,7 +102,7 @@ export default function NewPelletTest() {
   function handleImageSelect(file: File | undefined) {
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('Image must be under 10 MB')
+        toast('Image must be under 10 MB', 'error')
         return
       }
       setImageFiles(f => [...f, file])
@@ -152,7 +140,6 @@ export default function NewPelletTest() {
         barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
       })
 
-      // Create groups
       for (const g of validGroups) {
         await pelletTestApi.createGroup(session.id, {
           shot_count: g.shotCount,
@@ -161,7 +148,6 @@ export default function NewPelletTest() {
         })
       }
 
-      // Upload images
       for (const file of imageFiles) {
         await pelletTestApi.uploadImage(session.id, file)
       }
@@ -182,9 +168,7 @@ export default function NewPelletTest() {
       </h1>
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-        {/* Left column: setup */}
         <div className="space-y-4">
-          {/* Rifle */}
           <Field label="Rifle">
             {rifles.length > 0 ? (
               <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
@@ -200,7 +184,6 @@ export default function NewPelletTest() {
             )}
           </Field>
 
-          {/* Pellet */}
           <Field label="Pellet">
             <select value={pelletId} onChange={e => {
               if (e.target.value === '__add__') {
@@ -221,7 +204,6 @@ export default function NewPelletTest() {
             </select>
           </Field>
 
-          {/* Inline add pellet */}
           {showAddPellet && (
             <div className="space-y-3 p-3 rounded border border-subtle bg-surface">
               <div className="grid grid-cols-2 gap-3">
@@ -250,7 +232,6 @@ export default function NewPelletTest() {
             </div>
           )}
 
-          {/* Date & distance */}
           <Field label="Date">
             <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className={`${inputCls} font-mono`} />
           </Field>
@@ -271,7 +252,6 @@ export default function NewPelletTest() {
             <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Range / club" className={`${inputCls} placeholder:text-muted`} />
           </Field>
 
-          {/* Conditions */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="Wind (mph)">
               <input type="number" step="0.1" value={windMph} onChange={e => setWindMph(e.target.value)} placeholder="—" className={inputCls} />
@@ -288,12 +268,7 @@ export default function NewPelletTest() {
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Conditions, observations…" className={`${inputCls} placeholder:text-muted resize-none`} />
           </Field>
 
-          {/* Chronograph Data */}
-          <button
-            type="button"
-            onClick={() => setShowChrono(v => !v)}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-          >
+          <button type="button" onClick={() => setShowChrono(v => !v)} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
             {showChrono ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Chronograph Data
           </button>
@@ -311,12 +286,7 @@ export default function NewPelletTest() {
             </div>
           )}
 
-          {/* Advanced Conditions */}
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(v => !v)}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-          >
+          <button type="button" onClick={() => setShowAdvanced(v => !v)} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
             {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Advanced Conditions
           </button>
@@ -335,10 +305,7 @@ export default function NewPelletTest() {
           )}
         </div>
 
-        {/* Right column: groups + images + submit */}
         <div className="space-y-4 mt-6 lg:mt-0">
-
-          {/* Groups */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[11px] tracking-widest uppercase text-muted">Groups</label>
@@ -383,7 +350,6 @@ export default function NewPelletTest() {
             </div>
           </div>
 
-          {/* Images */}
           <div>
             <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Target Photos</label>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
@@ -416,12 +382,10 @@ export default function NewPelletTest() {
             </div>
           </div>
 
-          {/* Error */}
           {mutation.isError && (
             <p className="text-[var(--error-text)] text-sm">Failed to save test. Please try again.</p>
           )}
 
-          {/* Submit */}
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !canSubmit}
