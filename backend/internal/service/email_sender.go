@@ -48,6 +48,10 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 	if err != nil {
 		return fmt.Errorf("render forgot_password text: %w", err)
 	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render forgot_password html: %w", err)
+	}
 
 	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
 	if err != nil {
@@ -60,16 +64,7 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 	}
 	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
 
-	msg := strings.Builder{}
-	msg.WriteString("From: " + from + "\r\n")
-	msg.WriteString("To: " + toEmail + "\r\n")
-	msg.WriteString("Subject: " + subject + "\r\n")
-	msg.WriteString("MIME-Version: 1.0\r\n")
-	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	msg.WriteString("\r\n")
-	msg.WriteString(textBody)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, []byte(msg.String()))
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
 }
 
 func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, toEmail, displayName, confirmLink string, expiresAt time.Time) error {
@@ -94,6 +89,10 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 	if err != nil {
 		return fmt.Errorf("render email_change_confirm text: %w", err)
 	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render email_change_confirm html: %w", err)
+	}
 
 	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
 	if err != nil {
@@ -106,16 +105,28 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 	}
 	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
 
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+}
+
+func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
+	boundary := "=_sub12_boundary"
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
-	msg.WriteString("To: " + toEmail + "\r\n")
+	msg.WriteString("To: " + to + "\r\n")
 	msg.WriteString("Subject: " + subject + "\r\n")
 	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: multipart/alternative; boundary=\"" + boundary + "\"\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString("--" + boundary + "\r\n")
 	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
 	msg.WriteString("\r\n")
-	msg.WriteString(textBody)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, []byte(msg.String()))
+	msg.WriteString(textBody + "\r\n")
+	msg.WriteString("--" + boundary + "\r\n")
+	msg.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(htmlBody + "\r\n")
+	msg.WriteString("--" + boundary + "--\r\n")
+	return []byte(msg.String())
 }
 
 func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
