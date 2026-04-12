@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
@@ -6,7 +7,40 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefreshToken(): Promise<boolean> {
+  const { refreshToken, setAuth, clearAuth } = useAuthStore.getState()
+  if (!refreshToken) return false
+
+  try {
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    if (!res.ok) return false
+    const tokens = await res.json()
+    const user = useAuthStore.getState().user
+    if (user) {
+      setAuth(user, tokens.access_token, tokens.refresh_token)
+    }
+    return true
+  } catch {
+    clearAuth()
+    return false
+  }
+}
+
+async function handleUnauthorized(): Promise<boolean> {
+  // Deduplicate concurrent refresh attempts
+  if (!refreshPromise) {
+    refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null })
+  }
+  return refreshPromise
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
   const { body, headers, ...rest } = options
   const token = useAuthStore.getState().accessToken
 
@@ -20,6 +54,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     ...rest,
   })
 
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await handleUnauthorized()
+    if (refreshed) {
+      return request<T>(path, options, true)
+    }
+    useAuthStore.getState().clearAuth()
+    toast('Your session has expired. Please sign in again.', 'error')
+    window.location.href = '/login'
+    throw new Error('Session expired')
+  }
+
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${await res.text()}`)
   }
@@ -28,7 +73,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return res.json() as Promise<T>
 }
 
-async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+async function requestMultipart<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
   const token = useAuthStore.getState().accessToken
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -38,6 +83,17 @@ async function requestMultipart<T>(path: string, formData: FormData): Promise<T>
     },
     body: formData,
   })
+
+  if (res.status === 401 && !isRetry) {
+    const refreshed = await handleUnauthorized()
+    if (refreshed) {
+      return requestMultipart<T>(path, formData, true)
+    }
+    useAuthStore.getState().clearAuth()
+    toast('Your session has expired. Please sign in again.', 'error')
+    window.location.href = '/login'
+    throw new Error('Session expired')
+  }
 
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${await res.text()}`)

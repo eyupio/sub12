@@ -1,11 +1,12 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
 import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
+import { ToastContainer } from './Toast'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -25,13 +26,40 @@ const adminNavItems = [
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
 ]
 
+const mobileNavItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Home' },
+  { to: '/scores', icon: Target, label: 'Scores' },
+  { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
+  { to: '/leagues', icon: Trophy, label: 'Leagues' },
+] as const
+
+const moreMenuItems = [
+  { to: '/feed', icon: Activity, label: 'Feed' },
+  { to: '/clubs', icon: Users, label: 'Clubs' },
+  { to: '/gear', icon: Package, label: 'Gear' },
+  { to: '/profile', icon: User, label: 'Profile' },
+]
+
 export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
   const theme = useThemeStore((s) => s.theme)
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [moreOpen, setMoreOpen] = useState(false)
   const isAdmin = user?.role === 'admin'
   const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true)
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
@@ -72,6 +100,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
+      <ToastContainer />
       {/* Corner crosshair decorations */}
       <CornerMark className="top-5 left-5 text-muted" />
       <CornerMark className="top-5 right-5 text-muted" />
@@ -144,15 +173,23 @@ export default function Layout({ children }: PropsWithChildren) {
           </div>
         </header>
 
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="bg-amber-600/15 border-b border-amber-600/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 text-xs tracking-wide" role="status">
+            <WifiOff size={14} />
+            <span>You're offline \u2014 some features may be limited</span>
+          </div>
+        )}
+
         {/* Page content */}
         <main className={`flex-1 overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
           {children ?? <Outlet />}
         </main>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav \u2014 5 items max */}
         <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
-          <div className="grid w-full min-h-[var(--mobile-nav-offset)]" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
-            {navItems.map(({ to, icon: Icon, label, mobileLabel }) => (
+          <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
+            {mobileNavItems.map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
                 to={to}
@@ -160,12 +197,61 @@ export default function Layout({ children }: PropsWithChildren) {
                 activeProps={{ className: 'h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-[var(--brass)]' }}
               >
                 <Icon size={22} />
-                <span className="max-w-full truncate text-[9px] tracking-[0.12em] uppercase min-[390px]:hidden">{mobileLabel}</span>
-                <span className="hidden max-w-full truncate text-[10px] tracking-[0.08em] uppercase min-[390px]:block">{label}</span>
+                <span className="max-w-full truncate text-[11px] tracking-wide">{label}</span>
               </Link>
             ))}
+            <button
+              onClick={() => setMoreOpen(prev => !prev)}
+              className={`h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 transition-colors ${moreOpen ? 'text-[var(--brass)]' : 'text-muted hover:text-[var(--brass)]'}`}
+            >
+              <MoreHorizontal size={22} />
+              <span className="max-w-full truncate text-[11px] tracking-wide">More</span>
+            </button>
           </div>
         </nav>
+
+        {/* More menu overlay */}
+        {moreOpen && (
+          <div className="lg:hidden fixed inset-0 z-50" onClick={() => setMoreOpen(false)}>
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="absolute bottom-[var(--mobile-nav-offset)] left-0 right-0 bg-surface border-t border-subtle rounded-t-xl p-4 space-y-1" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs tracking-widest uppercase text-muted">More</span>
+                <button onClick={() => setMoreOpen(false)} className="text-muted hover:text-secondary transition-colors" aria-label="Close menu">
+                  <X size={18} />
+                </button>
+              </div>
+              {moreMenuItems.map(({ to, icon: Icon, label }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                >
+                  <Icon size={18} className="text-muted" />
+                  <span>{label}</span>
+                </Link>
+              ))}
+              {isAdmin && (
+                <>
+                  <div className="border-t border-subtle my-2" />
+                  <span className="text-[10px] tracking-widest uppercase text-muted px-3">Admin</span>
+                  {adminNavItems.map(({ to, icon: Icon, label }) => (
+                    <Link
+                      key={to}
+                      to={to}
+                      onClick={() => setMoreOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                    >
+                      <Icon size={18} className="text-muted" />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,26 +1,25 @@
-import { Sun, Moon, Monitor } from 'lucide-react'
+import { Sun, Moon } from 'lucide-react'
 import { useThemeStore } from '../store/theme'
 
 export function ThemeToggle() {
   const { theme, setTheme } = useThemeStore()
 
-  function cycle() {
-    if (theme === 'dark') setTheme('light')
-    else if (theme === 'light') setTheme('system')
-    else setTheme('dark')
-  }
+  // Resolve effective mode: system resolves to actual preference
+  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
-  const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
-  const title = theme === 'dark' ? 'Dark mode' : theme === 'light' ? 'Light mode' : 'System theme'
+  function toggle() {
+    setTheme(isDark ? 'light' : 'dark')
+  }
 
   return (
     <button
-      onClick={cycle}
-      className="text-muted hover:text-secondary transition-colors"
-      aria-label={title}
-      title={title}
+      onClick={toggle}
+      className="flex items-center gap-1.5 text-muted hover:text-secondary transition-colors"
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <Icon size={17} />
+      {isDark ? <Sun size={17} /> : <Moon size={17} />}
+      <span className="hidden sm:inline text-xs tracking-wide">{isDark ? 'Light' : 'Dark'}</span>
     </button>
   )
 }

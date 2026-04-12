@@ -3,15 +3,16 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
+import { formatDate } from '../utils/date'
 
 function VerificationDot({ status }: { status: string }) {
   if (status === 'verified') {
-    return <CheckCircle size={14} className="text-[var(--success-text)] shrink-0" />
+    return <span title="Verified by league admin"><CheckCircle size={14} className="text-[var(--success-text)] shrink-0" /></span>
   }
   if (status === 'rejected') {
-    return <XCircle size={14} className="text-[var(--error-text)] shrink-0" />
+    return <span title="Rejected by league admin"><XCircle size={14} className="text-[var(--error-text)] shrink-0" /></span>
   }
-  return <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+  return <span title="Pending review by league admin"><AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" /></span>
 }
 
 function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerification?: boolean }) {
@@ -22,7 +23,7 @@ function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerif
       className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
     >
       <div className="space-y-0.5">
-        <p className="font-mono text-secondary text-sm">{card.shot_at}</p>
+        <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at)}</p>
         {card.location && (
           <p className="text-[11px] text-muted tracking-wide">{card.location}</p>
         )}
@@ -55,7 +56,7 @@ export default function ScoreHistory() {
             to="/scores/trends"
             className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
           >
-            Trends →
+            Trends \u2192
           </Link>
           <Link
             to="/scores/new"

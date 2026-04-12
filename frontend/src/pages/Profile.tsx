@@ -7,6 +7,7 @@ import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
 import { usersApi, UpdateProfileInput } from '../api/users'
 import { achievementApi, Achievement } from '../api/achievements'
+import { toast } from '../store/toast'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -34,7 +35,7 @@ function AvatarUpload() {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image must be under 5 MB')
+        toast('Image must be under 5 MB', 'error')
         return
       }
       avatarMutation.mutate(file)

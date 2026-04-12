@@ -63,7 +63,7 @@ export default function ForgotPassword() {
               )}
 
               <div className="space-y-1">
-                <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="email">Email</label>
+                <label className="text-xs tracking-wide text-muted" htmlFor="email">Email</label>
                 <input
                   id="email"
                   type="email"
@@ -72,7 +72,7 @@ export default function ForgotPassword() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputCls}
-                  placeholder="YOUR EMAIL"
+                  placeholder="you@example.com"
                 />
               </div>
 
