@@ -78,14 +78,26 @@
 
 ## Phase 2 — Community
 
-- [ ] Private leagues (invite codes)
-- [ ] Social follow / unfollow
-- [ ] Activity feed (followed shooters + leagues)
-- [ ] Score card comments
-- [ ] Score card image upload (S3-compatible storage)
-- [ ] Achievements / badges engine
-- [ ] League admin tools (approve scores, manage members, rounds)
-- [ ] Mobile app builds (Capacitor iOS + Android)
+### Stage 2.1 — Foundation Data Models & APIs
+- [ ] Social graph model + APIs (followers/following relationships, privacy controls)
+- [ ] Comments schema + APIs (threading support, author metadata, moderation states)
+- [ ] Activity event model + ingestion APIs (normalized event types, actor/subject references)
+- [ ] Private leagues (invite codes, membership model, invite validation)
+- [ ] Score card image upload (S3-compatible storage, metadata persistence, access policy)
+
+### Stage 2.2 — User-Facing CRUD
+- [ ] Social follow / unfollow (backend action + endpoint + frontend interactions)
+- [ ] Score card comments (create/edit/delete UI + backend CRUD + basic moderation hooks)
+
+### Stage 2.3 — Feed Aggregation & Ranking
+- [ ] Activity feed (followed shooters + leagues, aggregation pipeline + ranking/query endpoints)
+
+### Stage 2.4 — Recognition Layer
+- [ ] Achievements / badges engine (rules/scoring signals + award processing + display surfaces)
+
+### Stage 2.5 — Community Operations & Distribution
+- [ ] League admin tools (approve scores, manage members, rounds; admin/mod tooling + audit logging)
+- [ ] Mobile app builds (Capacitor iOS + Android, signing + release tracks + store distribution)
 
 ---
 

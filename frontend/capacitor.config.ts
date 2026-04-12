@@ -4,6 +4,12 @@ const config: CapacitorConfig = {
   appId: 'uk.sub12.app',
   appName: 'sub-12',
   webDir: 'dist',
+  plugins: {
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true,
+    },
+  },
   server: {
     // Use local dev server during development
     // Comment out for production builds
