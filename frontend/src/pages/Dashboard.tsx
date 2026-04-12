@@ -5,6 +5,7 @@ import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
 import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
+import { pelletTestApi } from '../api/pelletTesting'
 import { RifleStats } from '../api/stats'
 import { useAuthStore } from '../store/auth'
 
@@ -66,6 +67,11 @@ export default function Dashboard() {
   const { data: myLeaguesData } = useQuery({
     queryKey: ['my-leagues'],
     queryFn: () => leagueApi.listMine(),
+  })
+
+  const { data: pelletTestStats } = useQuery({
+    queryKey: ['pellet-test-stats'],
+    queryFn: () => pelletTestApi.stats(),
   })
 
   const recentCards = history?.items ?? []
@@ -225,6 +231,34 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Pellet Testing */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">Pellet Testing</h2>
+          <Link
+            to="/pellet-testing"
+            className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+          >
+            View All →
+          </Link>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            label="Tests Logged"
+            value={pelletTestStats ? String(pelletTestStats.total_tests) : '—'}
+          />
+          <StatCard
+            label="Best Group"
+            value={pelletTestStats?.best_group_mm != null ? `${pelletTestStats.best_group_mm.toFixed(2)}mm` : '—'}
+            gold
+          />
+          <StatCard
+            label="Top Pellet"
+            value={pelletTestStats?.most_tested_pellet ?? '—'}
+          />
         </div>
       </div>
 

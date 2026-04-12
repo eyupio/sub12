@@ -10,6 +10,10 @@ import Gear from './pages/Gear'
 import Leagues from './pages/Leagues'
 import LeagueDetail from './pages/LeagueDetail'
 import LeagueSettings from './pages/LeagueSettings'
+import PelletTesting from './pages/PelletTesting'
+import NewPelletTest from './pages/NewPelletTest'
+import PelletTestDetail from './pages/PelletTestDetail'
+import PelletTestLeaderboard from './pages/PelletTestLeaderboard'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -84,6 +88,30 @@ const leagueSettingsRoute = createRoute({
   component: LeagueSettings,
 })
 
+const pelletTestingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing',
+  component: PelletTesting,
+})
+
+const newPelletTestRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing/new',
+  component: NewPelletTest,
+})
+
+const pelletTestDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing/$id',
+  component: PelletTestDetail,
+})
+
+const pelletTestLeaderboardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pellet-testing/leaderboard',
+  component: PelletTestLeaderboard,
+})
+
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
@@ -116,6 +144,10 @@ export const routeTree = rootRoute.addChildren([
     scoreHistoryRoute,
     scoreEntryRoute,
     scoreCardDetailRoute,
+    pelletTestingRoute,
+    newPelletTestRoute,
+    pelletTestDetailRoute,
+    pelletTestLeaderboardRoute,
     gearRoute,
     leaguesRoute,
     leagueDetailRoute,
