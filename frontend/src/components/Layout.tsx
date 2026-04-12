@@ -8,12 +8,12 @@ import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/scores', icon: Target, label: 'Scores' },
-  { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
-  { to: '/leagues', icon: Trophy, label: 'Leagues' },
-  { to: '/gear', icon: Package, label: 'Gear' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
+  { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
+  { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
+  { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
+  { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
+  { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
 ] as const
 
 export default function Layout({ children }: PropsWithChildren) {
@@ -115,17 +115,18 @@ export default function Layout({ children }: PropsWithChildren) {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle">
-          <div className="flex justify-around min-h-[var(--mobile-nav-offset)]">
-            {navItems.map(({ to, icon: Icon, label }) => (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden">
+          <div className="grid grid-cols-6 w-full min-h-[var(--mobile-nav-offset)]">
+            {navItems.map(({ to, icon: Icon, label, mobileLabel }) => (
               <Link
                 key={to}
                 to={to}
-                className="flex flex-col items-center gap-1 px-4 py-3 text-muted hover:text-[var(--brass)] transition-colors"
-                activeProps={{ className: 'flex flex-col items-center gap-1 px-4 py-3 text-[var(--brass)]' }}
+                className="h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-muted hover:text-[var(--brass)] transition-colors"
+                activeProps={{ className: 'h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-[var(--brass)]' }}
               >
                 <Icon size={22} />
-                <span className="text-[10px] tracking-widest uppercase">{label}</span>
+                <span className="max-w-full truncate text-[9px] tracking-[0.12em] uppercase min-[390px]:hidden">{mobileLabel}</span>
+                <span className="hidden max-w-full truncate text-[10px] tracking-[0.08em] uppercase min-[390px]:block">{label}</span>
               </Link>
             ))}
           </div>
