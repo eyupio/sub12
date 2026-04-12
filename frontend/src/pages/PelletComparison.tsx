@@ -46,8 +46,8 @@ export default function PelletComparison() {
     return a > b ? 'a' : 'b'
   }
 
-  const sideA = comparison?.side_a
-  const sideB = comparison?.side_b
+  const sideA = comparison?.side_a ?? comparison?.pellet_a
+  const sideB = comparison?.side_b ?? comparison?.pellet_b
   const bestGroupWinner = isBetter(sideA?.best_group_mm, sideB?.best_group_mm, true)
   const avgGroupWinner = isBetter(sideA?.avg_group_mm, sideB?.avg_group_mm, true)
   const velocitySDWinner = isBetter(sideA?.avg_velocity_sd, sideB?.avg_velocity_sd, true)
@@ -130,7 +130,11 @@ export default function PelletComparison() {
               <Stat label="Avg Group" value={sideA.avg_group_mm} unit="mm" highlight={avgGroupWinner === 'a'} />
               <Stat label="Avg Velocity" value={sideA.avg_velocity_fps} unit="fps" />
               <Stat label="Velocity SD" value={sideA.avg_velocity_sd} highlight={velocitySDWinner === 'a'} />
-              <Stat label="Consistency" value={sideA.consistency != null ? sideA.consistency.toFixed(2) : null} unit="σ" />
+              <Stat
+                label="Consistency"
+                value={(sideA.consistency ?? sideA.consistency_score) != null ? (sideA.consistency ?? sideA.consistency_score)!.toFixed(2) : null}
+                unit="σ"
+              />
             </div>
           </div>
 
@@ -150,7 +154,11 @@ export default function PelletComparison() {
               <Stat label="Avg Group" value={sideB.avg_group_mm} unit="mm" highlight={avgGroupWinner === 'b'} />
               <Stat label="Avg Velocity" value={sideB.avg_velocity_fps} unit="fps" />
               <Stat label="Velocity SD" value={sideB.avg_velocity_sd} highlight={velocitySDWinner === 'b'} />
-              <Stat label="Consistency" value={sideB.consistency != null ? sideB.consistency.toFixed(2) : null} unit="σ" />
+              <Stat
+                label="Consistency"
+                value={(sideB.consistency ?? sideB.consistency_score) != null ? (sideB.consistency ?? sideB.consistency_score)!.toFixed(2) : null}
+                unit="σ"
+              />
             </div>
           </div>
         </div>
