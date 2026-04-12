@@ -173,16 +173,6 @@
 
 ---
 
-## Phase 4 — Scale
-
-- [ ] Real-time live scoring (WebSockets / SSE)
-- [ ] Score verification / moderation workflow
-- [ ] Multi-discipline support (rimfire, FAC)
-- [ ] Internationalisation
-- [ ] Premium / subscription tier (TBD)
-
----
-
 ## Non-Functional Checklist
 
 | Requirement | Status |
