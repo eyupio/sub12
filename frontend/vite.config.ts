@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'sub-12 Benchrest',
-        short_name: 'sub-12',
-        description: 'Score tracking for UK airgun benchrest shooters',
+        name: 'SUB12',
+        short_name: 'SUB12',
+        description: 'Track scores, manage gear, and compete in leagues. The platform for precision airgun shooters.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',

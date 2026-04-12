@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { Target, Wind, Package, Trophy, BarChart3, Smartphone } from 'lucide-react'
 import { useThemeStore } from '../store/theme'
 import { CornerMark } from '../components/CornerMark'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 const features = [
   {
@@ -56,6 +57,7 @@ export default function LandingPage() {
             className="h-8 w-auto"
           />
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               to="/login"
               className="text-[var(--brass)] hover:opacity-80 transition-opacity text-sm tracking-[0.15em] uppercase font-medium"
@@ -75,7 +77,7 @@ export default function LandingPage() {
       {/* ── Hero ────────────────────────────────────────── */}
       <section className="flex flex-col items-center justify-center px-4 pt-16 pb-20 lg:pt-24 lg:pb-28">
         <img
-          src="/logo-primary-dark.svg"
+          src={isDark ? '/logo-primary-dark.svg' : '/logo-primary-light.svg'}
           alt="SUB12"
           className="h-36 lg:h-48 w-auto"
         />
@@ -140,7 +142,7 @@ export default function LandingPage() {
       {/* ── Footer ──────────────────────────────────────── */}
       <footer className="border-t border-subtle py-8 text-center">
         <p className="text-[11px] tracking-widest uppercase text-muted">
-          SUB12 &mdash; UK Airgun Benchrest
+          SUB12 &mdash; Precision Shooting Platform
         </p>
       </footer>
     </div>
