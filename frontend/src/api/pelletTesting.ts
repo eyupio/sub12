@@ -110,8 +110,8 @@ export interface CreatePelletTestPayload {
   rifle_id: string
   pellet_id: string
   test_date: string
-  distance_value: number
-  distance_unit: string
+  distance_value?: number
+  distance_unit?: string
   location?: string
   wind_mph?: number
   temp_celsius?: number
