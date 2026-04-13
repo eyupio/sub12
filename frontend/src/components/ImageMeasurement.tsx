@@ -64,6 +64,9 @@ export default function ImageMeasurement({
   const pointerTypeRef = useRef<string>('mouse')
   const didDrag = useRef(false)
   const isPointerDown = useRef(false)
+  const activePointers = useRef<Map<number, Point>>(new Map())
+  const lastPinchDist = useRef<number | null>(null)
+  const isPinching = useRef(false)
 
   const [step, setStep] = useState<WizardStep>(1)
   const [subMode, setSubMode] = useState<SubMode>('set_aim')
@@ -289,6 +292,16 @@ export default function ImageMeasurement({
     const canvas = canvasRef.current
     if (!canvas) return
     canvas.setPointerCapture(e.pointerId)
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    if (activePointers.current.size >= 2) {
+      const points = Array.from(activePointers.current.values())
+      const p1 = points[0]
+      const p2 = points[1]
+      isPinching.current = true
+      lastPinchDist.current = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+    }
+
     pointerTypeRef.current = e.pointerType
     pointerStart.current = { x: e.clientX, y: e.clientY }
     didDrag.current = false
@@ -298,6 +311,31 @@ export default function ImageMeasurement({
   }, [pan])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    if (isPinching.current && activePointers.current.size >= 2) {
+      const points = Array.from(activePointers.current.values())
+      const p1 = points[0]
+      const p2 = points[1]
+      const currentDist = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+      const prevDist = lastPinchDist.current
+      if (prevDist && prevDist > 0) {
+        const ratio = currentDist / prevDist
+        const nz = Math.min(Math.max(zoom * ratio, 0.1), 10)
+        const canvas = canvasRef.current
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect()
+          const mx = ((p1.x + p2.x) / 2) - rect.left
+          const my = ((p1.y + p2.y) / 2) - rect.top
+          setPan(prev => ({ x: mx - (mx - prev.x) * (nz / zoom), y: my - (my - prev.y) * (nz / zoom) }))
+          setZoom(nz)
+        }
+      }
+      lastPinchDist.current = currentDist
+      didDrag.current = true
+      return
+    }
+
     if (!isPointerDown.current) return
     const dx = e.clientX - pointerStart.current.x
     const dy = e.clientY - pointerStart.current.y
@@ -312,11 +350,20 @@ export default function ImageMeasurement({
         })
       }
     }
-  }, [isPanning, subMode])
+  }, [isPanning, subMode, zoom])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
     if (canvas) canvas.releasePointerCapture(e.pointerId)
+    activePointers.current.delete(e.pointerId)
+    if (isPinching.current && activePointers.current.size < 2) {
+      isPinching.current = false
+      lastPinchDist.current = null
+      isPointerDown.current = false
+      setIsPanning(false)
+      return
+    }
+
     isPointerDown.current = false
     if (isPanning) { setIsPanning(false); return }
     if (didDrag.current) return
@@ -335,6 +382,16 @@ export default function ImageMeasurement({
       if (minI >= 0) setImpacts(prev => prev.filter((_, i) => i !== minI))
     }
   }, [isPanning, screenToImage, subMode, impacts])
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent) => {
+    activePointers.current.delete(e.pointerId)
+    if (isPinching.current && activePointers.current.size < 2) {
+      isPinching.current = false
+      lastPinchDist.current = null
+    }
+    isPointerDown.current = false
+    setIsPanning(false)
+  }, [])
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
@@ -479,6 +536,7 @@ export default function ImageMeasurement({
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           onWheel={handleWheel}
         />
       </div>
