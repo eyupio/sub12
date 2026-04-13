@@ -11,6 +11,7 @@ import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
 import { pelletTestApi, PelletTestStats } from '../api/pelletTesting'
 import { useAuthStore } from '../store/auth'
+import { RifleProfileCard } from '../components/RifleProfileCard'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -325,41 +326,6 @@ function ActivityCard({ card, avgScore, scoreMax, rifleName }: {
         </div>
       </div>
       <ScoreBar score={card.total_score} max={scoreMax} />
-    </Link>
-  )
-}
-
-function PlatformRifleRow({ rs, globalBest }: { rs: EnrichedRifleStats; globalBest: number }) {
-  return (
-    <Link
-      to="/scores"
-      className="flex flex-col p-3 lg:p-4 rounded-lg border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
-    >
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg overflow-hidden border border-subtle shrink-0 bg-surface-hover">
-          {rs.image_url ? (
-            <img src={rs.image_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package size={14} className="text-muted opacity-40" />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-secondary font-medium truncate">{rs.make} {rs.model}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-muted font-mono bg-surface-hover px-1.5 py-0.5 rounded">{rs.calibre}</span>
-            <span className="text-[11px] text-muted">{rs.card_count} card{rs.card_count !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-        <div className="text-right shrink-0 font-mono">
-          <span className="text-xl font-semibold text-[var(--brass)]">{rs.best_score}</span>
-          {rs.best_x_count > 0 && (
-            <span className="text-xs text-[var(--brass)]/70 ml-1">{rs.best_x_count}X</span>
-          )}
-        </div>
-      </div>
-      <ScoreBar score={rs.best_score} max={globalBest} />
     </Link>
   )
 }
@@ -707,26 +673,9 @@ export default function Dashboard() {
           />
         ) : enrichedRifleStats.length === 0 ? (
           <div className="space-y-3">
-            {/* Show rifles without stats yet */}
-            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {rifles.slice(0, 6).map((rifle: Rifle) => (
-                <Link
-                  key={rifle.id}
-                  to="/gear"
-                  className="shrink-0 w-28 lg:w-32 bg-surface border border-subtle rounded-lg p-3 hover:border-[var(--brass)]/30 transition-colors text-center"
-                >
-                  <div className="w-16 h-16 mx-auto rounded-lg overflow-hidden border border-subtle mb-2 bg-surface-hover">
-                    {rifle.image_url ? (
-                      <img src={rifle.image_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted">
-                        <Package size={20} className="opacity-40" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-secondary font-medium truncate">{rifle.make}</p>
-                  <p className="text-[10px] text-muted truncate">{rifle.model}</p>
-                </Link>
+                <RifleProfileCard key={rifle.id} rifle={rifle} mode="dashboard" />
               ))}
             </div>
             <p className="text-[11px] text-muted tracking-wide">
@@ -734,10 +683,19 @@ export default function Dashboard() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {enrichedRifleStats.map(rs => (
-              <PlatformRifleRow key={rs.rifle_id} rs={rs} globalBest={globalBest} />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {enrichedRifleStats.map(rs => {
+              const rifle = rifleMap.get(rs.rifle_id)
+              return rifle ? (
+                <RifleProfileCard
+                  key={rs.rifle_id}
+                  rifle={rifle}
+                  stats={rs}
+                  mode="dashboard"
+                  globalBest={globalBest}
+                />
+              ) : null
+            })}
           </div>
         )}
       </div>
