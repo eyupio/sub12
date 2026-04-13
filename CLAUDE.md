@@ -2,61 +2,78 @@
 
 ## Project Overview
 
-sub-12 is a target shooting companion app (PWA + Capacitor) for logging 25-shot score cards, managing gear, running leagues, and pellet testing with image-based measurement. Monorepo with `backend/` (Go) and `frontend/` (React/TypeScript).
+sub-12 is a target shooting companion app (PWA + Capacitor) for logging 25-shot score cards, managing gear (rifles & pellets), running leagues, pellet testing with image-based measurement, clubs, achievements, and social features (follows, activity feed, comments). Monorepo with `backend/` (Go) and `frontend/` (React/TypeScript).
 
 ## Repository Structure
 
 ```
-backend/          Go API server
-  cmd/api/        Entrypoint (main.go)
+backend/              Go API server
+  cmd/api/            Entrypoint (main.go)
   internal/
-    api/          Router, handlers, middleware
-    config/       Env-based config (envconfig)
-    db/           Database connection, migrations, seeds
-    email/        Email rendering
-    model/        Domain types
-    repository/   Data access (pgx queries)
-    service/      Business logic
-frontend/         React SPA
+    api/
+      handler/        HTTP handlers (one file per domain)
+      middleware/      Auth (JWT extraction) and request logger
+      router.go       Chi route definitions
+    config/           Env-based config (envconfig struct tags)
+    db/
+      db.go           pgxpool connection
+      migrate.go      Embedded golang-migrate runner
+      migrations/     Sequential SQL migrations (000001–000019)
+      redis.go        Redis client setup
+      seed/           Dev seed data (seed.sql + seed.go)
+    email/            Email template renderer (renderer.go)
+    model/            Domain types (15 files: user, score_card, league, club, pellet, rifle, achievement, activity, image, stats, social, smtp, email_template, pellet_testing, admin)
+    repository/       Data access layer (pgx queries, one file per domain)
+    service/          Business logic layer (one file per domain + auth, email_sender)
+frontend/             React SPA
   src/
-    api/          API client modules (typed fetch wrappers)
-    components/   Shared UI components
-    pages/        Route pages
-    store/        Zustand stores (auth, theme)
-    utils/        Utilities (ballistics, hole detection)
-brand/            SVG brand assets
-landing/          Static landing page
+    api/              API client modules (typed fetch wrappers per domain)
+      client.ts       Base fetch client with Bearer token injection
+      __tests__/      API module tests
+    catalog/          Static data catalogs (pelletCatalog.ts, rifleCatalog.ts)
+    components/       Shared UI components (Layout, AuthLayout, ThemeToggle, Toast, ConfirmDialog, ImageMeasurement, etc.)
+    config/           App configuration (targetPresets.ts)
+    pages/            Route page components (~37 pages)
+      __tests__/      Page-level tests
+    store/            Zustand stores (auth, theme, toast)
+    utils/            Utilities (ballistics, holeDetection, date)
+    routeTree.ts      TanStack Router file-based route tree
+brand/                SVG brand assets
+landing/              Static landing page (index.html + favicon.svg)
 ```
 
 ## Tech Stack
 
-- **Backend:** Go 1.24, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5
+- **Backend:** Go 1.24, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5, go-redis v9
 - **Database:** PostgreSQL 16, Redis 7
-- **Frontend:** React 18, TypeScript, Vite 5, TanStack Router + Query, Zustand, Tailwind CSS v3
-- **Mobile:** Capacitor 6 (PWA-first)
-- **CI/CD:** GitHub Actions → GHCR container images
-- **Migrations:** golang-migrate with embedded SQL files
+- **Frontend:** React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts, Lucide React icons
+- **Mobile:** Capacitor 6 (PWA-first, via vite-plugin-pwa)
+- **Testing:** Go test + testify (backend), Vitest + Testing Library (frontend)
+- **CI/CD:** GitHub Actions (ci.yml + release.yml) → GHCR container images
+- **Migrations:** golang-migrate with embedded SQL files (pgx5 driver)
 
 ## Build & Run Commands
 
 ### Development
 
 ```bash
-# Start infra (postgres + redis)
-docker compose -f docker-compose.dev.yml up -d
+# Start infra (postgres + redis) via top-level Makefile
+make dev                        # docker compose -f docker-compose.dev.yml up -d
 
 # Backend
 cd backend && make run          # starts API on :8080
-cd backend && make test         # go test -race ./...
+cd backend && make test         # go test -race -count=1 ./...
 cd backend && make lint         # go vet ./...
 cd backend && make build        # compiles to bin/api
+cd backend && make tidy         # go mod tidy + verify
+cd backend && make seed         # load dev seed data (admin accounts, password: password123)
 
 # Frontend
 cd frontend && npm run dev      # Vite dev server on :5173
-cd frontend && npm run check    # TypeScript type check
+cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
 cd frontend && npm run lint     # ESLint
-cd frontend && npm test         # Vitest
-cd frontend && npm run build    # Production build
+cd frontend && npm test         # Vitest (vitest run)
+cd frontend && npm run build    # Production build (tsc -b && vite build)
 ```
 
 ### Production
@@ -64,6 +81,16 @@ cd frontend && npm run build    # Production build
 ```bash
 docker compose up -d            # pulls GHCR images, runs all 4 services
 docker compose logs backend     # check for migration/startup errors
+```
+
+### Top-Level Makefile
+
+```bash
+make dev    # start infra (postgres + redis) for local dev
+make up     # start full stack (infra + backend + frontend containers)
+make down   # stop all containers
+make logs   # tail all container logs
+make build  # build backend binary + frontend bundle
 ```
 
 ### Database Migrations
@@ -75,6 +102,8 @@ make migrate-up                    # apply pending migrations
 make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
+
+Current migration count: **19** (000001–000019). Latest: `000019_create_clubs`.
 
 ## Critical Migration Rules
 
@@ -107,17 +136,24 @@ make migrate-lint                  # check for duplicate prefixes
 - **Logging:** Use `zerolog` structured logging; don't use `fmt.Printf` or `log.Printf`
 - **Config:** All config via environment variables through `envconfig` struct tags
 - **SQL:** Use `pgx` with parameterized queries (`$1`, `$2`). Never build SQL with string concatenation
-- **Auth middleware:** `middleware.Authenticate(auth)` extracts user ID/role into context; use `middleware.UserIDFromContext(ctx)` to read it
-- **Tests:** Use `testify` assertions. Test files go next to the code they test (e.g. `service/score_card_test.go`)
+- **Auth middleware:** `middleware.Authenticate(auth)` extracts user ID/role into context; use `middleware.UserIDFromContext(ctx)` and `middleware.UserRoleFromContext(ctx)` to read them
+- **Admin middleware:** `middleware.RequireAdmin` gates admin-only routes
+- **Tests:** Use `testify` assertions. Test files go next to the code they test (e.g. `handler/health_test.go`, `service/score_card_test.go`)
+- **Handler pattern:** One file per domain in `internal/api/handler/`. Constructor: `NewXxx(service)` returns handler struct. Methods are HTTP handler funcs.
+- **Repository pattern:** One file per domain in `internal/repository/`. Direct pgx queries, no ORM.
+- **Service pattern:** One file per domain in `internal/service/`. Business logic between handlers and repositories.
 
 ### Frontend (TypeScript/React)
 
 - **Routing:** TanStack Router with file-based route tree (`routeTree.ts`)
-- **Data fetching:** TanStack Query — define queries/mutations in `src/api/` modules
-- **State:** Zustand stores in `src/store/` (auth is persisted to localStorage)
+- **Data fetching:** TanStack Query — define queries/mutations in `src/api/` modules (one per domain)
+- **State:** Zustand stores in `src/store/` (auth persisted to localStorage, theme, toast)
 - **Styling:** Tailwind CSS utility classes; dark mode via `ThemeToggle` and `theme` store
 - **API client:** `src/api/client.ts` auto-injects Bearer token from auth store
 - **Components:** Shared components in `src/components/`, page components in `src/pages/`
+- **Icons:** Lucide React (`lucide-react`)
+- **Charts:** Recharts (`recharts`)
+- **Static data:** Pellet and rifle catalogs in `src/catalog/`, target presets in `src/config/`
 
 ### General
 
@@ -130,24 +166,86 @@ make migrate-lint                  # check for duplicate prefixes
 
 All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
-- **Public:** `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /leagues`, `GET /images/{id}`
-- **Protected:** Everything else requires `Authorization: Bearer <jwt>`
-- **Admin:** Role-based via `middleware.RequireAdmin` (SMTP settings, email templates, admin email)
+### Public (no auth)
+
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
+- `POST /auth/forgot-password`, `POST /auth/reset-password`
+- `GET /images/{id}`
+- `GET /leagues`, `GET /leagues/{id}`
+- `GET /clubs`, `GET /clubs/{id}`, `GET /clubs/{id}/standings`
+- `GET /score-cards/{id}/comments`
+- `GET /pellet-tests/public-leaderboard`
+
+### Protected (requires `Authorization: Bearer <jwt>`)
+
+- **Score cards:** CRUD + image upload + comments (write)
+- **Rifles:** CRUD + image upload
+- **Pellets:** CRUD + image upload
+- **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
+- **Leagues:** Create, join, standings, scores, config, members, seasons, rounds, join requests, score verification (confirm/amend/reject + audit trail)
+- **Clubs:** Create, join, members, image upload
+- **Users:** Update profile, avatar upload, email change, view profiles
+- **Social:** Follow/unfollow users
+- **Activity:** `GET /feed`
+- **Achievements:** List own + list for user
+- **Stats:** User stats, rifle stats, score trends
+- **Images:** Upload
+
+### Admin (requires `middleware.RequireAdmin`)
+
+- **Email:** SMTP settings (get/patch/test), email templates (list/get/patch/preview)
+- **Users:** List, get, update role, delete
+- **Leagues:** List, get, update, delete, members management
+- **Clubs:** List, get, update, delete, members management
 
 ## Environment Variables
 
-Required: `DB_PASSWORD`, `JWT_SECRET`
-Optional with defaults: `PORT` (8080), `ENV` (development), `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME` (sub12), `DB_USER` (sub12), `REDIS_URL` (redis://localhost:6379), `CORS_ORIGIN` (http://localhost:5173)
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `DB_PASSWORD` | PostgreSQL password |
+| `JWT_SECRET` | JWT signing secret |
+
+### Optional (with defaults)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | API server port |
+| `ENV` | `development` | Environment (development/production/test) |
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5432` | PostgreSQL port |
+| `DB_NAME` | `sub12` | Database name |
+| `DB_USER` | `sub12` | Database user |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
+| `JWT_EXPIRY_HOURS` | `24` | JWT token expiry in hours |
+| `PASSWORD_RESET_TTL_MINUTES` | `60` | Password reset token TTL |
+| `PASSWORD_RESET_URL` | `http://localhost:5173/reset-password` | Frontend password reset page URL |
+| `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
+| `SEED_ADMIN` | `false` | Auto-seed admin user on startup |
+| `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
 
 ## CI Pipeline
 
-GitHub Actions runs on push/PR to `main`:
+Two GitHub Actions workflows:
+
+### ci.yml (push/PR to `main`)
+
 1. **Backend:** Migration lint (duplicate check) → `go vet` → `go test -race` → `go build`
+   - Runs against a PostgreSQL 16 service container
 2. **Frontend:** `npm ci` → type check → lint → test → build
-3. **Docker:** Smoke-test image builds for both services
+   - Node.js 20
+3. **Docker:** Smoke-test image builds for both services (depends on backend + frontend jobs)
+
+### release.yml (push to `main`)
+
+- Builds and pushes backend + frontend Docker images to GHCR
+- Tags: `sha-<commit>` + `latest`
+- Uses Docker Buildx with GitHub Actions cache
 
 ## Container Images
 
 - `ghcr.io/jnnngs/sub-12-backend:latest`
 - `ghcr.io/jnnngs/sub-12-frontend:latest`
 - Tag with `IMAGE_TAG` env var in `docker-compose.yml` for pinned deploys
+- Production frontend nginx proxies `/api/` to backend container (no host port exposed for backend)
