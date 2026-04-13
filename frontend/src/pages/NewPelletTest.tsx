@@ -117,7 +117,9 @@ export default function NewPelletTest() {
   }
 
   const validGroups = groups.filter(g => g.groupSizeMM && Number(g.groupSizeMM) > 0)
-  const canSubmit = rifleId && pelletId && testDate && distanceValue && Number(distanceValue) > 0 && validGroups.length > 0
+  const hasDistance = !!distanceValue && Number(distanceValue) > 0
+  const hasGroupOrImage = validGroups.length > 0 || imageFiles.length > 0
+  const canSubmit = rifleId && pelletId && testDate && hasGroupOrImage && (hasDistance || imageFiles.length > 0)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -125,8 +127,8 @@ export default function NewPelletTest() {
         rifle_id: rifleId,
         pellet_id: pelletId,
         test_date: testDate,
-        distance_value: Number(distanceValue),
-        distance_unit: distanceUnit,
+        distance_value: hasDistance ? Number(distanceValue) : undefined,
+        distance_unit: hasDistance ? distanceUnit : undefined,
         location: location || undefined,
         wind_mph: windMph ? Number(windMph) : undefined,
         temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,

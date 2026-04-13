@@ -185,8 +185,14 @@ export default function PelletTestDetail() {
   })
 
   const saveMeasurementMutation = useMutation({
-    mutationFn: async ({ imageId, payload, analyzedSizeMM, analyzedShotCount }: { imageId: string; payload: CreateMeasurementPayload; analyzedSizeMM?: number | null; analyzedShotCount?: number }) => {
+    mutationFn: async ({ imageId, payload, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
       const measurement = await pelletTestApi.createMeasurement(id!, imageId, payload)
+      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
+        await pelletTestApi.update(id!, {
+          distance_value: analyzedDistanceValue,
+          distance_unit: analyzedDistanceUnit ?? 'meters',
+        })
+      }
       if (pendingMeasuredGroupId && analyzedSizeMM && analyzedSizeMM > 0) {
         await syncMeasuredGroupMutation.mutateAsync({
           groupId: pendingMeasuredGroupId,
@@ -215,6 +221,8 @@ export default function PelletTestDetail() {
       annotatedBlob,
       analyzedSizeMM,
       analyzedShotCount,
+      analyzedDistanceValue,
+      analyzedDistanceUnit,
     }: {
       imageId: string
       payload: CreateMeasurementPayload
@@ -222,6 +230,8 @@ export default function PelletTestDetail() {
       annotatedBlob: Blob | null
       analyzedSizeMM?: number | null
       analyzedShotCount?: number
+      analyzedDistanceValue?: number
+      analyzedDistanceUnit?: 'meters' | 'yards'
     }) => {
       const measurement = await pelletTestApi.createMeasurement(id!, imageId, payload)
 
@@ -238,6 +248,12 @@ export default function PelletTestDetail() {
 
       if (annotatedBlob) {
         await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
+      }
+      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
+        await pelletTestApi.update(id!, {
+          distance_value: analyzedDistanceValue,
+          distance_unit: analyzedDistanceUnit ?? 'meters',
+        })
       }
 
       if (pendingMeasuredGroupId && analyzedSizeMM && analyzedSizeMM > 0) {
@@ -618,7 +634,7 @@ export default function PelletTestDetail() {
             sessionId={id!}
             imageId={measureImage.id}
             existingMeasurement={existingMeasurement}
-            onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount })}
+            onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount, analyzedDistanceValue: analysisMeta.distanceValue, analyzedDistanceUnit: analysisMeta.distanceUnit })}
             onSaveDetections={(payload, detections, annotatedBlob, analysisMeta) =>
               saveDetectionsMutation.mutate({
                 imageId: measureImage.id,
@@ -627,6 +643,8 @@ export default function PelletTestDetail() {
                 annotatedBlob,
                 analyzedSizeMM: analysisMeta.groupSizeMM,
                 analyzedShotCount: analysisMeta.shotCount,
+                analyzedDistanceValue: analysisMeta.distanceValue,
+                analyzedDistanceUnit: analysisMeta.distanceUnit,
               })
             }
             isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}

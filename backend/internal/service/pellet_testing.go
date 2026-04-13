@@ -31,11 +31,14 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 	if in.TestDate == "" {
 		return nil, fmt.Errorf("%w: test date is required", ErrInvalidPelletTest)
 	}
-	if in.DistanceValue <= 0 {
-		return nil, fmt.Errorf("%w: distance must be greater than zero", ErrInvalidPelletTest)
+	if in.DistanceUnit == "" {
+		in.DistanceUnit = "meters"
 	}
 	if in.DistanceUnit != "meters" && in.DistanceUnit != "yards" {
 		return nil, fmt.Errorf("%w: distance unit must be meters or yards", ErrInvalidPelletTest)
+	}
+	if in.DistanceValue < 0 {
+		return nil, fmt.Errorf("%w: distance must be zero or greater", ErrInvalidPelletTest)
 	}
 
 	distanceM := in.DistanceValue

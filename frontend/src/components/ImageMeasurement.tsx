@@ -10,8 +10,8 @@ interface Props {
   sessionId: string
   imageId: string
   existingMeasurement?: PelletTestMeasurement
-  onSave: (payload: CreateMeasurementPayload, analysisMeta: { groupSizeMM: number | null; shotCount: number }) => void
-  onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null, analysisMeta: { groupSizeMM: number | null; shotCount: number }) => void
+  onSave: (payload: CreateMeasurementPayload, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
+  onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
   onClose: () => void
   defaultDistanceUnit?: 'meters' | 'yards'
   defaultMeasurementUnit?: 'cm' | 'mm'
@@ -195,6 +195,7 @@ export default function ImageMeasurement({
     return { x: (lineStart.x + lineEnd.x) / 2, y: (lineStart.y + lineEnd.y) / 2 }
   }, [lineStart, lineEnd])
   const analysisShotCount = measureMethod === 'manual_line' ? Number(manualShotCount) || 0 : impacts.length
+  const analysisDistanceValue = Number(distanceToTarget) || 0
   const analysisGroupSizeMM = measureMethod === 'manual_line' ? manualGroupSizeMM : groupSizeRaw
   const analysisGroupSizeMOA = measureMethod === 'manual_line' ? manualGroupSizeMOA : groupSizeMOA
   const fmtLen = (mm: number) => displayUnit === 'cm' ? (mm / 10).toFixed(2) : mm.toFixed(2)
@@ -478,7 +479,7 @@ export default function ImageMeasurement({
         ...payload,
         manual_group_size_mm: manualGroupSizeMM ?? undefined,
         manual_shot_count: Number(manualShotCount) || 0,
-      }, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount })
+      }, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
       return
     }
     if (onSaveDetections && impacts.length > 0) {
@@ -488,9 +489,9 @@ export default function ImageMeasurement({
         diameterMM: pelletDiameterMM, confidence: 1.0, pixelCount: 0,
       }))
       const blob = await generateAnnotatedBlob()
-      onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount })
-    } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount }) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount])
+      onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
+    } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit }) }
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
