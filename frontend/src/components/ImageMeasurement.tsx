@@ -57,6 +57,8 @@ export default function ImageMeasurement({
 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
+  const zoomRef = useRef(1)
+  const panRef = useRef<Point>({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const panStart = useRef<Point>({ x: 0, y: 0 })
   const panOffset = useRef<Point>({ x: 0, y: 0 })
@@ -122,6 +124,15 @@ export default function ImageMeasurement({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+
+  useEffect(() => {
+    zoomRef.current = zoom
+  }, [zoom])
+
+  useEffect(() => {
+    panRef.current = pan
+  }, [pan])
 
   // Rotation helpers
   const imageToRotated = useCallback((pt: Point): Point => {
@@ -321,13 +332,21 @@ export default function ImageMeasurement({
       const prevDist = lastPinchDist.current
       if (prevDist && prevDist > 0) {
         const ratio = currentDist / prevDist
-        const nz = Math.min(Math.max(zoom * ratio, 0.1), 10)
+        const currentZoom = zoomRef.current
+        const nz = Math.min(Math.max(currentZoom * ratio, 0.1), 10)
         const canvas = canvasRef.current
         if (canvas) {
           const rect = canvas.getBoundingClientRect()
           const mx = ((p1.x + p2.x) / 2) - rect.left
           const my = ((p1.y + p2.y) / 2) - rect.top
-          setPan(prev => ({ x: mx - (mx - prev.x) * (nz / zoom), y: my - (my - prev.y) * (nz / zoom) }))
+          const currentPan = panRef.current
+          const nextPan = {
+            x: mx - (mx - currentPan.x) * (nz / currentZoom),
+            y: my - (my - currentPan.y) * (nz / currentZoom),
+          }
+          panRef.current = nextPan
+          zoomRef.current = nz
+          setPan(nextPan)
           setZoom(nz)
         }
       }
@@ -350,7 +369,7 @@ export default function ImageMeasurement({
         })
       }
     }
-  }, [isPanning, subMode, zoom])
+  }, [isPanning, subMode])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
@@ -396,14 +415,23 @@ export default function ImageMeasurement({
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     const factor = e.deltaY < 0 ? 1.1 : 0.9
-    const nz = Math.min(Math.max(zoom * factor, 0.1), 10)
+    const currentZoom = zoomRef.current
+    const nz = Math.min(Math.max(currentZoom * factor, 0.1), 10)
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top
-    setPan(prev => ({ x: mx - (mx - prev.x) * (nz / zoom), y: my - (my - prev.y) * (nz / zoom) }))
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const currentPan = panRef.current
+    const nextPan = {
+      x: mx - (mx - currentPan.x) * (nz / currentZoom),
+      y: my - (my - currentPan.y) * (nz / currentZoom),
+    }
+    panRef.current = nextPan
+    zoomRef.current = nz
+    setPan(nextPan)
     setZoom(nz)
-  }, [zoom])
+  }, [])
 
   // ── Actions ────────────────────────────────────────────────────────
   const handleCalibSet = () => {
