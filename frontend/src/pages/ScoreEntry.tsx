@@ -26,6 +26,7 @@ export default function ScoreEntry() {
   const [notes, setNotes] = useState('')
   const [rifleId, setRifleId] = useState<string>('')
   const [pelletId, setPelletId] = useState<string>('')
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showHelp, setShowHelp] = useState(() => {
@@ -212,6 +213,7 @@ export default function ScoreEntry() {
         rifle_id: rifleId || undefined,
         pellet_id: pelletId || undefined,
         league_round_id: leagueId ? leagueRoundId : undefined,
+        visibility,
       })
       if (imageFile) {
         await scoreCardApi.uploadImage(card.id, imageFile)
@@ -416,6 +418,35 @@ export default function ScoreEntry() {
               placeholder="Conditions, observations…"
               className={`${inputCls} placeholder:text-muted resize-none`}
             />
+          </div>
+
+          {/* Visibility */}
+          <div>
+            <label className="block text-xs tracking-wide text-muted mb-1">Visibility</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setVisibility('public')}
+                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                  visibility === 'public'
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibility('private')}
+                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                  visibility === 'private'
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                Private
+              </button>
+            </div>
           </div>
 
           {/* Photo upload */}

@@ -7,6 +7,7 @@ export interface PublicProfile {
   location?: string
   club?: string
   avatar_url?: string
+  profile_visibility: string
   created_at: string
 }
 
@@ -16,20 +17,50 @@ export interface FollowStats {
   is_following: boolean
 }
 
-export interface PublicProfileWithFollow extends PublicProfile, FollowStats {}
+export interface PublicProfileWithFollow extends PublicProfile, FollowStats {
+  is_private: boolean
+  is_blocked: boolean
+  follow_request_status?: string
+}
 
 export interface UpdateProfileInput {
   display_name?: string
   bio?: string
   location?: string
   club?: string
+  profile_visibility?: string
+}
+
+export interface FollowListItem {
+  user_id: string
+  display_name: string
+  avatar_url?: string
+}
+
+export interface UserBlock {
+  blocker_id: string
+  blocked_id: string
+  display_name: string
+  avatar_url?: string
+  created_at: string
+}
+
+export interface FollowRequest {
+  id: string
+  requester_id: string
+  target_id: string
+  status: string
+  display_name?: string
+  avatar_url?: string
+  created_at: string
+  decided_at?: string
 }
 
 export const usersApi = {
   getProfile: (id: string) => api.get<PublicProfileWithFollow>(`/users/${id}`),
-  follow: (id: string) => api.post<{ following: boolean }>(`/users/${id}/follow`, {}),
+  follow: (id: string) => api.post<{ following?: boolean; status?: string }>(`/users/${id}/follow`, {}),
   unfollow: (id: string) => api.del<{ following: boolean }>(`/users/${id}/follow`),
-  updateMe: (input: UpdateProfileInput) => api.patch<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string }>('/users/me', input),
+  updateMe: (input: UpdateProfileInput) => api.patch<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string; profile_visibility: string }>('/users/me', input),
   uploadAvatar: (file: File) => {
     const formData = new FormData()
     formData.append('image', file)
@@ -37,4 +68,20 @@ export const usersApi = {
   },
   requestEmailChange: (email: string) => api.post<{ message: string }>('/users/me/email', { email }),
   confirmEmailChange: (token: string) => api.post<{ id: string; email: string; display_name: string }>('/users/me/email/confirm', { token }),
+
+  // Social lists
+  getFollowers: (id: string, limit = 50, offset = 0) =>
+    api.get<{ items: FollowListItem[] }>(`/users/${id}/followers?limit=${limit}&offset=${offset}`),
+  getFollowing: (id: string, limit = 50, offset = 0) =>
+    api.get<{ items: FollowListItem[] }>(`/users/${id}/following?limit=${limit}&offset=${offset}`),
+
+  // Block
+  block: (id: string) => api.post<{ blocked: boolean }>(`/users/${id}/block`, {}),
+  unblock: (id: string) => api.del<{ blocked: boolean }>(`/users/${id}/block`),
+  listBlocked: () => api.get<{ items: UserBlock[] }>('/users/me/blocks'),
+
+  // Follow requests
+  listFollowRequests: () => api.get<{ items: FollowRequest[] }>('/users/me/follow-requests'),
+  decideFollowRequest: (id: string, decision: 'accepted' | 'rejected') =>
+    api.post<FollowRequest>(`/users/me/follow-requests/${id}/decide`, { decision }),
 }

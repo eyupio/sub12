@@ -10,6 +10,7 @@ interface User {
   location?: string
   club?: string
   avatar_url?: string
+  profile_visibility?: string
 }
 
 interface AuthState {

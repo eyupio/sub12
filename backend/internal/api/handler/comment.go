@@ -42,6 +42,10 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrCommentDenied) {
+			writeError(w, http.StatusForbidden, "you cannot comment on this score card")
+			return
+		}
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "score card not found")
 			return

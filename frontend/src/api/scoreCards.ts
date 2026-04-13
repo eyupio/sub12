@@ -23,6 +23,7 @@ export interface ScoreCard extends ScoreCardSummary {
   shot_xs: boolean[]
   card_image_url?: string
   verification: string
+  visibility: string
   league_round_id?: string
   updated_at: string
 }
@@ -38,6 +39,7 @@ export interface CreateScoreCardPayload {
   rifle_id?: string
   pellet_id?: string
   league_round_id?: string
+  visibility?: string
 }
 
 export interface Comment {

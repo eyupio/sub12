@@ -801,6 +801,12 @@ export default function ScoreCardDetail() {
                 <VerificationBadge status={card.verification} />
               </div>
             )}
+            {card.visibility === 'private' && (
+              <div className="flex justify-between pt-1">
+                <span className="text-muted tracking-widest uppercase text-[11px]">Visibility</span>
+                <span className="text-[11px] tracking-widest uppercase text-muted">Private</span>
+              </div>
+            )}
           </div>
 
           {card.card_image_url && (

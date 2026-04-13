@@ -111,10 +111,10 @@ func (r *SocialRepository) ListFollowing(ctx context.Context, userID string) ([]
 func (r *SocialRepository) GetPublicProfile(ctx context.Context, userID string) (*model.PublicProfile, error) {
 	var p model.PublicProfile
 	err := r.db.QueryRow(ctx,
-		`SELECT id, display_name, bio, location, club, avatar_url, created_at
+		`SELECT id, display_name, bio, location, club, avatar_url, profile_visibility, created_at
 		 FROM users WHERE id = $1`,
 		userID,
-	).Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.CreatedAt)
+	).Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.ProfileVisibility, &p.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
@@ -122,4 +122,197 @@ func (r *SocialRepository) GetPublicProfile(ctx context.Context, userID string) 
 		return nil, fmt.Errorf("get public profile: %w", err)
 	}
 	return &p, nil
+}
+
+// GetProfileVisibility returns just the profile_visibility setting for a user.
+func (r *SocialRepository) GetProfileVisibility(ctx context.Context, userID string) (string, error) {
+	var vis string
+	err := r.db.QueryRow(ctx,
+		`SELECT profile_visibility FROM users WHERE id = $1`,
+		userID,
+	).Scan(&vis)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("get profile visibility: %w", err)
+	}
+	return vis, nil
+}
+
+// CreateFollowRequest inserts a pending follow request. Idempotent via ON CONFLICT.
+func (r *SocialRepository) CreateFollowRequest(ctx context.Context, requesterID, targetID string) (*model.FollowRequest, error) {
+	var fr model.FollowRequest
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO follow_requests (requester_id, target_id, status)
+		VALUES ($1, $2, 'pending')
+		ON CONFLICT (requester_id, target_id)
+		DO UPDATE SET status = CASE
+			WHEN follow_requests.status = 'rejected' THEN 'pending'
+			ELSE follow_requests.status
+		END, decided_at = CASE
+			WHEN follow_requests.status = 'rejected' THEN NULL
+			ELSE follow_requests.decided_at
+		END
+		RETURNING id, requester_id, target_id, status, created_at, decided_at
+	`, requesterID, targetID).Scan(
+		&fr.ID, &fr.RequesterID, &fr.TargetID, &fr.Status, &fr.CreatedAt, &fr.DecidedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create follow request: %w", err)
+	}
+	return &fr, nil
+}
+
+// GetPendingRequest returns a pending follow request between two users, or ErrNotFound.
+func (r *SocialRepository) GetPendingRequest(ctx context.Context, requesterID, targetID string) (*model.FollowRequest, error) {
+	var fr model.FollowRequest
+	err := r.db.QueryRow(ctx, `
+		SELECT id, requester_id, target_id, status, created_at, decided_at
+		FROM follow_requests
+		WHERE requester_id = $1 AND target_id = $2 AND status = 'pending'
+	`, requesterID, targetID).Scan(
+		&fr.ID, &fr.RequesterID, &fr.TargetID, &fr.Status, &fr.CreatedAt, &fr.DecidedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get pending request: %w", err)
+	}
+	return &fr, nil
+}
+
+// ListPendingRequests returns all pending follow requests targeting the given user.
+func (r *SocialRepository) ListPendingRequests(ctx context.Context, targetID string) ([]*model.FollowRequest, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT fr.id, fr.requester_id, fr.target_id, fr.status,
+		       u.display_name, u.avatar_url, fr.created_at, fr.decided_at
+		FROM follow_requests fr
+		JOIN users u ON u.id = fr.requester_id
+		WHERE fr.target_id = $1 AND fr.status = 'pending'
+		ORDER BY fr.created_at DESC
+	`, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("list pending requests: %w", err)
+	}
+	defer rows.Close()
+
+	var reqs []*model.FollowRequest
+	for rows.Next() {
+		var fr model.FollowRequest
+		if err := rows.Scan(&fr.ID, &fr.RequesterID, &fr.TargetID, &fr.Status,
+			&fr.DisplayName, &fr.AvatarURL, &fr.CreatedAt, &fr.DecidedAt); err != nil {
+			return nil, fmt.Errorf("scan follow request: %w", err)
+		}
+		reqs = append(reqs, &fr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list pending requests rows: %w", err)
+	}
+	if reqs == nil {
+		reqs = []*model.FollowRequest{}
+	}
+	return reqs, nil
+}
+
+// DecideFollowRequest updates a follow request's status to accepted or rejected.
+func (r *SocialRepository) DecideFollowRequest(ctx context.Context, requestID, targetID, decision string) (*model.FollowRequest, error) {
+	var fr model.FollowRequest
+	err := r.db.QueryRow(ctx, `
+		UPDATE follow_requests
+		SET status = $3, decided_at = NOW()
+		WHERE id = $1 AND target_id = $2 AND status = 'pending'
+		RETURNING id, requester_id, target_id, status, created_at, decided_at
+	`, requestID, targetID, decision).Scan(
+		&fr.ID, &fr.RequesterID, &fr.TargetID, &fr.Status, &fr.CreatedAt, &fr.DecidedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("decide follow request: %w", err)
+	}
+	return &fr, nil
+}
+
+// ListFollowers returns a paginated list of users who follow the given user.
+func (r *SocialRepository) ListFollowers(ctx context.Context, userID string, limit, offset int) ([]*model.FollowListItem, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.display_name, u.avatar_url
+		FROM user_follows uf
+		JOIN users u ON u.id = uf.follower_id
+		WHERE uf.following_id = $1
+		ORDER BY uf.created_at DESC
+		LIMIT $2 OFFSET $3
+	`, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list followers: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.FollowListItem
+	for rows.Next() {
+		var item model.FollowListItem
+		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.AvatarURL); err != nil {
+			return nil, fmt.Errorf("scan follower: %w", err)
+		}
+		items = append(items, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list followers rows: %w", err)
+	}
+	if items == nil {
+		items = []*model.FollowListItem{}
+	}
+	return items, nil
+}
+
+// ListFollowingProfiles returns a paginated list of users the given user follows.
+func (r *SocialRepository) ListFollowingProfiles(ctx context.Context, userID string, limit, offset int) ([]*model.FollowListItem, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.display_name, u.avatar_url
+		FROM user_follows uf
+		JOIN users u ON u.id = uf.following_id
+		WHERE uf.follower_id = $1
+		ORDER BY uf.created_at DESC
+		LIMIT $2 OFFSET $3
+	`, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list following profiles: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.FollowListItem
+	for rows.Next() {
+		var item model.FollowListItem
+		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.AvatarURL); err != nil {
+			return nil, fmt.Errorf("scan following: %w", err)
+		}
+		items = append(items, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list following rows: %w", err)
+	}
+	if items == nil {
+		items = []*model.FollowListItem{}
+	}
+	return items, nil
+}
+
+// GetFollowRequestStatus returns the status of a follow request from requesterID to targetID.
+// Returns "" if no request exists.
+func (r *SocialRepository) GetFollowRequestStatus(ctx context.Context, requesterID, targetID string) (string, error) {
+	var status string
+	err := r.db.QueryRow(ctx,
+		`SELECT status FROM follow_requests WHERE requester_id = $1 AND target_id = $2`,
+		requesterID, targetID,
+	).Scan(&status)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("get follow request status: %w", err)
+	}
+	return status, nil
 }

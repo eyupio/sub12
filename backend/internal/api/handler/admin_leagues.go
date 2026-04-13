@@ -31,7 +31,7 @@ func (h *AdminLeaguesHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/admin/leagues/{id}
 func (h *AdminLeaguesHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	league, err := h.svc.GetByID(r.Context(), id)
+	league, err := h.svc.AdminGetByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
