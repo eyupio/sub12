@@ -133,7 +133,7 @@ export default function PelletTestDetail() {
     onSuccess: (group) => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-      const picked = (session.images ?? []).find(img => img.id === newGroupImageId)
+      const picked = (session?.images ?? []).find(img => img.id === newGroupImageId)
       if (picked) {
         setPendingMeasuredGroupId(group.id)
         setMeasureImage(picked)
@@ -157,7 +157,7 @@ export default function PelletTestDetail() {
 
   const syncMeasuredGroupMutation = useMutation({
     mutationFn: ({ groupId, sizeMM, shotCount }: { groupId: string; sizeMM: number; shotCount: number }) => {
-      const existing = session.groups?.find(g => g.id === groupId)
+      const existing = session?.groups?.find(g => g.id === groupId)
       return pelletTestApi.updateGroup(id!, groupId, {
         group_size_mm: sizeMM,
         shot_count: shotCount > 0 ? shotCount : (existing?.shot_count ?? newShotCount),
