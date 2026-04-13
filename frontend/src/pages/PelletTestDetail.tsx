@@ -131,6 +131,9 @@ export default function PelletTestDetail() {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
       setMeasureImage(null)
     },
+    onError: () => {
+      toast('Failed to save measurement.', 'error')
+    },
   })
 
   const saveDetectionsMutation = useMutation({
@@ -168,6 +171,9 @@ export default function PelletTestDetail() {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
       qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
       setMeasureImage(null)
+    },
+    onError: () => {
+      toast('Failed to save detections.', 'error')
     },
   })
 
@@ -523,6 +529,8 @@ export default function PelletTestDetail() {
                 annotatedBlob,
               })
             }
+            isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
+            saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
             onClose={() => setMeasureImage(null)}
             defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
             defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
