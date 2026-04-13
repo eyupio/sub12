@@ -10,8 +10,8 @@ interface Props {
   sessionId: string
   imageId: string
   existingMeasurement?: PelletTestMeasurement
-  onSave: (payload: CreateMeasurementPayload) => void
-  onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null) => void
+  onSave: (payload: CreateMeasurementPayload, analysisMeta: { groupSizeMM: number | null; shotCount: number }) => void
+  onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null, analysisMeta: { groupSizeMM: number | null; shotCount: number }) => void
   onClose: () => void
   defaultDistanceUnit?: 'meters' | 'yards'
   defaultMeasurementUnit?: 'cm' | 'mm'
@@ -450,7 +450,7 @@ export default function ImageMeasurement({
         ...payload,
         manual_group_size_mm: manualGroupSizeMM ?? undefined,
         manual_shot_count: Number(manualShotCount) || 0,
-      })
+      }, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount })
       return
     }
     if (onSaveDetections && impacts.length > 0) {
@@ -460,9 +460,9 @@ export default function ImageMeasurement({
         diameterMM: pelletDiameterMM, confidence: 1.0, pixelCount: 0,
       }))
       const blob = await generateAnnotatedBlob()
-      onSaveDetections(payload, dets, blob)
-    } else { onSave(payload) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount])
+      onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount })
+    } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount }) }
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
