@@ -28,6 +28,9 @@ func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateS
 func (m *mockScoreCardRepo) GetByID(_ context.Context, _, _ string) (*model.ScoreCard, error) {
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
+func (m *mockScoreCardRepo) GetPublicByID(_ context.Context, _ string) (*model.ScoreCard, error) {
+	return &model.ScoreCard{ID: "test-id"}, nil
+}
 func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ string) ([]*model.ScoreCardSummary, error) {
 	return nil, nil
 }

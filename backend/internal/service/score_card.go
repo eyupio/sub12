@@ -18,6 +18,7 @@ var (
 type ScoreCardRepo interface {
 	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
+	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
@@ -78,6 +79,18 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 // GetByID returns a score card owned by the given user.
 func (s *ScoreCardService) GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error) {
 	card, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, err
+	}
+	return card, nil
+}
+
+// GetPublicByID returns a score card by ID without an ownership check.
+func (s *ScoreCardService) GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error) {
+	card, err := s.cards.GetPublicByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
