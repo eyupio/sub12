@@ -29,6 +29,7 @@ type ScoreCardRepo interface {
 type LeagueConfigRepo interface {
 	GetConfigByRoundID(ctx context.Context, roundID string) (*model.LeagueConfig, error)
 	CountUserSubmissionsForRound(ctx context.Context, userID, roundID string) (int, error)
+	GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error)
 }
 
 type ScoreCardService struct {
@@ -91,7 +92,16 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		targetID := card.ID
 		targetType := "score_card"
 		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount}
-		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta)
+
+		// Resolve league_id from round if this is a league submission
+		var leagueID *string
+		if card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil {
+			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *card.LeagueRoundID); err == nil {
+				leagueID = &lid
+			}
+		}
+
+		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta, leagueID, nil, card.Visibility)
 	}
 
 	if s.achievement != nil {

@@ -1006,3 +1006,22 @@ func (r *LeagueRepository) CountUserSubmissionsForRound(ctx context.Context, use
 	}
 	return count, nil
 }
+
+// GetLeagueIDByRoundID resolves a round ID to its parent league ID via rounds → seasons → leagues.
+func (r *LeagueRepository) GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error) {
+	var leagueID string
+	err := r.db.QueryRow(ctx, `
+		SELECT l.id
+		FROM rounds r
+		JOIN seasons s ON s.id = r.season_id
+		JOIN leagues l ON l.id = s.league_id
+		WHERE r.id = $1
+	`, roundID).Scan(&leagueID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("get league id by round: %w", err)
+	}
+	return leagueID, nil
+}

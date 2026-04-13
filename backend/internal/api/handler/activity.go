@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
+	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
@@ -33,9 +34,23 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 
 	cursor := r.URL.Query().Get("cursor")
 
-	feed, err := h.svc.GetFeed(r.Context(), userID, limit, cursor)
+	filter := r.URL.Query().Get("filter")
+	if filter == "" {
+		filter = model.FeedForYou
+	}
+
+	req := model.FeedRequest{
+		ViewerID: userID,
+		Filter:   filter,
+		LeagueID: r.URL.Query().Get("league_id"),
+		ClubID:   r.URL.Query().Get("club_id"),
+		Limit:    limit,
+		Cursor:   cursor,
+	}
+
+	feed, err := h.svc.GetFeed(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to fetch feed")
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

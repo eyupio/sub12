@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Camera, Upload, X, Trophy, HelpCircle } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { toast } from '../store/toast'
+import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 
@@ -26,7 +27,8 @@ export default function ScoreEntry() {
   const [notes, setNotes] = useState('')
   const [rifleId, setRifleId] = useState<string>('')
   const [pelletId, setPelletId] = useState<string>('')
-  const [visibility, setVisibility] = useState<'public' | 'private'>('public')
+  const userDefaultVis = useAuthStore((s) => s.user?.default_score_visibility ?? 'public') as 'public' | 'followers' | 'private'
+  const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>(userDefaultVis)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showHelp, setShowHelp] = useState(() => {
@@ -447,28 +449,20 @@ export default function ScoreEntry() {
           <div>
             <label className="block text-xs tracking-wide text-muted mb-1">Visibility</label>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setVisibility('public')}
-                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
-                  visibility === 'public'
-                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
-                    : 'border-subtle text-muted hover:text-secondary'
-                }`}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                onClick={() => setVisibility('private')}
-                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
-                  visibility === 'private'
-                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
-                    : 'border-subtle text-muted hover:text-secondary'
-                }`}
-              >
-                Private
-              </button>
+              {(['public', 'followers', 'private'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVisibility(v)}
+                  className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                    visibility === v
+                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      : 'border-subtle text-muted hover:text-secondary'
+                  }`}
+                >
+                  {v === 'followers' ? 'Followers' : v.charAt(0).toUpperCase() + v.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
 

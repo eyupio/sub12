@@ -184,6 +184,89 @@ function FollowRequestsSection() {
   )
 }
 
+function PrivacySettings() {
+  const { user, updateUser } = useAuthStore()
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateProfileInput) => usersApi.updateMe(input),
+    onSuccess: (updated) => {
+      updateUser({
+        default_score_visibility: updated.default_score_visibility,
+        feed_opt_out: updated.feed_opt_out,
+      })
+      toast('Privacy settings saved', 'success')
+    },
+    onError: () => {
+      toast('Failed to save privacy settings', 'error')
+    },
+  })
+
+  const visOptions = [
+    { value: 'public', label: 'Public', icon: Globe },
+    { value: 'followers', label: 'Followers', icon: UserCheck },
+    { value: 'private', label: 'Private', icon: Lock },
+  ]
+
+  return (
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Feed</h2>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Default Score Visibility
+          </label>
+          <div className="flex gap-2">
+            {visOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => mutation.mutate({ default_score_visibility: value })}
+                disabled={mutation.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                  (user?.default_score_visibility ?? 'public') === value
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-1">
+            New score cards will default to this visibility.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-secondary">Hide from Public feed</p>
+            <p className="text-[10px] text-muted mt-0.5">
+              Your activity won't appear in the global Public feed.
+            </p>
+          </div>
+          <button
+            onClick={() => mutation.mutate({ feed_opt_out: !user?.feed_opt_out })}
+            disabled={mutation.isPending}
+            className={`relative w-10 h-5 rounded-full transition-colors ${
+              user?.feed_opt_out
+                ? 'bg-[var(--brass)]'
+                : 'bg-[var(--surface-hover)]'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                user?.feed_opt_out ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
   const { user, updateUser } = useAuthStore()
   const queryClient = useQueryClient()
@@ -236,6 +319,8 @@ export default function Profile() {
         club: updated.club,
         avatar_url: updated.avatar_url,
         profile_visibility: updated.profile_visibility,
+        default_score_visibility: updated.default_score_visibility,
+        feed_opt_out: updated.feed_opt_out,
       })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
       setEditing(false)
@@ -498,6 +583,9 @@ export default function Profile() {
         {emailMsg && <p className="text-xs text-[var(--brass)]">{emailMsg}</p>}
         {emailError && <p className="text-xs text-[var(--error-text)]">{emailError}</p>}
       </div>
+
+      {/* Privacy & Feed */}
+      <PrivacySettings />
 
       {/* Stats */}
       <div>

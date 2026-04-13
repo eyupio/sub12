@@ -232,19 +232,21 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
     const dy = e.clientY - pointerStart.current.y
     if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
       didDrag.current = true
-      if (!isPanning) setIsPanning(true)
-      setPan({
-        x: panOffset.current.x + (e.clientX - panStart.current.x),
-        y: panOffset.current.y + (e.clientY - panStart.current.y),
-      })
+      if (subMode === 'idle') {
+        if (!isPanning) setIsPanning(true)
+        setPan({
+          x: panOffset.current.x + (e.clientX - panStart.current.x),
+          y: panOffset.current.y + (e.clientY - panStart.current.y),
+        })
+      }
     }
-  }, [isPanning])
+  }, [isPanning, subMode])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
     if (canvas) canvas.releasePointerCapture(e.pointerId)
     if (isPanning) { setIsPanning(false); return }
-    if (didDrag.current) return
+    if (didDrag.current && subMode === 'idle') return
 
     // Tap action
     const pt = screenToImage(e.clientX, e.clientY)

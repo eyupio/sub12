@@ -14,11 +14,12 @@ var ErrInvalidPelletTest = errors.New("invalid pellet test")
 var ErrInvalidMeasurement = errors.New("invalid measurement")
 
 type PelletTestService struct {
-	repo *repository.PelletTestRepository
+	repo     *repository.PelletTestRepository
+	activity *ActivityService // nil disables feed ingestion
 }
 
-func NewPelletTestService(repo *repository.PelletTestRepository) *PelletTestService {
-	return &PelletTestService{repo: repo}
+func NewPelletTestService(repo *repository.PelletTestRepository, activity *ActivityService) *PelletTestService {
+	return &PelletTestService{repo: repo, activity: activity}
 }
 
 // ── Session ─────────────────────────────────────────────────────────────────────
@@ -42,7 +43,19 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 		distanceM = in.DistanceValue * 0.9144
 	}
 
-	return s.repo.Create(ctx, userID, in, distanceM)
+	session, err := s.repo.Create(ctx, userID, in, distanceM)
+	if err != nil {
+		return nil, err
+	}
+	if s.activity != nil && session.IsPublic {
+		tid, tt := session.ID, "pellet_test"
+		meta := model.PelletTestPostedMeta{
+			BestGroupMM: session.BestGroupSizeMM,
+			AvgGroupMM:  session.AverageGroupSizeMM,
+		}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityPelletTestPosted, &tid, &tt, meta, nil, nil, "public")
+	}
+	return session, nil
 }
 
 func (s *PelletTestService) GetByID(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {

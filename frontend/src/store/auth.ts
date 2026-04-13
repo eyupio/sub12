@@ -11,6 +11,8 @@ interface User {
   club?: string
   avatar_url?: string
   profile_visibility?: string
+  default_score_visibility?: string
+  feed_opt_out?: boolean
 }
 
 interface AuthState {

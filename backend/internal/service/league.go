@@ -157,7 +157,7 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		}
 		if s.activity != nil {
 			lid, tt := leagueID, "league"
-			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil)
+			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil, &lid, nil, "public")
 		}
 		return true, false, nil
 
@@ -177,7 +177,7 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		}
 		if s.activity != nil {
 			lid, tt := leagueID, "league"
-			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil)
+			go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedLeague, &lid, &tt, nil, &lid, nil, "public")
 		}
 		return true, false, nil
 
@@ -269,7 +269,21 @@ func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID strin
 	if input.StartsOn == "" {
 		return nil, fmt.Errorf("%w: starts_on is required", ErrInvalidSeason)
 	}
-	return s.leagues.CreateSeason(ctx, leagueID, input)
+	season, err := s.leagues.CreateSeason(ctx, leagueID, input)
+	if err != nil {
+		return nil, err
+	}
+	if s.activity != nil {
+		league, _ := s.leagues.GetByID(ctx, leagueID)
+		leagueName := ""
+		if league != nil {
+			leagueName = league.Name
+		}
+		tid, tt := season.ID, "season"
+		meta := model.LeagueSeasonStartedMeta{LeagueName: leagueName, SeasonName: season.Name}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityLeagueSeasonStarted, &tid, &tt, meta, &leagueID, nil, "public")
+	}
+	return season, nil
 }
 
 func (s *LeagueService) ListSeasons(ctx context.Context, leagueID string) ([]*model.Season, error) {
@@ -283,7 +297,21 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
 	}
-	return s.leagues.CreateRound(ctx, seasonID, input)
+	round, err := s.leagues.CreateRound(ctx, seasonID, input)
+	if err != nil {
+		return nil, err
+	}
+	if s.activity != nil {
+		league, _ := s.leagues.GetByID(ctx, leagueID)
+		leagueName := ""
+		if league != nil {
+			leagueName = league.Name
+		}
+		tid, tt := round.ID, "round"
+		meta := model.LeagueRoundOpenedMeta{LeagueName: leagueName, RoundName: round.Name}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityLeagueRoundOpened, &tid, &tt, meta, &leagueID, nil, "public")
+	}
+	return round, nil
 }
 
 func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*model.Round, error) {

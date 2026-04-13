@@ -20,10 +20,11 @@ type CardCountRepo interface {
 type AchievementService struct {
 	achievements AchievementRepo
 	cards        CardCountRepo
+	activity     *ActivityService // nil disables feed ingestion
 }
 
-func NewAchievementService(achievements *repository.AchievementRepository, cards CardCountRepo) *AchievementService {
-	return &AchievementService{achievements: achievements, cards: cards}
+func NewAchievementService(achievements *repository.AchievementRepository, cards CardCountRepo, activity *ActivityService) *AchievementService {
+	return &AchievementService{achievements: achievements, cards: cards, activity: activity}
 }
 
 // EvaluateForScoreCard checks all achievement rules against the newly created card
@@ -58,8 +59,30 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 		candidates = append(candidates, "league_debut")
 	}
 
+	// Achievement name/icon mapping for feed metadata
+	achievementNames := map[string]string{
+		"first_card":    "First Card",
+		"century":       "Century",
+		"perfect_score": "Perfect Score",
+		"sharp_eye":     "Sharp Eye",
+		"sharpshooter":  "Sharpshooter",
+		"dedicated":     "Dedicated",
+		"league_debut":  "League Debut",
+	}
+
 	for _, id := range candidates {
-		s.achievements.Award(ctx, userID, id) //nolint:errcheck
+		awarded, err := s.achievements.Award(ctx, userID, id)
+		if err != nil {
+			continue
+		}
+		if awarded && s.activity != nil {
+			aid, tt := id, "achievement"
+			meta := model.AchievementEarnedMeta{
+				AchievementID:   id,
+				AchievementName: achievementNames[id],
+			}
+			go s.activity.Ingest(context.Background(), userID, model.ActivityAchievementEarned, &aid, &tt, meta, nil, nil, "public")
+		}
 	}
 }
 

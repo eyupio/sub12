@@ -78,6 +78,12 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 	if in.ProfileVisibility != nil && *in.ProfileVisibility != "public" && *in.ProfileVisibility != "private" {
 		return nil, fmt.Errorf("%w: profile_visibility must be 'public' or 'private'", ErrInvalidProfile)
 	}
+	if in.DefaultScoreVisibility != nil {
+		v := *in.DefaultScoreVisibility
+		if v != "public" && v != "followers" && v != "private" {
+			return nil, fmt.Errorf("%w: default_score_visibility must be 'public', 'followers', or 'private'", ErrInvalidProfile)
+		}
+	}
 	return s.users.UpdateMe(ctx, id, in)
 }
 

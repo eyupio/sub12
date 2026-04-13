@@ -29,6 +29,8 @@ export interface UpdateProfileInput {
   location?: string
   club?: string
   profile_visibility?: string
+  default_score_visibility?: string
+  feed_opt_out?: boolean
 }
 
 export interface FollowListItem {
@@ -60,7 +62,7 @@ export const usersApi = {
   getProfile: (id: string) => api.get<PublicProfileWithFollow>(`/users/${id}`),
   follow: (id: string) => api.post<{ following?: boolean; status?: string }>(`/users/${id}/follow`, {}),
   unfollow: (id: string) => api.del<{ following: boolean }>(`/users/${id}/follow`),
-  updateMe: (input: UpdateProfileInput) => api.patch<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string; profile_visibility: string }>('/users/me', input),
+  updateMe: (input: UpdateProfileInput) => api.patch<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string; profile_visibility: string; default_score_visibility: string; feed_opt_out: boolean }>('/users/me', input),
   uploadAvatar: (file: File) => {
     const formData = new FormData()
     formData.append('image', file)

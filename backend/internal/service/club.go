@@ -18,11 +18,12 @@ var (
 )
 
 type ClubService struct {
-	repo *repository.ClubRepository
+	repo     *repository.ClubRepository
+	activity *ActivityService // nil disables feed ingestion
 }
 
-func NewClubService(repo *repository.ClubRepository) *ClubService {
-	return &ClubService{repo: repo}
+func NewClubService(repo *repository.ClubRepository, activity *ActivityService) *ClubService {
+	return &ClubService{repo: repo, activity: activity}
 }
 
 func (s *ClubService) Create(ctx context.Context, userID string, input *model.CreateClubInput) (*model.Club, error) {
@@ -56,7 +57,20 @@ func (s *ClubService) Join(ctx context.Context, clubID, userID string) error {
 	if member {
 		return ErrClubAlreadyMember
 	}
-	return s.repo.Join(ctx, clubID, userID)
+	if err := s.repo.Join(ctx, clubID, userID); err != nil {
+		return err
+	}
+	if s.activity != nil {
+		club, _ := s.repo.GetByID(ctx, clubID, "")
+		clubName := ""
+		if club != nil {
+			clubName = club.Name
+		}
+		cid, tt := clubID, "club"
+		meta := model.JoinedClubMeta{ClubName: clubName}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
+	}
+	return nil
 }
 
 func (s *ClubService) ListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
