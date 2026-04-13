@@ -181,6 +181,8 @@ type PelletTestMeasurement struct {
 	BboxY               *float64  `json:"bbox_y,omitempty"`
 	BboxWidth           *float64  `json:"bbox_width,omitempty"`
 	BboxHeight          *float64  `json:"bbox_height,omitempty"`
+	ManualGroupSizeMM   *float64  `json:"manual_group_size_mm,omitempty"`
+	ManualShotCount     *int      `json:"manual_shot_count,omitempty"`
 	MeasuredSizeMM      *float64  `json:"measured_size_mm,omitempty"`
 	MeasuredSizeMOA     *float64  `json:"measured_size_moa,omitempty"`
 	DetectionMethod     string    `json:"detection_method"`
@@ -208,6 +210,8 @@ type CreatePelletTestMeasurementInput struct {
 	BboxY               *float64 `json:"bbox_y"`
 	BboxWidth           *float64 `json:"bbox_width"`
 	BboxHeight          *float64 `json:"bbox_height"`
+	ManualGroupSizeMM   *float64 `json:"manual_group_size_mm"`
+	ManualShotCount     *int     `json:"manual_shot_count"`
 	MeasuredSizeMM      *float64 `json:"-"`
 	MeasuredSizeMOA     *float64 `json:"-"`
 }

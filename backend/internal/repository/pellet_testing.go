@@ -497,6 +497,7 @@ const measurementCols = `id, image_id, session_id, group_id,
 	reference_diameter_mm, reference_pixels, pixels_per_mm,
 	ref_center_x, ref_center_y, ref_radius_pixels,
 	bbox_x, bbox_y, bbox_width, bbox_height,
+	manual_group_size_mm, manual_shot_count,
 	measured_size_mm, measured_size_moa,
 	detection_method, annotated_image_id, detected_hole_count,
 	auto_group_size_mm, auto_group_size_moa, detection_confidence,
@@ -510,6 +511,7 @@ func scanMeasurement(row pgx.Row) (*model.PelletTestMeasurement, error) {
 		&m.ReferenceDiameterMM, &m.ReferencePixels, &m.PixelsPerMM,
 		&m.RefCenterX, &m.RefCenterY, &m.RefRadiusPixels,
 		&m.BboxX, &m.BboxY, &m.BboxWidth, &m.BboxHeight,
+		&m.ManualGroupSizeMM, &m.ManualShotCount,
 		&m.MeasuredSizeMM, &m.MeasuredSizeMOA,
 		&m.DetectionMethod, &m.AnnotatedImageID, &m.DetectedHoleCount,
 		&m.AutoGroupSizeMM, &m.AutoGroupSizeMOA, &m.DetectionConfidence,
@@ -547,14 +549,16 @@ func (r *PelletTestRepository) CreateMeasurement(ctx context.Context, sessionID,
 			reference_diameter_mm, reference_pixels, pixels_per_mm,
 			ref_center_x, ref_center_y, ref_radius_pixels,
 			bbox_x, bbox_y, bbox_width, bbox_height,
+			manual_group_size_mm, manual_shot_count,
 			measured_size_mm, measured_size_moa)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		RETURNING `+measurementCols+`
 	`, imageID, sessionID, in.GroupID,
 		in.CalibrationType, in.TargetPreset, in.ReferenceRingName,
 		in.ReferenceDiameterMM, in.ReferencePixels, in.PixelsPerMM,
 		in.RefCenterX, in.RefCenterY, in.RefRadiusPixels,
 		in.BboxX, in.BboxY, in.BboxWidth, in.BboxHeight,
+		in.ManualGroupSizeMM, in.ManualShotCount,
 		in.MeasuredSizeMM, in.MeasuredSizeMOA))
 	if err != nil {
 		return nil, fmt.Errorf("create measurement: %w", err)

@@ -177,6 +177,8 @@ export interface PelletTestMeasurement {
   bbox_y?: number
   bbox_width?: number
   bbox_height?: number
+  manual_group_size_mm?: number
+  manual_shot_count?: number
   measured_size_mm?: number
   measured_size_moa?: number
   detection_method: string
