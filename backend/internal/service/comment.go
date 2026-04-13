@@ -10,71 +10,117 @@ import (
 )
 
 var (
-	ErrCommentEmpty    = errors.New("comment body cannot be empty")
-	ErrCommentTooLong  = errors.New("comment body exceeds maximum length of 2000 characters")
-	ErrCommentDenied   = errors.New("you cannot comment on this score card")
+	ErrCommentEmpty   = errors.New("comment body cannot be empty")
+	ErrCommentTooLong = errors.New("comment body exceeds maximum length of 2000 characters")
+	ErrCommentDenied  = errors.New("you cannot comment on this content")
 )
 
 type CommentService struct {
 	comments   *repository.CommentRepository
 	scoreCards *repository.ScoreCardRepository
+	posts      *repository.PostRepository
 	blocks     *repository.BlockRepository
 }
 
-func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, blocks *repository.BlockRepository) *CommentService {
-	return &CommentService{comments: comments, scoreCards: scoreCards, blocks: blocks}
+func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, blocks *repository.BlockRepository) *CommentService {
+	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, blocks: blocks}
 }
 
-// Create validates input, verifies the card exists, and persists the comment.
-func (s *CommentService) Create(ctx context.Context, cardID, userID, body string) (*model.Comment, error) {
+func (s *CommentService) validateBody(body string) (string, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
-		return nil, ErrCommentEmpty
+		return "", ErrCommentEmpty
 	}
 	if len([]rune(body)) > 2000 {
-		return nil, ErrCommentTooLong
+		return "", ErrCommentTooLong
 	}
-	// Verify the card exists (public lookup — no ownership check)
-	card, err := s.scoreCards.GetPublicByID(ctx, cardID)
+	return body, nil
+}
+
+// Create validates input, verifies the target exists, and persists the comment.
+func (s *CommentService) Create(ctx context.Context, targetID, targetType, userID, body string, parentID *string) (*model.Comment, error) {
+	body, err := s.validateBody(body)
 	if err != nil {
-		return nil, err // propagates ErrNotFound
+		return nil, err
 	}
-	// If the card is private and the commenter is not the owner, deny
-	if card.Visibility == "private" && card.UserID != userID {
-		return nil, ErrCommentDenied
-	}
-	// If the card owner has blocked the commenter (or vice versa), deny
-	if card.UserID != userID {
-		blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
+
+	// Validate target and check permissions based on target type
+	switch targetType {
+	case "score_card":
+		card, err := s.scoreCards.GetPublicByID(ctx, targetID)
 		if err != nil {
 			return nil, err
 		}
-		if blocked {
+		if card.Visibility == "private" && card.UserID != userID {
 			return nil, ErrCommentDenied
 		}
+		if card.UserID != userID {
+			blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
+			if err != nil {
+				return nil, err
+			}
+			if blocked {
+				return nil, ErrCommentDenied
+			}
+		}
+	case "post":
+		post, err := s.posts.GetByID(ctx, targetID, nil)
+		if err != nil {
+			return nil, err
+		}
+		if post.UserID != userID {
+			blocked, err := s.blocks.IsBlocked(ctx, post.UserID, userID)
+			if err != nil {
+				return nil, err
+			}
+			if blocked {
+				return nil, ErrCommentDenied
+			}
+		}
+	default:
+		return nil, errors.New("unsupported comment target type")
 	}
-	return s.comments.Create(ctx, cardID, userID, body)
+
+	// If replying, validate parent exists and shares the same target
+	if parentID != nil {
+		parent, err := s.comments.GetByID(ctx, *parentID)
+		if err != nil {
+			return nil, err
+		}
+		if parent.TargetID != targetID || parent.TargetType != targetType {
+			return nil, errors.New("parent comment does not belong to this target")
+		}
+	}
+
+	return s.comments.Create(ctx, targetID, targetType, userID, body, parentID)
 }
 
-// List returns all comments for a card.
-func (s *CommentService) List(ctx context.Context, cardID string) ([]*model.Comment, error) {
-	return s.comments.List(ctx, cardID)
+// ListByTarget returns top-level comments for a target.
+func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType string) ([]*model.Comment, error) {
+	return s.comments.ListByTarget(ctx, targetID, targetType)
+}
+
+// ListReplies returns replies to a specific comment.
+func (s *CommentService) ListReplies(ctx context.Context, commentID string) ([]*model.Comment, error) {
+	return s.comments.ListReplies(ctx, commentID)
 }
 
 // Update edits a comment owned by userID.
 func (s *CommentService) Update(ctx context.Context, commentID, userID, body string) (*model.Comment, error) {
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return nil, ErrCommentEmpty
-	}
-	if len([]rune(body)) > 2000 {
-		return nil, ErrCommentTooLong
+	body, err := s.validateBody(body)
+	if err != nil {
+		return nil, err
 	}
 	comment, err := s.comments.Update(ctx, commentID, userID, body)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, repository.ErrNotFound
 	}
 	return comment, err
+}
+
+// GetByID retrieves a single comment by ID.
+func (s *CommentService) GetByID(ctx context.Context, commentID string) (*model.Comment, error) {
+	return s.comments.GetByID(ctx, commentID)
 }
 
 // Delete removes a comment owned by userID.

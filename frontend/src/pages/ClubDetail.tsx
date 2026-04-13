@@ -1,9 +1,13 @@
 import { useRef, useState } from 'react'
-import { useParams } from '@tanstack/react-router'
+import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus } from 'lucide-react'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
+import { postApi } from '../api/posts'
+import type { League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+import { PostCard } from '../components/PostCard'
+import { PostComposer } from '../components/PostComposer'
 
 function StandingsTable({ standings }: { standings: ClubStanding[] }) {
   if (standings.length === 0) {
@@ -124,6 +128,28 @@ export default function ClubDetail() {
     queryKey: ['club', id, 'members'],
     queryFn: () => clubsApi.listMembers(id),
     enabled: !!club?.is_member,
+  })
+
+  const { data: leaguesData } = useQuery({
+    queryKey: ['club', id, 'leagues'],
+    queryFn: () => clubsApi.listLeagues(id),
+    enabled: !!id,
+  })
+
+  const [showCreateLeague, setShowCreateLeague] = useState(false)
+  const [newLeagueName, setNewLeagueName] = useState('')
+  const [newLeagueDesc, setNewLeagueDesc] = useState('')
+  const [newLeagueType, setNewLeagueType] = useState<'public' | 'private'>('public')
+
+  const createLeagueMutation = useMutation({
+    mutationFn: () => clubsApi.createLeague(id, { name: newLeagueName, description: newLeagueDesc || undefined, type: newLeagueType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', id, 'leagues'] })
+      setShowCreateLeague(false)
+      setNewLeagueName('')
+      setNewLeagueDesc('')
+      setNewLeagueType('public')
+    },
   })
 
   const joinMutation = useMutation({
@@ -278,6 +304,139 @@ export default function ClubDetail() {
           )}
         </div>
       </div>
+
+      {/* Leagues */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between border-b border-subtle pb-2">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">
+            Leagues
+          </h2>
+          {club.is_admin && (
+            <button
+              onClick={() => setShowCreateLeague(!showCreateLeague)}
+              className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+            >
+              <Plus size={12} />
+              New League
+            </button>
+          )}
+        </div>
+
+        {showCreateLeague && (
+          <form
+            onSubmit={e => { e.preventDefault(); createLeagueMutation.mutate() }}
+            className="p-4 rounded border border-subtle bg-card space-y-3"
+          >
+            <input
+              type="text"
+              placeholder="League name"
+              value={newLeagueName}
+              onChange={e => setNewLeagueName(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Description (optional)"
+              value={newLeagueDesc}
+              onChange={e => setNewLeagueDesc(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
+            />
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
+                <input
+                  type="radio"
+                  checked={newLeagueType === 'public'}
+                  onChange={() => setNewLeagueType('public')}
+                  className="accent-[var(--brass)]"
+                />
+                Public
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
+                <input
+                  type="radio"
+                  checked={newLeagueType === 'private'}
+                  onChange={() => setNewLeagueType('private')}
+                  className="accent-[var(--brass)]"
+                />
+                Private
+              </label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateLeague(false)}
+                className="px-3 py-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!newLeagueName.trim() || createLeagueMutation.isPending}
+                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
+              >
+                {createLeagueMutation.isPending ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {(leaguesData?.items ?? []).length === 0 && !showCreateLeague && (
+          <p className="text-sm text-muted text-center py-4">
+            No leagues yet.{club.is_admin ? ' Create one to get started.' : ''}
+          </p>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(leaguesData?.items ?? []).map((league: League) => (
+            <Link
+              key={league.id}
+              to="/app/leagues/$id"
+              params={{ id: league.id }}
+              className="flex items-center gap-3 p-3 rounded border border-subtle bg-card hover:border-[var(--brass)]/30 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[var(--brass)]/10 border border-[var(--brass)]/20 flex items-center justify-center shrink-0">
+                <Trophy size={18} className="text-[var(--brass)]/60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-secondary truncate">{league.name}</p>
+                <div className="flex items-center gap-2 text-[10px] text-muted">
+                  <span>{league.type}</span>
+                  <span>&middot;</span>
+                  <span>{league.member_count} member{league.member_count !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Club Feed */}
+      {club.is_member && <ClubFeed clubId={id} />}
+    </div>
+  )
+}
+
+function ClubFeed({ clubId }: { clubId: string }) {
+  const { data } = useQuery({
+    queryKey: ['club', clubId, 'posts'],
+    queryFn: () => postApi.listByClub(clubId),
+  })
+
+  const posts = data?.items ?? []
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
+        Feed
+      </h2>
+      <PostComposer clubId={clubId} queryKey={['club', clubId, 'posts']} />
+      {posts.length === 0 && (
+        <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
+      )}
+      {posts.map((post) => (
+        <PostCard key={post.id} post={post} />
+      ))}
     </div>
   )
 }

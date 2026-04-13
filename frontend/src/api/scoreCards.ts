@@ -9,6 +9,7 @@ export interface ScoreCardSummary {
   rifle_id?: string
   verification: string
   league_round_id?: string
+  club_id?: string
   created_at: string
 }
 
@@ -25,6 +26,10 @@ export interface ScoreCard extends ScoreCardSummary {
   verification: string
   visibility: string
   league_round_id?: string
+  club_id?: string
+  like_count: number
+  comment_count: number
+  is_liked: boolean
   updated_at: string
 }
 
@@ -39,16 +44,21 @@ export interface CreateScoreCardPayload {
   rifle_id?: string
   pellet_id?: string
   league_round_id?: string
+  club_id?: string
   visibility?: string
 }
 
 export interface Comment {
   id: string
-  card_id: string
+  target_id: string
+  target_type: string
+  parent_id?: string
   user_id: string
   display_name: string
   avatar_url?: string
   body: string
+  like_count: number
+  reply_count: number
   created_at: string
   updated_at: string
 }
@@ -57,7 +67,7 @@ export const scoreCardApi = {
   create: (payload: CreateScoreCardPayload) =>
     api.post<ScoreCard>('/score-cards', payload),
 
-  list: (limit = 20, offset = 0, scope?: 'personal' | 'league') => {
+  list: (limit = 20, offset = 0, scope?: 'personal' | 'league' | 'club') => {
     let url = `/score-cards?limit=${limit}&offset=${offset}`
     if (scope) url += `&scope=${scope}`
     return api.get<{ items: ScoreCardSummary[] }>(url)
@@ -78,12 +88,26 @@ export const scoreCardApi = {
   listComments: (cardId: string) =>
     api.get<{ items: Comment[] }>(`/score-cards/${cardId}/comments`),
 
-  createComment: (cardId: string, body: string) =>
-    api.post<Comment>(`/score-cards/${cardId}/comments`, { body }),
+  createComment: (cardId: string, body: string, parentId?: string) =>
+    api.post<Comment>(`/score-cards/${cardId}/comments`, { body, parent_id: parentId }),
 
   updateComment: (cardId: string, commentId: string, body: string) =>
     api.patch<Comment>(`/score-cards/${cardId}/comments/${commentId}`, { body }),
 
   deleteComment: (cardId: string, commentId: string) =>
     api.del<void>(`/score-cards/${cardId}/comments/${commentId}`),
+}
+
+export const commentApi = {
+  listReplies: (commentId: string) =>
+    api.get<{ items: Comment[] }>(`/comments/${commentId}/replies`),
+
+  reply: (commentId: string, body: string) =>
+    api.post<Comment>(`/comments/${commentId}/replies`, { body }),
+
+  update: (commentId: string, body: string) =>
+    api.patch<Comment>(`/comments/${commentId}`, { body }),
+
+  delete: (commentId: string) =>
+    api.del<void>(`/comments/${commentId}`),
 }

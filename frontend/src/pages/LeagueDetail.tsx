@@ -3,7 +3,10 @@ import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
+import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
+import { PostCard } from '../components/PostCard'
+import { PostComposer } from '../components/PostComposer'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -463,6 +466,33 @@ export default function LeagueDetail() {
           </div>
         )}
       </div>
+
+      {/* League Feed */}
+      {isMember && <LeagueFeed leagueId={league.id} />}
+    </div>
+  )
+}
+
+function LeagueFeed({ leagueId }: { leagueId: string }) {
+  const { data } = useQuery({
+    queryKey: ['league', leagueId, 'posts'],
+    queryFn: () => postApi.listByLeague(leagueId),
+  })
+
+  const posts = data?.items ?? []
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
+        Feed
+      </h2>
+      <PostComposer leagueId={leagueId} queryKey={['league', leagueId, 'posts']} />
+      {posts.length === 0 && (
+        <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
+      )}
+      {posts.map((post) => (
+        <PostCard key={post.id} post={post} />
+      ))}
     </div>
   )
 }

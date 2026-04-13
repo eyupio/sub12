@@ -85,8 +85,10 @@ func main() {
 
 	blockRepo := repository.NewBlockRepository(pool)
 
+	postRepo := repository.NewPostRepository(pool)
+
 	commentRepo := repository.NewCommentRepository(pool)
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, blockRepo)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, blockRepo)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -97,7 +99,7 @@ func main() {
 	pelletRepo := repository.NewPelletRepository(pool)
 	pelletSvc := service.NewPelletService(pelletRepo)
 
-	leagueSvc := service.NewLeagueService(leagueRepo, activitySvc)
+	leagueSvc := service.NewLeagueService(leagueRepo, clubRepo, activitySvc)
 
 	pelletTestRepo := repository.NewPelletTestRepository(pool)
 	pelletTestSvc := service.NewPelletTestService(pelletTestRepo, activitySvc)
@@ -127,13 +129,17 @@ func main() {
 
 	imageRepo := repository.NewImageRepository(pool)
 
+	likeRepo := repository.NewLikeRepository(pool)
+	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, blockRepo)
+
 	socialRepo := repository.NewSocialRepository(pool)
 	socialSvc := service.NewSocialService(socialRepo, blockRepo)
 	blockSvc := service.NewBlockService(blockRepo, socialRepo)
 
 	clubSvc := service.NewClubService(clubRepo, activitySvc)
+	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, activitySvc)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

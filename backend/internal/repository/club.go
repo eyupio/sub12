@@ -254,6 +254,7 @@ func (r *ClubRepository) GetStandings(ctx context.Context, clubID string) ([]*mo
 		FROM club_members cm
 		JOIN users u ON u.id = cm.user_id
 		LEFT JOIN score_cards sc ON sc.user_id = cm.user_id AND sc.verification = 'verified'
+			AND (sc.club_id = $1 OR sc.club_id IS NULL)
 		WHERE cm.club_id = $1
 		GROUP BY u.id, u.display_name, u.avatar_url
 		ORDER BY rank

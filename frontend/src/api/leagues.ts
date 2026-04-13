@@ -7,6 +7,7 @@ export interface League {
   type: string
   join_code?: string
   image_url?: string
+  club_id?: string
   created_by: string
   member_count: number
   created_at: string
@@ -26,6 +27,7 @@ export interface CreateLeaguePayload {
   name: string
   description?: string
   type?: 'public' | 'private'
+  club_id?: string
 }
 
 export interface LeagueConfig {

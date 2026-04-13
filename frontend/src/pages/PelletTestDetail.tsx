@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download } from 'lucide-react'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download, Share2 } from 'lucide-react'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
+import { ShareDialog } from '../components/ShareDialog'
 import {
   pelletTestApi,
   PelletTestGroup,
@@ -40,6 +41,7 @@ export default function PelletTestDetail() {
 
   // Measurement modal state
   const [measureImage, setMeasureImage] = useState<PelletTestImage | null>(null)
+  const [showShare, setShowShare] = useState(false)
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -224,6 +226,14 @@ export default function PelletTestDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShare(true)}
+              className="text-muted hover:text-secondary transition-colors"
+              aria-label="Share test"
+              title="Share"
+            >
+              <Share2 size={18} />
+            </button>
             <button
               onClick={handleExport}
               className="text-muted hover:text-secondary transition-colors"
@@ -518,6 +528,15 @@ export default function PelletTestDetail() {
             defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
           />
         )
+      )}
+
+      {showShare && id && (
+        <ShareDialog
+          targetId={id}
+          targetType="pellet_test"
+          targetLabel="Pellet Test"
+          onClose={() => setShowShare(false)}
+        />
       )}
     </div>
   )

@@ -30,6 +30,7 @@ type LeagueConfigRepo interface {
 	GetConfigByRoundID(ctx context.Context, roundID string) (*model.LeagueConfig, error)
 	CountUserSubmissionsForRound(ctx context.Context, userID, roundID string) (int, error)
 	GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error)
+	GetByID(ctx context.Context, id string) (*model.League, error)
 }
 
 type ScoreCardService struct {
@@ -81,6 +82,15 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
 			}
 		}
+
+		// Auto-populate club_id from the league if not explicitly provided
+		if (input.ClubID == nil || *input.ClubID == "") {
+			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID); err == nil {
+				if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league.ClubID != nil {
+					input.ClubID = league.ClubID
+				}
+			}
+		}
 	}
 
 	card, err := s.cards.Create(ctx, userID, input, totalScore, xCount)
@@ -101,7 +111,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			}
 		}
 
-		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta, leagueID, nil, card.Visibility)
+		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta, leagueID, card.ClubID, card.Visibility)
 	}
 
 	if s.achievement != nil {
@@ -144,7 +154,7 @@ func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit,
 	if offset < 0 {
 		offset = 0
 	}
-	if scope != "" && scope != "personal" && scope != "league" {
+	if scope != "" && scope != "personal" && scope != "league" && scope != "club" {
 		scope = ""
 	}
 	return s.cards.ListByUser(ctx, userID, limit, offset, scope)

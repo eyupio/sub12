@@ -28,11 +28,12 @@ var (
 
 type LeagueService struct {
 	leagues  *repository.LeagueRepository
+	clubs    *repository.ClubRepository
 	activity *ActivityService // nil disables feed ingestion
 }
 
-func NewLeagueService(leagues *repository.LeagueRepository, activity *ActivityService) *LeagueService {
-	return &LeagueService{leagues: leagues, activity: activity}
+func NewLeagueService(leagues *repository.LeagueRepository, clubs *repository.ClubRepository, activity *ActivityService) *LeagueService {
+	return &LeagueService{leagues: leagues, clubs: clubs, activity: activity}
 }
 
 func (s *LeagueService) requireAdmin(ctx context.Context, leagueID, userID string) error {
@@ -53,7 +54,22 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.Type != "" && input.Type != "public" && input.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
 	}
+	// If creating under a club, verify the user is a club admin.
+	if input.ClubID != nil && *input.ClubID != "" {
+		isAdmin, err := s.clubs.IsAdmin(ctx, *input.ClubID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if !isAdmin {
+			return nil, fmt.Errorf("%w: must be a club admin to create a league under this club", ErrNotAdmin)
+		}
+	}
 	return s.leagues.Create(ctx, userID, input)
+}
+
+// ListByClub returns leagues hosted by a given club.
+func (s *LeagueService) ListByClub(ctx context.Context, clubID string) ([]*model.League, error) {
+	return s.leagues.ListByClub(ctx, clubID)
 }
 
 // RemoveMember removes a non-admin member from a league. Only league admins may call this.

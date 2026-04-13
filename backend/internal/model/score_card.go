@@ -20,6 +20,10 @@ type ScoreCard struct {
 	Verification  string    `json:"verification"`
 	Visibility    string    `json:"visibility"`
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
+	ClubID        *string   `json:"club_id,omitempty"`
+	LikeCount     int       `json:"like_count"`
+	CommentCount  int       `json:"comment_count"`
+	IsLiked       bool      `json:"is_liked"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -35,6 +39,7 @@ type CreateScoreCardInput struct {
 	ShotScores    []int16  `json:"shot_scores"`
 	ShotXs        []bool   `json:"shot_xs"`
 	LeagueRoundID *string  `json:"league_round_id"`
+	ClubID        *string  `json:"club_id"`
 	Visibility    *string  `json:"visibility"`
 }
 
@@ -52,20 +57,25 @@ type UpdateScoreCardInput struct {
 	Visibility  *string  `json:"visibility"`
 }
 
-// Comment is a user comment on a score card.
+// Comment is a user comment on any content type (score_card, post, etc.).
 type Comment struct {
 	ID          string    `json:"id"`
-	CardID      string    `json:"card_id"`
+	TargetID    string    `json:"target_id"`
+	TargetType  string    `json:"target_type"`
+	ParentID    *string   `json:"parent_id,omitempty"`
 	UserID      string    `json:"user_id"`
 	DisplayName string    `json:"display_name"`
 	AvatarURL   *string   `json:"avatar_url,omitempty"`
 	Body        string    `json:"body"`
+	LikeCount   int       `json:"like_count"`
+	ReplyCount  int       `json:"reply_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type CreateCommentInput struct {
-	Body string `json:"body"`
+	Body     string  `json:"body"`
+	ParentID *string `json:"parent_id,omitempty"`
 }
 
 type UpdateCommentInput struct {
@@ -81,6 +91,7 @@ type ScoreCardSummary struct {
 	Location      *string   `json:"location,omitempty"`
 	Verification  string    `json:"verification"`
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
+	ClubID        *string   `json:"club_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 

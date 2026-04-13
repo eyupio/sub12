@@ -19,21 +19,23 @@ func NewCommentRepository(db *pgxpool.Pool) *CommentRepository {
 }
 
 // Create inserts a new comment and returns it with the author's display name.
-func (r *CommentRepository) Create(ctx context.Context, cardID, userID, body string) (*model.Comment, error) {
+func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, userID, body string, parentID *string) (*model.Comment, error) {
 	var c model.Comment
 	err := r.db.QueryRow(ctx, `
 		WITH ins AS (
-			INSERT INTO score_card_comments (card_id, user_id, body, updated_at)
-			VALUES ($1, $2, $3, NOW())
-			RETURNING id, card_id, user_id, body, created_at, updated_at
+			INSERT INTO comments (target_id, target_type, user_id, body, parent_id, updated_at)
+			VALUES ($1, $2, $3, $4, $5, NOW())
+			RETURNING id, target_id, target_type, parent_id, user_id, body, like_count, created_at, updated_at
 		)
-		SELECT ins.id, ins.card_id, ins.user_id, u.display_name, u.avatar_url,
-		       ins.body, ins.created_at, ins.updated_at
+		SELECT ins.id, ins.target_id, ins.target_type, ins.parent_id, ins.user_id,
+		       u.display_name, u.avatar_url,
+		       ins.body, ins.like_count, 0 AS reply_count, ins.created_at, ins.updated_at
 		FROM ins
 		JOIN users u ON u.id = ins.user_id
-	`, cardID, userID, body).Scan(
-		&c.ID, &c.CardID, &c.UserID, &c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.CreatedAt, &c.UpdatedAt,
+	`, targetID, targetType, userID, body, parentID).Scan(
+		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
+		&c.DisplayName, &c.AvatarURL,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create comment: %w", err)
@@ -41,16 +43,19 @@ func (r *CommentRepository) Create(ctx context.Context, cardID, userID, body str
 	return &c, nil
 }
 
-// List returns all comments for a card, oldest first, joined with author info.
-func (r *CommentRepository) List(ctx context.Context, cardID string) ([]*model.Comment, error) {
+// ListByTarget returns top-level comments for a target, oldest first.
+func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetType string) ([]*model.Comment, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT c.id, c.card_id, c.user_id, u.display_name, u.avatar_url,
-		       c.body, c.created_at, c.updated_at
-		FROM score_card_comments c
+		SELECT c.id, c.target_id, c.target_type, c.parent_id, c.user_id,
+		       u.display_name, u.avatar_url,
+		       c.body, c.like_count,
+		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       c.created_at, c.updated_at
+		FROM comments c
 		JOIN users u ON u.id = c.user_id
-		WHERE c.card_id = $1
+		WHERE c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL
 		ORDER BY c.created_at ASC
-	`, cardID)
+	`, targetID, targetType)
 	if err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
@@ -60,8 +65,9 @@ func (r *CommentRepository) List(ctx context.Context, cardID string) ([]*model.C
 	for rows.Next() {
 		var c model.Comment
 		if err := rows.Scan(
-			&c.ID, &c.CardID, &c.UserID, &c.DisplayName, &c.AvatarURL,
-			&c.Body, &c.CreatedAt, &c.UpdatedAt,
+			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
+			&c.DisplayName, &c.AvatarURL,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
 		}
@@ -76,24 +82,92 @@ func (r *CommentRepository) List(ctx context.Context, cardID string) ([]*model.C
 	return comments, nil
 }
 
+// ListReplies returns replies to a specific comment, oldest first.
+func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([]*model.Comment, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT c.id, c.target_id, c.target_type, c.parent_id, c.user_id,
+		       u.display_name, u.avatar_url,
+		       c.body, c.like_count,
+		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       c.created_at, c.updated_at
+		FROM comments c
+		JOIN users u ON u.id = c.user_id
+		WHERE c.parent_id = $1
+		ORDER BY c.created_at ASC
+	`, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("list replies: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []*model.Comment
+	for rows.Next() {
+		var c model.Comment
+		if err := rows.Scan(
+			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
+			&c.DisplayName, &c.AvatarURL,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan reply: %w", err)
+		}
+		comments = append(comments, &c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list replies rows: %w", err)
+	}
+	if comments == nil {
+		comments = []*model.Comment{}
+	}
+	return comments, nil
+}
+
+// GetByID retrieves a single comment by ID.
+func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*model.Comment, error) {
+	var c model.Comment
+	err := r.db.QueryRow(ctx, `
+		SELECT c.id, c.target_id, c.target_type, c.parent_id, c.user_id,
+		       u.display_name, u.avatar_url,
+		       c.body, c.like_count,
+		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       c.created_at, c.updated_at
+		FROM comments c
+		JOIN users u ON u.id = c.user_id
+		WHERE c.id = $1
+	`, commentID).Scan(
+		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
+		&c.DisplayName, &c.AvatarURL,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get comment: %w", err)
+	}
+	return &c, nil
+}
+
 // Update edits a comment body, enforcing ownership via user_id.
-// Returns ErrNotFound if the comment does not exist or belongs to another user.
 func (r *CommentRepository) Update(ctx context.Context, commentID, userID, body string) (*model.Comment, error) {
 	var c model.Comment
 	err := r.db.QueryRow(ctx, `
 		WITH upd AS (
-			UPDATE score_card_comments
+			UPDATE comments
 			SET body = $3, updated_at = NOW()
 			WHERE id = $1 AND user_id = $2
-			RETURNING id, card_id, user_id, body, created_at, updated_at
+			RETURNING id, target_id, target_type, parent_id, user_id, body, like_count, created_at, updated_at
 		)
-		SELECT upd.id, upd.card_id, upd.user_id, u.display_name, u.avatar_url,
-		       upd.body, upd.created_at, upd.updated_at
+		SELECT upd.id, upd.target_id, upd.target_type, upd.parent_id, upd.user_id,
+		       u.display_name, u.avatar_url,
+		       upd.body, upd.like_count,
+		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = upd.id) AS reply_count,
+		       upd.created_at, upd.updated_at
 		FROM upd
 		JOIN users u ON u.id = upd.user_id
 	`, commentID, userID, body).Scan(
-		&c.ID, &c.CardID, &c.UserID, &c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
+		&c.DisplayName, &c.AvatarURL,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -105,10 +179,9 @@ func (r *CommentRepository) Update(ctx context.Context, commentID, userID, body 
 }
 
 // Delete removes a comment, enforcing ownership via user_id.
-// Returns ErrNotFound if the comment does not exist or belongs to another user.
 func (r *CommentRepository) Delete(ctx context.Context, commentID, userID string) error {
 	tag, err := r.db.Exec(ctx,
-		`DELETE FROM score_card_comments WHERE id = $1 AND user_id = $2`,
+		`DELETE FROM comments WHERE id = $1 AND user_id = $2`,
 		commentID, userID,
 	)
 	if err != nil {
@@ -118,4 +191,17 @@ func (r *CommentRepository) Delete(ctx context.Context, commentID, userID string
 		return ErrNotFound
 	}
 	return nil
+}
+
+// CountByTarget returns the number of comments for a target.
+func (r *CommentRepository) CountByTarget(ctx context.Context, targetID, targetType string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM comments WHERE target_id = $1 AND target_type = $2`,
+		targetID, targetType,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count comments: %w", err)
+	}
+	return count, nil
 }

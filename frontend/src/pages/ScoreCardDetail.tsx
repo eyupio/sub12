@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2 } from 'lucide-react'
-import { scoreCardApi, Comment } from '../api/scoreCards'
+import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
+import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { LikeButton } from '../components/LikeButton'
+import { ShareDialog } from '../components/ShareDialog'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -318,12 +320,87 @@ function EditScoreGrid({ shots, onUpdate }: { shots: Shot[]; onUpdate: (shots: S
   )
 }
 
+function CommentReplies({ commentId, cardId }: { commentId: string; cardId: string }) {
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [replyBody, setReplyBody] = useState('')
+
+  const { data } = useQuery({
+    queryKey: ['comments', commentId, 'replies'],
+    queryFn: () => commentApi.listReplies(commentId),
+  })
+
+  const replyMutation = useMutation({
+    mutationFn: () => commentApi.reply(commentId, replyBody.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', commentId, 'replies'] })
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+      setReplyBody('')
+    },
+  })
+
+  const replies: Comment[] = data?.items ?? []
+  const initials = (name: string) =>
+    name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+
+  return (
+    <div className="ml-8 mt-2 space-y-2 border-l-2 border-subtle pl-3">
+      {replies.map((r) => (
+        <div key={r.id} className="flex gap-2">
+          <div className="w-6 h-6 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[9px] font-medium text-muted">
+            {r.avatar_url
+              ? <img src={r.avatar_url} alt={r.display_name} className="w-full h-full object-cover" />
+              : initials(r.display_name)
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-0.5">
+              <span className="text-[11px] font-medium text-secondary">{r.display_name}</span>
+              <span className="text-[10px] text-muted">
+                {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              </span>
+            </div>
+            <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+          </div>
+        </div>
+      ))}
+
+      {currentUser && (
+        <div className="flex gap-2 pt-1">
+          <textarea
+            value={replyBody}
+            onChange={(e) => setReplyBody(e.target.value)}
+            placeholder="Reply…"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && replyBody.trim()) {
+                e.preventDefault()
+                replyMutation.mutate()
+              }
+            }}
+            className="flex-1 bg-surface border border-subtle rounded px-2 py-1.5 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none placeholder-muted"
+          />
+          <button
+            onClick={() => replyMutation.mutate()}
+            disabled={replyMutation.isPending || !replyBody.trim()}
+            className="p-1.5 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-40 self-end"
+            aria-label="Post reply"
+          >
+            <Send size={12} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CommentsSection({ cardId }: { cardId: string }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [newBody, setNewBody] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
 
   const { data } = useQuery({
     queryKey: ['score-cards', cardId, 'comments'],
@@ -361,6 +438,15 @@ function CommentsSection({ cardId }: { cardId: string }) {
     setEditBody(c.body)
   }
 
+  function toggleReplies(id: string) {
+    setExpandedReplies(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const initials = (name: string) =>
     name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -377,72 +463,92 @@ function CommentsSection({ cardId }: { cardId: string }) {
 
       <div className="space-y-3">
         {comments.map((c) => (
-          <div key={c.id} className="flex gap-3">
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-              {c.avatar_url
-                ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
-                : initials(c.display_name)
-              }
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 mb-0.5">
-                <span className="text-xs font-medium text-secondary">{c.display_name}</span>
-                <span className="text-[10px] text-muted">
-                  {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </span>
+          <div key={c.id}>
+            <div className="flex gap-3">
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
+                {c.avatar_url
+                  ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
+                  : initials(c.display_name)
+                }
               </div>
 
-              {editingId === c.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editBody}
-                    onChange={(e) => setEditBody(e.target.value)}
-                    rows={2}
-                    className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => updateMutation.mutate({ id: c.id, body: editBody.trim() })}
-                      disabled={updateMutation.isPending || !editBody.trim()}
-                      className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
-                    >
-                      {updateMutation.isPending ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-2.5 py-1 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 mb-0.5">
+                  <span className="text-xs font-medium text-secondary">{c.display_name}</span>
+                  <span className="text-[10px] text-muted">
+                    {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
                 </div>
-              ) : (
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm text-secondary leading-relaxed">{c.body}</p>
-                  {currentUser?.id === c.user_id && (
-                    <div className="flex gap-1 flex-shrink-0">
+
+                {editingId === c.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      rows={2}
+                      className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
+                    />
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => startEdit(c)}
-                        className="p-1 text-muted hover:text-secondary transition-colors"
-                        aria-label="Edit comment"
+                        onClick={() => updateMutation.mutate({ id: c.id, body: editBody.trim() })}
+                        disabled={updateMutation.isPending || !editBody.trim()}
+                        className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
                       >
-                        <Edit3 size={12} />
+                        {updateMutation.isPending ? 'Saving…' : 'Save'}
                       </button>
                       <button
-                        onClick={() => deleteMutation.mutate(c.id)}
-                        disabled={deleteMutation.isPending}
-                        className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
-                        aria-label="Delete comment"
+                        onClick={() => setEditingId(null)}
+                        className="px-2.5 py-1 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
                       >
-                        <Trash2 size={12} />
+                        Cancel
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm text-secondary leading-relaxed">{c.body}</p>
+                      {currentUser?.id === c.user_id && (
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => startEdit(c)}
+                            className="p-1 text-muted hover:text-secondary transition-colors"
+                            aria-label="Edit comment"
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                          <button
+                            onClick={() => deleteMutation.mutate(c.id)}
+                            disabled={deleteMutation.isPending}
+                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                            aria-label="Delete comment"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Comment actions: like + reply toggle */}
+                    <div className="flex items-center gap-3 mt-1">
+                      <LikeButton targetId={c.id} targetType="comment" initialLiked={false} initialCount={c.like_count} size={14} />
+                      <button
+                        onClick={() => toggleReplies(c.id)}
+                        className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary transition-colors"
+                      >
+                        <CornerDownRight size={12} />
+                        {c.reply_count > 0 ? `${c.reply_count} ${c.reply_count === 1 ? 'reply' : 'replies'}` : 'Reply'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+
+            {/* Threaded replies */}
+            {expandedReplies.has(c.id) && (
+              <CommentReplies commentId={c.id} cardId={cardId} />
+            )}
           </div>
         ))}
       </div>
@@ -486,6 +592,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
   const [showLightbox, setShowLightbox] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
@@ -863,6 +970,34 @@ export default function ScoreCardDetail() {
       {/* Audit Trail \u2014 only shown for league cards */}
       {card.league_round_id && (
         <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
+      )}
+
+      {/* Like / Share */}
+      <div className="flex items-center gap-4 border-t border-subtle pt-4">
+        <LikeButton
+          targetId={id}
+          targetType="score_card"
+          initialLiked={card.is_liked}
+          initialCount={card.like_count}
+        />
+        <span className="flex items-center gap-1.5 text-sm text-muted">
+          <MessageSquare size={18} /> {card.comment_count}
+        </span>
+        <button
+          onClick={() => setShowShare(true)}
+          className="flex items-center gap-1.5 text-sm text-muted hover:text-secondary transition-colors ml-auto"
+        >
+          <Share2 size={18} /> Share
+        </button>
+      </div>
+
+      {showShare && (
+        <ShareDialog
+          targetId={id}
+          targetType="score_card"
+          targetLabel="Score Card"
+          onClose={() => setShowShare(false)}
+        />
       )}
 
       {/* Comments */}

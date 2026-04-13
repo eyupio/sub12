@@ -37,6 +37,8 @@ func NewRouter(
 	emailSender *service.EmailSenderService,
 	clubs *service.ClubService,
 	blocks *service.BlockService,
+	likes *service.LikeService,
+	posts *service.PostService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -177,6 +179,31 @@ func NewRouter(
 			r.Patch("/score-cards/{id}/comments/{commentId}", commentH.Update)
 			r.Delete("/score-cards/{id}/comments/{commentId}", commentH.Delete)
 
+			// Generic comment operations (replies, edit/delete by comment ID)
+			r.Post("/comments/{id}/replies", commentH.Reply)
+			r.Get("/comments/{id}/replies", commentH.ListReplies)
+			r.Patch("/comments/{id}", commentH.Update)
+			r.Delete("/comments/{id}", commentH.Delete)
+
+			// Likes
+			lkh := handler.NewLike(likes)
+			r.Post("/score-cards/{id}/like", lkh.LikeScoreCard)
+			r.Delete("/score-cards/{id}/like", lkh.UnlikeScoreCard)
+			r.Post("/comments/{id}/like", lkh.LikeComment)
+			r.Delete("/comments/{id}/like", lkh.UnlikeComment)
+			r.Post("/posts/{id}/like", lkh.LikePost)
+			r.Delete("/posts/{id}/like", lkh.UnlikePost)
+
+			// Posts
+			postH := handler.NewPost(posts)
+			r.Post("/posts", postH.Create)
+			r.Post("/posts/share", postH.Share)
+			r.Get("/posts/{id}", postH.Get)
+			r.Patch("/posts/{id}", postH.Update)
+			r.Delete("/posts/{id}", postH.Delete)
+			r.Post("/posts/{id}/comments", commentH.CreateOnPost)
+			r.Get("/posts/{id}/comments", commentH.ListOnPost)
+
 			// Activity feed
 			activityH := handler.NewActivity(activity)
 			r.Get("/feed", activityH.GetFeed)
@@ -191,6 +218,7 @@ func NewRouter(
 			r.Get("/leagues/{id}/scores", lh.ListScores)
 			r.Post("/leagues/{id}/ensure-round", lh.EnsureDefaultRound)
 			r.Post("/leagues/{id}/image", lh.UploadImage)
+			r.Get("/leagues/{id}/posts", postH.ListByLeague)
 
 			// League config & management
 			r.Get("/leagues/{id}/config", lh.GetConfig)
@@ -217,12 +245,14 @@ func NewRouter(
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 
 			// Clubs (auth-required operations)
-			clh := handler.NewClub(clubs, images)
+			clh := handler.NewClub(clubs, leagues, images)
 			r.Post("/clubs", clh.Create)
 			r.Post("/clubs/{id}/join", clh.Join)
 			r.Get("/clubs/{id}/members", clh.ListMembers)
 			r.Delete("/clubs/{id}/members/{userId}", clh.RemoveMember)
 			r.Post("/clubs/{id}/image", clh.UploadImage)
+			r.Post("/clubs/{id}/leagues", clh.CreateLeague)
+			r.Get("/clubs/{id}/posts", postH.ListByClub)
 
 			// Achievements
 			ah := handler.NewAchievement(achievements)
@@ -284,10 +314,11 @@ func NewRouter(
 		// Public club routes (no auth required; viewer context optional)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.OptionalAuthenticate(auth))
-			clh := handler.NewClub(clubs, images)
+			clh := handler.NewClub(clubs, leagues, images)
 			r.Get("/clubs", clh.List)
 			r.Get("/clubs/{id}", clh.GetByID)
 			r.Get("/clubs/{id}/standings", clh.GetStandings)
+			r.Get("/clubs/{id}/leagues", clh.ListLeagues)
 		})
 	})
 

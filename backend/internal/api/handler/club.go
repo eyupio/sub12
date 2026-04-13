@@ -14,12 +14,13 @@ import (
 )
 
 type ClubHandler struct {
-	svc    *service.ClubService
-	images *repository.ImageRepository
+	svc     *service.ClubService
+	leagues *service.LeagueService
+	images  *repository.ImageRepository
 }
 
-func NewClub(svc *service.ClubService, images *repository.ImageRepository) *ClubHandler {
-	return &ClubHandler{svc: svc, images: images}
+func NewClub(svc *service.ClubService, leagues *service.LeagueService, images *repository.ImageRepository) *ClubHandler {
+	return &ClubHandler{svc: svc, leagues: leagues, images: images}
 }
 
 // GET /api/v1/clubs
@@ -201,4 +202,52 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"image_url": imageURL})
+}
+
+// GET /api/v1/clubs/{id}/leagues
+func (h *ClubHandler) ListLeagues(w http.ResponseWriter, r *http.Request) {
+	clubID := chi.URLParam(r, "id")
+	leagues, err := h.leagues.ListByClub(r.Context(), clubID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list club leagues")
+		return
+	}
+	if leagues == nil {
+		leagues = []*model.League{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": leagues})
+}
+
+// POST /api/v1/clubs/{id}/leagues
+func (h *ClubHandler) CreateLeague(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	var input model.CreateLeagueInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	input.ClubID = &clubID
+
+	league, err := h.leagues.Create(r.Context(), userID, &input)
+	if err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "must be a club admin to create a league")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidLeague) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create league")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, league)
 }

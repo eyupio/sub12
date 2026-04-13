@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { League, CreateLeaguePayload } from './leagues'
 
 export interface Club {
   id: string
@@ -10,6 +11,7 @@ export interface Club {
   created_at: string
   updated_at: string
   member_count: number
+  league_count?: number
   is_admin?: boolean
   is_member?: boolean
 }
@@ -64,4 +66,10 @@ export const clubsApi = {
     fd.append('image', file)
     return api.upload<{ image_url: string }>(`/clubs/${clubId}/image`, fd)
   },
+
+  listLeagues: (clubId: string) =>
+    api.get<{ items: League[] }>(`/clubs/${clubId}/leagues`),
+
+  createLeague: (clubId: string, payload: Omit<CreateLeaguePayload, 'club_id'>) =>
+    api.post<League>(`/clubs/${clubId}/leagues`, payload),
 }

@@ -9,6 +9,7 @@ type League struct {
 	Type        string    `json:"type"`
 	JoinCode    *string   `json:"join_code,omitempty"`
 	ImageURL    *string   `json:"image_url,omitempty"`
+	ClubID      *string   `json:"club_id,omitempty"`
 	CreatedBy   string    `json:"created_by"`
 	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -17,7 +18,8 @@ type League struct {
 type CreateLeagueInput struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
-	Type        string  `json:"type"` // "public" or "private"; defaults to "public"
+	Type        string  `json:"type"`    // "public" or "private"; defaults to "public"
+	ClubID      *string `json:"club_id"` // optional: host this league under a club
 }
 
 type LeagueStanding struct {
