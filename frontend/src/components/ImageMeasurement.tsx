@@ -51,6 +51,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const pointerStart = useRef<Point>({ x: 0, y: 0 })
   const pointerTypeRef = useRef<string>('mouse')
   const didDrag = useRef(false)
+  const isPointerDown = useRef(false)
 
   const [step, setStep] = useState<WizardStep>(1)
   const [subMode, setSubMode] = useState<SubMode>('set_aim')
@@ -237,11 +238,13 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
     pointerTypeRef.current = e.pointerType
     pointerStart.current = { x: e.clientX, y: e.clientY }
     didDrag.current = false
+    isPointerDown.current = true
     panStart.current = { x: e.clientX, y: e.clientY }
     panOffset.current = { ...pan }
   }, [pan])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isPointerDown.current) return
     const dx = e.clientX - pointerStart.current.x
     const dy = e.clientY - pointerStart.current.y
     const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
@@ -260,6 +263,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
     if (canvas) canvas.releasePointerCapture(e.pointerId)
+    isPointerDown.current = false
     if (isPanning) { setIsPanning(false); return }
     if (didDrag.current) return
 
@@ -362,7 +366,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
     <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5 pointer-events-none">
       <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{impacts.length}</span></div>
       <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{displayDistance}{distanceLabel}</span></div>
-      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${(meanRadiusMM / 10).toFixed(1)}cm` : ''}</span></div>
+      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${meanRadiusMM.toFixed(2)}mm` : ''}</span></div>
       <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : ''}</span></div>
       <div className="flex gap-6"><span>Elevation<br/>(moa/mrad):</span><span className="font-semibold">{elevMOA !== null ? `${elevMOA}/${elevMRAD}` : ''}</span></div>
       <div className="flex gap-6"><span>Windage<br/>(moa/mrad):</span><span className="font-semibold">{windMOA !== null ? `${windMOA}/${windMRAD}` : ''}</span></div>
@@ -387,7 +391,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
             <div className="h-px bg-white/10 my-1" />
             <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : '—'}</span></div>
             <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeCM !== null ? `${groupSizeCM} cm` : '—'}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${(meanRadiusMM / 10).toFixed(1)}cm` : '—'}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${meanRadiusMM.toFixed(2)}mm` : '—'}</span></div>
           </div>
 
           <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 mb-6">
