@@ -67,6 +67,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const [calibUnit, setCalibUnit] = useState<'cm' | 'mm'>(defaultMeasurementUnit ?? 'cm')
   const [calibDistance, setCalibDistance] = useState('')
   const [pixelsPerMM, setPixelsPerMM] = useState(0)
+  const [displayUnit, setDisplayUnit] = useState<'cm' | 'mm'>(defaultMeasurementUnit ?? 'mm')
   // Step 3
   const [distanceUnit, setDistanceUnit] = useState<'meters' | 'yards'>(defaultDistanceUnit ?? 'meters')
   const [distanceToTarget, setDistanceToTarget] = useState(() => {
@@ -153,7 +154,8 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
 
   const groupResult = useMemo(() => computeGroupSizeFromImpacts(impacts, pixelsPerMM, pelletDiameterMM), [impacts, pixelsPerMM, pelletDiameterMM])
   const groupSizeMOA = groupResult ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
-  const groupSizeCM = groupResult ? Math.round(groupResult.mm / 10 * 100) / 100 : null
+  const groupSizeRaw = groupResult?.mm ?? null
+  const fmtLen = (mm: number) => displayUnit === 'cm' ? (mm / 10).toFixed(2) : mm.toFixed(2)
 
   const elevationMM = aimPoint && centroid && pixelsPerMM > 0 ? (aimPoint.y - centroid.y) / pixelsPerMM : null
   const windageMM = aimPoint && centroid && pixelsPerMM > 0 ? (centroid.x - aimPoint.x) / pixelsPerMM : null
@@ -362,11 +364,20 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const inputCls = 'w-full bg-gray-100 border border-gray-300 rounded px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-blue-400'
 
   // ── Stats Overlay ──────────────────────────────────────────────────
+  const unitToggle = (
+    <div className="flex rounded border border-white/20 overflow-hidden">
+      <button onClick={() => setDisplayUnit('mm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>mm</button>
+      <button onClick={() => setDisplayUnit('cm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>cm</button>
+    </div>
+  )
+
   const statsOverlay = (
-    <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5 pointer-events-none">
+    <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5">
+      <div className="flex items-center justify-between gap-4 mb-1"><span className="text-[10px] text-gray-400 uppercase">Stats</span>{unitToggle}</div>
       <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{impacts.length}</span></div>
       <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{displayDistance}{distanceLabel}</span></div>
-      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${meanRadiusMM.toFixed(2)}mm` : ''}</span></div>
+      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)}${displayUnit}` : ''}</span></div>
+      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeRaw !== null ? `${fmtLen(groupSizeRaw)}${displayUnit}` : ''}</span></div>
       <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : ''}</span></div>
       <div className="flex gap-6"><span>Elevation<br/>(moa/mrad):</span><span className="font-semibold">{elevMOA !== null ? `${elevMOA}/${elevMRAD}` : ''}</span></div>
       <div className="flex gap-6"><span>Windage<br/>(moa/mrad):</span><span className="font-semibold">{windMOA !== null ? `${windMOA}/${windMRAD}` : ''}</span></div>
@@ -385,13 +396,19 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <h1 className="text-white text-xl font-semibold text-center mb-6">Group Analysis Summary</h1>
           <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 space-y-3 mb-6">
-            <h2 className="text-white font-semibold text-base mb-3">Group Analysis Results</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white font-semibold text-base">Group Analysis Results</h2>
+              <div className="flex rounded border border-white/20 overflow-hidden">
+                <button onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>mm</button>
+                <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>cm</button>
+              </div>
+            </div>
             <div className="flex justify-between text-sm"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{impacts.length}</span></div>
             <div className="flex justify-between text-sm"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{displayDistance}{distanceLabel}</span></div>
             <div className="h-px bg-white/10 my-1" />
             <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : '—'}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeCM !== null ? `${groupSizeCM} cm` : '—'}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${meanRadiusMM.toFixed(2)}mm` : '—'}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeRaw !== null ? `${fmtLen(groupSizeRaw)} ${displayUnit}` : '—'}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)} ${displayUnit}` : '—'}</span></div>
           </div>
 
           <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 mb-6">
