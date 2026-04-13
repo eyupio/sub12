@@ -4,6 +4,9 @@ import { Plus, Trash2, Camera, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { CatalogSearch } from '../components/CatalogSearch'
+import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
+import { PELLET_CATALOG, PelletCatalogEntry } from '../catalog/pelletCatalog'
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
 function AddRifleForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<CreateRiflePayload>({ make: '', model: '', calibre: '.177' })
+  const [showFields, setShowFields] = useState(false)
 
   const mutation = useMutation({
     mutationFn: () => gearApi.createRifle(form),
@@ -79,31 +83,56 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
     },
   })
 
+  function handleCatalogSelect(entry: RifleCatalogEntry) {
+    setForm({
+      make: entry.make,
+      model: entry.model,
+      calibre: entry.calibre,
+      power_ftlb: entry.power_ftlb,
+    })
+    setShowFields(true)
+  }
+
   return (
     <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Make">
-          <input className={inputCls} placeholder="Weihrauch" value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))} />
-        </Field>
-        <Field label="Model">
-          <input className={inputCls} placeholder="HW100" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Calibre">
-          <input className={inputCls} placeholder=".177" value={form.calibre ?? ''} onChange={e => setForm(f => ({ ...f, calibre: e.target.value }))} />
-        </Field>
-        <Field label="Power (ft·lb)">
-          <input className={inputCls} type="number" step="0.01" placeholder="11.5" onChange={e => setForm(f => ({ ...f, power_ftlb: e.target.value ? Number(e.target.value) : undefined }))} />
-        </Field>
-      </div>
-      {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save rifle. Please try again.</p>}
-      <div className="flex gap-2">
-        <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.make || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
-          {mutation.isPending ? 'Saving…' : 'Add Rifle'}
-        </button>
-        <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
-      </div>
+      {!showFields && (
+        <CatalogSearch
+          items={RIFLE_CATALOG}
+          searchKeys={['make', 'model']}
+          renderItem={(e) => `${e.make} ${e.model}`}
+          renderDetail={(e) => [e.calibre, e.power_ftlb != null ? `${e.power_ftlb} ft·lb` : ''].filter(Boolean).join(' · ')}
+          onSelect={handleCatalogSelect}
+          onManualEntry={() => setShowFields(true)}
+          placeholder="Search rifles — e.g. HW100, Air Arms..."
+        />
+      )}
+      {showFields && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Make">
+              <input className={inputCls} placeholder="Weihrauch" value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))} />
+            </Field>
+            <Field label="Model">
+              <input className={inputCls} placeholder="HW100" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Calibre">
+              <input className={inputCls} placeholder=".177" value={form.calibre ?? ''} onChange={e => setForm(f => ({ ...f, calibre: e.target.value }))} />
+            </Field>
+            <Field label="Power (ft·lb)">
+              <input className={inputCls} type="number" step="0.01" placeholder="11.5" value={form.power_ftlb ?? ''} onChange={e => setForm(f => ({ ...f, power_ftlb: e.target.value ? Number(e.target.value) : undefined }))} />
+            </Field>
+          </div>
+          {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save rifle. Please try again.</p>}
+          <div className="flex gap-2">
+            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.make || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+              {mutation.isPending ? 'Saving…' : 'Add Rifle'}
+            </button>
+            <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -228,6 +257,7 @@ function RiflesTab() {
 function AddPelletForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<CreatePelletPayload>({ brand: '', model: '' })
+  const [showFields, setShowFields] = useState(false)
 
   const mutation = useMutation({
     mutationFn: () => gearApi.createPellet(form),
@@ -238,34 +268,59 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
     },
   })
 
+  function handleCatalogSelect(entry: PelletCatalogEntry) {
+    setForm({
+      brand: entry.brand,
+      model: entry.model,
+      head_size_mm: entry.head_size_mm,
+      weight_grains: entry.weight_grains,
+    })
+    setShowFields(true)
+  }
+
   return (
     <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Brand">
-          <input className={inputCls} placeholder="JSB" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
-        </Field>
-        <Field label="Model">
-          <input className={inputCls} placeholder="Match Exact" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Head size (mm)">
-          <input className={inputCls} type="number" step="0.01" placeholder="4.51" onChange={e => setForm(f => ({ ...f, head_size_mm: e.target.value ? Number(e.target.value) : undefined }))} />
-        </Field>
-        <Field label="Weight (grains)">
-          <input className={inputCls} type="number" step="0.01" placeholder="8.44" onChange={e => setForm(f => ({ ...f, weight_grains: e.target.value ? Number(e.target.value) : undefined }))} />
-        </Field>
-      </div>
-      <Field label="Batch code">
-        <input className={inputCls} placeholder="Optional" onChange={e => setForm(f => ({ ...f, batch_code: e.target.value || undefined }))} />
-      </Field>
-      {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save pellet. Please try again.</p>}
-      <div className="flex gap-2">
-        <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.brand || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
-          {mutation.isPending ? 'Saving…' : 'Add Pellet'}
-        </button>
-        <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
-      </div>
+      {!showFields && (
+        <CatalogSearch
+          items={PELLET_CATALOG}
+          searchKeys={['brand', 'model']}
+          renderItem={(e) => `${e.brand} ${e.model}`}
+          renderDetail={(e) => [e.head_size_mm != null ? `${e.head_size_mm}mm` : '', e.weight_grains != null ? `${e.weight_grains}gr` : ''].filter(Boolean).join(' · ')}
+          onSelect={handleCatalogSelect}
+          onManualEntry={() => setShowFields(true)}
+          placeholder="Search pellets — e.g. JSB Exact, H&N..."
+        />
+      )}
+      {showFields && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Brand">
+              <input className={inputCls} placeholder="JSB" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} />
+            </Field>
+            <Field label="Model">
+              <input className={inputCls} placeholder="Match Exact" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Head size (mm)">
+              <input className={inputCls} type="number" step="0.01" placeholder="4.51" value={form.head_size_mm ?? ''} onChange={e => setForm(f => ({ ...f, head_size_mm: e.target.value ? Number(e.target.value) : undefined }))} />
+            </Field>
+            <Field label="Weight (grains)">
+              <input className={inputCls} type="number" step="0.01" placeholder="8.44" value={form.weight_grains ?? ''} onChange={e => setForm(f => ({ ...f, weight_grains: e.target.value ? Number(e.target.value) : undefined }))} />
+            </Field>
+          </div>
+          <Field label="Batch code">
+            <input className={inputCls} placeholder="Optional" onChange={e => setForm(f => ({ ...f, batch_code: e.target.value || undefined }))} />
+          </Field>
+          {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save pellet. Please try again.</p>}
+          <div className="flex gap-2">
+            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.brand || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+              {mutation.isPending ? 'Saving…' : 'Add Pellet'}
+            </button>
+            <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
