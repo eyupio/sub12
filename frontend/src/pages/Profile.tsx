@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users, Camera, Mail, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, Globe, UserCheck, UserX } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera, Mail, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, Globe, UserCheck, UserX, Ruler } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
@@ -267,6 +267,97 @@ function PrivacySettings() {
   )
 }
 
+function UnitPreferences() {
+  const { user, updateUser } = useAuthStore()
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateProfileInput) => usersApi.updateMe(input),
+    onSuccess: (updated) => {
+      updateUser({
+        default_distance_unit: updated.default_distance_unit,
+        default_measurement_unit: updated.default_measurement_unit,
+      })
+      toast('Unit preferences saved', 'success')
+    },
+    onError: () => {
+      toast('Failed to save unit preferences', 'error')
+    },
+  })
+
+  const distanceOptions = [
+    { value: 'meters', label: 'Meters' },
+    { value: 'yards', label: 'Yards' },
+  ]
+
+  const measurementOptions = [
+    { value: 'cm', label: 'cm' },
+    { value: 'mm', label: 'mm' },
+  ]
+
+  return (
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <Ruler size={14} className="text-muted" />
+        <h2 className="text-[11px] tracking-widest uppercase text-muted">Unit Preferences</h2>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Default Distance Unit
+          </label>
+          <div className="flex gap-2">
+            {distanceOptions.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => mutation.mutate({ default_distance_unit: value })}
+                disabled={mutation.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                  (user?.default_distance_unit ?? 'meters') === value
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-1">
+            Used as the default when creating pellet tests and measurements.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Default Measurement Unit
+          </label>
+          <div className="flex gap-2">
+            {measurementOptions.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => mutation.mutate({ default_measurement_unit: value })}
+                disabled={mutation.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                  (user?.default_measurement_unit ?? 'cm') === value
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-1">
+            Used for calibration distance in the measurement wizard.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
   const { user, updateUser } = useAuthStore()
   const queryClient = useQueryClient()
@@ -321,6 +412,8 @@ export default function Profile() {
         profile_visibility: updated.profile_visibility,
         default_score_visibility: updated.default_score_visibility,
         feed_opt_out: updated.feed_opt_out,
+        default_distance_unit: updated.default_distance_unit,
+        default_measurement_unit: updated.default_measurement_unit,
       })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
       setEditing(false)
@@ -586,6 +679,9 @@ export default function Profile() {
 
       {/* Privacy & Feed */}
       <PrivacySettings />
+
+      {/* Unit Preferences */}
+      <UnitPreferences />
 
       {/* Stats */}
       <div>

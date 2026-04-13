@@ -41,8 +41,8 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*mo
 	return club, nil
 }
 
-func (s *ClubService) List(ctx context.Context) ([]*model.Club, error) {
-	return s.repo.List(ctx)
+func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
+	return s.repo.List(ctx, viewerID)
 }
 
 func (s *ClubService) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {

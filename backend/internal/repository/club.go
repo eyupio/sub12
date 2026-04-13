@@ -97,17 +97,50 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 	return &club, nil
 }
 
-func (r *ClubRepository) List(ctx context.Context) ([]*model.Club, error) {
+func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
+	if viewerID == "" {
+		rows, err := r.db.Query(ctx, `
+			SELECT
+				c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
+				c.created_at::text, c.updated_at::text,
+				COUNT(cm.user_id)::int AS member_count
+			FROM clubs c
+			LEFT JOIN club_members cm ON cm.club_id = c.id
+			GROUP BY c.id
+			ORDER BY c.created_at DESC
+		`)
+		if err != nil {
+			return nil, fmt.Errorf("list clubs: %w", err)
+		}
+		defer rows.Close()
+
+		var clubs []*model.Club
+		for rows.Next() {
+			var club model.Club
+			if err := rows.Scan(
+				&club.ID, &club.Name, &club.Description, &club.ImageURL,
+				&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+				&club.MemberCount,
+			); err != nil {
+				return nil, fmt.Errorf("scan club: %w", err)
+			}
+			clubs = append(clubs, &club)
+		}
+		return clubs, rows.Err()
+	}
+
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
 			c.created_at::text, c.updated_at::text,
-			COUNT(cm.user_id)::int AS member_count
+			COUNT(cm.user_id)::int AS member_count,
+			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $1::uuid), false) AS is_admin,
+			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $1::uuid) AS is_member
 		FROM clubs c
 		LEFT JOIN club_members cm ON cm.club_id = c.id
 		GROUP BY c.id
 		ORDER BY c.created_at DESC
-	`)
+	`, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("list clubs: %w", err)
 	}
@@ -119,7 +152,7 @@ func (r *ClubRepository) List(ctx context.Context) ([]*model.Club, error) {
 		if err := rows.Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-			&club.MemberCount,
+			&club.MemberCount, &club.IsAdmin, &club.IsMember,
 		); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
 		}

@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download } from 'lucide-react'
 import { toast } from '../store/toast'
+import { useAuthStore } from '../store/auth'
 import {
   pelletTestApi,
   PelletTestGroup,
@@ -28,6 +29,7 @@ export default function PelletTestDetail() {
   const { id } = useParams({ strict: false })
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const authUser = useAuthStore(s => s.user)
 
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupSize, setNewGroupSize] = useState('')
@@ -512,6 +514,8 @@ export default function PelletTestDetail() {
               })
             }
             onClose={() => setMeasureImage(null)}
+            defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
+            defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
           />
         )
       )}

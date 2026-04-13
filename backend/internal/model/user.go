@@ -15,6 +15,8 @@ type User struct {
 	ProfileVisibility      string    `json:"profile_visibility"`
 	DefaultScoreVisibility string    `json:"default_score_visibility"`
 	FeedOptOut             bool      `json:"feed_opt_out"`
+	DefaultDistanceUnit    string    `json:"default_distance_unit"`
+	DefaultMeasurementUnit string    `json:"default_measurement_unit"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 }
@@ -40,4 +42,6 @@ type UpdateProfileInput struct {
 	ProfileVisibility      *string `json:"profile_visibility"`
 	DefaultScoreVisibility *string `json:"default_score_visibility"`
 	FeedOptOut             *bool   `json:"feed_opt_out"`
+	DefaultDistanceUnit    *string `json:"default_distance_unit"`
+	DefaultMeasurementUnit *string `json:"default_measurement_unit"`
 }

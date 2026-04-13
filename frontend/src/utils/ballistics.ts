@@ -52,3 +52,10 @@ export function mmToMRAD(sizeMM: number, distanceM: number): number {
 export function yardsToMeters(yards: number): number {
   return yards * 0.9144
 }
+
+/**
+ * Convert meters to yards.
+ */
+export function metersToYards(meters: number): number {
+  return meters / 0.9144
+}

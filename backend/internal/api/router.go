@@ -282,10 +282,13 @@ func NewRouter(
 		r.Get("/pellet-tests/public-leaderboard", pth.PublicLeaderboard)
 
 		// Public club routes (no auth required; viewer context optional)
-		clh := handler.NewClub(clubs, images)
-		r.Get("/clubs", clh.List)
-		r.Get("/clubs/{id}", clh.GetByID)
-		r.Get("/clubs/{id}/standings", clh.GetStandings)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.OptionalAuthenticate(auth))
+			clh := handler.NewClub(clubs, images)
+			r.Get("/clubs", clh.List)
+			r.Get("/clubs/{id}", clh.GetByID)
+			r.Get("/clubs/{id}/standings", clh.GetStandings)
+		})
 	})
 
 	return r

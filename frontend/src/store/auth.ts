@@ -13,6 +13,8 @@ interface User {
   profile_visibility?: string
   default_score_visibility?: string
   feed_opt_out?: boolean
+  default_distance_unit?: string
+  default_measurement_unit?: string
 }
 
 interface AuthState {

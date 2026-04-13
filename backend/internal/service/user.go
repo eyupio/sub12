@@ -84,6 +84,18 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 			return nil, fmt.Errorf("%w: default_score_visibility must be 'public', 'followers', or 'private'", ErrInvalidProfile)
 		}
 	}
+	if in.DefaultDistanceUnit != nil {
+		v := *in.DefaultDistanceUnit
+		if v != "meters" && v != "yards" {
+			return nil, fmt.Errorf("%w: default_distance_unit must be 'meters' or 'yards'", ErrInvalidProfile)
+		}
+	}
+	if in.DefaultMeasurementUnit != nil {
+		v := *in.DefaultMeasurementUnit
+		if v != "cm" && v != "mm" {
+			return nil, fmt.Errorf("%w: default_measurement_unit must be 'cm' or 'mm'", ErrInvalidProfile)
+		}
+	}
 	return s.users.UpdateMe(ctx, id, in)
 }
 

@@ -37,6 +37,25 @@ func Authenticate(auth *service.AuthService) func(http.Handler) http.Handler {
 	}
 }
 
+// OptionalAuthenticate is like Authenticate but does not reject unauthenticated
+// requests. If a valid Bearer token is present the user ID and role are injected
+// into the context; otherwise the request proceeds without them.
+func OptionalAuthenticate(auth *service.AuthService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := bearerToken(r)
+			if token != "" {
+				if principal, err := auth.ValidateAccessToken(token); err == nil {
+					ctx := context.WithValue(r.Context(), UserIDKey, principal.UserID)
+					ctx = context.WithValue(ctx, UserRoleKey, principal.Role)
+					r = r.WithContext(ctx)
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // UserIDFromContext retrieves the authenticated user ID from context.
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	id, ok := ctx.Value(UserIDKey).(string)

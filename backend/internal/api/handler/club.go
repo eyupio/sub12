@@ -24,7 +24,8 @@ func NewClub(svc *service.ClubService, images *repository.ImageRepository) *Club
 
 // GET /api/v1/clubs
 func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
-	clubs, err := h.svc.List(r.Context())
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	clubs, err := h.svc.List(r.Context(), viewerID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list clubs")
 		return

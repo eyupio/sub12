@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize } from 'lucide-react'
-import { mmToMOA, mmToMRAD } from '../utils/ballistics'
+import { mmToMOA, mmToMRAD, yardsToMeters, metersToYards } from '../utils/ballistics'
 import type { DetectedHole } from '../utils/holeDetection'
 import type { PelletTestMeasurement, CreateMeasurementPayload } from '../api/pelletTesting'
 
@@ -13,6 +13,8 @@ interface Props {
   onSave: (payload: CreateMeasurementPayload) => void
   onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null) => void
   onClose: () => void
+  defaultDistanceUnit?: 'meters' | 'yards'
+  defaultMeasurementUnit?: 'cm' | 'mm'
 }
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -23,6 +25,7 @@ const CALIBER_MAP: Record<string, number> = { '.177': 4.5, '.20': 5.08, '.22': 5
 const RED = '#ef4444'
 const YELLOW = '#eab308'
 const DRAG_THRESHOLD = 5
+const TOUCH_DRAG_THRESHOLD = 15
 
 function computeGroupSizeFromImpacts(impacts: Point[], ppmm: number, pelletMM: number) {
   if (impacts.length < 2 || ppmm <= 0) return null
@@ -35,7 +38,7 @@ function computeGroupSizeFromImpacts(impacts: Point[], ppmm: number, pelletMM: n
   return { mm: Math.round((max / ppmm + pelletMM) * 1000) / 1000 }
 }
 
-export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDetections, onClose }: Props) {
+export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDetections, onClose, defaultDistanceUnit, defaultMeasurementUnit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
@@ -46,6 +49,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const panStart = useRef<Point>({ x: 0, y: 0 })
   const panOffset = useRef<Point>({ x: 0, y: 0 })
   const pointerStart = useRef<Point>({ x: 0, y: 0 })
+  const pointerTypeRef = useRef<string>('mouse')
   const didDrag = useRef(false)
 
   const [step, setStep] = useState<WizardStep>(1)
@@ -59,15 +63,23 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   // Step 2
   const [pointA, setPointA] = useState<Point | null>(null)
   const [pointB, setPointB] = useState<Point | null>(null)
-  const [calibDistanceCM, setCalibDistanceCM] = useState('')
+  const [calibUnit, setCalibUnit] = useState<'cm' | 'mm'>(defaultMeasurementUnit ?? 'cm')
+  const [calibDistance, setCalibDistance] = useState('')
   const [pixelsPerMM, setPixelsPerMM] = useState(0)
   // Step 3
-  const [distanceToTargetM, setDistanceToTargetM] = useState(String(distanceM))
+  const [distanceUnit, setDistanceUnit] = useState<'meters' | 'yards'>(defaultDistanceUnit ?? 'meters')
+  const [distanceToTarget, setDistanceToTarget] = useState(() => {
+    if (defaultDistanceUnit === 'yards') return String(Math.round(metersToYards(distanceM) * 10) / 10)
+    return String(distanceM)
+  })
   const [markerSize, setMarkerSize] = useState('.22')
   // Step 4
   const [impacts, setImpacts] = useState<Point[]>([])
 
-  const effectiveDistanceM = Number(distanceToTargetM) || distanceM
+  const rawDistance = Number(distanceToTarget) || distanceM
+  const effectiveDistanceM = distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance
+  const displayDistance = distanceUnit === 'yards' ? rawDistance : rawDistance
+  const distanceLabel = distanceUnit === 'yards' ? 'yd' : 'm'
   const pelletDiameterMM = CALIBER_MAP[markerSize] ?? (Number(markerSize) || 4.5)
 
   // Load image
@@ -218,9 +230,11 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
 
   // ── Pointer handlers ───────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
     const canvas = canvasRef.current
     if (!canvas) return
     canvas.setPointerCapture(e.pointerId)
+    pointerTypeRef.current = e.pointerType
     pointerStart.current = { x: e.clientX, y: e.clientY }
     didDrag.current = false
     panStart.current = { x: e.clientX, y: e.clientY }
@@ -230,7 +244,8 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const dx = e.clientX - pointerStart.current.x
     const dy = e.clientY - pointerStart.current.y
-    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+    const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
+    if (Math.hypot(dx, dy) > threshold) {
       didDrag.current = true
       if (subMode === 'idle') {
         if (!isPanning) setIsPanning(true)
@@ -246,7 +261,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
     const canvas = canvasRef.current
     if (canvas) canvas.releasePointerCapture(e.pointerId)
     if (isPanning) { setIsPanning(false); return }
-    if (didDrag.current && subMode === 'idle') return
+    if (didDrag.current) return
 
     // Tap action
     const pt = screenToImage(e.clientX, e.clientY)
@@ -275,9 +290,9 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
 
   // ── Actions ────────────────────────────────────────────────────────
   const handleCalibSet = () => {
-    if (!pointA || !pointB || !calibDistanceCM) return
+    if (!pointA || !pointB || !calibDistance) return
     const d = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y)
-    const mm = Number(calibDistanceCM) * 10
+    const mm = calibUnit === 'cm' ? Number(calibDistance) * 10 : Number(calibDistance)
     if (mm > 0 && d > 0) setPixelsPerMM(d / mm)
   }
 
@@ -303,9 +318,10 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const handleDone = useCallback(async () => {
     if (!pointA || pixelsPerMM <= 0) { onClose(); return }
     const pd = pointB ? Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y) : 0
+    const refMM = calibUnit === 'cm' ? Number(calibDistance) * 10 : Number(calibDistance)
     const payload: CreateMeasurementPayload = {
       calibration_type: 'two_point',
-      reference_diameter_mm: Number(calibDistanceCM) * 10,
+      reference_diameter_mm: refMM,
       reference_pixels: pd,
       pixels_per_mm: pixelsPerMM,
       ref_center_x: pointA.x,
@@ -321,7 +337,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
       const blob = await generateAnnotatedBlob()
       onSaveDetections(payload, dets, blob)
     } else { onSave(payload) }
-  }, [pointA, pointB, pixelsPerMM, calibDistanceCM, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob])
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
@@ -345,7 +361,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
   const statsOverlay = (
     <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5 pointer-events-none">
       <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{impacts.length}</span></div>
-      <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{effectiveDistanceM}m</span></div>
+      <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{displayDistance}{distanceLabel}</span></div>
       <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${(meanRadiusMM / 10).toFixed(1)}cm` : ''}</span></div>
       <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : ''}</span></div>
       <div className="flex gap-6"><span>Elevation<br/>(moa/mrad):</span><span className="font-semibold">{elevMOA !== null ? `${elevMOA}/${elevMRAD}` : ''}</span></div>
@@ -367,7 +383,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
           <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 space-y-3 mb-6">
             <h2 className="text-white font-semibold text-base mb-3">Group Analysis Results</h2>
             <div className="flex justify-between text-sm"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{impacts.length}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{effectiveDistanceM}m</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{displayDistance}{distanceLabel}</span></div>
             <div className="h-px bg-white/10 my-1" />
             <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : '—'}</span></div>
             <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeCM !== null ? `${groupSizeCM} cm` : '—'}</span></div>
@@ -485,10 +501,14 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
                 SET POINT B {pointB && '\u2713'}
               </button>
             </div>
-            <p className="text-gray-500 text-xs text-center">Distance between points (cm)</p>
+            <p className="text-gray-500 text-xs text-center">Distance between points ({calibUnit})</p>
             <div className="flex gap-2">
-              <input type="number" step="0.1" min="0" value={calibDistanceCM} onChange={e => setCalibDistanceCM(e.target.value)} placeholder="5.5" className={inputCls} />
-              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistanceCM} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium disabled:opacity-40">SET</button>
+              <input type="number" step="0.1" min="0" value={calibDistance} onChange={e => setCalibDistance(e.target.value)} placeholder={calibUnit === 'cm' ? '5.5' : '55'} className={inputCls} />
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
+                <button onClick={() => { setCalibUnit('cm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>cm</button>
+                <button onClick={() => { setCalibUnit('mm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>mm</button>
+              </div>
+              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium disabled:opacity-40">SET</button>
             </div>
             <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
               {'>'} NEXT
@@ -499,10 +519,13 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
         {/* Step 3 controls */}
         {step === 3 && (
           <div className="space-y-3">
-            <p className="text-gray-500 text-xs text-center">Distance to target (m)</p>
+            <p className="text-gray-500 text-xs text-center">Distance to target ({distanceUnit === 'yards' ? 'yd' : 'm'})</p>
             <div className="flex gap-2">
-              <input type="number" step="0.1" min="0" value={distanceToTargetM} onChange={e => setDistanceToTargetM(e.target.value)} className={inputCls} />
-              <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
+              <input type="number" step="0.1" min="0" value={distanceToTarget} onChange={e => setDistanceToTarget(e.target.value)} className={inputCls} />
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
+                <button onClick={() => { if (distanceUnit !== 'meters') { setDistanceUnit('meters'); setDistanceToTarget(String(Math.round(yardsToMeters(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'meters' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>m</button>
+                <button onClick={() => { if (distanceUnit !== 'yards') { setDistanceUnit('yards'); setDistanceToTarget(String(Math.round(metersToYards(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'yards' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>yd</button>
+              </div>
             </div>
             <p className="text-gray-500 text-xs text-center">Impact marker size</p>
             <div className="flex gap-2">
@@ -511,7 +534,7 @@ export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDe
               </select>
               <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
             </div>
-            <button onClick={goNext} disabled={!distanceToTargetM || Number(distanceToTargetM) <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+            <button onClick={goNext} disabled={!distanceToTarget || Number(distanceToTarget) <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
               {'>'} NEXT
             </button>
           </div>
