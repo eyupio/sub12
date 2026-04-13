@@ -145,6 +145,11 @@ export interface MyLeagueSummary {
   ends_on?: string
 }
 
+export interface ScoreCardLeague {
+  id: string
+  name: string
+}
+
 export const leagueApi = {
   // My leagues (dashboard)
   listMine: () =>
@@ -205,21 +210,27 @@ export const leagueApi = {
     api.del<void>(`/leagues/${leagueId}/members/${userId}`),
 
   // Score verification
-  confirmScore: (scoreCardId: string, leagueId: string) =>
-    api.post<{ confirmed: boolean }>(`/score-cards/${scoreCardId}/confirmations`, { league_id: leagueId }),
+  getLeagueForScoreCard: (scoreCardId: string) =>
+    api.get<ScoreCardLeague>(`/score-cards/${scoreCardId}/league`),
+
+  confirmScore: (scoreCardId: string) =>
+    api.post<{ confirmed: boolean }>(`/score-cards/${scoreCardId}/confirmations`, {}),
 
   getAuditTrail: (scoreCardId: string) =>
     api.get<{ confirmations: ScoreConfirmation[]; actions: ScoreCardAction[] }>(`/score-cards/${scoreCardId}/audit-trail`),
 
-  amendScore: (scoreCardId: string, leagueId: string, payload: { new_total_score: number; new_x_count: number; reason?: string }) =>
-    api.post(`/score-cards/${scoreCardId}/amend`, { league_id: leagueId, ...payload }),
+  amendScore: (scoreCardId: string, payload: { new_total_score: number; new_x_count: number; reason?: string }) =>
+    api.post(`/score-cards/${scoreCardId}/amend`, payload),
 
-  rejectScore: (scoreCardId: string, leagueId: string, reason: string) =>
-    api.post(`/score-cards/${scoreCardId}/reject`, { league_id: leagueId, reason }),
+  rejectScore: (scoreCardId: string, reason: string) =>
+    api.post(`/score-cards/${scoreCardId}/reject`, { reason }),
 
   // League scores
-  listScores: (id: string, limit = 50, offset = 0) =>
-    api.get<{ items: LeagueScore[] }>(`/leagues/${id}/scores?limit=${limit}&offset=${offset}`),
+  listScores: (id: string, limit = 50, offset = 0, verification?: string) => {
+    let url = `/leagues/${id}/scores?limit=${limit}&offset=${offset}`
+    if (verification) url += `&verification=${verification}`
+    return api.get<{ items: LeagueScore[] }>(url)
+  },
 
   ensureDefaultRound: (id: string) =>
     api.post<{ round_id: string }>(`/leagues/${id}/ensure-round`, {}),

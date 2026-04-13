@@ -304,7 +304,8 @@ func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID string)
 }
 
 // ListScores returns score cards submitted to a league, newest first.
-func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, offset int) ([]*model.LeagueScore, error) {
+// When verification is non-empty, results are filtered by that status.
+func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, offset int, verification string) ([]*model.LeagueScore, error) {
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
@@ -312,7 +313,16 @@ func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, 
 	if err != nil {
 		return nil, err
 	}
-	return s.leagues.ListScores(ctx, leagueID, limit, offset)
+	return s.leagues.ListScores(ctx, leagueID, limit, offset, verification)
+}
+
+// GetLeagueForScoreCard resolves the league that a score card belongs to.
+func (s *LeagueService) GetLeagueForScoreCard(ctx context.Context, scoreCardID string) (*model.ScoreCardLeague, error) {
+	league, err := s.leagues.GetLeagueByScoreCardID(ctx, scoreCardID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	return league, err
 }
 
 // ---------------------------------------------------------------------------
@@ -370,9 +380,18 @@ func (s *LeagueService) ListMembers(ctx context.Context, leagueID string) ([]*mo
 // Score verification
 // ---------------------------------------------------------------------------
 
-func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, leagueID, userID string) error {
+func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID string) error {
+	// Resolve the league from the score card
+	league, err := s.leagues.GetLeagueByScoreCardID(ctx, scoreCardID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
+		return err
+	}
+
 	// Verify the user is a member of the league
-	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
+	isMember, err := s.leagues.IsMember(ctx, league.ID, userID)
 	if err != nil {
 		return err
 	}
@@ -402,7 +421,7 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, leagueID,
 	}
 
 	// Check if confirmation threshold is met
-	cfg, err := s.leagues.GetConfig(ctx, leagueID)
+	cfg, err := s.leagues.GetConfig(ctx, league.ID)
 	if err != nil {
 		return nil // confirmation recorded, config lookup failed but not critical
 	}
@@ -420,16 +439,31 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, leagueID,
 	return nil
 }
 
-func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, leagueID, adminID string, input *model.AmendScoreInput) error {
-	if err := s.requireAdmin(ctx, leagueID, adminID); err != nil {
+func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error {
+	isAdmin, leagueID, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
 		return err
 	}
+	if !isAdmin {
+		return ErrNotAdmin
+	}
+	_ = leagueID // league resolved internally
 	return s.leagues.AmendScore(ctx, scoreCardID, adminID, input)
 }
 
-func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, leagueID, adminID string, input *model.RejectScoreInput) error {
-	if err := s.requireAdmin(ctx, leagueID, adminID); err != nil {
+func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error {
+	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
 		return err
+	}
+	if !isAdmin {
+		return ErrNotAdmin
 	}
 	if input.Reason == "" {
 		return ErrReasonRequired

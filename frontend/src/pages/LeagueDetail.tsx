@@ -97,6 +97,7 @@ export default function LeagueDetail() {
   const [joinPending, setJoinPending] = useState(false)
   const [joinCode, setJoinCode] = useState(initialJoinCode)
   const [copied, setCopied] = useState(false)
+  const [scoreFilter, setScoreFilter] = useState<string>('')
 
   useEffect(() => {
     setJoinCode(initialJoinCode)
@@ -128,14 +129,22 @@ export default function LeagueDetail() {
   })
 
   const { data: scoresData, isLoading: scoresLoading } = useQuery({
-    queryKey: ['leagues', leagueId ?? 'invalid', 'scores'],
-    queryFn: () => leagueApi.listScores(leagueId!),
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', scoreFilter],
+    queryFn: () => leagueApi.listScores(leagueId!, 50, 0, scoreFilter || undefined),
     enabled: !!leagueId,
   })
 
+  // Pending scores count for admin badge
+  const { data: pendingData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'pending'],
+    queryFn: () => leagueApi.listScores(leagueId!, 100, 0, 'pending'),
+    enabled: !!leagueId && !!members?.items?.find(m => m.user_id === currentUser?.id)?.is_admin,
+  })
+
   const isLoading = leagueLoading || standingsLoading
-  const isAdmin = currentUser && league ? league.created_by === currentUser.id : false
-  const isMember = currentUser && members ? members.items.some(m => m.user_id === currentUser.id) : false
+  const currentMember = currentUser && members ? members.items.find(m => m.user_id === currentUser.id) : null
+  const isAdmin = currentMember?.is_admin ?? false
+  const isMember = !!currentMember
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -377,9 +386,58 @@ export default function LeagueDetail() {
         )}
       </div>
 
+      {/* Admin: Pending Review */}
+      {isAdmin && pendingData && pendingData.items.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-[11px] tracking-widest uppercase text-muted">Review Scores</h2>
+            <span className="bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded">
+              {pendingData.items.length}
+            </span>
+          </div>
+          <div className="border border-amber-500/20 rounded bg-amber-500/5 px-3 lg:px-4 mt-2">
+            {pendingData.items.map(score => (
+              <LeagueScoreRow key={score.id} score={score} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && pendingData && pendingData.items.length === 0 && (
+        <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
+          <CheckCircle size={14} />
+          All scores reviewed
+        </div>
+      )}
+
       {/* Submitted Scores */}
       <div className="space-y-1">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Submitted Scores</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">Submitted Scores</h2>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex gap-1 pt-1">
+          {[
+            { value: '', label: 'All' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'verified', label: 'Verified' },
+            { value: 'rejected', label: 'Rejected' },
+          ].map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setScoreFilter(tab.value)}
+              className={[
+                'text-[10px] tracking-widest uppercase px-2.5 py-1 rounded transition-colors',
+                scoreFilter === tab.value
+                  ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-medium'
+                  : 'text-muted hover:text-secondary',
+              ].join(' ')}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
         {scoresLoading && (
           <div className="space-y-px pt-2">
@@ -391,7 +449,9 @@ export default function LeagueDetail() {
 
         {scoresData && scoresData.items.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted text-sm tracking-widest uppercase">No scores submitted yet</p>
+            <p className="text-muted text-sm tracking-widest uppercase">
+              {scoreFilter ? `No ${scoreFilter} scores` : 'No scores submitted yet'}
+            </p>
           </div>
         )}
 

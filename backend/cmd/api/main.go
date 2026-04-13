@@ -77,7 +77,8 @@ func main() {
 	achievementRepo := repository.NewAchievementRepository(pool)
 	achievementSvc := service.NewAchievementService(achievementRepo, scoreCardRepo)
 
-	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, activitySvc, achievementSvc)
+	leagueRepo := repository.NewLeagueRepository(pool)
+	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 
 	blockRepo := repository.NewBlockRepository(pool)
 
@@ -93,7 +94,6 @@ func main() {
 	pelletRepo := repository.NewPelletRepository(pool)
 	pelletSvc := service.NewPelletService(pelletRepo)
 
-	leagueRepo := repository.NewLeagueRepository(pool)
 	leagueSvc := service.NewLeagueService(leagueRepo, activitySvc)
 
 	pelletTestRepo := repository.NewPelletTestRepository(pool)

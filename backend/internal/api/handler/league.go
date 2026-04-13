@@ -411,8 +411,9 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	verification := r.URL.Query().Get("verification")
 
-	scores, err := h.svc.ListScores(r.Context(), leagueID, limit, offset)
+	scores, err := h.svc.ListScores(r.Context(), leagueID, limit, offset, verification)
 	if err != nil {
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
@@ -671,19 +672,7 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body struct {
-		LeagueID string `json:"league_id"`
-	}
-	if err := decodeJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if !isUUID(body.LeagueID) {
-		writeInvalidUUIDError(w, "league id")
-		return
-	}
-
-	err := h.svc.ConfirmScore(r.Context(), scoreCardID, body.LeagueID, userID)
+	err := h.svc.ConfirmScore(r.Context(), scoreCardID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotMember) {
 			writeError(w, http.StatusForbidden, "not a league member")
@@ -750,12 +739,8 @@ func (h *LeagueHandler) AmendScore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !isUUID(input.LeagueID) {
-		writeInvalidUUIDError(w, "league id")
-		return
-	}
 
-	err := h.svc.AmendScore(r.Context(), scoreCardID, input.LeagueID, userID, &input)
+	err := h.svc.AmendScore(r.Context(), scoreCardID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
 			writeError(w, http.StatusForbidden, "not a league admin")
@@ -787,12 +772,8 @@ func (h *LeagueHandler) RejectScore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if !isUUID(input.LeagueID) {
-		writeInvalidUUIDError(w, "league id")
-		return
-	}
 
-	err := h.svc.RejectScore(r.Context(), scoreCardID, input.LeagueID, userID, &input)
+	err := h.svc.RejectScore(r.Context(), scoreCardID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
 			writeError(w, http.StatusForbidden, "not a league admin")
@@ -807,4 +788,25 @@ func (h *LeagueHandler) RejectScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"rejected": true})
+}
+
+// GET /api/v1/score-cards/{id}/league
+func (h *LeagueHandler) GetLeagueForScoreCard(w http.ResponseWriter, r *http.Request) {
+	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+
+	league, err := h.svc.GetLeagueForScoreCard(r.Context(), scoreCardID)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "score card is not linked to a league")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to resolve league")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, league)
 }

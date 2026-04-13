@@ -68,6 +68,14 @@ export default function ScoreEntry() {
     enabled: !!leagueId && seasonsData !== undefined && (!activeSeason || (roundsData !== undefined && (roundsData?.items ?? []).length === 0)),
   })
 
+  // League config for require_image_upload enforcement
+  const { data: leagueConfig } = useQuery({
+    queryKey: ['leagues', leagueId, 'config'],
+    queryFn: () => leagueApi.getConfig(leagueId!),
+    enabled: !!leagueId,
+  })
+  const requireImage = leagueId && leagueConfig?.require_image_upload
+
   // Pick the round: use search param, or find the currently open round, or latest, or ensured default
   const rounds = roundsData?.items ?? []
   const leagueRoundId = roundIdParam
@@ -253,14 +261,29 @@ export default function ScoreEntry() {
           </button>
         </div>
         {league ? (
-          <p className="text-xs text-[var(--brass)] tracking-wide mt-1 flex items-center gap-1.5">
-            <Trophy size={12} />
-            {league.name}
-            {activeSeason && <span className="text-muted"> · {activeSeason.name}</span>}
-            {leagueRoundId && rounds.length > 0 && (
-              <span className="text-muted"> · {rounds.find(r => r.id === leagueRoundId)?.name}</span>
+          <div className="mt-1 space-y-0.5">
+            <p className="text-xs text-[var(--brass)] tracking-wide flex items-center gap-1.5">
+              <Trophy size={12} />
+              {league.name}
+              {activeSeason && <span className="text-muted"> · {activeSeason.name}</span>}
+              {leagueRoundId && rounds.length > 0 && (
+                <span className="text-muted"> · {rounds.find(r => r.id === leagueRoundId)?.name}</span>
+              )}
+            </p>
+            {leagueRoundId && rounds.length > 0 && (() => {
+              const round = rounds.find(r => r.id === leagueRoundId)
+              return round?.closes_at ? (
+                <p className="text-[10px] text-muted tracking-wide">
+                  Round closes {new Date(round.closes_at).toLocaleDateString()}
+                </p>
+              ) : null
+            })()}
+            {requireImage && !imageFile && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 tracking-wide">
+                This league requires a score card photo
+              </p>
             )}
-          </p>
+          </div>
         ) : (
           <p className="text-xs text-muted tracking-wide mt-1">
             Personal practice card — not linked to any league
@@ -508,7 +531,7 @@ export default function ScoreEntry() {
           {/* Submit */}
           <button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !shotAt}
+            disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
             className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
           >
             {mutation.isPending ? 'Saving…' : 'Save Card'}

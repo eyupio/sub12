@@ -120,15 +120,13 @@ type ScoreCardAction struct {
 }
 
 type AmendScoreInput struct {
-	LeagueID      string  `json:"league_id"`
 	NewTotalScore int16   `json:"new_total_score"`
 	NewXCount     int16   `json:"new_x_count"`
 	Reason        *string `json:"reason"`
 }
 
 type RejectScoreInput struct {
-	LeagueID string `json:"league_id"`
-	Reason   string `json:"reason"`
+	Reason string `json:"reason"`
 }
 
 type LeagueMember struct {
@@ -136,6 +134,12 @@ type LeagueMember struct {
 	DisplayName string    `json:"display_name"`
 	IsAdmin     bool      `json:"is_admin"`
 	JoinedAt    time.Time `json:"joined_at"`
+}
+
+// ScoreCardLeague is a lightweight league reference resolved from a score card.
+type ScoreCardLeague struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type MyLeagueSummary struct {

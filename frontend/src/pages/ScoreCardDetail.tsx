@@ -39,8 +39,19 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   const [amendX, setAmendX] = useState('')
   const [amendReason, setAmendReason] = useState('')
   const [rejectReason, setRejectReason] = useState('')
-  const [confirmLeagueId, setConfirmLeagueId] = useState('')
-  const [actionLeagueId, setActionLeagueId] = useState('')
+
+  // Auto-resolve league from score card
+  const { data: league } = useQuery({
+    queryKey: ['score-cards', scoreCardId, 'league'],
+    queryFn: () => leagueApi.getLeagueForScoreCard(scoreCardId),
+  })
+
+  // Check if current user is a league member / admin
+  const { data: members } = useQuery({
+    queryKey: ['leagues', league?.id ?? '', 'members'],
+    queryFn: () => leagueApi.listMembers(league!.id),
+    enabled: !!league?.id,
+  })
 
   const { data: auditTrail } = useQuery({
     queryKey: ['score-cards', scoreCardId, 'audit-trail'],
@@ -48,7 +59,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   })
 
   const confirmMutation = useMutation({
-    mutationFn: () => leagueApi.confirmScore(scoreCardId, confirmLeagueId),
+    mutationFn: () => leagueApi.confirmScore(scoreCardId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'audit-trail'] })
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId] })
@@ -57,7 +68,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
 
   const amendMutation = useMutation({
     mutationFn: () =>
-      leagueApi.amendScore(scoreCardId, actionLeagueId, {
+      leagueApi.amendScore(scoreCardId, {
         new_total_score: Number(amendScore),
         new_x_count: Number(amendX),
         reason: amendReason || undefined,
@@ -73,7 +84,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   })
 
   const rejectMutation = useMutation({
-    mutationFn: () => leagueApi.rejectScore(scoreCardId, actionLeagueId, rejectReason),
+    mutationFn: () => leagueApi.rejectScore(scoreCardId, rejectReason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId] })
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'audit-trail'] })
@@ -85,12 +96,26 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   const confirmations = auditTrail?.confirmations ?? []
   const actions = auditTrail?.actions ?? []
   const isOwnScore = currentUser?.id === cardOwnerID
+  const currentMember = members?.items?.find(m => m.user_id === currentUser?.id)
+  const isMember = !!currentMember
+  const isAdmin = currentMember?.is_admin ?? false
 
   const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 
   return (
     <div className="space-y-4 border-t border-subtle pt-4">
-      <h3 className="text-[11px] tracking-widest uppercase text-muted">Verification Audit Trail</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] tracking-widest uppercase text-muted">Verification Audit Trail</h3>
+        {league && (
+          <Link
+            to="/leagues/$id"
+            params={{ id: league.id }}
+            className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+          >
+            {league.name}
+          </Link>
+        )}
+      </div>
 
       {confirmations.length > 0 && (
         <div className="space-y-1.5">
@@ -145,29 +170,19 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         <p className="text-muted text-xs">No verification activity yet.</p>
       )}
 
-      {!isOwnScore && (
+      {/* Confirm button — visible to league members who don't own the score */}
+      {!isOwnScore && isMember && (
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={confirmLeagueId}
-              onChange={e => setConfirmLeagueId(e.target.value)}
-              placeholder="League ID to confirm for"
-              className={inputCls}
-            />
-            <button
-              onClick={() => confirmMutation.mutate()}
-              disabled={confirmMutation.isPending || !confirmLeagueId.trim()}
-              className="shrink-0 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-3 rounded transition-colors"
-            >
-              {confirmMutation.isPending ? '...' : 'Confirm'}
-            </button>
-          </div>
+          <button
+            onClick={() => confirmMutation.mutate()}
+            disabled={confirmMutation.isPending}
+            className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+          >
+            {confirmMutation.isPending ? 'Confirming...' : 'Confirm Score'}
+          </button>
           {confirmMutation.isError && (
             <p className="text-[var(--error-text)] text-xs">
-              {(confirmMutation.error as Error).message.includes('403')
-                ? 'Cannot confirm your own score or not a member.'
-                : (confirmMutation.error as Error).message.includes('409')
+              {(confirmMutation.error as Error).message.includes('409')
                 ? 'Already confirmed.'
                 : 'Failed to confirm.'}
             </p>
@@ -175,59 +190,62 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
-          className="text-[11px] tracking-widest uppercase border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 px-3 py-1.5 rounded transition-colors"
-        >
-          Amend
-        </button>
-        <button
-          onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
-          className="text-[11px] tracking-widest uppercase border border-red-500/30 text-[var(--error-text)] hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
-        >
-          Reject
-        </button>
-      </div>
-
-      {showAmend && (
-        <div className="space-y-2 bg-surface rounded p-3">
-          <input type="text" placeholder="League ID" value={actionLeagueId} onChange={e => setActionLeagueId(e.target.value)} className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input type="number" placeholder="New total score" value={amendScore} onChange={e => setAmendScore(e.target.value)} className={inputCls} />
-            <input type="number" placeholder="New X count" value={amendX} onChange={e => setAmendX(e.target.value)} className={inputCls} />
+      {/* Amend/Reject buttons — visible only to league admins */}
+      {isAdmin && (
+        <>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
+              className="text-[11px] tracking-widest uppercase border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 px-3 py-1.5 rounded transition-colors"
+            >
+              Amend
+            </button>
+            <button
+              onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
+              className="text-[11px] tracking-widest uppercase border border-red-500/30 text-[var(--error-text)] hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
+            >
+              Reject
+            </button>
           </div>
-          <input type="text" placeholder="Reason (optional)" value={amendReason} onChange={e => setAmendReason(e.target.value)} className={inputCls} />
-          <button
-            onClick={() => amendMutation.mutate()}
-            disabled={amendMutation.isPending || !amendScore || !amendX || !actionLeagueId}
-            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
-          >
-            {amendMutation.isPending ? 'Amending...' : 'Submit Amendment'}
-          </button>
-          {amendMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to amend. Not a league admin?</p>}
-        </div>
-      )}
 
-      {showReject && (
-        <div className="space-y-2 bg-surface rounded p-3">
-          <input type="text" placeholder="League ID" value={actionLeagueId} onChange={e => setActionLeagueId(e.target.value)} className={inputCls} />
-          <textarea
-            placeholder="Reason for rejection (required)"
-            value={rejectReason}
-            onChange={e => setRejectReason(e.target.value)}
-            rows={2}
-            className={inputCls + ' resize-none'}
-          />
-          <button
-            onClick={() => rejectMutation.mutate()}
-            disabled={rejectMutation.isPending || !rejectReason.trim() || !actionLeagueId}
-            className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
-          >
-            {rejectMutation.isPending ? 'Rejecting...' : 'Submit Rejection'}
-          </button>
-          {rejectMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to reject. Reason required or not admin.</p>}
-        </div>
+          {showAmend && (
+            <div className="space-y-2 bg-surface rounded p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" placeholder="New total score" value={amendScore} onChange={e => setAmendScore(e.target.value)} className={inputCls} />
+                <input type="number" placeholder="New X count" value={amendX} onChange={e => setAmendX(e.target.value)} className={inputCls} />
+              </div>
+              <input type="text" placeholder="Reason (optional)" value={amendReason} onChange={e => setAmendReason(e.target.value)} className={inputCls} />
+              <button
+                onClick={() => amendMutation.mutate()}
+                disabled={amendMutation.isPending || !amendScore || !amendX}
+                className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+              >
+                {amendMutation.isPending ? 'Amending...' : 'Submit Amendment'}
+              </button>
+              {amendMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to amend score.</p>}
+            </div>
+          )}
+
+          {showReject && (
+            <div className="space-y-2 bg-surface rounded p-3">
+              <textarea
+                placeholder="Reason for rejection (required)"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                rows={2}
+                className={inputCls + ' resize-none'}
+              />
+              <button
+                onClick={() => rejectMutation.mutate()}
+                disabled={rejectMutation.isPending || !rejectReason.trim()}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+              >
+                {rejectMutation.isPending ? 'Rejecting...' : 'Submit Rejection'}
+              </button>
+              {rejectMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to reject. Reason required.</p>}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -483,6 +501,13 @@ export default function ScoreCardDetail() {
     queryFn: () => scoreCardApi.get(id),
   })
 
+  // Resolve league info for league-submitted cards
+  const { data: cardLeague } = useQuery({
+    queryKey: ['score-cards', id, 'league'],
+    queryFn: () => leagueApi.getLeagueForScoreCard(id),
+    enabled: !!card?.league_round_id,
+  })
+
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles(), enabled: editing })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
 
@@ -578,9 +603,19 @@ export default function ScoreCardDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>
-            <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
-              {card.league_round_id ? 'League' : 'Personal'}
-            </span>
+            {card.league_round_id && cardLeague ? (
+              <Link
+                to="/leagues/$id"
+                params={{ id: cardLeague.id }}
+                className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded hover:bg-[var(--brass)]/20 transition-colors"
+              >
+                {cardLeague.name}
+              </Link>
+            ) : (
+              <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
+                {card.league_round_id ? 'League' : 'Personal'}
+              </span>
+            )}
           </div>
           {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
         </div>

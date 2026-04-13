@@ -617,8 +617,15 @@ export default function LeagueSettings() {
     queryFn: () => leagueApi.getConfig(id),
   })
 
-  const isLoading = leagueLoading || configLoading
-  const isAdmin = !isLoading && league && currentUser ? league.created_by === currentUser.id : null
+  const { data: members, isLoading: membersLoading } = useQuery({
+    queryKey: ['leagues', id, 'members'],
+    queryFn: () => leagueApi.listMembers(id),
+  })
+
+  const isLoading = leagueLoading || configLoading || membersLoading
+  const isAdmin = !isLoading && members && currentUser
+    ? members.items.some(m => m.user_id === currentUser.id && m.is_admin)
+    : null
 
   useEffect(() => {
     if (isAdmin === false) {

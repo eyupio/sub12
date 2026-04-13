@@ -210,6 +210,7 @@ func NewRouter(
 			r.Post("/leagues/{id}/join-code", lh.RegenerateJoinCode)
 
 			// Score verification
+			r.Get("/score-cards/{id}/league", lh.GetLeagueForScoreCard)
 			r.Post("/score-cards/{id}/confirmations", lh.ConfirmScore)
 			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
