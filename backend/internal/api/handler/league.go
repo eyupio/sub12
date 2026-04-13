@@ -103,7 +103,9 @@ func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	league, err := h.svc.GetByID(r.Context(), leagueID)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+
+	league, err := h.svc.GetByID(r.Context(), leagueID, viewerID)
 	if err != nil {
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")

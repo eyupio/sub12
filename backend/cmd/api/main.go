@@ -79,8 +79,10 @@ func main() {
 
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, activitySvc, achievementSvc)
 
+	blockRepo := repository.NewBlockRepository(pool)
+
 	commentRepo := repository.NewCommentRepository(pool)
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, blockRepo)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -123,12 +125,13 @@ func main() {
 	imageRepo := repository.NewImageRepository(pool)
 
 	socialRepo := repository.NewSocialRepository(pool)
-	socialSvc := service.NewSocialService(socialRepo)
+	socialSvc := service.NewSocialService(socialRepo, blockRepo)
+	blockSvc := service.NewBlockService(blockRepo, socialRepo)
 
 	clubRepo := repository.NewClubRepository(pool)
 	clubSvc := service.NewClubService(clubRepo)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

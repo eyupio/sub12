@@ -59,13 +59,14 @@ func (s *UserService) GetPublicProfile(ctx context.Context, id string) (*model.P
 		return nil, err
 	}
 	return &model.PublicProfile{
-		ID:          u.ID,
-		DisplayName: u.DisplayName,
-		Bio:         u.Bio,
-		Location:    u.Location,
-		Club:        u.Club,
-		AvatarURL:   u.AvatarURL,
-		CreatedAt:   u.CreatedAt,
+		ID:                u.ID,
+		DisplayName:       u.DisplayName,
+		Bio:               u.Bio,
+		Location:          u.Location,
+		Club:              u.Club,
+		AvatarURL:         u.AvatarURL,
+		ProfileVisibility: u.ProfileVisibility,
+		CreatedAt:         u.CreatedAt,
 	}, nil
 }
 
@@ -73,6 +74,9 @@ func (s *UserService) GetPublicProfile(ctx context.Context, id string) (*model.P
 func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateProfileInput) (*model.User, error) {
 	if in.DisplayName != nil && strings.TrimSpace(*in.DisplayName) == "" {
 		return nil, fmt.Errorf("%w: display_name cannot be blank", ErrInvalidProfile)
+	}
+	if in.ProfileVisibility != nil && *in.ProfileVisibility != "public" && *in.ProfileVisibility != "private" {
+		return nil, fmt.Errorf("%w: profile_visibility must be 'public' or 'private'", ErrInvalidProfile)
 	}
 	return s.users.UpdateMe(ctx, id, in)
 }
