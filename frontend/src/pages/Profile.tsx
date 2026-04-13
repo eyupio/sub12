@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users, Camera, Mail, Target, Star, Award, Eye, Crosshair, Calendar, Trophy } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera, Mail, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, Globe, UserCheck, UserX } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
@@ -123,6 +123,65 @@ function AchievementsSection({ achievements }: { achievements: Achievement[] }) 
   )
 }
 
+function FollowRequestsSection() {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ['follow-requests'],
+    queryFn: () => usersApi.listFollowRequests(),
+  })
+
+  const decideMutation = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'accepted' | 'rejected' }) =>
+      usersApi.decideFollowRequest(id, decision),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['follow-requests'] })
+    },
+  })
+
+  const requests = data?.items ?? []
+  if (requests.length === 0) return null
+
+  return (
+    <div>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Follow Requests</h2>
+      <div className="space-y-2">
+        {requests.map((req) => (
+          <div key={req.id} className="flex items-center justify-between p-3 bg-surface border border-subtle rounded-lg">
+            <div className="flex items-center gap-3">
+              {req.avatar_url ? (
+                <img src={req.avatar_url} alt={req.display_name ?? ''} className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-muted text-xs font-medium">
+                  {(req.display_name ?? '?')[0]?.toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm text-secondary">{req.display_name}</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => decideMutation.mutate({ id: req.id, decision: 'accepted' })}
+                disabled={decideMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+              >
+                <UserCheck size={11} />
+                Accept
+              </button>
+              <button
+                onClick={() => decideMutation.mutate({ id: req.id, decision: 'rejected' })}
+                disabled={decideMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
+              >
+                <UserX size={11} />
+                Decline
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
   const { user, updateUser } = useAuthStore()
   const queryClient = useQueryClient()
@@ -159,6 +218,7 @@ export default function Profile() {
         location: updated.location,
         club: updated.club,
         avatar_url: updated.avatar_url,
+        profile_visibility: updated.profile_visibility,
       })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
       setEditing(false)
@@ -190,6 +250,7 @@ export default function Profile() {
       bio: user?.bio ?? '',
       location: user?.location ?? '',
       club: user?.club ?? '',
+      profile_visibility: user?.profile_visibility ?? 'public',
     })
     setError(null)
     setEditing(true)
@@ -206,6 +267,7 @@ export default function Profile() {
     if (form.bio !== undefined) input.bio = form.bio || undefined
     if (form.location !== undefined) input.location = form.location || undefined
     if (form.club !== undefined) input.club = form.club || undefined
+    if (form.profile_visibility !== undefined) input.profile_visibility = form.profile_visibility
     mutation.mutate(input)
   }
 
@@ -284,6 +346,43 @@ export default function Profile() {
                       placeholder="e.g. YHFTA"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-widest uppercase text-muted mb-1">
+                    Profile Visibility
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, profile_visibility: 'public' }))}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                        (form.profile_visibility ?? user?.profile_visibility ?? 'public') === 'public'
+                          ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                          : 'border-subtle text-muted hover:text-secondary'
+                      }`}
+                    >
+                      <Globe size={12} />
+                      Public
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, profile_visibility: 'private' }))}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                        (form.profile_visibility ?? user?.profile_visibility ?? 'public') === 'private'
+                          ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                          : 'border-subtle text-muted hover:text-secondary'
+                      }`}
+                    >
+                      <Lock size={12} />
+                      Private
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted mt-1">
+                    {(form.profile_visibility ?? user?.profile_visibility ?? 'public') === 'private'
+                      ? 'Only your followers can see your full profile and activity.'
+                      : 'Anyone can see your full profile and activity.'}
+                  </p>
                 </div>
 
                 {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
@@ -407,6 +506,9 @@ export default function Profile() {
 
       {/* Achievements */}
       <AchievementsSection achievements={achievementsData?.items ?? []} />
+
+      {/* Follow Requests (only for private profiles) */}
+      {(user?.profile_visibility === 'private') && <FollowRequestsSection />}
 
       {/* Recent cards */}
       <div>

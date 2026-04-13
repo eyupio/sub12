@@ -10,17 +10,19 @@ import (
 )
 
 var (
-	ErrCommentEmpty   = errors.New("comment body cannot be empty")
-	ErrCommentTooLong = errors.New("comment body exceeds maximum length of 2000 characters")
+	ErrCommentEmpty    = errors.New("comment body cannot be empty")
+	ErrCommentTooLong  = errors.New("comment body exceeds maximum length of 2000 characters")
+	ErrCommentDenied   = errors.New("you cannot comment on this score card")
 )
 
 type CommentService struct {
 	comments   *repository.CommentRepository
 	scoreCards *repository.ScoreCardRepository
+	blocks     *repository.BlockRepository
 }
 
-func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository) *CommentService {
-	return &CommentService{comments: comments, scoreCards: scoreCards}
+func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, blocks *repository.BlockRepository) *CommentService {
+	return &CommentService{comments: comments, scoreCards: scoreCards, blocks: blocks}
 }
 
 // Create validates input, verifies the card exists, and persists the comment.
@@ -33,8 +35,23 @@ func (s *CommentService) Create(ctx context.Context, cardID, userID, body string
 		return nil, ErrCommentTooLong
 	}
 	// Verify the card exists (public lookup — no ownership check)
-	if _, err := s.scoreCards.GetPublicByID(ctx, cardID); err != nil {
+	card, err := s.scoreCards.GetPublicByID(ctx, cardID)
+	if err != nil {
 		return nil, err // propagates ErrNotFound
+	}
+	// If the card is private and the commenter is not the owner, deny
+	if card.Visibility == "private" && card.UserID != userID {
+		return nil, ErrCommentDenied
+	}
+	// If the card owner has blocked the commenter (or vice versa), deny
+	if card.UserID != userID {
+		blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, ErrCommentDenied
+		}
 	}
 	return s.comments.Create(ctx, cardID, userID, body)
 }

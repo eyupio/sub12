@@ -91,12 +91,28 @@ func (s *LeagueService) ListMyLeagues(ctx context.Context, userID string) ([]*mo
 	return leagues, nil
 }
 
-func (s *LeagueService) GetByID(ctx context.Context, id string) (*model.League, error) {
+func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*model.League, error) {
 	league, err := s.leagues.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
 	}
-	return league, err
+	if err != nil {
+		return nil, err
+	}
+	// Private leagues require membership to view
+	if league.Type == "private" && viewerID != "" {
+		isMember, err := s.leagues.IsMember(ctx, id, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if !isMember {
+			return nil, ErrLeagueNotFound
+		}
+	}
+	if league.Type == "private" && viewerID == "" {
+		return nil, ErrLeagueNotFound
+	}
+	return league, nil
 }
 
 func (s *LeagueService) ListPublic(ctx context.Context) ([]*model.League, error) {
@@ -431,6 +447,15 @@ func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID stri
 		return nil, nil, err
 	}
 	return confs, actions, nil
+}
+
+// AdminGetByID returns a league by ID without privacy checks (for admin use).
+func (s *LeagueService) AdminGetByID(ctx context.Context, id string) (*model.League, error) {
+	league, err := s.leagues.GetByID(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	return league, err
 }
 
 // AdminListLeagues returns all leagues regardless of type.

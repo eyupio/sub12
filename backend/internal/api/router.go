@@ -36,6 +36,7 @@ func NewRouter(
 	emailTemplates *service.EmailTemplateService,
 	emailSender *service.EmailSenderService,
 	clubs *service.ClubService,
+	blocks *service.BlockService,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -160,6 +161,16 @@ func NewRouter(
 			socialH := handler.NewSocial(social)
 			r.Post("/users/{id}/follow", socialH.Follow)
 			r.Delete("/users/{id}/follow", socialH.Unfollow)
+			r.Get("/users/{id}/followers", socialH.ListFollowers)
+			r.Get("/users/{id}/following", socialH.ListFollowing)
+			r.Get("/users/me/follow-requests", socialH.ListFollowRequests)
+			r.Post("/users/me/follow-requests/{id}/decide", socialH.DecideFollowRequest)
+
+			// Block
+			blockH := handler.NewBlock(blocks)
+			r.Post("/users/{id}/block", blockH.Block)
+			r.Delete("/users/{id}/block", blockH.Unblock)
+			r.Get("/users/me/blocks", blockH.ListBlocked)
 
 			// Score card comments (write operations — auth required)
 			r.Post("/score-cards/{id}/comments", commentH.Create)
@@ -174,6 +185,7 @@ func NewRouter(
 			lh := handler.NewLeague(leagues, images)
 			r.Get("/users/me/leagues", lh.ListMyLeagues)
 			r.Post("/leagues", lh.Create)
+			r.Get("/leagues/{id}", lh.Get)
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Get("/leagues/{id}/standings", lh.Standings)
 			r.Get("/leagues/{id}/scores", lh.ListScores)
@@ -263,7 +275,6 @@ func NewRouter(
 		// Public league routes (no auth required)
 		lh := handler.NewLeague(leagues, images)
 		r.Get("/leagues", lh.List)
-		r.Get("/leagues/{id}", lh.Get)
 
 		// Public pellet leaderboard (no auth required)
 		pth := handler.NewPelletTest(pelletTests, images)

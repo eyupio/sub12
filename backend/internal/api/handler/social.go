@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -29,9 +30,14 @@ func (h *SocialHandler) Follow(w http.ResponseWriter, r *http.Request) {
 
 	targetID := chi.URLParam(r, "id")
 
-	if err := h.svc.Follow(r.Context(), followerID, targetID); err != nil {
+	followed, requested, err := h.svc.Follow(r.Context(), followerID, targetID)
+	if err != nil {
 		if errors.Is(err, service.ErrCannotFollowSelf) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrBlockedUser) {
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
 		if errors.Is(err, repository.ErrNotFound) {
@@ -42,6 +48,14 @@ func (h *SocialHandler) Follow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if requested {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "requested"})
+		return
+	}
+	if followed {
+		writeJSON(w, http.StatusOK, map[string]bool{"following": true})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]bool{"following": true})
 }
 
@@ -65,4 +79,128 @@ func (h *SocialHandler) Unfollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]bool{"following": false})
+}
+
+// GET /api/v1/users/{id}/followers
+func (h *SocialHandler) ListFollowers(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	profileID := chi.URLParam(r, "id")
+	limit, offset := parsePagination(r)
+
+	items, err := h.svc.ListFollowers(r.Context(), profileID, viewerID, limit, offset)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		if errors.Is(err, service.ErrAccessDenied) {
+			writeError(w, http.StatusForbidden, "this profile is private")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list followers")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// GET /api/v1/users/{id}/following
+func (h *SocialHandler) ListFollowing(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	profileID := chi.URLParam(r, "id")
+	limit, offset := parsePagination(r)
+
+	items, err := h.svc.ListFollowing(r.Context(), profileID, viewerID, limit, offset)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		if errors.Is(err, service.ErrAccessDenied) {
+			writeError(w, http.StatusForbidden, "this profile is private")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list following")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// GET /api/v1/users/me/follow-requests
+func (h *SocialHandler) ListFollowRequests(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	reqs, err := h.svc.ListFollowRequests(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list follow requests")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": reqs})
+}
+
+// POST /api/v1/users/me/follow-requests/{id}/decide
+func (h *SocialHandler) DecideFollowRequest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	requestID := chi.URLParam(r, "id")
+
+	var input struct {
+		Decision string `json:"decision"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	fr, err := h.svc.DecideFollowRequest(r.Context(), requestID, userID, input.Decision)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidDecision) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "follow request not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to decide follow request")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, fr)
+}
+
+func parsePagination(r *http.Request) (int, int) {
+	limit := 50
+	offset := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	return limit, offset
 }

@@ -18,6 +18,7 @@ type ScoreCard struct {
 	XCount        int16     `json:"x_count"`
 	CardImageURL  *string   `json:"card_image_url,omitempty"`
 	Verification  string    `json:"verification"`
+	Visibility    string    `json:"visibility"`
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
@@ -34,6 +35,7 @@ type CreateScoreCardInput struct {
 	ShotScores    []int16  `json:"shot_scores"`
 	ShotXs        []bool   `json:"shot_xs"`
 	LeagueRoundID *string  `json:"league_round_id"`
+	Visibility    *string  `json:"visibility"`
 }
 
 // UpdateScoreCardInput holds fields a user can change after submission.
@@ -47,6 +49,7 @@ type UpdateScoreCardInput struct {
 	Notes       *string  `json:"notes"`
 	ShotScores  []int16  `json:"shot_scores"`
 	ShotXs      []bool   `json:"shot_xs"`
+	Visibility  *string  `json:"visibility"`
 }
 
 // Comment is a user comment on a score card.
