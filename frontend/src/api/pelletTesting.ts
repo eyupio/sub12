@@ -204,6 +204,8 @@ export interface CreateMeasurementPayload {
   bbox_y?: number
   bbox_width?: number
   bbox_height?: number
+  manual_group_size_mm?: number
+  manual_shot_count?: number
 }
 
 export interface UpdateMeasurementPayload {

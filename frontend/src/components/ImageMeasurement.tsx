@@ -20,7 +20,7 @@ interface Props {
 }
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
-type SubMode = 'idle' | 'set_aim' | 'set_point_a' | 'set_point_b' | 'add_impact' | 'remove_impact'
+type SubMode = 'idle' | 'set_aim' | 'set_point_a' | 'set_point_b' | 'add_impact' | 'remove_impact' | 'draw_line_start' | 'draw_line_end'
 interface Point { x: number; y: number }
 
 const CALIBER_MAP: Record<string, number> = { '.177': 4.5, '.20': 5.08, '.22': 5.5, '.25': 6.35 }
@@ -88,7 +88,11 @@ export default function ImageMeasurement({
   })
   const [markerSize, setMarkerSize] = useState('.22')
   // Step 4
+  const [measureMethod, setMeasureMethod] = useState<'impacts' | 'manual_line'>('impacts')
   const [impacts, setImpacts] = useState<Point[]>([])
+  const [lineStart, setLineStart] = useState<Point | null>(null)
+  const [lineEnd, setLineEnd] = useState<Point | null>(null)
+  const [manualShotCount, setManualShotCount] = useState('')
 
   const rawDistance = Number(distanceToTarget) || distanceM
   const effectiveDistanceM = distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance
@@ -167,10 +171,23 @@ export default function ImageMeasurement({
   const groupResult = useMemo(() => computeGroupSizeFromImpacts(impacts, pixelsPerMM, pelletDiameterMM), [impacts, pixelsPerMM, pelletDiameterMM])
   const groupSizeMOA = groupResult ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
   const groupSizeRaw = groupResult?.mm ?? null
+  const manualGroupSizeMM = useMemo(() => {
+    if (!lineStart || !lineEnd || pixelsPerMM <= 0) return null
+    return Math.hypot(lineEnd.x - lineStart.x, lineEnd.y - lineStart.y) / pixelsPerMM
+  }, [lineStart, lineEnd, pixelsPerMM])
+  const manualGroupSizeMOA = manualGroupSizeMM !== null ? Math.round(mmToMOA(manualGroupSizeMM, effectiveDistanceM) * 10) / 10 : null
+  const manualMidpoint = useMemo(() => {
+    if (!lineStart || !lineEnd) return null
+    return { x: (lineStart.x + lineEnd.x) / 2, y: (lineStart.y + lineEnd.y) / 2 }
+  }, [lineStart, lineEnd])
+  const analysisShotCount = measureMethod === 'manual_line' ? Number(manualShotCount) || 0 : impacts.length
+  const analysisGroupSizeMM = measureMethod === 'manual_line' ? manualGroupSizeMM : groupSizeRaw
+  const analysisGroupSizeMOA = measureMethod === 'manual_line' ? manualGroupSizeMOA : groupSizeMOA
   const fmtLen = (mm: number) => displayUnit === 'cm' ? (mm / 10).toFixed(2) : mm.toFixed(2)
 
-  const elevationMM = aimPoint && centroid && pixelsPerMM > 0 ? (aimPoint.y - centroid.y) / pixelsPerMM : null
-  const windageMM = aimPoint && centroid && pixelsPerMM > 0 ? (centroid.x - aimPoint.x) / pixelsPerMM : null
+  const referencePoint = measureMethod === 'manual_line' ? manualMidpoint : centroid
+  const elevationMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (aimPoint.y - referencePoint.y) / pixelsPerMM : null
+  const windageMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (referencePoint.x - aimPoint.x) / pixelsPerMM : null
   const elevMOA = elevationMM !== null ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
   const windMOA = windageMM !== null ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
   const elevMRAD = elevationMM !== null ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
@@ -236,8 +253,33 @@ export default function ImageMeasurement({
       ctx.beginPath(); ctx.moveTo(rp.x + d, rp.y - d); ctx.lineTo(rp.x - d, rp.y + d); ctx.stroke()
     }
 
+    if (lineStart && lineEnd) {
+      const rs = imageToRotated(lineStart)
+      const re = imageToRotated(lineEnd)
+      ctx.strokeStyle = '#22c55e'
+      ctx.lineWidth = 2 / zoom
+      ctx.beginPath()
+      ctx.moveTo(rs.x, rs.y)
+      ctx.lineTo(re.x, re.y)
+      ctx.stroke()
+
+      const pointRadius = 5 / zoom
+      ctx.fillStyle = '#22c55e'
+      ctx.beginPath(); ctx.arc(rs.x, rs.y, pointRadius, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(re.x, re.y, pointRadius, 0, Math.PI * 2); ctx.fill()
+
+      if (manualGroupSizeMM !== null) {
+        const mx = (rs.x + re.x) / 2
+        const my = (rs.y + re.y) / 2
+        ctx.font = `bold ${Math.max(12, 14 / zoom)}px sans-serif`
+        ctx.fillStyle = '#22c55e'
+        ctx.textAlign = 'center'
+        ctx.fillText(`${manualGroupSizeMM.toFixed(2)} mm`, mx, my - 8 / zoom)
+      }
+    }
+
     ctx.restore()
-  }, [canvasSize, pan, zoom, rotation, aimPoint, pointA, pointB, impacts, imageToRotated, pixelsPerMM, pelletDiameterMM])
+  }, [canvasSize, pan, zoom, rotation, aimPoint, pointA, pointB, impacts, imageToRotated, pixelsPerMM, pelletDiameterMM, lineStart, lineEnd, manualGroupSizeMM])
 
   useEffect(() => { if (imageLoaded) requestAnimationFrame(draw) }, [imageLoaded, draw])
 
@@ -284,6 +326,8 @@ export default function ImageMeasurement({
     if (subMode === 'set_aim') setAimPoint(pt)
     else if (subMode === 'set_point_a') { setPointA(pt); setSubMode('idle') }
     else if (subMode === 'set_point_b') { setPointB(pt); setSubMode('idle') }
+    else if (subMode === 'draw_line_start') { setLineStart(pt); setSubMode('idle') }
+    else if (subMode === 'draw_line_end') { setLineEnd(pt); setSubMode('idle') }
     else if (subMode === 'add_impact') setImpacts(prev => [...prev, pt])
     else if (subMode === 'remove_impact' && impacts.length > 0) {
       let minD = Infinity, minI = -1
@@ -344,6 +388,14 @@ export default function ImageMeasurement({
       ref_center_y: pointA.y,
       ref_radius_pixels: 0,
     }
+    if (measureMethod === 'manual_line') {
+      onSave({
+        ...payload,
+        manual_group_size_mm: manualGroupSizeMM ?? undefined,
+        manual_shot_count: Number(manualShotCount) || 0,
+      })
+      return
+    }
     if (onSaveDetections && impacts.length > 0) {
       const dets: DetectedHole[] = impacts.map(p => ({
         centerX: p.x, centerY: p.y,
@@ -353,7 +405,7 @@ export default function ImageMeasurement({
       const blob = await generateAnnotatedBlob()
       onSaveDetections(payload, dets, blob)
     } else { onSave(payload) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob])
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
@@ -362,6 +414,19 @@ export default function ImageMeasurement({
     else if (step === 2) { setStep(3); setSubMode('idle') }
     else if (step === 3) { setStep(4); setSubMode('add_impact') }
     else if (step === 4) { setStep(5); setSubMode('idle') }
+  }
+
+  const setMeasurementMethod = (method: 'impacts' | 'manual_line') => {
+    setMeasureMethod(method)
+    if (method === 'impacts') {
+      setLineStart(null)
+      setLineEnd(null)
+      setManualShotCount('')
+      setSubMode('add_impact')
+    } else {
+      setImpacts([])
+      setSubMode('idle')
+    }
   }
   const goBack = () => {
     if (step === 1) onClose()
@@ -382,13 +447,13 @@ export default function ImageMeasurement({
   )
 
   const statsOverlay = (
-    <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5">
+      <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5">
       <div className="flex items-center justify-between gap-4 mb-1"><span className="text-[10px] text-gray-400 uppercase">Stats</span>{unitToggle}</div>
-      <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{impacts.length}</span></div>
+      <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{analysisShotCount}</span></div>
       <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{displayDistance}{distanceLabel}</span></div>
-      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)}${displayUnit}` : ''}</span></div>
-      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeRaw !== null ? `${fmtLen(groupSizeRaw)}${displayUnit}` : ''}</span></div>
-      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : ''}</span></div>
+      {measureMethod === 'impacts' && <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)}${displayUnit}` : ''}</span></div>}
+      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{analysisGroupSizeMM !== null ? `${fmtLen(analysisGroupSizeMM)}${displayUnit}` : ''}</span></div>
+      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{analysisGroupSizeMOA !== null ? `${analysisGroupSizeMOA} MOA` : ''}</span></div>
       <div className="flex gap-6"><span>Elevation<br/>(moa/mrad):</span><span className="font-semibold">{elevMOA !== null ? `${elevMOA}/${elevMRAD}` : ''}</span></div>
       <div className="flex gap-6"><span>Windage<br/>(moa/mrad):</span><span className="font-semibold">{windMOA !== null ? `${windMOA}/${windMRAD}` : ''}</span></div>
     </div>
@@ -505,14 +570,55 @@ export default function ImageMeasurement({
         {step === 4 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
-                ADD
+              <button onClick={() => setMeasurementMethod('impacts')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'impacts' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+                MARK IMPACTS
               </button>
-              <button onClick={() => setSubMode('remove_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'remove_impact' ? 'bg-red-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
-                REMOVE
+              <button onClick={() => setMeasurementMethod('manual_line')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'manual_line' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+                DRAW LINE
               </button>
             </div>
-            <button onClick={goNext} disabled={impacts.length < 2} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+
+            {measureMethod === 'impacts' && (
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                  ADD
+                </button>
+                <button onClick={() => setSubMode('remove_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'remove_impact' ? 'bg-red-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                  REMOVE
+                </button>
+              </div>
+            )}
+
+            {measureMethod === 'manual_line' && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setSubMode('draw_line_start')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_start' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}>
+                    SET START {lineStart && '\u2713'}
+                  </button>
+                  <button onClick={() => setSubMode('draw_line_end')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_end' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}>
+                    SET END {lineEnd && '\u2713'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 text-center">
+                  Group size: {manualGroupSizeMM !== null ? `${fmtLen(manualGroupSizeMM)} ${displayUnit} (${manualGroupSizeMOA ?? '—'} MOA)` : '—'}
+                </p>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={manualShotCount}
+                  onChange={e => setManualShotCount(e.target.value)}
+                  placeholder="Shot count"
+                  className={inputCls}
+                />
+              </div>
+            )}
+
+            <button
+              onClick={goNext}
+              disabled={measureMethod === 'impacts' ? impacts.length < 2 : !(lineStart && lineEnd && Number(manualShotCount) > 0)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40"
+            >
               {'>'} ANALYZE
             </button>
           </div>
@@ -529,12 +635,12 @@ export default function ImageMeasurement({
                   <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>cm</button>
                 </div>
               </div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{impacts.length}</span></div>
+              <div className="flex justify-between text-xs"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{analysisShotCount}</span></div>
               <div className="flex justify-between text-xs"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{displayDistance}{distanceLabel}</span></div>
               <div className="h-px bg-white/10 my-1" />
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : '—'}</span></div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeRaw !== null ? `${fmtLen(groupSizeRaw)} ${displayUnit}` : '—'}</span></div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)} ${displayUnit}` : '—'}</span></div>
+              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{analysisGroupSizeMOA !== null ? `${analysisGroupSizeMOA} MOA` : '—'}</span></div>
+              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{analysisGroupSizeMM !== null ? `${fmtLen(analysisGroupSizeMM)} ${displayUnit}` : '—'}</span></div>
+              {measureMethod === 'impacts' && <div className="flex justify-between text-xs"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)} ${displayUnit}` : '—'}</span></div>}
             </div>
 
             <button
