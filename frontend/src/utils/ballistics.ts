@@ -35,6 +35,18 @@ export function mmToMOA(sizeMM: number, distanceM: number): number {
 }
 
 /**
+ * Convert a group size in mm to MRAD at a given distance.
+ *
+ * @param sizeMM - Group size in mm
+ * @param distanceM - Distance in meters
+ * @returns Group size in MRAD
+ */
+export function mmToMRAD(sizeMM: number, distanceM: number): number {
+  if (distanceM <= 0) return 0
+  return sizeMM / distanceM
+}
+
+/**
  * Convert yards to meters.
  */
 export function yardsToMeters(yards: number): number {

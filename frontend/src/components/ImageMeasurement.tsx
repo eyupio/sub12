@@ -1,8 +1,7 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
-import { Circle, Move, Square, RotateCcw, Save, ZoomIn, ZoomOut, Crosshair, Check, X } from 'lucide-react'
-import { TARGET_PRESETS, type TargetPreset, type TargetRing } from '../config/targetPresets'
-import { mmToMOA } from '../utils/ballistics'
-import { detectHoles, computeGroupSize, type DetectedHole } from '../utils/holeDetection'
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
+import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize } from 'lucide-react'
+import { mmToMOA, mmToMRAD } from '../utils/ballistics'
+import type { DetectedHole } from '../utils/holeDetection'
 import type { PelletTestMeasurement, CreateMeasurementPayload } from '../api/pelletTesting'
 
 interface Props {
@@ -16,100 +15,71 @@ interface Props {
   onClose: () => void
 }
 
-type Mode = 'idle' | 'calibrate' | 'measure' | 'detect_review'
-type DrawState = 'none' | 'drawing'
-
-interface ReviewableHole extends DetectedHole {
-  status: 'pending' | 'confirmed' | 'rejected'
-}
-
+type WizardStep = 1 | 2 | 3 | 4 | 5
+type SubMode = 'idle' | 'set_aim' | 'set_point_a' | 'set_point_b' | 'add_impact' | 'remove_impact'
 interface Point { x: number; y: number }
 
-const BRASS = '#c9a84c'
-const BRASS_30 = 'rgba(201,168,76,0.3)'
-const GREEN = '#22c55e'
-const GREEN_30 = 'rgba(34,197,94,0.3)'
-const CYAN = '#06b6d4'
-const CYAN_40 = 'rgba(6,182,212,0.4)'
+const CALIBER_MAP: Record<string, number> = { '.177': 4.5, '.20': 5.08, '.22': 5.5, '.25': 6.35 }
 const RED = '#ef4444'
+const YELLOW = '#eab308'
+const GREEN = '#22c55e'
+const DRAG_THRESHOLD = 5
 
-const btnCls = 'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium tracking-wider uppercase transition-colors'
-const btnPrimary = `${btnCls} bg-[var(--brass)] text-inverse hover:opacity-90`
-const btnSecondary = `${btnCls} border border-subtle text-secondary hover:bg-surface-hover`
-const selectCls = 'rounded bg-surface border border-subtle px-2 py-1.5 text-xs text-primary focus:border-[var(--brass)]/50 focus:outline-none'
+function computeGroupSizeFromImpacts(impacts: Point[], ppmm: number, pelletMM: number) {
+  if (impacts.length < 2 || ppmm <= 0) return null
+  let max = 0
+  for (let i = 0; i < impacts.length; i++)
+    for (let j = i + 1; j < impacts.length; j++) {
+      const d = Math.hypot(impacts[i].x - impacts[j].x, impacts[i].y - impacts[j].y)
+      if (d > max) max = d
+    }
+  return { mm: Math.round((max / ppmm + pelletMM) * 1000) / 1000 }
+}
 
-export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurement, onSave, onSaveDetections, onClose }: Props) {
+export default function ImageMeasurement({ imageUrl, distanceM, onSave, onSaveDetections, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
-  // View transform (pan + zoom)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const panStart = useRef<Point>({ x: 0, y: 0 })
   const panOffset = useRef<Point>({ x: 0, y: 0 })
+  const pointerStart = useRef<Point>({ x: 0, y: 0 })
+  const didDrag = useRef(false)
 
-  // Mode
-  const [mode, setMode] = useState<Mode>(existingMeasurement ? 'idle' : 'idle')
-  const [drawState, setDrawState] = useState<DrawState>('none')
-
-  // Calibration state
-  const [selectedPreset, setSelectedPreset] = useState<TargetPreset | null>(
-    existingMeasurement?.target_preset
-      ? TARGET_PRESETS.find(p => p.id === existingMeasurement.target_preset) ?? null
-      : null
-  )
-  const [selectedRing, setSelectedRing] = useState<TargetRing | null>(() => {
-    if (!existingMeasurement?.target_preset || !existingMeasurement.reference_ring_name) return null
-    const preset = TARGET_PRESETS.find(p => p.id === existingMeasurement.target_preset)
-    return preset?.rings.find(r => r.name === existingMeasurement.reference_ring_name) ?? null
-  })
-  const [referenceDiameterInput, setReferenceDiameterInput] = useState(
-    existingMeasurement?.reference_diameter_mm != null
-      ? String(existingMeasurement.reference_diameter_mm)
-      : ''
-  )
-  const [refCircle, setRefCircle] = useState<{ cx: number; cy: number; r: number } | null>(
-    existingMeasurement
-      ? { cx: existingMeasurement.ref_center_x, cy: existingMeasurement.ref_center_y, r: existingMeasurement.ref_radius_pixels }
-      : null
-  )
-  const [pixelsPerMM, setPixelsPerMM] = useState<number>(existingMeasurement?.pixels_per_mm ?? 0)
-  const drawOrigin = useRef<Point>({ x: 0, y: 0 })
-  const drawCurrent = useRef<Point>({ x: 0, y: 0 })
-
-  // Measurement state
-  const [bbox, setBbox] = useState<{ x: number; y: number; w: number; h: number } | null>(
-    existingMeasurement?.bbox_x != null
-      ? { x: existingMeasurement.bbox_x!, y: existingMeasurement.bbox_y!, w: existingMeasurement.bbox_width!, h: existingMeasurement.bbox_height! }
-      : null
-  )
-  const [measuredMM, setMeasuredMM] = useState<number | null>(existingMeasurement?.measured_size_mm ?? null)
-  const [measuredMOA, setMeasuredMOA] = useState<number | null>(existingMeasurement?.measured_size_moa ?? null)
-
-  // Detection state (PT-3)
-  const [detectedHoles, setDetectedHoles] = useState<ReviewableHole[]>([])
-  const [autoGroupMM, setAutoGroupMM] = useState<number | null>(null)
-  const [autoGroupMOA, setAutoGroupMOA] = useState<number | null>(null)
-  const [detecting, setDetecting] = useState(false)
-
-  // Image loaded flag
+  const [step, setStep] = useState<WizardStep>(1)
+  const [subMode, setSubMode] = useState<SubMode>('set_aim')
+  const [rotation, setRotation] = useState<number>(0)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 })
+
+  // Step 1
+  const [aimPoint, setAimPoint] = useState<Point | null>(null)
+  // Step 2
+  const [pointA, setPointA] = useState<Point | null>(null)
+  const [pointB, setPointB] = useState<Point | null>(null)
+  const [calibDistanceCM, setCalibDistanceCM] = useState('')
+  const [pixelsPerMM, setPixelsPerMM] = useState(0)
+  // Step 3
+  const [distanceToTargetM, setDistanceToTargetM] = useState(String(distanceM))
+  const [markerSize, setMarkerSize] = useState('.22')
+  // Step 4
+  const [impacts, setImpacts] = useState<Point[]>([])
+
+  const effectiveDistanceM = Number(distanceToTargetM) || distanceM
+  const pelletDiameterMM = CALIBER_MAP[markerSize] ?? (Number(markerSize) || 4.5)
 
   // Load image
   useEffect(() => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      imgRef.current = img
-      setImageLoaded(true)
-    }
+    img.onload = () => { imgRef.current = img; setImageLoaded(true) }
     img.src = imageUrl
   }, [imageUrl])
 
-  // Canvas size
-  const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 })
+  // Canvas resize
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -121,631 +91,447 @@ export default function ImageMeasurement({ imageUrl, distanceM, existingMeasurem
     return () => ro.disconnect()
   }, [])
 
-  // Convert screen coordinates to image coordinates
-  const screenToImage = useCallback((sx: number, sy: number): Point => {
-    const canvas = canvasRef.current
-    if (!canvas) return { x: 0, y: 0 }
-    const rect = canvas.getBoundingClientRect()
-    const cx = sx - rect.left
-    const cy = sy - rect.top
-    return {
-      x: (cx - pan.x) / zoom,
-      y: (cy - pan.y) / zoom,
-    }
-  }, [pan, zoom])
+  // Rotation helpers
+  const imageToRotated = useCallback((pt: Point): Point => {
+    const img = imgRef.current
+    if (!img) return pt
+    const cx = img.width / 2, cy = img.height / 2
+    const dx = pt.x - cx, dy = pt.y - cy
+    const rad = (rotation * Math.PI) / 180
+    return { x: dx * Math.cos(rad) - dy * Math.sin(rad) + cx, y: dx * Math.sin(rad) + dy * Math.cos(rad) + cy }
+  }, [rotation])
 
-  // Fit image to viewport
+  const screenToImage = useCallback((sx: number, sy: number): Point => {
+    const canvas = canvasRef.current, img = imgRef.current
+    if (!canvas || !img) return { x: 0, y: 0 }
+    const rect = canvas.getBoundingClientRect()
+    let ix = (sx - rect.left - pan.x) / zoom
+    let iy = (sy - rect.top - pan.y) / zoom
+    const cx = img.width / 2, cy = img.height / 2
+    ix -= cx; iy -= cy
+    const rad = (-rotation * Math.PI) / 180
+    return { x: ix * Math.cos(rad) - iy * Math.sin(rad) + cx, y: ix * Math.sin(rad) + iy * Math.cos(rad) + cy }
+  }, [pan, zoom, rotation])
+
   const fitToView = useCallback(() => {
     const img = imgRef.current
     if (!img) return
-    const scaleX = canvasSize.w / img.width
-    const scaleY = canvasSize.h / img.height
-    const scale = Math.min(scaleX, scaleY) * 0.95
+    const is90 = rotation === 90 || rotation === 270
+    const iw = is90 ? img.height : img.width, ih = is90 ? img.width : img.height
+    const scale = Math.min(canvasSize.w / iw, canvasSize.h / ih) * 0.95
     setZoom(scale)
-    setPan({
-      x: (canvasSize.w - img.width * scale) / 2,
-      y: (canvasSize.h - img.height * scale) / 2,
-    })
-  }, [canvasSize])
+    setPan({ x: (canvasSize.w - img.width * scale) / 2, y: (canvasSize.h - img.height * scale) / 2 })
+  }, [canvasSize, rotation])
 
-  useEffect(() => {
-    if (imageLoaded) fitToView()
-  }, [imageLoaded, fitToView])
+  useEffect(() => { if (imageLoaded) fitToView() }, [imageLoaded, fitToView])
 
-  // ── Drawing ─────────────────────────────────────────────────────────
+  // Computed analysis values
+  const centroid = useMemo(() => {
+    if (impacts.length === 0) return null
+    const sx = impacts.reduce((s, p) => s + p.x, 0)
+    const sy = impacts.reduce((s, p) => s + p.y, 0)
+    return { x: sx / impacts.length, y: sy / impacts.length }
+  }, [impacts])
 
+  const meanRadiusMM = useMemo(() => {
+    if (!centroid || impacts.length < 2 || pixelsPerMM <= 0) return null
+    const avg = impacts.reduce((s, p) => s + Math.hypot(p.x - centroid.x, p.y - centroid.y), 0) / impacts.length
+    return Math.round((avg / pixelsPerMM) * 100) / 100
+  }, [centroid, impacts, pixelsPerMM])
+
+  const groupResult = useMemo(() => computeGroupSizeFromImpacts(impacts, pixelsPerMM, pelletDiameterMM), [impacts, pixelsPerMM, pelletDiameterMM])
+  const groupSizeMOA = groupResult ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
+  const groupSizeCM = groupResult ? Math.round(groupResult.mm / 10 * 100) / 100 : null
+
+  const elevationMM = aimPoint && centroid && pixelsPerMM > 0 ? (aimPoint.y - centroid.y) / pixelsPerMM : null
+  const windageMM = aimPoint && centroid && pixelsPerMM > 0 ? (centroid.x - aimPoint.x) / pixelsPerMM : null
+  const elevMOA = elevationMM !== null ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMOA = windageMM !== null ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const elevMRAD = elevationMM !== null ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMRAD = windageMM !== null ? Math.round(mmToMRAD(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const scopeElev = elevationMM !== null ? (elevationMM > 0 ? 'Scope Down' : elevationMM < 0 ? 'Scope Up' : '') : ''
+  const scopeWind = windageMM !== null ? (windageMM > 0 ? 'Scope Left' : windageMM < 0 ? 'Scope Right' : '') : ''
+
+
+  // ── Drawing ────────────────────────────────────────────────────────
   const draw = useCallback(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    const img = imgRef.current
+    const canvas = canvasRef.current, ctx = canvas?.getContext('2d'), img = imgRef.current
     if (!canvas || !ctx || !img) return
-
-    canvas.width = canvasSize.w
-    canvas.height = canvasSize.h
+    canvas.width = canvasSize.w; canvas.height = canvasSize.h
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Dark background
-    ctx.fillStyle = '#111'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // Draw image with transform
     ctx.save()
     ctx.translate(pan.x, pan.y)
     ctx.scale(zoom, zoom)
+    // Rotate around image center
+    const cx = img.width / 2, cy = img.height / 2
+    ctx.translate(cx, cy)
+    ctx.rotate((rotation * Math.PI) / 180)
+    ctx.translate(-cx, -cy)
     ctx.drawImage(img, 0, 0)
+    ctx.restore()
 
-    // Draw reference circle
-    if (refCircle) {
-      ctx.beginPath()
-      ctx.arc(refCircle.cx, refCircle.cy, refCircle.r, 0, Math.PI * 2)
-      ctx.strokeStyle = GREEN
-      ctx.lineWidth = 2 / zoom
-      ctx.stroke()
-      ctx.fillStyle = GREEN_30
-      ctx.fill()
+    // Draw overlays in screen-transformed image space
+    ctx.save()
+    ctx.translate(pan.x, pan.y)
+    ctx.scale(zoom, zoom)
+
+    // Crosshairs through aim point
+    if (aimPoint) {
+      const rp = imageToRotated(aimPoint)
+      ctx.strokeStyle = RED; ctx.lineWidth = 1 / zoom
+      ctx.beginPath(); ctx.moveTo(0, rp.y); ctx.lineTo(img.width, rp.y); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rp.x, 0); ctx.lineTo(rp.x, img.height); ctx.stroke()
     }
 
-    // Draw in-progress circle (while drawing in calibrate mode)
-    if (mode === 'calibrate' && drawState === 'drawing') {
-      const dx = drawCurrent.current.x - drawOrigin.current.x
-      const dy = drawCurrent.current.y - drawOrigin.current.y
-      const r = Math.sqrt(dx * dx + dy * dy)
-      ctx.beginPath()
-      ctx.arc(drawOrigin.current.x, drawOrigin.current.y, r, 0, Math.PI * 2)
-      ctx.strokeStyle = GREEN
-      ctx.lineWidth = 2 / zoom
-      ctx.setLineDash([4 / zoom, 4 / zoom])
-      ctx.stroke()
-      ctx.setLineDash([])
+    // Calibration points
+    const drawCalibPoint = (pt: Point, label: string) => {
+      const rp = imageToRotated(pt)
+      const r = 8 / zoom
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, r, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(234,179,8,0.4)'; ctx.fill()
+      ctx.strokeStyle = YELLOW; ctx.lineWidth = 2 / zoom; ctx.stroke()
+      ctx.font = `bold ${Math.max(12, 14 / zoom)}px sans-serif`
+      ctx.fillStyle = YELLOW; ctx.textAlign = 'center'
+      ctx.fillText(label, rp.x, rp.y - r - 4 / zoom)
     }
+    if (pointA) drawCalibPoint(pointA, 'A')
+    if (pointB) drawCalibPoint(pointB, 'B')
 
-    // Draw bounding box
-    if (bbox) {
-      ctx.strokeStyle = BRASS
-      ctx.lineWidth = 2 / zoom
-      ctx.strokeRect(bbox.x, bbox.y, bbox.w, bbox.h)
-      ctx.fillStyle = BRASS_30
-      ctx.fillRect(bbox.x, bbox.y, bbox.w, bbox.h)
-    }
-
-    // Draw in-progress bbox (while drawing in measure mode)
-    if (mode === 'measure' && drawState === 'drawing') {
-      const x = Math.min(drawOrigin.current.x, drawCurrent.current.x)
-      const y = Math.min(drawOrigin.current.y, drawCurrent.current.y)
-      const w = Math.abs(drawCurrent.current.x - drawOrigin.current.x)
-      const h = Math.abs(drawCurrent.current.y - drawOrigin.current.y)
-      ctx.strokeStyle = BRASS
-      ctx.lineWidth = 2 / zoom
-      ctx.setLineDash([4 / zoom, 4 / zoom])
-      ctx.strokeRect(x, y, w, h)
-      ctx.setLineDash([])
-    }
-
-    // Draw detected holes (PT-3)
-    for (const hole of detectedHoles) {
-      let color: string
-      let fillColor: string
-      if (hole.status === 'confirmed') {
-        color = GREEN
-        fillColor = GREEN_30
-      } else if (hole.status === 'rejected') {
-        color = RED
-        fillColor = 'rgba(239,68,68,0.15)'
-      } else {
-        color = CYAN
-        fillColor = CYAN_40
-      }
-
-      ctx.beginPath()
-      ctx.arc(hole.centerX, hole.centerY, hole.radiusPixels, 0, Math.PI * 2)
-      ctx.strokeStyle = color
-      ctx.lineWidth = 2 / zoom
-      ctx.stroke()
-      ctx.fillStyle = fillColor
-      ctx.fill()
-
-      // Confidence label
-      if (mode === 'detect_review') {
-        const label = `${Math.round(hole.confidence * 100)}%`
-        ctx.font = `${Math.max(10, 12 / zoom)}px monospace`
-        ctx.fillStyle = color
-        ctx.textAlign = 'center'
-        ctx.fillText(label, hole.centerX, hole.centerY - hole.radiusPixels - 4 / zoom)
-      }
+    // Impact markers
+    for (const imp of impacts) {
+      const rp = imageToRotated(imp)
+      const r = pixelsPerMM > 0 ? (pelletDiameterMM / 2) * pixelsPerMM : 12 / zoom
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, r, 0, Math.PI * 2)
+      ctx.strokeStyle = RED; ctx.lineWidth = 2 / zoom; ctx.stroke()
+      ctx.fillStyle = 'rgba(239,68,68,0.2)'; ctx.fill()
+      // X through center
+      const d = r * 0.7
+      ctx.beginPath(); ctx.moveTo(rp.x - d, rp.y - d); ctx.lineTo(rp.x + d, rp.y + d); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(rp.x + d, rp.y - d); ctx.lineTo(rp.x - d, rp.y + d); ctx.stroke()
     }
 
     ctx.restore()
-  }, [canvasSize, pan, zoom, refCircle, bbox, mode, drawState, detectedHoles])
+  }, [canvasSize, pan, zoom, rotation, aimPoint, pointA, pointB, impacts, imageToRotated, pixelsPerMM, pelletDiameterMM])
 
-  useEffect(() => {
-    if (imageLoaded) requestAnimationFrame(draw)
-  }, [imageLoaded, draw])
+  useEffect(() => { if (imageLoaded) requestAnimationFrame(draw) }, [imageLoaded, draw])
 
-  // ── Mouse / Touch handlers ──────────────────────────────────────────
-
+  // ── Pointer handlers ───────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
     if (!canvas) return
     canvas.setPointerCapture(e.pointerId)
-
-    if (mode === 'detect_review') {
-      // Click on a hole to cycle: pending → confirmed → rejected → pending
-      const pt = screenToImage(e.clientX, e.clientY)
-      const hitIdx = detectedHoles.findIndex(h => {
-        const dx = pt.x - h.centerX
-        const dy = pt.y - h.centerY
-        return Math.sqrt(dx * dx + dy * dy) <= h.radiusPixels * 1.5
-      })
-      if (hitIdx >= 0) {
-        setDetectedHoles(prev => {
-          const next = [...prev]
-          const current = next[hitIdx].status
-          next[hitIdx] = {
-            ...next[hitIdx],
-            status: current === 'pending' ? 'confirmed' : current === 'confirmed' ? 'rejected' : 'pending',
-          }
-          return next
-        })
-      }
-      return
-    }
-
-    if (mode === 'idle') {
-      // Pan mode
-      setIsPanning(true)
-      panStart.current = { x: e.clientX, y: e.clientY }
-      panOffset.current = { ...pan }
-      return
-    }
-
-    // Drawing mode (calibrate or measure)
-    const pt = screenToImage(e.clientX, e.clientY)
-    drawOrigin.current = pt
-    drawCurrent.current = pt
-    setDrawState('drawing')
-  }, [mode, pan, screenToImage, detectedHoles])
+    pointerStart.current = { x: e.clientX, y: e.clientY }
+    didDrag.current = false
+    panStart.current = { x: e.clientX, y: e.clientY }
+    panOffset.current = { ...pan }
+  }, [pan])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (isPanning) {
+    const dx = e.clientX - pointerStart.current.x
+    const dy = e.clientY - pointerStart.current.y
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+      didDrag.current = true
+      if (!isPanning) setIsPanning(true)
       setPan({
         x: panOffset.current.x + (e.clientX - panStart.current.x),
         y: panOffset.current.y + (e.clientY - panStart.current.y),
       })
-      return
     }
-
-    if (drawState === 'drawing') {
-      drawCurrent.current = screenToImage(e.clientX, e.clientY)
-      requestAnimationFrame(draw)
-    }
-  }, [isPanning, drawState, screenToImage, draw])
+  }, [isPanning])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
     if (canvas) canvas.releasePointerCapture(e.pointerId)
+    if (isPanning) { setIsPanning(false); return }
+    if (didDrag.current) return
 
-    if (isPanning) {
-      setIsPanning(false)
-      return
+    // Tap action
+    const pt = screenToImage(e.clientX, e.clientY)
+    if (subMode === 'set_aim') setAimPoint(pt)
+    else if (subMode === 'set_point_a') { setPointA(pt); setSubMode('idle') }
+    else if (subMode === 'set_point_b') { setPointB(pt); setSubMode('idle') }
+    else if (subMode === 'add_impact') setImpacts(prev => [...prev, pt])
+    else if (subMode === 'remove_impact' && impacts.length > 0) {
+      let minD = Infinity, minI = -1
+      impacts.forEach((p, i) => { const d = Math.hypot(pt.x - p.x, pt.y - p.y); if (d < minD) { minD = d; minI = i } })
+      if (minI >= 0) setImpacts(prev => prev.filter((_, i) => i !== minI))
     }
+  }, [isPanning, screenToImage, subMode, impacts])
 
-    if (drawState !== 'drawing') return
-    setDrawState('none')
-
-    const referenceDiameterMM = Number(referenceDiameterInput)
-
-    if (mode === 'calibrate' && referenceDiameterMM > 0) {
-      const dx = drawCurrent.current.x - drawOrigin.current.x
-      const dy = drawCurrent.current.y - drawOrigin.current.y
-      const r = Math.sqrt(dx * dx + dy * dy)
-      if (r < 5) return // too small, ignore
-
-      const circle = { cx: drawOrigin.current.x, cy: drawOrigin.current.y, r }
-      setRefCircle(circle)
-
-      const ppm = (r * 2) / referenceDiameterMM
-      setPixelsPerMM(ppm)
-      setMode('measure')
-    }
-
-    if (mode === 'measure' && pixelsPerMM > 0) {
-      const x = Math.min(drawOrigin.current.x, drawCurrent.current.x)
-      const y = Math.min(drawOrigin.current.y, drawCurrent.current.y)
-      const w = Math.abs(drawCurrent.current.x - drawOrigin.current.x)
-      const h = Math.abs(drawCurrent.current.y - drawOrigin.current.y)
-      if (w < 3 && h < 3) return // too small
-
-      const newBbox = { x, y, w, h }
-      setBbox(newBbox)
-
-      // Compute group size from diagonal
-      const diag = Math.sqrt(w * w + h * h)
-      const mm = diag / pixelsPerMM
-      const moa = mmToMOA(mm, distanceM)
-      setMeasuredMM(mm)
-      setMeasuredMOA(moa)
-      setMode('idle')
-    }
-  }, [isPanning, drawState, mode, referenceDiameterInput, pixelsPerMM, distanceM])
-
-  // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     const factor = e.deltaY < 0 ? 1.1 : 0.9
-    const newZoom = Math.min(Math.max(zoom * factor, 0.1), 10)
-
+    const nz = Math.min(Math.max(zoom * factor, 0.1), 10)
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const cx = e.clientX - rect.left
-    const cy = e.clientY - rect.top
-
-    setPan(prev => ({
-      x: cx - (cx - prev.x) * (newZoom / zoom),
-      y: cy - (cy - prev.y) * (newZoom / zoom),
-    }))
-    setZoom(newZoom)
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top
+    setPan(prev => ({ x: mx - (mx - prev.x) * (nz / zoom), y: my - (my - prev.y) * (nz / zoom) }))
+    setZoom(nz)
   }, [zoom])
 
-  // ── Actions ─────────────────────────────────────────────────────────
-
-  const handleAutoDetect = useCallback(() => {
-    const img = imgRef.current
-    if (!img || pixelsPerMM <= 0) return
-
-    setDetecting(true)
-
-    // Use a temporary canvas to get ImageData
-    requestAnimationFrame(() => {
-      const tmpCanvas = document.createElement('canvas')
-      tmpCanvas.width = img.width
-      tmpCanvas.height = img.height
-      const tmpCtx = tmpCanvas.getContext('2d')
-      if (!tmpCtx) { setDetecting(false); return }
-
-      tmpCtx.drawImage(img, 0, 0)
-      const imageData = tmpCtx.getImageData(0, 0, img.width, img.height)
-
-      const holes = detectHoles(imageData, { pixelsPerMM })
-      const reviewable: ReviewableHole[] = holes.map(h => ({ ...h, status: 'pending' as const }))
-      setDetectedHoles(reviewable)
-
-      // Auto-compute group size from detected holes
-      const confirmedOrPending = reviewable.filter(h => h.status !== 'rejected')
-      const gs = computeGroupSize(confirmedOrPending, pixelsPerMM)
-      if (gs) {
-        setAutoGroupMM(gs.groupSizeMM)
-        setAutoGroupMOA(mmToMOA(gs.groupSizeMM, distanceM))
-      }
-
-      setMode('detect_review')
-      setDetecting(false)
-    })
-  }, [pixelsPerMM, distanceM])
-
-  // Recompute auto group size when holes change
-  useEffect(() => {
-    const active = detectedHoles.filter(h => h.status !== 'rejected')
-    if (active.length >= 2 && pixelsPerMM > 0) {
-      const gs = computeGroupSize(active, pixelsPerMM)
-      if (gs) {
-        setAutoGroupMM(gs.groupSizeMM)
-        setAutoGroupMOA(mmToMOA(gs.groupSizeMM, distanceM))
-        return
-      }
-    }
-    setAutoGroupMM(null)
-    setAutoGroupMOA(null)
-  }, [detectedHoles, pixelsPerMM, distanceM])
+  // ── Actions ────────────────────────────────────────────────────────
+  const handleCalibSet = () => {
+    if (!pointA || !pointB || !calibDistanceCM) return
+    const d = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y)
+    const mm = Number(calibDistanceCM) * 10
+    if (mm > 0 && d > 0) setPixelsPerMM(d / mm)
+  }
 
   const generateAnnotatedBlob = useCallback((): Promise<Blob | null> => {
     const img = imgRef.current
     if (!img) return Promise.resolve(null)
-
-    const tmpCanvas = document.createElement('canvas')
-    tmpCanvas.width = img.width
-    tmpCanvas.height = img.height
-    const ctx = tmpCanvas.getContext('2d')
+    const tc = document.createElement('canvas')
+    tc.width = img.width; tc.height = img.height
+    const ctx = tc.getContext('2d')
     if (!ctx) return Promise.resolve(null)
-
     ctx.drawImage(img, 0, 0)
-
-    // Draw confirmed/pending holes
-    for (const hole of detectedHoles) {
-      if (hole.status === 'rejected') continue
-      ctx.beginPath()
-      ctx.arc(hole.centerX, hole.centerY, hole.radiusPixels, 0, Math.PI * 2)
-      ctx.strokeStyle = hole.status === 'confirmed' ? GREEN : CYAN
-      ctx.lineWidth = 2
-      ctx.stroke()
+    for (const imp of impacts) {
+      const r = pixelsPerMM > 0 ? (pelletDiameterMM / 2) * pixelsPerMM : 12
+      ctx.beginPath(); ctx.arc(imp.x, imp.y, r, 0, Math.PI * 2)
+      ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke()
+      const d = r * 0.7
+      ctx.beginPath(); ctx.moveTo(imp.x - d, imp.y - d); ctx.lineTo(imp.x + d, imp.y + d); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(imp.x + d, imp.y - d); ctx.lineTo(imp.x - d, imp.y + d); ctx.stroke()
     }
+    return new Promise(resolve => { tc.toBlob(b => resolve(b), 'image/png') })
+  }, [impacts, pixelsPerMM, pelletDiameterMM])
 
-    return new Promise(resolve => {
-      tmpCanvas.toBlob(blob => resolve(blob), 'image/png')
-    })
-  }, [detectedHoles])
-
-  const buildMeasurementPayload = useCallback((): CreateMeasurementPayload | null => {
-    const referenceDiameterMM = Number(referenceDiameterInput)
-    if (!refCircle || pixelsPerMM <= 0 || referenceDiameterMM <= 0) return null
-
-    return {
-      calibration_type: 'target_ring',
-      target_preset: selectedPreset?.id,
-      reference_ring_name: selectedRing?.name,
-      reference_diameter_mm: referenceDiameterMM,
-      reference_pixels: refCircle.r * 2,
+  const handleDone = useCallback(async () => {
+    if (!pointA || pixelsPerMM <= 0) { onClose(); return }
+    const pd = pointB ? Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y) : 0
+    const payload: CreateMeasurementPayload = {
+      calibration_type: 'two_point',
+      reference_diameter_mm: Number(calibDistanceCM) * 10,
+      reference_pixels: pd,
       pixels_per_mm: pixelsPerMM,
-      ref_center_x: refCircle.cx,
-      ref_center_y: refCircle.cy,
-      ref_radius_pixels: refCircle.r,
-      bbox_x: bbox?.x,
-      bbox_y: bbox?.y,
-      bbox_width: bbox?.w,
-      bbox_height: bbox?.h,
+      ref_center_x: pointA.x,
+      ref_center_y: pointA.y,
+      ref_radius_pixels: 0,
     }
-  }, [bbox, pixelsPerMM, refCircle, referenceDiameterInput, selectedPreset, selectedRing])
+    if (onSaveDetections && impacts.length > 0) {
+      const dets: DetectedHole[] = impacts.map(p => ({
+        centerX: p.x, centerY: p.y,
+        radiusPixels: (pelletDiameterMM / 2) * pixelsPerMM,
+        diameterMM: pelletDiameterMM, confidence: 1.0, pixelCount: 0,
+      }))
+      const blob = await generateAnnotatedBlob()
+      onSaveDetections(payload, dets, blob)
+    } else { onSave(payload) }
+  }, [pointA, pointB, pixelsPerMM, calibDistanceCM, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob])
 
-  const handleSaveDetections = useCallback(async () => {
-    if (!onSaveDetections) return
-    const payload = buildMeasurementPayload()
-    if (!payload) return
-    const active = detectedHoles.filter(h => h.status !== 'rejected')
-    if (active.length === 0) return
-    const blob = await generateAnnotatedBlob()
-    onSaveDetections(payload, active, blob)
-  }, [buildMeasurementPayload, detectedHoles, generateAnnotatedBlob, onSaveDetections])
+  const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
-  const handleConfirmAll = () => {
-    setDetectedHoles(prev => prev.map(h => h.status === 'pending' ? { ...h, status: 'confirmed' as const } : h))
+  const goNext = () => {
+    if (step === 1) { setStep(2); setSubMode('idle') }
+    else if (step === 2) { setStep(3); setSubMode('idle') }
+    else if (step === 3) { setStep(4); setSubMode('add_impact') }
+    else if (step === 4) setStep(5)
+  }
+  const goBack = () => {
+    if (step === 1) onClose()
+    else if (step === 2) { setStep(1); setSubMode('set_aim') }
+    else if (step === 3) { setStep(2); setSubMode('idle') }
+    else if (step === 4) { setStep(3); setSubMode('idle') }
+    else if (step === 5) { setStep(4); setSubMode('add_impact') }
   }
 
-  const handleRejectAll = () => {
-    setDetectedHoles(prev => prev.map(h => h.status === 'pending' ? { ...h, status: 'rejected' as const } : h))
-  }
+  const inputCls = 'w-full bg-gray-100 border border-gray-300 rounded px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-blue-400'
 
-  const handleReset = () => {
-    setRefCircle(null)
-    setBbox(null)
-    setPixelsPerMM(0)
-    setMeasuredMM(null)
-    setMeasuredMOA(null)
-    setDetectedHoles([])
-    setAutoGroupMM(null)
-    setAutoGroupMOA(null)
-    setMode('idle')
-    setDrawState('none')
-  }
+  // ── Stats Overlay ──────────────────────────────────────────────────
+  const statsOverlay = (
+    <div className="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 text-white text-xs font-mono space-y-0.5 pointer-events-none">
+      <div className="flex gap-6"><span>Shots:</span><span className="font-semibold">{impacts.length}</span></div>
+      <div className="flex gap-6"><span>Distance:</span><span className="font-semibold">{effectiveDistanceM}m</span></div>
+      <div className="flex gap-6"><span>Mean Radius:</span><span className="font-semibold">{meanRadiusMM !== null ? `${(meanRadiusMM / 10).toFixed(1)}cm` : ''}</span></div>
+      <div className="flex gap-6"><span>Group Size:</span><span className="font-semibold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : ''}</span></div>
+      <div className="flex gap-6"><span>Elevation<br/>(moa/mrad):</span><span className="font-semibold">{elevMOA !== null ? `${elevMOA}/${elevMRAD}` : ''}</span></div>
+      <div className="flex gap-6"><span>Windage<br/>(moa/mrad):</span><span className="font-semibold">{windMOA !== null ? `${windMOA}/${windMRAD}` : ''}</span></div>
+    </div>
+  )
 
-  const handleSave = () => {
-    const payload = buildMeasurementPayload()
-    if (!payload) return
-    onSave(payload)
-  }
+  // ── Render ─────────────────────────────────────────────────────────
+  if (step === 5) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#1a1a1a]">
+        <div className="flex items-center justify-between px-4 py-3 bg-[#2a2a2a] border-b border-white/10">
+          <button onClick={goBack} className="text-white p-1"><ArrowLeft size={20} /></button>
+          <span className="text-white font-medium text-sm tracking-wide">Group Analysis Summary</span>
+          <button onClick={onClose} className="text-white p-1"><XIcon size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <h1 className="text-white text-xl font-semibold text-center mb-6">Group Analysis Summary</h1>
+          <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 space-y-3 mb-6">
+            <h2 className="text-white font-semibold text-base mb-3">Group Analysis Results</h2>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{impacts.length}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{effectiveDistanceM}m</span></div>
+            <div className="h-px bg-white/10 my-1" />
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeMOA !== null ? `${groupSizeMOA} MOA` : '—'}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{groupSizeCM !== null ? `${groupSizeCM} cm` : '—'}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${(meanRadiusMM / 10).toFixed(1)}cm` : '—'}</span></div>
+          </div>
 
-  const startCalibrate = () => {
-    if (!(Number(referenceDiameterInput) > 0)) return
-    setMode('calibrate')
-  }
-
-  const startMeasure = () => {
-    if (pixelsPerMM <= 0) return
-    setMode('measure')
-  }
-
-  const canSave = refCircle !== null && pixelsPerMM > 0
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-page">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-subtle p-2 bg-surface">
-        {/* Target preset selector */}
-        <select
-          className={selectCls}
-          value={selectedPreset?.id ?? ''}
-          onChange={e => {
-            const preset = TARGET_PRESETS.find(p => p.id === e.target.value)
-            setSelectedPreset(preset ?? null)
-            setSelectedRing(null)
-          }}
-        >
-          <option value="">Select target…</option>
-          {TARGET_PRESETS.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-
-        {/* Ring selector */}
-        {selectedPreset && (
-          <select
-            className={selectCls}
-            value={selectedRing?.name ?? ''}
-            onChange={e => {
-              const ring = selectedPreset.rings.find(r => r.name === e.target.value)
-              setSelectedRing(ring ?? null)
-              setReferenceDiameterInput(ring ? String(ring.diameter_mm) : '')
-            }}
-          >
-            <option value="">Select ring…</option>
-            {selectedPreset.rings.map(ring => (
-              <option key={ring.name} value={ring.name}>
-                {ring.name} — {ring.diameter_mm}mm
-              </option>
-            ))}
-          </select>
-        )}
-
-        <input
-          type="number"
-          min="0.1"
-          step="0.1"
-          className={`${selectCls} w-32`}
-          value={referenceDiameterInput}
-          onChange={e => setReferenceDiameterInput(e.target.value)}
-          placeholder="Ref mm"
-          title="Reference diameter in mm. Example: 140 for a 14cm target."
-        />
-
-        <div className="h-5 w-px bg-subtle" />
-
-        {/* Mode buttons */}
-        <button
-          className={mode === 'calibrate' ? btnPrimary : btnSecondary}
-          onClick={startCalibrate}
-          disabled={!(Number(referenceDiameterInput) > 0)}
-          title="Draw circle on reference ring"
-        >
-          <Circle size={14} /> Calibrate
-        </button>
-        <button
-          className={mode === 'measure' ? btnPrimary : btnSecondary}
-          onClick={startMeasure}
-          disabled={pixelsPerMM <= 0}
-          title="Draw bounding box around group"
-        >
-          <Square size={14} /> Measure
-        </button>
-        <button
-          className={mode === 'detect_review' ? btnPrimary : btnSecondary}
-          onClick={handleAutoDetect}
-          disabled={pixelsPerMM <= 0 || detecting}
-          title="Automatically detect pellet holes"
-        >
-          <Crosshair size={14} /> {detecting ? 'Detecting…' : 'Auto Detect'}
-        </button>
-        <button className={btnSecondary} onClick={() => setMode('idle')} title="Pan mode">
-          <Move size={14} /> Pan
-        </button>
-
-        <div className="h-5 w-px bg-subtle" />
-
-        {/* Zoom controls */}
-        <button className={btnSecondary} onClick={() => setZoom(z => Math.min(z * 1.25, 10))} title="Zoom in">
-          <ZoomIn size={14} />
-        </button>
-        <button className={btnSecondary} onClick={() => setZoom(z => Math.max(z * 0.8, 0.1))} title="Zoom out">
-          <ZoomOut size={14} />
-        </button>
-        <button className={btnSecondary} onClick={fitToView} title="Fit to view">
-          Fit
-        </button>
-
-        <div className="h-5 w-px bg-subtle" />
-
-        <button className={btnSecondary} onClick={handleReset}>
-          <RotateCcw size={14} /> Reset
-        </button>
-
-        <div className="flex-1" />
-
-        {/* Detection review controls */}
-        {mode === 'detect_review' && detectedHoles.length > 0 && (
-          <>
-            <button className={btnSecondary} onClick={handleConfirmAll} title="Confirm all pending">
-              <Check size={14} /> Confirm All
-            </button>
-            <button className={btnSecondary} onClick={handleRejectAll} title="Reject all pending">
-              <X size={14} /> Reject All
-            </button>
-            {onSaveDetections && (
-              <button
-                className={btnPrimary}
-                onClick={handleSaveDetections}
-                disabled={detectedHoles.every(h => h.status === 'rejected')}
-              >
-                <Save size={14} /> Save Detections
-              </button>
-            )}
-            <div className="h-5 w-px bg-subtle" />
-          </>
-        )}
-
-        {/* Save / Close */}
-        {canSave && (
-          <button className={btnPrimary} onClick={handleSave}>
-            <Save size={14} /> Save
-          </button>
-        )}
-        <button className={btnSecondary} onClick={onClose}>
-          Close
-        </button>
+          <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-5 mb-6">
+            <div className="border-t border-white/10 pt-4">
+              <h3 className="text-white font-semibold text-center mb-4">MOA (Minute of Angle)</h3>
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-gray-400 text-xs mb-1">Elevation</p>
+                  <p className="text-white text-3xl font-bold">{elevMOA ?? '—'}</p>
+                  <p className="text-gray-400 text-xs">MOA</p>
+                  {scopeElev && <p className={`text-sm font-semibold mt-1 ${elevationMM && elevationMM > 0 ? 'text-blue-400' : 'text-blue-400'}`}>{scopeElev}</p>}
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs mb-1">Windage</p>
+                  <p className="text-white text-3xl font-bold">{windMOA ?? '—'}</p>
+                  <p className="text-gray-400 text-xs">MOA</p>
+                  {scopeWind && <p className={`text-sm font-semibold mt-1 ${windageMM && windageMM > 0 ? 'text-blue-400' : 'text-blue-400'}`}>{scopeWind}</p>}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-white/10 pt-4 mt-4">
+              <h3 className="text-white font-semibold text-center mb-4">MRAD (Milliradian)</h3>
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-gray-400 text-xs mb-1">Elevation</p>
+                  <p className="text-white text-3xl font-bold">{elevMRAD ?? '—'}</p>
+                  <p className="text-gray-400 text-xs">MRAD</p>
+                  {scopeElev && <p className="text-sm font-semibold mt-1 text-blue-400">{scopeElev}</p>}
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs mb-1">Windage</p>
+                  <p className="text-white text-3xl font-bold">{windMRAD ?? '—'}</p>
+                  <p className="text-gray-400 text-xs">MRAD</p>
+                  {scopeWind && <p className="text-sm font-semibold mt-1 text-blue-400">{scopeWind}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="px-4 pb-6 pt-2">
+          <button onClick={handleDone} className="w-full py-3 rounded-lg bg-white text-gray-900 font-semibold text-sm tracking-wider uppercase">DONE</button>
+        </div>
       </div>
+    )
+  }
 
-      {/* Status bar */}
-      <div className="flex flex-wrap items-center gap-4 border-b border-subtle px-3 py-1.5 bg-surface text-xs text-muted">
-        {mode === 'calibrate' && (
-          <span className="text-[var(--success-text)]">
-            Click center of the <strong>{selectedRing?.name ?? 'reference circle'}</strong> and drag to its edge
-          </span>
-        )}
-        {mode === 'measure' && (
-          <span className="text-[var(--brass)]">
-            Draw a rectangle around the shot group
-          </span>
-        )}
-        {mode === 'idle' && !refCircle && (
-          <span>Select a preset/ring or enter a custom diameter in mm, then click Calibrate</span>
-        )}
-        {mode === 'idle' && refCircle && !bbox && (
-          <span>Calibrated — click Measure to draw bounding box, or Auto Detect</span>
-        )}
-
-        {mode === 'detect_review' && (
-          <span className="text-cyan-500">
-            Click holes to cycle: <strong>pending</strong> → <strong className="text-green-500">confirmed</strong> → <strong className="text-red-500">rejected</strong>
-          </span>
-        )}
-
-        {pixelsPerMM > 0 && (
-          <span>Scale: <strong className="font-mono">{pixelsPerMM.toFixed(2)}</strong> px/mm</span>
-        )}
-        {Number(referenceDiameterInput) > 0 && (
-          <span>Reference: <strong className="font-mono">{Number(referenceDiameterInput).toFixed(1)} mm</strong></span>
-        )}
-        {measuredMM !== null && (
-          <>
-            <span>
-              Group: <strong className="font-mono text-[var(--brass)]">{measuredMM.toFixed(2)} mm</strong>
-            </span>
-            <span>
-              <strong className="font-mono text-[var(--brass)]">{measuredMOA?.toFixed(3)} MOA</strong>
-            </span>
-          </>
-        )}
-
-        {detectedHoles.length > 0 && (
-          <span>
-            Holes: <strong className="font-mono text-cyan-500">
-              {detectedHoles.filter(h => h.status !== 'rejected').length}
-            </strong>
-            <span className="text-muted">/{detectedHoles.length}</span>
-          </span>
-        )}
-        {autoGroupMM !== null && (
-          <>
-            <span>
-              Auto group: <strong className="font-mono text-cyan-500">{autoGroupMM.toFixed(2)} mm</strong>
-            </span>
-            <span>
-              <strong className="font-mono text-cyan-500">{autoGroupMOA?.toFixed(3)} MOA</strong>
-            </span>
-          </>
-        )}
-
-        <span className="ml-auto font-mono">{Math.round(zoom * 100)}%</span>
+  // ── Steps 1–4 layout ──────────────────────────────────────────────
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#1a1a1a]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#2a2a2a] border-b border-white/10">
+        <button onClick={goBack} className="text-white p-1"><ArrowLeft size={20} /></button>
+        <span className="text-white font-medium text-sm tracking-wide">{stepTitles[step]}</span>
+        <button onClick={onClose} className="text-white p-1"><XIcon size={20} /></button>
       </div>
 
       {/* Canvas */}
-      <div ref={containerRef} className="flex-1 overflow-hidden touch-none">
+      <div ref={containerRef} className="relative flex-1 overflow-hidden touch-none">
+        {statsOverlay}
         <canvas
           ref={canvasRef}
-          className="block cursor-crosshair"
-          style={{ width: canvasSize.w, height: canvasSize.h, touchAction: 'none' }}
+          className="block"
+          style={{ width: canvasSize.w, height: canvasSize.h, touchAction: 'none', cursor: subMode === 'idle' ? 'grab' : 'crosshair' }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onWheel={handleWheel}
         />
+      </div>
+
+      {/* Bottom Panel */}
+      <div className="bg-white rounded-t-xl px-4 pb-4 pt-0 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+        {/* Title bar */}
+        <div className="bg-[#8B7355] text-white text-center py-2.5 text-xs font-semibold tracking-widest uppercase -mx-4 rounded-t-xl mb-3">
+          {step === 1 && 'SET AIM POINT'}
+          {step === 2 && 'SET MEASUREMENT POINTS'}
+          {step === 3 && 'TARGET DISTANCE AND MARKER SIZE'}
+          {step === 4 && 'ADD IMPACTS'}
+        </div>
+
+        {/* Step 1 controls */}
+        {step === 1 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setRotation(r => ((r + 270) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">
+                <RotateCcw size={16} /> ROTATE
+              </button>
+              <button onClick={() => setRotation(r => ((r + 90) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">
+                <RotateCw size={16} /> ROTATE
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => { setSubMode('set_aim'); fitToView() }} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium">
+                <Maximize size={16} /> SET
+              </button>
+              <button onClick={goNext} disabled={!aimPoint} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+                {'>'} NEXT
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2 controls */}
+        {step === 2 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setSubMode('set_point_a')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_a' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+                SET POINT A {pointA && '\u2713'}
+              </button>
+              <button onClick={() => setSubMode('set_point_b')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_b' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+                SET POINT B {pointB && '\u2713'}
+              </button>
+            </div>
+            <p className="text-gray-500 text-xs text-center">Distance between points (cm)</p>
+            <div className="flex gap-2">
+              <input type="number" step="0.1" min="0" value={calibDistanceCM} onChange={e => setCalibDistanceCM(e.target.value)} placeholder="5.5" className={inputCls} />
+              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistanceCM} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium disabled:opacity-40">SET</button>
+            </div>
+            <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+              {'>'} NEXT
+            </button>
+          </div>
+        )}
+
+        {/* Step 3 controls */}
+        {step === 3 && (
+          <div className="space-y-3">
+            <p className="text-gray-500 text-xs text-center">Distance to target (m)</p>
+            <div className="flex gap-2">
+              <input type="number" step="0.1" min="0" value={distanceToTargetM} onChange={e => setDistanceToTargetM(e.target.value)} className={inputCls} />
+              <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
+            </div>
+            <p className="text-gray-500 text-xs text-center">Impact marker size</p>
+            <div className="flex gap-2">
+              <select value={markerSize} onChange={e => setMarkerSize(e.target.value)} className={inputCls}>
+                {Object.keys(CALIBER_MAP).map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+              <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
+            </div>
+            <button onClick={goNext} disabled={!distanceToTargetM || Number(distanceToTargetM) <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+              {'>'} NEXT
+            </button>
+          </div>
+        )}
+
+        {/* Step 4 controls */}
+        {step === 4 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                ADD
+              </button>
+              <button onClick={() => setSubMode('remove_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'remove_impact' ? 'bg-red-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                REMOVE
+              </button>
+            </div>
+            <button onClick={goNext} disabled={impacts.length < 2} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+              {'>'} ANALYZE
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
