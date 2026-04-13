@@ -391,7 +391,7 @@ export default function ClubDetail() {
           {(leaguesData?.items ?? []).map((league: League) => (
             <Link
               key={league.id}
-              to="/app/leagues/$id"
+              to="/leagues/$id"
               params={{ id: league.id }}
               className="flex items-center gap-3 p-3 rounded border border-subtle bg-card hover:border-[var(--brass)]/30 transition-colors"
             >

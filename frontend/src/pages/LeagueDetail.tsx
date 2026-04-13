@@ -468,7 +468,7 @@ export default function LeagueDetail() {
       </div>
 
       {/* League Feed */}
-      {isMember && <LeagueFeed leagueId={league.id} />}
+      {isMember && league && <LeagueFeed leagueId={league.id} />}
     </div>
   )
 }

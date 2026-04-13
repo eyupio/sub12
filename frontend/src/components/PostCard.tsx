@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { MessageSquare, Target, TestTube2, Image } from 'lucide-react'
+import { MessageSquare, Target, TestTube2 } from 'lucide-react'
 import { LikeButton } from './LikeButton'
 import type { Post, PostAttachment } from '../api/posts'
 
