@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
@@ -21,6 +21,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
+
+const selectCls =
+  'w-full bg-surface border border-subtle rounded px-2 py-1.5 text-primary text-xs tracking-wide focus:outline-none focus:border-[var(--brass)]/50'
 
 function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpload: (file: File) => void; isPending: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -73,6 +76,32 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<CreateRiflePayload>({ make: '', model: '', calibre: '.177' })
   const [showFields, setShowFields] = useState(false)
+  const [makeFilter, setMakeFilter] = useState('')
+  const [modelFilter, setModelFilter] = useState('')
+  const [calibreFilter, setCalibreFilter] = useState('')
+
+  const makes = useMemo(() => [...new Set(RIFLE_CATALOG.map(e => e.make))].sort(), [])
+
+  const models = useMemo(() => {
+    let items: RifleCatalogEntry[] = RIFLE_CATALOG
+    if (makeFilter) items = items.filter(e => e.make === makeFilter)
+    if (calibreFilter) items = items.filter(e => e.calibre === calibreFilter)
+    return [...new Set(items.map(e => e.model))].sort()
+  }, [makeFilter, calibreFilter])
+
+  const calibres = useMemo(() => {
+    let items: RifleCatalogEntry[] = RIFLE_CATALOG
+    if (makeFilter) items = items.filter(e => e.make === makeFilter)
+    return [...new Set(items.map(e => e.calibre))].sort()
+  }, [makeFilter])
+
+  const filteredCatalog = useMemo(() => {
+    let items: RifleCatalogEntry[] = RIFLE_CATALOG
+    if (makeFilter) items = items.filter(e => e.make === makeFilter)
+    if (modelFilter) items = items.filter(e => e.model === modelFilter)
+    if (calibreFilter) items = items.filter(e => e.calibre === calibreFilter)
+    return items
+  }, [makeFilter, modelFilter, calibreFilter])
 
   const mutation = useMutation({
     mutationFn: () => gearApi.createRifle(form),
@@ -96,15 +125,31 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
       {!showFields && (
-        <CatalogSearch
-          items={RIFLE_CATALOG}
-          searchKeys={['make', 'model']}
-          renderItem={(e) => `${e.make} ${e.model}`}
-          renderDetail={(e) => [e.calibre, e.power_ftlb != null ? `${e.power_ftlb} ft·lb` : ''].filter(Boolean).join(' · ')}
-          onSelect={handleCatalogSelect}
-          onManualEntry={() => setShowFields(true)}
-          placeholder="Search rifles — e.g. HW100, Air Arms..."
-        />
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <select className={selectCls} value={makeFilter} onChange={e => { setMakeFilter(e.target.value); setModelFilter('') }}>
+              <option value="">All brands</option>
+              {makes.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className={selectCls} value={modelFilter} onChange={e => setModelFilter(e.target.value)}>
+              <option value="">All models</option>
+              {models.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className={selectCls} value={calibreFilter} onChange={e => setCalibreFilter(e.target.value)}>
+              <option value="">All calibres</option>
+              {calibres.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <CatalogSearch
+            items={filteredCatalog}
+            searchKeys={['make', 'model']}
+            renderItem={(e) => `${e.make} ${e.model}`}
+            renderDetail={(e) => [e.calibre, e.power_ftlb != null ? `${e.power_ftlb} ft·lb` : ''].filter(Boolean).join(' · ')}
+            onSelect={handleCatalogSelect}
+            onManualEntry={() => setShowFields(true)}
+            placeholder="Search rifles — e.g. HW100, Air Arms..."
+          />
+        </>
       )}
       {showFields && (
         <>
@@ -258,6 +303,45 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<CreatePelletPayload>({ brand: '', model: '' })
   const [showFields, setShowFields] = useState(false)
+  const [brandFilter, setBrandFilter] = useState('')
+  const [modelFilter, setModelFilter] = useState('')
+  const [calibreFilter, setCalibreFilter] = useState('')
+  const [sizeFilter, setSizeFilter] = useState('')
+
+  const pelletCalibre = (mm?: number) => mm != null ? (mm < 5 ? '.177' : '.22') : undefined
+
+  const brands = useMemo(() => [...new Set(PELLET_CATALOG.map(e => e.brand))].sort(), [])
+
+  const models = useMemo(() => {
+    let items: PelletCatalogEntry[] = PELLET_CATALOG
+    if (brandFilter) items = items.filter(e => e.brand === brandFilter)
+    if (calibreFilter) items = items.filter(e => pelletCalibre(e.head_size_mm) === calibreFilter)
+    return [...new Set(items.map(e => e.model))].sort()
+  }, [brandFilter, calibreFilter])
+
+  const calibres = useMemo(() => {
+    let items: PelletCatalogEntry[] = PELLET_CATALOG
+    if (brandFilter) items = items.filter(e => e.brand === brandFilter)
+    const cals = new Set(items.map(e => pelletCalibre(e.head_size_mm)).filter(Boolean))
+    return [...cals].sort() as string[]
+  }, [brandFilter])
+
+  const sizes = useMemo(() => {
+    let items: PelletCatalogEntry[] = PELLET_CATALOG
+    if (brandFilter) items = items.filter(e => e.brand === brandFilter)
+    if (modelFilter) items = items.filter(e => e.model === modelFilter)
+    if (calibreFilter) items = items.filter(e => pelletCalibre(e.head_size_mm) === calibreFilter)
+    return [...new Set(items.filter(e => e.head_size_mm != null).map(e => e.head_size_mm!))].sort((a, b) => a - b)
+  }, [brandFilter, modelFilter, calibreFilter])
+
+  const filteredCatalog = useMemo(() => {
+    let items: PelletCatalogEntry[] = PELLET_CATALOG
+    if (brandFilter) items = items.filter(e => e.brand === brandFilter)
+    if (modelFilter) items = items.filter(e => e.model === modelFilter)
+    if (calibreFilter) items = items.filter(e => pelletCalibre(e.head_size_mm) === calibreFilter)
+    if (sizeFilter) items = items.filter(e => e.head_size_mm === Number(sizeFilter))
+    return items
+  }, [brandFilter, modelFilter, calibreFilter, sizeFilter])
 
   const mutation = useMutation({
     mutationFn: () => gearApi.createPellet(form),
@@ -281,15 +365,35 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
       {!showFields && (
-        <CatalogSearch
-          items={PELLET_CATALOG}
-          searchKeys={['brand', 'model']}
-          renderItem={(e) => `${e.brand} ${e.model}`}
-          renderDetail={(e) => [e.head_size_mm != null ? `${e.head_size_mm}mm` : '', e.weight_grains != null ? `${e.weight_grains}gr` : ''].filter(Boolean).join(' · ')}
-          onSelect={handleCatalogSelect}
-          onManualEntry={() => setShowFields(true)}
-          placeholder="Search pellets — e.g. JSB Exact, H&N..."
-        />
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <select className={selectCls} value={brandFilter} onChange={e => { setBrandFilter(e.target.value); setModelFilter(''); setSizeFilter('') }}>
+              <option value="">All brands</option>
+              {brands.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <select className={selectCls} value={modelFilter} onChange={e => { setModelFilter(e.target.value); setSizeFilter('') }}>
+              <option value="">All models</option>
+              {models.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className={selectCls} value={calibreFilter} onChange={e => { setCalibreFilter(e.target.value); setSizeFilter('') }}>
+              <option value="">All calibres</option>
+              {calibres.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className={selectCls} value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}>
+              <option value="">All sizes</option>
+              {sizes.map(s => <option key={s} value={String(s)}>{s.toFixed(2)}mm</option>)}
+            </select>
+          </div>
+          <CatalogSearch
+            items={filteredCatalog}
+            searchKeys={['brand', 'model']}
+            renderItem={(e) => `${e.brand} ${e.model}`}
+            renderDetail={(e) => [e.head_size_mm != null ? `${e.head_size_mm}mm` : '', e.weight_grains != null ? `${e.weight_grains}gr` : ''].filter(Boolean).join(' · ')}
+            onSelect={handleCatalogSelect}
+            onManualEntry={() => setShowFields(true)}
+            placeholder="Search pellets — e.g. JSB Exact, H&N..."
+          />
+        </>
       )}
       {showFields && (
         <>

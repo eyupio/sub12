@@ -59,10 +59,17 @@ export const PELLET_CATALOG: PelletCatalogEntry[] = [
   { brand: 'Legends', model: 'Legend', head_size_mm: 4.52, weight_grains: 8.44 },
 
   // .22 calibre pellets
+  { brand: 'JSB', model: 'Exact', head_size_mm: 5.50, weight_grains: 15.89 },
+  { brand: 'JSB', model: 'Exact', head_size_mm: 5.51, weight_grains: 15.89 },
   { brand: 'JSB', model: 'Exact', head_size_mm: 5.52, weight_grains: 15.89 },
   { brand: 'JSB', model: 'Exact', head_size_mm: 5.53, weight_grains: 15.89 },
+  { brand: 'JSB', model: 'Exact RS', head_size_mm: 5.50, weight_grains: 13.43 },
+  { brand: 'JSB', model: 'Exact RS', head_size_mm: 5.51, weight_grains: 13.43 },
   { brand: 'JSB', model: 'Exact RS', head_size_mm: 5.52, weight_grains: 13.43 },
+  { brand: 'JSB', model: 'Exact Heavy', head_size_mm: 5.50, weight_grains: 18.13 },
+  { brand: 'JSB', model: 'Exact Heavy', head_size_mm: 5.51, weight_grains: 18.13 },
   { brand: 'JSB', model: 'Exact Heavy', head_size_mm: 5.52, weight_grains: 18.13 },
+  { brand: 'JSB', model: 'Exact Heavy', head_size_mm: 5.53, weight_grains: 18.13 },
   { brand: 'H&N', model: 'Field Target Trophy', head_size_mm: 5.53, weight_grains: 14.66 },
   { brand: 'H&N', model: 'Baracuda Match', head_size_mm: 5.53, weight_grains: 21.14 },
   { brand: 'Air Arms', model: 'Diabolo Field', head_size_mm: 5.52, weight_grains: 15.89 },
