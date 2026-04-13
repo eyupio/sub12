@@ -2,9 +2,11 @@ import { useState, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
+import { statsApi, RifleStats } from '../api/stats'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { CatalogSearch } from '../components/CatalogSearch'
+import { RifleProfileCard } from '../components/RifleProfileCard'
 import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, PelletCatalogEntry } from '../catalog/pelletCatalog'
 
@@ -182,7 +184,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
   )
 }
 
-function RifleRow({ rifle }: { rifle: Rifle }) {
+function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -243,27 +245,16 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
   }
 
   return (
-    <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <GearImage imageUrl={rifle.image_url} onUpload={file => imgMutation.mutate(file)} isPending={imgMutation.isPending} />
-      <div className="flex-1 min-w-0">
-        <p className="text-secondary text-sm font-medium">{rifle.make} {rifle.model}</p>
-        <p className="text-[11px] text-muted tracking-wide">{rifle.calibre}{rifle.power_ftlb != null ? ` · ${rifle.power_ftlb} ft·lb` : ''}</p>
-      </div>
-      <button
-        onClick={() => { setForm({ make: rifle.make, model: rifle.model, calibre: rifle.calibre ?? '', power_ftlb: rifle.power_ftlb }); setEditing(true) }}
-        className="text-muted hover:text-[var(--brass)] transition-colors"
-        aria-label="Edit rifle"
-      >
-        <Pencil size={15} />
-      </button>
-      <button
-        onClick={() => setConfirmDelete(true)}
-        disabled={del.isPending}
-        className="text-muted hover:text-[var(--error-text)] transition-colors"
-        aria-label="Delete rifle"
-      >
-        <Trash2 size={15} />
-      </button>
+    <>
+      <RifleProfileCard
+        rifle={rifle}
+        stats={stats}
+        mode="gear"
+        onUploadImage={file => imgMutation.mutate(file)}
+        isUploadPending={imgMutation.isPending}
+        onEdit={() => { setForm({ make: rifle.make, model: rifle.model, calibre: rifle.calibre ?? '', power_ftlb: rifle.power_ftlb }); setEditing(true) }}
+        onDelete={() => setConfirmDelete(true)}
+      />
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete ${rifle.make} ${rifle.model}?`}
@@ -271,17 +262,23 @@ function RifleRow({ rifle }: { rifle: Rifle }) {
         onConfirm={() => { setConfirmDelete(false); del.mutate() }}
         onCancel={() => setConfirmDelete(false)}
       />
-    </div>
+    </>
   )
 }
 
 function RiflesTab() {
   const [adding, setAdding] = useState(false)
   const { data, isLoading } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
+  const { data: rifleStatsData } = useQuery({ queryKey: ['rifle-stats'], queryFn: () => statsApi.getRifleStats() })
   const rifles = data?.items ?? []
+  const rifleStatsMap = useMemo(() => {
+    const map = new Map<string, RifleStats>()
+    for (const rs of rifleStatsData?.items ?? []) map.set(rs.rifle_id, rs)
+    return map
+  }, [rifleStatsData])
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {!adding && (
         <button onClick={() => setAdding(true)} className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
           <Plus size={13} /> Add Rifle
@@ -289,7 +286,9 @@ function RiflesTab() {
       )}
       {adding && <AddRifleForm onDone={() => setAdding(false)} />}
       {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
-      {rifles.map(r => <RifleRow key={r.id} rifle={r} />)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {rifles.map(r => <RifleRow key={r.id} rifle={r} stats={rifleStatsMap.get(r.id)} />)}
+      </div>
       {!isLoading && rifles.length === 0 && !adding && (
         <p className="text-muted text-sm">No rifles added yet.</p>
       )}

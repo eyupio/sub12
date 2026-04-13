@@ -7,6 +7,8 @@ import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
 import { usersApi, UpdateProfileInput } from '../api/users'
 import { achievementApi, Achievement } from '../api/achievements'
+import { gearApi } from '../api/gear'
+import { RifleProfileCard } from '../components/RifleProfileCard'
 import { toast } from '../store/toast'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
@@ -208,6 +210,21 @@ export default function Profile() {
     queryFn: () => achievementApi.listMine(),
     enabled: !!user,
   })
+
+  const { data: riflesData } = useQuery({
+    queryKey: ['rifles'],
+    queryFn: () => gearApi.listRifles(),
+  })
+
+  const { data: rifleStatsData } = useQuery({
+    queryKey: ['rifle-stats'],
+    queryFn: () => statsApi.getRifleStats(),
+  })
+
+  const rifles = riflesData?.items ?? []
+  const rifleStatsMap = new Map(
+    (rifleStatsData?.items ?? []).map(rs => [rs.rifle_id, rs])
+  )
 
   const mutation = useMutation({
     mutationFn: (input: UpdateProfileInput) => usersApi.updateMe(input),
@@ -502,6 +519,33 @@ export default function Profile() {
             value={stats?.avg_score != null ? stats.avg_score.toFixed(1) : '—'}
           />
         </div>
+      </div>
+
+      {/* My Rifles */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">My Rifles</h2>
+          <Link
+            to="/gear"
+            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            Manage gear →
+          </Link>
+        </div>
+        {rifles.length === 0 ? (
+          <p className="text-sm text-muted tracking-wide">No rifles added yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {rifles.map(r => (
+              <RifleProfileCard
+                key={r.id}
+                rifle={r}
+                stats={rifleStatsMap.get(r.id)}
+                mode="profile"
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Achievements */}
