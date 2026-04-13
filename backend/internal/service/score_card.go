@@ -11,7 +11,8 @@ import (
 
 
 var (
-	ErrInvalidCard = errors.New("invalid score card")
+	ErrInvalidCard       = errors.New("invalid score card")
+	ErrMaxSubmissions    = errors.New("maximum submissions per round reached")
 )
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
@@ -24,14 +25,21 @@ type ScoreCardRepo interface {
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 }
 
+// LeagueConfigRepo provides league config lookups needed by ScoreCardService.
+type LeagueConfigRepo interface {
+	GetConfigByRoundID(ctx context.Context, roundID string) (*model.LeagueConfig, error)
+	CountUserSubmissionsForRound(ctx context.Context, userID, roundID string) (int, error)
+}
+
 type ScoreCardService struct {
 	cards       ScoreCardRepo
+	leagueRepo  LeagueConfigRepo    // optional; nil skips league rule enforcement
 	activity    *ActivityService    // optional; nil disables feed ingestion
 	achievement *AchievementService // optional; nil disables achievement evaluation
 }
 
-func NewScoreCardService(cards ScoreCardRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
-	return &ScoreCardService{cards: cards, activity: activity, achievement: achievement}
+func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
+	return &ScoreCardService{cards: cards, leagueRepo: leagueRepo, activity: activity, achievement: achievement}
 }
 
 // Create validates the input and persists a new score card.
@@ -54,6 +62,23 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		totalScore += score
 		if input.ShotXs[i] {
 			xCount++
+		}
+	}
+
+	// Enforce max_submissions_per_round when submitting to a league round
+	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
+		cfg, err := s.leagueRepo.GetConfigByRoundID(ctx, *input.LeagueRoundID)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return nil, fmt.Errorf("check league config: %w", err)
+		}
+		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
+			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *input.LeagueRoundID)
+			if err != nil {
+				return nil, fmt.Errorf("count submissions: %w", err)
+			}
+			if count >= int(cfg.MaxSubmissionsPerRound) {
+				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
+			}
 		}
 	}
 

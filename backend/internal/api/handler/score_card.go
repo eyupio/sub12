@@ -43,6 +43,10 @@ func (h *ScoreCardHandler) Create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrMaxSubmissions) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to save score card")
 		return
 	}

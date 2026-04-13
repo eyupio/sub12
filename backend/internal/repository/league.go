@@ -537,11 +537,13 @@ func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID
 
 // ListScores returns score cards submitted to a league (linked via rounds),
 // enriched with the submitter's display name. Newest first.
-func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limit, offset int) ([]*model.LeagueScore, error) {
+// When verification is non-empty, results are filtered by that status.
+func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limit, offset int, verification string) ([]*model.LeagueScore, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	rows, err := r.db.Query(ctx, `
+
+	query := `
 		SELECT sc.id, sc.user_id, u.display_name,
 		       sc.shot_at::text, sc.total_score, sc.x_count,
 		       sc.verification::text, sc.created_at
@@ -549,10 +551,20 @@ func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limi
 		JOIN rounds rd ON rd.id = sc.league_round_id
 		JOIN seasons s  ON s.id  = rd.season_id
 		JOIN users u    ON u.id  = sc.user_id
-		WHERE s.league_id = $1
+		WHERE s.league_id = $1`
+
+	args := []any{leagueID}
+	if verification != "" {
+		args = append(args, verification)
+		query += fmt.Sprintf(" AND sc.verification = $%d::verification_status", len(args))
+	}
+
+	query += `
 		ORDER BY sc.shot_at DESC, sc.created_at DESC
-		LIMIT $2 OFFSET $3
-	`, leagueID, limit, offset)
+		LIMIT $` + fmt.Sprintf("%d", len(args)+1) + ` OFFSET $` + fmt.Sprintf("%d", len(args)+2)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list league scores: %w", err)
 	}
@@ -897,6 +909,50 @@ func (r *LeagueRepository) RemoveMember(ctx context.Context, leagueID, memberID 
 	return nil
 }
 
+// GetLeagueByScoreCardID resolves the league that a score card belongs to
+// by traversing score_cards → rounds → seasons → leagues.
+func (r *LeagueRepository) GetLeagueByScoreCardID(ctx context.Context, scoreCardID string) (*model.ScoreCardLeague, error) {
+	var league model.ScoreCardLeague
+	err := r.db.QueryRow(ctx, `
+		SELECT l.id, l.name
+		FROM leagues l
+		JOIN seasons s  ON s.league_id = l.id
+		JOIN rounds rd  ON rd.season_id = s.id
+		JOIN score_cards sc ON sc.league_round_id = rd.id
+		WHERE sc.id = $1
+	`, scoreCardID).Scan(&league.ID, &league.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get league by score card: %w", err)
+	}
+	return &league, nil
+}
+
+// IsAdminForScoreCard checks whether the given user is an admin of the league
+// that owns the given score card.
+func (r *LeagueRepository) IsAdminForScoreCard(ctx context.Context, scoreCardID, userID string) (bool, string, error) {
+	var leagueID string
+	var isAdmin bool
+	err := r.db.QueryRow(ctx, `
+		SELECT l.id, COALESCE(lm.is_admin, false)
+		FROM leagues l
+		JOIN seasons s  ON s.league_id = l.id
+		JOIN rounds rd  ON rd.season_id = s.id
+		JOIN score_cards sc ON sc.league_round_id = rd.id
+		LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $2
+		WHERE sc.id = $1
+	`, scoreCardID, userID).Scan(&leagueID, &isAdmin)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, "", ErrNotFound
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("check admin for score card: %w", err)
+	}
+	return isAdmin, leagueID, nil
+}
+
 // GetScoreCardOwner returns the user_id of a score card.
 func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error) {
 	var userID string
@@ -908,4 +964,45 @@ func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID st
 		return "", fmt.Errorf("get score card owner: %w", err)
 	}
 	return userID, nil
+}
+
+// GetConfigByRoundID looks up the league config for the league that owns the given round.
+func (r *LeagueRepository) GetConfigByRoundID(ctx context.Context, roundID string) (*model.LeagueConfig, error) {
+	var c model.LeagueConfig
+	err := r.db.QueryRow(ctx, `
+		SELECT lc.league_id, lc.starts_on::text, lc.ends_on::text,
+		       lc.max_submissions_per_round, lc.scoring_rule::text, lc.join_policy::text,
+		       lc.require_score_verification, lc.required_confirmations,
+		       lc.require_image_upload, lc.updated_at
+		FROM league_configs lc
+		JOIN seasons s ON s.league_id = lc.league_id
+		JOIN rounds rd ON rd.season_id = s.id
+		WHERE rd.id = $1
+	`, roundID).Scan(
+		&c.LeagueID, &c.StartsOn, &c.EndsOn,
+		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
+		&c.RequireScoreVerification, &c.RequiredConfirmations,
+		&c.RequireImageUpload, &c.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get config by round: %w", err)
+	}
+	return &c, nil
+}
+
+// CountUserSubmissionsForRound returns the number of score cards a user has
+// submitted to a specific round.
+func (r *LeagueRepository) CountUserSubmissionsForRound(ctx context.Context, userID, roundID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM score_cards
+		WHERE user_id = $1 AND league_round_id = $2
+	`, userID, roundID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count user submissions for round: %w", err)
+	}
+	return count, nil
 }
