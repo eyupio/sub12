@@ -22,7 +22,6 @@ interface Point { x: number; y: number }
 const CALIBER_MAP: Record<string, number> = { '.177': 4.5, '.20': 5.08, '.22': 5.5, '.25': 6.35 }
 const RED = '#ef4444'
 const YELLOW = '#eab308'
-const GREEN = '#22c55e'
 const DRAG_THRESHOLD = 5
 
 function computeGroupSizeFromImpacts(impacts: Point[], ppmm: number, pelletMM: number) {
