@@ -46,35 +46,35 @@ export default function PelletTesting() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Pellet Testing</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <Link
             to="/pellet-testing/batch-report"
-            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded border border-subtle text-xs lg:text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors whitespace-nowrap"
           >
             Batches
           </Link>
           <Link
             to="/pellet-testing/combo-analytics"
-            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded border border-subtle text-xs lg:text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors whitespace-nowrap"
           >
             Combos
           </Link>
           <Link
             to="/pellet-testing/compare"
-            className="flex items-center gap-1.5 px-4 py-2 rounded border border-subtle text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded border border-subtle text-xs lg:text-sm font-medium tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors whitespace-nowrap"
           >
             <ArrowLeftRight size={14} />
             Compare
           </Link>
           <Link
-          to="/pellet-testing/new"
-          className="flex items-center gap-1.5 px-4 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase hover:opacity-90 transition-opacity"
-        >
-          <Plus size={14} />
-          New Test
-        </Link>
+            to="/pellet-testing/new"
+            className="flex items-center gap-1.5 px-3 py-2 rounded bg-[var(--brass)] text-inverse text-xs lg:text-sm font-medium tracking-widest uppercase hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            <Plus size={14} />
+            New Test
+          </Link>
         </div>
       </div>
 
