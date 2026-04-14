@@ -20,7 +20,7 @@ type ScoreCardRepo interface {
 	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
 	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
-	ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error)
+	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 }
@@ -147,7 +147,8 @@ func (s *ScoreCardService) GetPublicByID(ctx context.Context, id string) (*model
 
 // ListByUser returns paginated summaries for the requesting user.
 // scope filters results: "personal", "league", or "" (all).
-func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error) {
+// leagueID optionally filters to cards belonging to a specific league.
+func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -157,7 +158,7 @@ func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit,
 	if scope != "" && scope != "personal" && scope != "league" && scope != "club" {
 		scope = ""
 	}
-	return s.cards.ListByUser(ctx, userID, limit, offset, scope)
+	return s.cards.ListByUser(ctx, userID, limit, offset, scope, leagueID)
 }
 
 // Update modifies a score card's shots and metadata, resets verification, and

@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
+import { leagueApi } from '../api/leagues'
 import { formatDate } from '../utils/date'
 
 function VerificationDot({ status }: { status: string }) {
@@ -24,6 +25,9 @@ function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerif
     >
       <div className="space-y-0.5">
         <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at)}</p>
+        {card.league_name && (
+          <p className="text-[11px] text-[var(--brass)] tracking-wide">{card.league_name}</p>
+        )}
         {card.location && (
           <p className="text-[11px] text-muted tracking-wide">{card.location}</p>
         )}
@@ -41,10 +45,17 @@ function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerif
 
 export default function ScoreHistory() {
   const [tab, setTab] = useState<'personal' | 'league'>('personal')
+  const [leagueFilter, setLeagueFilter] = useState('')
+
+  const { data: myLeagues } = useQuery({
+    queryKey: ['my-leagues'],
+    queryFn: () => leagueApi.listMine(),
+    enabled: tab === 'league',
+  })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['score-cards', tab],
-    queryFn: () => scoreCardApi.list(20, 0, tab),
+    queryKey: ['score-cards', tab, leagueFilter],
+    queryFn: () => scoreCardApi.list(20, 0, tab, leagueFilter || undefined),
   })
 
   return (
@@ -71,7 +82,7 @@ export default function ScoreHistory() {
       {/* Segmented control */}
       <div className="flex border border-subtle rounded overflow-hidden">
         <button
-          onClick={() => setTab('personal')}
+          onClick={() => { setTab('personal'); setLeagueFilter('') }}
           className={`flex-1 py-2 text-[11px] tracking-widest uppercase transition-colors border-r border-subtle ${
             tab === 'personal'
               ? 'bg-[var(--brass)]/10 text-[var(--brass)]'
@@ -91,6 +102,19 @@ export default function ScoreHistory() {
           League
         </button>
       </div>
+
+      {tab === 'league' && myLeagues && myLeagues.items.length > 0 && (
+        <select
+          value={leagueFilter}
+          onChange={e => setLeagueFilter(e.target.value)}
+          className="bg-surface border border-subtle rounded px-2.5 py-1.5 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50 transition-colors w-full"
+        >
+          <option value="">All Leagues</option>
+          {myLeagues.items.map(l => (
+            <option key={l.id} value={l.id}>{l.name}</option>
+          ))}
+        </select>
+      )}
 
       {isLoading && (
         <div className="space-y-2">

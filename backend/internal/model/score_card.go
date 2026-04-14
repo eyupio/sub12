@@ -91,6 +91,8 @@ type ScoreCardSummary struct {
 	Location      *string   `json:"location,omitempty"`
 	Verification  string    `json:"verification"`
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
+	LeagueID      *string   `json:"league_id,omitempty"`
+	LeagueName    *string   `json:"league_name,omitempty"`
 	ClubID        *string   `json:"club_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }

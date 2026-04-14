@@ -157,25 +157,36 @@ func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (
 
 // ListByUser returns paginated score card summaries for a user, newest first.
 // scope filters results: "personal" (no league), "league" (has league), or "" (all).
-func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.ScoreCardSummary, error) {
+// leagueID optionally filters to cards belonging to a specific league.
+func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error) {
 	query := `
-		SELECT id, shot_at::text, total_score, x_count, location,
-		       verification::text, league_round_id, club_id, created_at
-		FROM score_cards
-		WHERE user_id = $1
+		SELECT sc.id, sc.shot_at::text, sc.total_score, sc.x_count, sc.location,
+		       sc.verification::text, sc.league_round_id, l.id, l.name, sc.club_id, sc.created_at
+		FROM score_cards sc
+		LEFT JOIN rounds rd ON rd.id = sc.league_round_id
+		LEFT JOIN seasons s ON s.id = rd.season_id
+		LEFT JOIN leagues l ON l.id = s.league_id
+		WHERE sc.user_id = $1
 	`
 	args := []any{userID}
+	argIdx := 2
 
 	switch scope {
 	case "personal":
-		query += ` AND league_round_id IS NULL AND club_id IS NULL`
+		query += ` AND sc.league_round_id IS NULL AND sc.club_id IS NULL`
 	case "league":
-		query += ` AND league_round_id IS NOT NULL`
+		query += ` AND sc.league_round_id IS NOT NULL`
 	case "club":
-		query += ` AND club_id IS NOT NULL`
+		query += ` AND sc.club_id IS NOT NULL`
 	}
 
-	query += ` ORDER BY shot_at DESC, created_at DESC LIMIT $2 OFFSET $3`
+	if leagueID != "" {
+		query += fmt.Sprintf(` AND l.id = $%d`, argIdx)
+		args = append(args, leagueID)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY sc.shot_at DESC, sc.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -188,7 +199,7 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	for rows.Next() {
 		var c model.ScoreCardSummary
 		if err := rows.Scan(&c.ID, &c.ShotAt, &c.TotalScore, &c.XCount, &c.Location,
-			&c.Verification, &c.LeagueRoundID, &c.ClubID, &c.CreatedAt); err != nil {
+			&c.Verification, &c.LeagueRoundID, &c.LeagueID, &c.LeagueName, &c.ClubID, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan score card summary: %w", err)
 		}
 		cards = append(cards, &c)
