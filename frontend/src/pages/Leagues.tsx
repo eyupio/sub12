@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, ChevronRight, X } from 'lucide-react'
-import { leagueApi, CreateLeaguePayload } from '../api/leagues'
+import { leagueApi, CreateLeaguePayload, MyLeagueSummary } from '../api/leagues'
+import { useAuthStore } from '../store/auth'
 
 function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -100,32 +101,53 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function LeagueRow({ league }: { league: import('../api/leagues').League }) {
+function ordinal(n: number): string {
+  if (n <= 0) return '—'
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+function LeagueRow({ league, myLeague }: { league: import('../api/leagues').League; myLeague?: MyLeagueSummary }) {
   return (
     <Link
       to="/leagues/$id"
       params={{ id: league.id }}
       className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
     >
-      {league.image_url && (
+      {league.image_url ? (
         <img
           src={league.image_url}
           alt={league.name}
           className="w-9 h-9 rounded-lg object-cover border border-subtle shrink-0"
         />
+      ) : (
+        <div className="w-9 h-9 rounded-lg border border-subtle shrink-0 bg-surface-hover flex items-center justify-center">
+          <Users size={16} className="text-muted opacity-40" />
+        </div>
       )}
       <div className="space-y-0.5 min-w-0 flex-1">
         <p className="text-sm text-secondary font-medium truncate">{league.name}</p>
         {league.description && (
           <p className="text-[11px] text-muted truncate">{league.description}</p>
         )}
+        <div className="flex items-center gap-1 text-muted">
+          <Users size={10} />
+          <span className="text-[11px]">{league.member_count}</span>
+        </div>
       </div>
       <div className="flex items-center gap-3 ml-3 shrink-0">
-        <div className="flex items-center gap-1 text-muted">
-          <Users size={13} />
-          <span className="font-mono text-xs">{league.member_count}</span>
-        </div>
-        <ChevronRight size={16} className="text-muted" />
+        {myLeague && myLeague.user_rank > 0 ? (
+          <div className="text-right font-mono">
+            <span className="text-sm text-primary">{ordinal(myLeague.user_rank)}</span>
+            <span className="text-[11px] text-muted ml-0.5">/{league.member_count}</span>
+            {league.member_count >= 5 && (
+              <p className="text-[10px] text-muted mt-0.5">top {Math.round((myLeague.user_rank / league.member_count) * 100)}%</p>
+            )}
+          </div>
+        ) : (
+          <ChevronRight size={16} className="text-muted" />
+        )}
       </div>
     </Link>
   )
@@ -133,11 +155,22 @@ function LeagueRow({ league }: { league: import('../api/leagues').League }) {
 
 export default function Leagues() {
   const [showCreate, setShowCreate] = useState(false)
+  const user = useAuthStore((s) => s.user)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['leagues'],
     queryFn: () => leagueApi.list(),
   })
+
+  const { data: myLeagues } = useQuery({
+    queryKey: ['my-leagues'],
+    queryFn: () => leagueApi.listMine(),
+    enabled: !!user,
+  })
+
+  const myLeagueMap = new Map(
+    myLeagues?.items?.map((l) => [l.id, l]) ?? [],
+  )
 
   return (
     <>
@@ -180,7 +213,7 @@ export default function Leagues() {
         {data && data.items.length > 0 && (
           <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {data.items.map(league => (
-              <LeagueRow key={league.id} league={league} />
+              <LeagueRow key={league.id} league={league} myLeague={myLeagueMap.get(league.id)} />
             ))}
           </div>
         )}
