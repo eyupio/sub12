@@ -62,6 +62,8 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
       <div
         className="bg-card border border-subtle rounded-lg shadow-lg w-full max-w-md mx-4 p-4 space-y-4"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         {/* Header */}
         <div className="flex items-center justify-between">

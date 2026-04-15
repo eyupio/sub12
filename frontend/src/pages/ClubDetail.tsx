@@ -6,6 +6,8 @@ import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
 import type { League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
 
@@ -64,6 +66,7 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
   onRemoved: () => void
 }) {
   const queryClient = useQueryClient()
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const removeMutation = useMutation({
     mutationFn: () => clubsApi.removeMember(clubId, member.user_id),
     onSuccess: () => {
@@ -93,7 +96,7 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
       )}
       {isAdmin && !member.is_admin && (
         <button
-          onClick={() => removeMutation.mutate()}
+          onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
           className="text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
           title="Remove member"
@@ -101,6 +104,14 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
           <Trash2 size={14} />
         </button>
       )}
+      <ConfirmDialog
+        open={confirmRemove}
+        title={`Remove ${member.display_name}?`}
+        message="This member will be removed from the club."
+        confirmLabel="Remove"
+        onConfirm={() => { setConfirmRemove(false); removeMutation.mutate() }}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </div>
   )
 }
@@ -149,6 +160,7 @@ export default function ClubDetail() {
       setNewLeagueName('')
       setNewLeagueDesc('')
       setNewLeagueType('public')
+      toast('League created', 'success')
     },
   })
 
@@ -157,6 +169,7 @@ export default function ClubDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', id] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Joined club', 'success')
     },
     onError: () => setJoinError('Failed to join club. You may already be a member.'),
   })
@@ -164,6 +177,7 @@ export default function ClubDetail() {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => clubsApi.uploadImage(id, file),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['club', id] }),
+    onError: () => toast('Failed to upload image', 'error'),
   })
 
   function copyJoinCode() {

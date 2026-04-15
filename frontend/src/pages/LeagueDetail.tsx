@@ -3,6 +3,7 @@ import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
+import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { PostCard } from '../components/PostCard'
@@ -168,9 +169,9 @@ export default function LeagueDetail() {
       }
     },
     onError: (err: Error) => {
-      if (err.message.includes('409')) {
+      if (err instanceof ApiError && err.status === 409) {
         setJoinError('You\'re already a member of this league.')
-      } else if (err.message.includes('403')) {
+      } else if (err instanceof ApiError && err.status === 403) {
         setJoinError('Invalid or missing invite code.')
       } else {
         setJoinError('Failed to join. Please try again.')

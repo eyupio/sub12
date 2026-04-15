@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, ChevronRight, X } from 'lucide-react'
 import { leagueApi, CreateLeaguePayload, MyLeagueSummary } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
 
 function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -16,6 +17,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
     mutationFn: (payload: CreateLeaguePayload) => leagueApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
+      toast('League created', 'success')
       onClose()
     },
     onError: () => setError('Failed to create league. Please try again.'),
@@ -31,7 +33,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5">
+      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5" role="dialog" aria-modal="true">
         <div className="flex items-center justify-between">
           <h2 className="text-sm tracking-widest uppercase text-secondary">New League</h2>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
