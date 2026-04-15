@@ -5,8 +5,10 @@ import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, 
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
+import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LikeButton } from '../components/LikeButton'
 import { ShareDialog } from '../components/ShareDialog'
 
@@ -65,6 +67,10 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'audit-trail'] })
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId] })
+      toast('Score confirmed', 'success')
+    },
+    onError: (err) => {
+      toast(err instanceof ApiError && err.status === 409 ? 'Already confirmed' : 'Failed to confirm score', 'error')
     },
   })
 
@@ -82,6 +88,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
       setAmendScore('')
       setAmendX('')
       setAmendReason('')
+      toast('Score amended', 'success')
     },
   })
 
@@ -92,6 +99,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
       queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'audit-trail'] })
       setShowReject(false)
       setRejectReason('')
+      toast('Score rejected', 'success')
     },
   })
 
@@ -184,7 +192,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
           </button>
           {confirmMutation.isError && (
             <p className="text-[var(--error-text)] text-xs">
-              {(confirmMutation.error as Error).message.includes('409')
+              {confirmMutation.error instanceof ApiError && confirmMutation.error.status === 409
                 ? 'Already confirmed.'
                 : 'Failed to confirm.'}
             </p>
@@ -401,6 +409,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const { data } = useQuery({
     queryKey: ['score-cards', cardId, 'comments'],
@@ -519,7 +528,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
                             <Edit3 size={12} />
                           </button>
                           <button
-                            onClick={() => deleteMutation.mutate(c.id)}
+                            onClick={() => setConfirmDeleteId(c.id)}
                             disabled={deleteMutation.isPending}
                             className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
                             aria-label="Delete comment"
@@ -585,6 +594,17 @@ function CommentsSection({ cardId }: { cardId: string }) {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete comment?"
+        message="This comment will be permanently removed."
+        onConfirm={() => {
+          if (confirmDeleteId) deleteMutation.mutate(confirmDeleteId)
+          setConfirmDeleteId(null)
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
@@ -639,6 +659,7 @@ export default function ScoreCardDetail() {
       queryClient.invalidateQueries({ queryKey: ['score-cards', id, 'audit-trail'] })
       clearImage()
       setEditing(false)
+      toast('Score card updated', 'success')
     },
   })
 
@@ -1009,7 +1030,7 @@ export default function ScoreCardDetail() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
           onClick={() => setShowLightbox(false)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] p-4">
+          <div className="relative max-w-4xl max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
             <button
               onClick={() => setShowLightbox(false)}
               className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-2 text-muted hover:text-primary transition-colors z-10"

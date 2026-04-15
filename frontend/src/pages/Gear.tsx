@@ -197,6 +197,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadRifleImage(rifle.id, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['rifles'] }),
+    onError: () => toast('Failed to upload image', 'error'),
   })
   const updateMutation = useMutation({
     mutationFn: () => gearApi.updateRifle(rifle.id, {
@@ -441,6 +442,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadPelletImage(pellet.id, file),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pellets'] }),
+    onError: () => toast('Failed to upload image', 'error'),
   })
   const updateMutation = useMutation({
     mutationFn: () => gearApi.updatePellet(pellet.id, {

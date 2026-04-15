@@ -16,17 +16,21 @@ const colours: Record<ToastVariant, string> = {
 export function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts)
   const removeToast = useToastStore((s) => s.removeToast)
+  const pauseToast = useToastStore((s) => s.pauseToast)
+  const resumeToast = useToastStore((s) => s.resumeToast)
 
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-80 z-[100] space-y-2 pointer-events-none">
+    <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-80 z-[100] space-y-2 pointer-events-none" aria-live="polite">
       {toasts.map((t) => {
         const Icon = icons[t.variant]
         return (
           <div
             key={t.id}
             role="alert"
+            onMouseEnter={() => pauseToast(t.id)}
+            onMouseLeave={() => resumeToast(t.id)}
             className={`pointer-events-auto flex items-start gap-2.5 px-4 py-3 rounded-lg border shadow-lg text-sm tracking-wide animate-slide-in ${colours[t.variant]}`}
           >
             <Icon size={16} className="shrink-0 mt-0.5" />

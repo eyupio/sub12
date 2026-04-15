@@ -1,6 +1,16 @@
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
@@ -66,7 +76,10 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   }
 
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`)
+    const text = await res.text()
+    let msg = text
+    try { const parsed = JSON.parse(text); if (parsed.error) msg = parsed.error } catch { /* not JSON */ }
+    throw new ApiError(res.status, msg)
   }
 
   if (res.status === 204) return undefined as T
@@ -96,7 +109,10 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
   }
 
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`)
+    const text = await res.text()
+    let msg = text
+    try { const parsed = JSON.parse(text); if (parsed.error) msg = parsed.error } catch { /* not JSON */ }
+    throw new ApiError(res.status, msg)
   }
 
   if (res.status === 204) return undefined as T
