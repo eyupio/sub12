@@ -289,6 +289,29 @@ func (r *ClubRepository) UpdateImageURL(ctx context.Context, clubID, url string)
 	return err
 }
 
+// CountAdmins returns how many admins a club currently has.
+func (r *ClubRepository) CountAdmins(ctx context.Context, clubID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM club_members WHERE club_id = $1 AND is_admin = true
+	`, clubID).Scan(&count)
+	return count, err
+}
+
+// UpdateMemberRole sets is_admin for a specific club member.
+func (r *ClubRepository) UpdateMemberRole(ctx context.Context, clubID, userID string, isAdmin bool) error {
+	ct, err := r.db.Exec(ctx, `
+		UPDATE club_members SET is_admin = $3 WHERE club_id = $1 AND user_id = $2
+	`, clubID, userID, isAdmin)
+	if err != nil {
+		return fmt.Errorf("update member role: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("member not found")
+	}
+	return nil
+}
+
 // AdminUpdate applies a partial update (name/description) to any club.
 func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
 	var club model.Club

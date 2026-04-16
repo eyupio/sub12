@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut } from 'lucide-react'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
 import type { League } from '../api/leagues'
@@ -59,14 +59,18 @@ function StandingsTable({ standings }: { standings: ClubStanding[] }) {
   )
 }
 
-function MemberRow({ member, clubId, isAdmin, onRemoved }: {
+function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemoved }: {
   member: ClubMember
   clubId: string
   isAdmin: boolean
+  currentUserId: string
+  adminCount: number
   onRemoved: () => void
 }) {
   const queryClient = useQueryClient()
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [confirmRole, setConfirmRole] = useState(false)
+
   const removeMutation = useMutation({
     mutationFn: () => clubsApi.removeMember(clubId, member.user_id),
     onSuccess: () => {
@@ -75,6 +79,18 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
       onRemoved()
     },
   })
+
+  const roleMutation = useMutation({
+    mutationFn: () => clubsApi.updateMember(clubId, member.user_id, { is_admin: !member.is_admin }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      toast(member.is_admin ? 'Demoted from admin' : 'Promoted to admin', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update role', 'error'),
+  })
+
+  const isSelf = member.user_id === currentUserId
 
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-subtle last:border-0">
@@ -94,7 +110,17 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
           Admin
         </span>
       )}
-      {isAdmin && !member.is_admin && (
+      {isAdmin && !isSelf && (
+        <button
+          onClick={() => setConfirmRole(true)}
+          disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
+          className="text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
+          title={member.is_admin ? 'Demote from admin' : 'Promote to admin'}
+        >
+          {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
+        </button>
+      )}
+      {isAdmin && !member.is_admin && !isSelf && (
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
@@ -112,6 +138,16 @@ function MemberRow({ member, clubId, isAdmin, onRemoved }: {
         onConfirm={() => { setConfirmRemove(false); removeMutation.mutate() }}
         onCancel={() => setConfirmRemove(false)}
       />
+      <ConfirmDialog
+        open={confirmRole}
+        title={member.is_admin ? `Demote ${member.display_name}?` : `Promote ${member.display_name}?`}
+        message={member.is_admin
+          ? 'This member will no longer be able to manage club settings and members.'
+          : 'This member will be able to manage club settings and members.'}
+        confirmLabel={member.is_admin ? 'Demote' : 'Promote'}
+        onConfirm={() => { setConfirmRole(false); roleMutation.mutate() }}
+        onCancel={() => setConfirmRole(false)}
+      />
     </div>
   )
 }
@@ -123,6 +159,7 @@ export default function ClubDetail() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [copied, setCopied] = useState(false)
   const [joinError, setJoinError] = useState('')
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   const { data: club, isLoading } = useQuery({
     queryKey: ['club', id],
@@ -178,6 +215,16 @@ export default function ClubDetail() {
     mutationFn: (file: File) => clubsApi.uploadImage(id, file),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['club', id] }),
     onError: () => toast('Failed to upload image', 'error'),
+  })
+
+  const leaveMutation = useMutation({
+    mutationFn: () => clubsApi.leave(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      queryClient.invalidateQueries({ queryKey: ['club', id] })
+      toast('Left club', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to leave club', 'error'),
   })
 
   function copyJoinCode() {
@@ -270,6 +317,29 @@ export default function ClubDetail() {
               {joinError && <p className="text-[10px] text-[var(--error-text)] text-right">{joinError}</p>}
             </div>
           )}
+          <div className="flex items-center gap-2">
+            {club.is_admin && (
+              <Link
+                to="/clubs/$id/settings"
+                params={{ id }}
+                className="text-muted hover:text-secondary transition-colors"
+                title="Club settings"
+              >
+                <Settings size={16} />
+              </Link>
+            )}
+            {club.is_member && !club.is_admin && (
+              <button
+                onClick={() => setConfirmLeave(true)}
+                disabled={leaveMutation.isPending}
+                className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                title="Leave club"
+              >
+                <LogOut size={12} />
+                Leave
+              </button>
+            )}
+          </div>
           {club.is_admin && (
             <button
               onClick={copyJoinCode}
@@ -308,6 +378,8 @@ export default function ClubDetail() {
                   member={member}
                   clubId={id}
                   isAdmin={!!club.is_admin}
+                  currentUserId={user?.id ?? ''}
+                  adminCount={(membersData?.items ?? []).filter(m => m.is_admin).length}
                   onRemoved={() => {}}
                 />
               ))}
@@ -427,6 +499,15 @@ export default function ClubDetail() {
 
       {/* Club Feed */}
       {club.is_member && <ClubFeed clubId={id} />}
+
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Leave club?"
+        message="You will no longer be a member of this club. You can rejoin later."
+        confirmLabel="Leave"
+        onConfirm={() => { setConfirmLeave(false); leaveMutation.mutate() }}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </div>
   )
 }

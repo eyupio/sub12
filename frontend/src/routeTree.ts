@@ -35,6 +35,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Clubs from './pages/Clubs'
 import ClubDetail from './pages/ClubDetail'
+import ClubSettings from './pages/ClubSettings'
 import ScoreTrends from './pages/ScoreTrends'
 import ComboAnalytics from './pages/ComboAnalytics'
 
@@ -184,6 +185,12 @@ const clubDetailRoute = createRoute({
   component: ClubDetail,
 })
 
+const clubSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/clubs/$id/settings',
+  component: ClubSettings,
+})
+
 const scoreTrendsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/trends',
@@ -310,6 +317,7 @@ export const routeTree = rootRoute.addChildren([
     leagueSettingsRoute,
     clubsRoute,
     clubDetailRoute,
+    clubSettingsRoute,
     profileRoute,
     userProfileRoute,
     feedRoute,

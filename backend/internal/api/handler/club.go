@@ -80,6 +80,103 @@ func (h *ClubHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, club)
 }
 
+// PATCH /api/v1/clubs/{id}
+func (h *ClubHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	var in model.UpdateClubInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	club, err := h.svc.UpdateClub(r.Context(), clubID, userID, &in)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidClub) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update club")
+		return
+	}
+	writeJSON(w, http.StatusOK, club)
+}
+
+// DELETE /api/v1/clubs/{id}/members/me
+func (h *ClubHandler) Leave(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	if err := h.svc.LeaveClub(r.Context(), clubID, userID); err != nil {
+		if errors.Is(err, service.ErrClubNotMember) {
+			writeError(w, http.StatusNotFound, "not a member of this club")
+			return
+		}
+		if errors.Is(err, service.ErrClubLastAdmin) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to leave club")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/clubs/{id}/members/{userId}
+func (h *ClubHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	targetID := chi.URLParam(r, "userId")
+
+	var in model.UpdateClubMemberInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if in.IsAdmin == nil {
+		writeError(w, http.StatusBadRequest, "is_admin field is required")
+		return
+	}
+
+	if err := h.svc.UpdateMemberRole(r.Context(), clubID, requesterID, targetID, *in.IsAdmin); err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if errors.Is(err, service.ErrClubLastAdmin) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update member")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+}
+
 // POST /api/v1/clubs/{id}/join
 func (h *ClubHandler) Join(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

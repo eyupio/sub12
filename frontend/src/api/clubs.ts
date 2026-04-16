@@ -72,4 +72,13 @@ export const clubsApi = {
 
   createLeague: (clubId: string, payload: Omit<CreateLeaguePayload, 'club_id'>) =>
     api.post<League>(`/clubs/${clubId}/leagues`, payload),
+
+  update: (id: string, input: { name?: string; description?: string }) =>
+    api.patch<Club>(`/clubs/${id}`, input),
+
+  leave: (id: string) =>
+    api.del<void>(`/clubs/${id}/members/me`),
+
+  updateMember: (clubId: string, userId: string, input: { is_admin: boolean }) =>
+    api.patch<{ updated: boolean }>(`/clubs/${clubId}/members/${userId}`, input),
 }
