@@ -52,9 +52,28 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 		return nil, fmt.Errorf("insert creator as member: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, `INSERT INTO league_configs (league_id) VALUES ($1)`, league.ID)
+	_, err = tx.Exec(ctx, `
+		INSERT INTO league_configs (league_id, scoring_rule, join_policy)
+		VALUES ($1, COALESCE($2::scoring_rule, 'highest'), COALESCE($3::join_policy, 'open'))
+	`, league.ID, input.ScoringRule, input.JoinPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("insert league config: %w", err)
+	}
+
+	// Generate a join code when join_policy is invite_code or league type is private.
+	needsCode := (input.JoinPolicy != nil && *input.JoinPolicy == "invite_code") ||
+		(input.Type == "private" && (input.JoinPolicy == nil || *input.JoinPolicy != "open"))
+	if needsCode {
+		b := make([]byte, 4)
+		if _, err := rand.Read(b); err != nil {
+			return nil, fmt.Errorf("generate join code: %w", err)
+		}
+		code := hex.EncodeToString(b)
+		_, err = tx.Exec(ctx, `UPDATE leagues SET join_code = $2 WHERE id = $1`, league.ID, code)
+		if err != nil {
+			return nil, fmt.Errorf("set join code: %w", err)
+		}
+		league.JoinCode = &code
 	}
 
 	// Auto-create a default season and round so scores can be submitted immediately.

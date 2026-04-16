@@ -11,6 +11,8 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<'public' | 'private'>('public')
+  const [scoringRule, setScoringRule] = useState<'highest' | 'average'>('highest')
+  const [joinPolicy, setJoinPolicy] = useState<'open' | 'invite_code' | 'approval'>('open')
   const [error, setError] = useState('')
 
   const mutation = useMutation({
@@ -27,13 +29,26 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setError('')
     if (!name.trim()) { setError('Name is required'); return }
-    mutation.mutate({ name: name.trim(), description: description.trim() || undefined, type })
+    mutation.mutate({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      type,
+      scoring_rule: scoringRule,
+      join_policy: joinPolicy,
+    })
   }
+
+  const toggleCls = (active: boolean) =>
+    `flex-1 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+      active
+        ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+        : 'border-subtle text-muted hover:text-secondary'
+    }`
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5" role="dialog" aria-modal="true">
+      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
         <div className="flex items-center justify-between">
           <h2 className="text-sm tracking-widest uppercase text-secondary">New League</h2>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
@@ -69,16 +84,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
             <label className="text-[11px] tracking-widest uppercase text-muted">Visibility</label>
             <div className="flex gap-3">
               {(['public', 'private'] as const).map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setType(opt)}
-                  className={`flex-1 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
-                    type === opt
-                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
-                      : 'border-subtle text-muted hover:text-secondary'
-                  }`}
-                >
+                <button key={opt} type="button" onClick={() => setType(opt)} className={toggleCls(type === opt)}>
                   {opt}
                 </button>
               ))}
@@ -86,6 +92,45 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
             {type === 'private' && (
               <p className="text-[10px] text-muted">An invite code will be generated after creation.</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] tracking-widest uppercase text-muted">Standings</label>
+            <div className="flex gap-3">
+              {(['highest', 'average'] as const).map((opt) => (
+                <button key={opt} type="button" onClick={() => setScoringRule(opt)} className={toggleCls(scoringRule === opt)}>
+                  {opt === 'highest' ? 'Best Score' : 'Average'}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted">
+              {scoringRule === 'highest' ? 'Rank members by their single best score.' : 'Rank members by their average across all scores.'}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] tracking-widest uppercase text-muted">How members join</label>
+            <div className="space-y-1.5">
+              {([
+                { value: 'open' as const, label: 'Open', desc: 'Anyone can join' },
+                { value: 'invite_code' as const, label: 'Invite Code', desc: 'Requires a code to join' },
+                { value: 'approval' as const, label: 'Approval', desc: 'Admin must approve requests' },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setJoinPolicy(opt.value)}
+                  className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${
+                    joinPolicy === opt.value
+                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      : 'border-subtle text-muted hover:text-secondary'
+                  }`}
+                >
+                  <span className="text-[11px] tracking-widest uppercase font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted ml-2">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}

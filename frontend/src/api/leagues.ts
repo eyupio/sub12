@@ -28,6 +28,8 @@ export interface CreateLeaguePayload {
   description?: string
   type?: 'public' | 'private'
   club_id?: string
+  scoring_rule?: 'highest' | 'average'
+  join_policy?: 'open' | 'invite_code' | 'approval'
 }
 
 export interface LeagueConfig {

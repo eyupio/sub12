@@ -54,6 +54,12 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.Type != "" && input.Type != "public" && input.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
 	}
+	if input.ScoringRule != nil && *input.ScoringRule != "highest" && *input.ScoringRule != "average" {
+		return nil, fmt.Errorf("%w: scoring_rule must be 'highest' or 'average'", ErrInvalidLeague)
+	}
+	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
+		return nil, fmt.Errorf("%w: join_policy must be 'open', 'invite_code', or 'approval'", ErrInvalidLeague)
+	}
 	// If creating under a club, verify the user is a club admin.
 	if input.ClubID != nil && *input.ClubID != "" {
 		isAdmin, err := s.clubs.IsAdmin(ctx, *input.ClubID, userID)
