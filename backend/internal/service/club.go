@@ -14,6 +14,8 @@ var (
 	ErrClubNotFound      = errors.New("club not found")
 	ErrClubAlreadyMember = errors.New("already a member of this club")
 	ErrClubNotAdmin      = errors.New("admin access required")
+	ErrClubNotMember     = errors.New("not a member of this club")
+	ErrClubLastAdmin     = errors.New("cannot leave as the last admin; promote another member first")
 	ErrInvalidClub       = errors.New("club name is required")
 )
 
@@ -105,6 +107,78 @@ func (s *ClubService) UpdateImageURL(ctx context.Context, clubID, requesterID, u
 		return ErrClubNotAdmin
 	}
 	return s.repo.UpdateImageURL(ctx, clubID, url)
+}
+
+// UpdateClub allows a club admin to update name/description.
+func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string, in *model.UpdateClubInput) (*model.Club, error) {
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !isAdmin {
+		return nil, ErrClubNotAdmin
+	}
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, ErrInvalidClub
+	}
+	club, err := s.repo.AdminUpdate(ctx, clubID, in)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrClubNotFound, err)
+	}
+	return club, nil
+}
+
+// LeaveClub allows a member to remove themselves from a club.
+func (s *ClubService) LeaveClub(ctx context.Context, clubID, userID string) error {
+	isMember, err := s.repo.IsMember(ctx, clubID, userID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return ErrClubNotMember
+	}
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, userID)
+	if err != nil {
+		return err
+	}
+	if isAdmin {
+		count, err := s.repo.CountAdmins(ctx, clubID)
+		if err != nil {
+			return err
+		}
+		if count <= 1 {
+			return ErrClubLastAdmin
+		}
+	}
+	return s.repo.RemoveMember(ctx, clubID, userID)
+}
+
+// UpdateMemberRole allows a club admin to promote or demote another member.
+func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID, targetID string, isAdmin bool) error {
+	reqIsAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return err
+	}
+	if !reqIsAdmin {
+		return ErrClubNotAdmin
+	}
+	// Prevent demoting the last admin
+	if !isAdmin {
+		count, err := s.repo.CountAdmins(ctx, clubID)
+		if err != nil {
+			return err
+		}
+		if count <= 1 {
+			targetIsAdmin, err := s.repo.IsAdmin(ctx, clubID, targetID)
+			if err != nil {
+				return err
+			}
+			if targetIsAdmin {
+				return ErrClubLastAdmin
+			}
+		}
+	}
+	return s.repo.UpdateMemberRole(ctx, clubID, targetID, isAdmin)
 }
 
 // AdminUpdateClub applies a partial update to any club without ownership checks.
