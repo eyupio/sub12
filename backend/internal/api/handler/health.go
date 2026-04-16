@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -50,4 +51,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func decodeJSON(r *http.Request, v any) error {
 	return json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(v) // 1 MiB max
+}
+
+// parsePagination reads ?limit= and ?offset= with safe defaults. Invalid or
+// missing values fall back to defaultLimit / 0 instead of silently becoming
+// zero. limit is clamped to [1, maxLimit].
+func parsePagination(r *http.Request, defaultLimit, maxLimit int) (limit, offset int) {
+	limit = defaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			if n > maxLimit {
+				n = maxLimit
+			}
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	return limit, offset
 }

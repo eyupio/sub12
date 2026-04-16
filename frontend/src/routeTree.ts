@@ -38,6 +38,7 @@ import ClubDetail from './pages/ClubDetail'
 import ClubSettings from './pages/ClubSettings'
 import ScoreTrends from './pages/ScoreTrends'
 import ComboAnalytics from './pages/ComboAnalytics'
+import NotFound from './pages/NotFound'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -51,7 +52,9 @@ function requireGuest() {
   if (token) throw redirect({ to: '/' })
 }
 
-const rootRoute = createRootRoute()
+const rootRoute = createRootRoute({
+  notFoundComponent: NotFound,
+})
 
 // Authenticated shell (with bottom nav)
 const appRoute = createRoute({

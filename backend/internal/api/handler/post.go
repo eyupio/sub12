@@ -160,7 +160,7 @@ func (h *PostHandler) Share(w http.ResponseWriter, r *http.Request) {
 // ListByLeague handles GET /api/v1/leagues/{id}/posts
 func (h *PostHandler) ListByLeague(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
-	limit, offset := parsePagination(r)
+	limit, offset := parsePagination(r, 50, 100)
 
 	posts, err := h.svc.ListByLeague(r.Context(), leagueID, limit, offset)
 	if err != nil {
@@ -174,7 +174,7 @@ func (h *PostHandler) ListByLeague(w http.ResponseWriter, r *http.Request) {
 // ListByClub handles GET /api/v1/clubs/{id}/posts
 func (h *PostHandler) ListByClub(w http.ResponseWriter, r *http.Request) {
 	clubID := chi.URLParam(r, "id")
-	limit, offset := parsePagination(r)
+	limit, offset := parsePagination(r, 50, 100)
 
 	posts, err := h.svc.ListByClub(r.Context(), clubID, limit, offset)
 	if err != nil {

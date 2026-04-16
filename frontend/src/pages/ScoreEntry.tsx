@@ -216,6 +216,10 @@ export default function ScoreEntry() {
       toast('Score card saved', 'success')
       navigate({ to: '/scores/$id', params: { id: card.id } })
     },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to save score card'
+      toast(msg, 'error')
+    },
   })
 
   const inputCls =

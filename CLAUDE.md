@@ -103,7 +103,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **19** (000001–000019). Latest: `000019_create_clubs`.
+Current migration count: **36** (000001–000036). Latest: `000036_measurement_manual_fields`.
 
 ## Critical Migration Rules
 

@@ -29,7 +29,7 @@ export default function PelletTesting() {
     queryFn: () => pelletTestApi.stats(),
   })
 
-  const { data: testsData } = useQuery({
+  const { data: testsData, isLoading: testsLoading } = useQuery({
     queryKey: ['pellet-tests'],
     queryFn: () => pelletTestApi.list(10, 0),
   })
@@ -107,7 +107,13 @@ export default function PelletTesting() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[11px] tracking-widest uppercase text-muted">Recent Tests</h2>
           </div>
-          {recentTests.length === 0 ? (
+          {testsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-14 rounded border border-subtle bg-surface animate-pulse" />
+              ))}
+            </div>
+          ) : recentTests.length === 0 ? (
             <Link
               to="/pellet-testing/new"
               className="block text-center p-6 border border-dashed border-subtle rounded-lg text-sm text-muted hover:border-[var(--brass)]/30 transition-colors"

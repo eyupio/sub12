@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -25,12 +24,7 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 20
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil {
-			limit = parsed
-		}
-	}
+	limit, _ := parsePagination(r, 20, 100)
 
 	cursor := r.URL.Query().Get("cursor")
 

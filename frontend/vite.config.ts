@@ -48,8 +48,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Proxy /api to the Go backend (default PORT=8080 in backend/internal/config).
       '/api': {
-        target: 'http://localhost:8081',
+        target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
