@@ -73,6 +73,10 @@ func (s *ClubService) Join(ctx context.Context, clubID, userID string) error {
 	return nil
 }
 
+func (s *ClubService) IsMember(ctx context.Context, clubID, userID string) (bool, error) {
+	return s.repo.IsMember(ctx, clubID, userID)
+}
+
 func (s *ClubService) ListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
 	return s.repo.ListMembers(ctx, clubID)
 }

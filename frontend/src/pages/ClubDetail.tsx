@@ -144,13 +144,13 @@ export default function ClubDetail() {
   const { data: leaguesData } = useQuery({
     queryKey: ['club', id, 'leagues'],
     queryFn: () => clubsApi.listLeagues(id),
-    enabled: !!id,
+    enabled: !!id && !!club?.is_member,
   })
 
   const [showCreateLeague, setShowCreateLeague] = useState(false)
   const [newLeagueName, setNewLeagueName] = useState('')
   const [newLeagueDesc, setNewLeagueDesc] = useState('')
-  const [newLeagueType, setNewLeagueType] = useState<'public' | 'private'>('public')
+  const [newLeagueType, setNewLeagueType] = useState<'public' | 'private'>('private')
 
   const createLeagueMutation = useMutation({
     mutationFn: () => clubsApi.createLeague(id, { name: newLeagueName, description: newLeagueDesc || undefined, type: newLeagueType }),
@@ -319,8 +319,8 @@ export default function ClubDetail() {
         </div>
       </div>
 
-      {/* Leagues */}
-      <div className="space-y-3">
+      {/* Leagues (members only) */}
+      {club.is_member && <div className="space-y-3">
         <div className="flex items-center justify-between border-b border-subtle pb-2">
           <h2 className="text-[11px] tracking-widest uppercase text-muted">
             Leagues
@@ -423,7 +423,7 @@ export default function ClubDetail() {
             </Link>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Club Feed */}
       {club.is_member && <ClubFeed clubId={id} />}
