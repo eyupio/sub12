@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -62,8 +61,7 @@ func (h *ScoreCardHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, offset := parsePagination(r, 20, 100)
 	scope := r.URL.Query().Get("scope")
 	leagueID := r.URL.Query().Get("league_id")
 

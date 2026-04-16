@@ -31,8 +31,12 @@ func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger,
 
 // Ingest writes an activity event. It is intended to be called as a goroutine
 // (fire-and-forget). Always use context.Background() as the context when calling
-// from a goroutine to avoid cancellation when the HTTP handler returns.
+// from a goroutine to avoid cancellation when the HTTP handler returns. An
+// internal timeout bounds the operation so hung goroutines don't leak.
 func (s *ActivityService) Ingest(ctx context.Context, userID string, actType model.ActivityType, targetID, targetType *string, meta any, leagueID, clubID *string, visibility string) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	b, err := json.Marshal(meta)
 	if err != nil {
 		s.log.Warn().Err(err).Str("type", actType).Msg("activity: failed to marshal metadata")

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -29,7 +30,11 @@ func NewAchievementService(achievements *repository.AchievementRepository, cards
 
 // EvaluateForScoreCard checks all achievement rules against the newly created card
 // and awards any that pass. Intended to be called in a goroutine after card creation.
+// An internal timeout bounds the operation so hung goroutines don't leak.
 func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID string, card *model.ScoreCard) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	cardCount, err := s.cards.GetCardCount(ctx, userID)
 	if err != nil {
 		return

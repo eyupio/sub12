@@ -1,4 +1,10 @@
-.PHONY: run build test migrate-up migrate-down lint tidy seed
+.PHONY: run build test migrate-up migrate-down migrate-create migrate-lint lint tidy seed help
+
+.DEFAULT_GOAL := help
+
+## help: show this help message
+help:
+	@awk 'BEGIN {FS = ":.*?## "} /^## / {sub(/^## /, "", $$0); printf "  %s\n", $$0; next} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Load .env so DB_USER, DB_PASSWORD etc. are available to make targets.
 -include ../.env

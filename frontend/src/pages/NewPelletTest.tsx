@@ -161,6 +161,10 @@ export default function NewPelletTest() {
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
       navigate({ to: '/pellet-testing/$id', params: { id: session.id } })
     },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to save test'
+      toast(msg, 'error')
+    },
   })
 
   return (
@@ -395,6 +399,16 @@ export default function NewPelletTest() {
           >
             {mutation.isPending ? 'Saving…' : 'Save Test'}
           </button>
+          {!mutation.isPending && !canSubmit && (
+            <p className="text-xs text-muted text-center">
+              {!rifleId ? 'Select a rifle to continue.'
+                : !pelletId ? 'Select or add a pellet.'
+                : !testDate ? 'Pick a test date.'
+                : !hasGroupOrImage ? 'Add at least one group size or upload a target photo.'
+                : !hasDistance && imageFiles.length === 0 ? 'Enter a distance.'
+                : 'Complete the highlighted fields to save.'}
+            </p>
+          )}
         </div>
       </div>
     </div>

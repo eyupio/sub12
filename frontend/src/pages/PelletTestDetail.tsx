@@ -15,6 +15,13 @@ import {
 import type { DetectedHole } from '../utils/holeDetection'
 import ImageMeasurement from '../components/ImageMeasurement'
 import ConfidenceBadge from '../components/ConfidenceBadge'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+
+type PendingDelete =
+  | { kind: 'test' }
+  | { kind: 'group'; id: string }
+  | { kind: 'image'; id: string }
+  | null
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
@@ -60,6 +67,7 @@ export default function PelletTestDetail() {
   // Measurement modal state
   const [measureImage, setMeasureImage] = useState<PelletTestImage | null>(null)
   const [showShare, setShowShare] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null)
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -349,7 +357,7 @@ export default function PelletTestDetail() {
               <Download size={18} />
             </button>
             <button
-              onClick={() => { if (window.confirm('Delete this pellet test?')) deleteMutation.mutate() }}
+              onClick={() => setPendingDelete({ kind: 'test' })}
               disabled={deleteMutation.isPending}
               className="text-muted hover:text-[var(--error-text)] transition-colors"
               aria-label="Delete test"
@@ -565,7 +573,7 @@ export default function PelletTestDetail() {
                   <p className="text-[11px] text-muted">{g.shot_count} shots · {sourceLabel(g.notes)}{cleanSourceTag(g.notes) ? ` · ${cleanSourceTag(g.notes)}` : ''}</p>
                 </div>
                 <button
-                  onClick={() => { if (window.confirm('Delete this group?')) deleteGroupMutation.mutate(g.id) }}
+                  onClick={() => setPendingDelete({ kind: 'group', id: g.id })}
                   className="text-muted hover:text-[var(--error-text)] transition-colors shrink-0"
                   aria-label="Delete group"
                 >
@@ -599,7 +607,7 @@ export default function PelletTestDetail() {
                   <Crosshair size={14} />
                 </button>
                 <button
-                  onClick={() => { if (window.confirm('Remove this photo?')) deleteImageMutation.mutate(img.id) }}
+                  onClick={() => setPendingDelete({ kind: 'image', id: img.id })}
                   className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
                   aria-label="Remove photo"
                 >
@@ -664,6 +672,29 @@ export default function PelletTestDetail() {
           onClose={() => setShowShare(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete?.kind === 'test' ? 'Delete pellet test?' :
+          pendingDelete?.kind === 'group' ? 'Delete group?' :
+          'Remove photo?'
+        }
+        message={
+          pendingDelete?.kind === 'test' ? 'This removes the test and all its groups and photos. This cannot be undone.' :
+          pendingDelete?.kind === 'group' ? 'This group will be permanently removed.' :
+          'This photo will be removed from the test.'
+        }
+        confirmLabel={pendingDelete?.kind === 'image' ? 'Remove' : 'Delete'}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return
+          if (pendingDelete.kind === 'test') deleteMutation.mutate()
+          else if (pendingDelete.kind === 'group') deleteGroupMutation.mutate(pendingDelete.id)
+          else if (pendingDelete.kind === 'image') deleteImageMutation.mutate(pendingDelete.id)
+          setPendingDelete(null)
+        }}
+      />
     </div>
   )
 }

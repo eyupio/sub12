@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -446,8 +445,7 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, offset := parsePagination(r, 20, 100)
 	verification := r.URL.Query().Get("verification")
 
 	scores, err := h.svc.ListScores(r.Context(), leagueID, limit, offset, verification)
