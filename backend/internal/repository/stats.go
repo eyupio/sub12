@@ -24,7 +24,9 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 			COUNT(*)::int,
 			MAX(total_score),
 			MAX(x_count),
-			ROUND(AVG(total_score)::numeric, 2)
+			ROUND(AVG(total_score)::numeric, 2),
+			(SELECT ROUND(AVG(total_score)::numeric, 2)
+			 FROM (SELECT total_score FROM score_cards WHERE user_id = $1 ORDER BY shot_at DESC, created_at DESC LIMIT 10) sub)
 		FROM score_cards
 		WHERE user_id = $1
 	`, userID).Scan(
@@ -32,6 +34,7 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 		&stats.BestScore,
 		&stats.BestXCount,
 		&stats.AvgScore,
+		&stats.Rolling10Avg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get user stats: %w", err)
@@ -70,7 +73,9 @@ func (r *StatsRepository) GetScoreTrends(ctx context.Context, userID, granularit
 			ROUND(AVG(total_score)::numeric, 2)             AS avg_score,
 			MAX(total_score)::smallint                      AS best_score,
 			ROUND(COALESCE(STDDEV_POP(total_score), 0)::numeric, 2) AS std_dev,
-			COUNT(*)::int                                   AS card_count
+			COUNT(*)::int                                   AS card_count,
+			ROUND(AVG(x_count)::numeric, 2)                 AS avg_x_count,
+			MAX(x_count)::smallint                          AS best_x_count
 		FROM score_cards
 		WHERE user_id = $1
 		  AND ($3::UUID IS NULL OR rifle_id = $3)
@@ -85,7 +90,7 @@ func (r *StatsRepository) GetScoreTrends(ctx context.Context, userID, granularit
 	var points []*model.ScoreTrendPoint
 	for rows.Next() {
 		var p model.ScoreTrendPoint
-		if err := rows.Scan(&p.Period, &p.AvgScore, &p.BestScore, &p.StdDev, &p.CardCount); err != nil {
+		if err := rows.Scan(&p.Period, &p.AvgScore, &p.BestScore, &p.StdDev, &p.CardCount, &p.AvgXCount, &p.BestXCount); err != nil {
 			return nil, fmt.Errorf("scan trend point: %w", err)
 		}
 		points = append(points, &p)
