@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminEmailApi } from '../api/adminEmail'
 import { TemplateFormState, validateTemplateForm } from './adminEmailValidation'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const textareaCls = `${inputCls} min-h-[130px] font-mono`
@@ -34,6 +35,7 @@ export default function AdminEmailTemplates() {
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [serverError, setServerError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [pendingSwitchKey, setPendingSwitchKey] = useState<string | null>(null)
 
   const templatesQuery = useQuery({
     queryKey: ['admin-email-templates'],
@@ -67,6 +69,10 @@ export default function AdminEmailTemplates() {
 
   const previewMutation = useMutation({
     mutationFn: () => adminEmailApi.previewTemplate(selectedKey, { payload: {} }),
+    onError: (err) => {
+      setServerError(parseError(err))
+      setSuccessMessage(null)
+    },
   })
 
   const saveMutation = useMutation({
@@ -106,14 +112,21 @@ export default function AdminEmailTemplates() {
 
   const renderedPreview = previewMutation.data
 
-  function trySelectTemplate(key: string) {
-    if (key === selectedKey) return
-    if (isDirty && !window.confirm('Discard unsaved changes?')) return
+  function applyTemplateSwitch(key: string) {
     setSelectedKey(key)
     setFormErrors([])
     setServerError(null)
     setSuccessMessage(null)
     previewMutation.reset()
+  }
+
+  function trySelectTemplate(key: string) {
+    if (key === selectedKey) return
+    if (isDirty) {
+      setPendingSwitchKey(key)
+      return
+    }
+    applyTemplateSwitch(key)
   }
 
   function handleSubmit(e: FormEvent) {
@@ -240,6 +253,18 @@ export default function AdminEmailTemplates() {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={pendingSwitchKey !== null}
+        title="Discard unsaved changes?"
+        message="Switching templates will lose your unsaved edits."
+        confirmLabel="Discard"
+        onConfirm={() => {
+          if (pendingSwitchKey) applyTemplateSwitch(pendingSwitchKey)
+          setPendingSwitchKey(null)
+        }}
+        onCancel={() => setPendingSwitchKey(null)}
+      />
     </div>
   )
 }

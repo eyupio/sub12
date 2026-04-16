@@ -112,6 +112,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
       toast('Rifle added', 'success')
       onDone()
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to add rifle', 'error'),
   })
 
   function handleCatalogSelect(entry: RifleCatalogEntry) {
@@ -193,6 +194,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
   const del = useMutation({
     mutationFn: () => gearApi.deleteRifle(rifle.id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['rifles'] }); toast('Rifle deleted', 'success') },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to delete rifle', 'error'),
   })
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadRifleImage(rifle.id, file),
@@ -211,6 +213,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
       toast('Rifle updated', 'success')
       setEditing(false)
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update rifle', 'error'),
   })
 
   if (editing) {
@@ -350,6 +353,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
       toast('Pellet added', 'success')
       onDone()
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to add pellet', 'error'),
   })
 
   function handleCatalogSelect(entry: PelletCatalogEntry) {
@@ -438,6 +442,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
   const del = useMutation({
     mutationFn: () => gearApi.deletePellet(pellet.id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['pellets'] }); toast('Pellet deleted', 'success') },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to delete pellet', 'error'),
   })
   const imgMutation = useMutation({
     mutationFn: (file: File) => gearApi.uploadPelletImage(pellet.id, file),
@@ -457,6 +462,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
       toast('Pellet updated', 'success')
       setEditing(false)
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update pellet', 'error'),
   })
 
   if (editing) {

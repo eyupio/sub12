@@ -82,6 +82,7 @@ export default function NewPelletTest() {
       setShowAddPellet(false)
       setNewPellet({ brand: '', model: '' })
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to add pellet', 'error'),
   })
 
   const distM = distanceValue ? distanceToMeters(Number(distanceValue), distanceUnit) : 0
