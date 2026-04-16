@@ -97,7 +97,7 @@ describe('scoreCardApi', () => {
       shot_at: '2025-01-01',
       shot_scores: Array(10).fill(8),
       shot_xs: Array(10).fill(false),
-    })).rejects.toThrow('API error 422')
+    })).rejects.toMatchObject({ name: 'ApiError', status: 422, message: 'invalid' })
   })
 
   it('uploadImage sends multipart form data', async () => {
