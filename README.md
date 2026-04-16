@@ -26,7 +26,7 @@ Seed these with `cd backend && make seed` (requires Postgres running).
 
 ### Prerequisites
 
-- [Go 1.22+](https://go.dev/dl/)
+- [Go 1.24+](https://go.dev/dl/)
 - [Node 20+](https://nodejs.org/)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 

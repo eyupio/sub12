@@ -75,6 +75,9 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 	if in.DisplayName != nil && strings.TrimSpace(*in.DisplayName) == "" {
 		return nil, fmt.Errorf("%w: display_name cannot be blank", ErrInvalidProfile)
 	}
+	if in.DisplayName != nil && len(*in.DisplayName) > 64 {
+		return nil, fmt.Errorf("%w: display_name must be 64 characters or fewer", ErrInvalidProfile)
+	}
 	if in.ProfileVisibility != nil && *in.ProfileVisibility != "public" && *in.ProfileVisibility != "private" {
 		return nil, fmt.Errorf("%w: profile_visibility must be 'public' or 'private'", ErrInvalidProfile)
 	}

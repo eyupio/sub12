@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/mail"
 
+	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
@@ -37,8 +38,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid email address")
 		return
 	}
+	if len(body.Email) > 254 {
+		writeError(w, http.StatusBadRequest, "email is too long")
+		return
+	}
+	if len(body.DisplayName) > 64 {
+		writeError(w, http.StatusBadRequest, "display_name must be 64 characters or fewer")
+		return
+	}
 	if len(body.Password) < 8 {
 		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+	if len(body.Password) > 128 {
+		writeError(w, http.StatusBadRequest, "password is too long")
 		return
 	}
 
@@ -83,6 +96,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"user":   user,
 		"tokens": tokens,
 	})
+}
+
+// GET /api/v1/me returns the authenticated user's id and role from the JWT context.
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, okID := middleware.UserIDFromContext(r.Context())
+	role, okRole := middleware.UserRoleFromContext(r.Context())
+	if !okID || !okRole {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"user_id": userID, "role": role})
 }
 
 // POST /api/v1/auth/refresh

@@ -24,6 +24,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to upload image', 'error'),
   })
 
   return (
@@ -225,6 +226,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to regenerate code', 'error'),
   })
 
   return (
@@ -292,6 +294,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'join-requests'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update request', 'error'),
   })
 
   const requests = data?.items ?? []
@@ -346,6 +349,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'standings'] })
     },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to remove member', 'error'),
   })
 
   const members = data?.items ?? []
@@ -377,6 +381,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
                 disabled={removeMutation.isPending}
                 className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 title="Remove member"
+                aria-label={`Remove ${member.display_name} from league`}
               >
                 <Trash2 size={14} />
               </button>

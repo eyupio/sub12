@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -75,18 +74,7 @@ func NewRouter(
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(auth))
 
-			r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
-				userID, okID := middleware.UserIDFromContext(r.Context())
-				role, okRole := middleware.UserRoleFromContext(r.Context())
-				if !okID || !okRole {
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte(`{"error":"unauthorized"}`))
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]string{"user_id": userID, "role": role})
-			})
+			r.Get("/me", authHandler.Me)
 
 			// Images
 			r.Post("/images", ih.Upload)

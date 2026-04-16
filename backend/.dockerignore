@@ -1,0 +1,10 @@
+bin/
+tmp/
+coverage.out
+*.test
+.git
+.github
+.idea
+.vscode
+Dockerfile
+Makefile
