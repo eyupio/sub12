@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize } from 'lucide-react'
+import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize, Scan } from 'lucide-react'
 import { mmToMOA, mmToMRAD, yardsToMeters, metersToYards } from '../utils/ballistics'
+import { detectHoles } from '../utils/holeDetection'
 import type { DetectedHole } from '../utils/holeDetection'
 import type { PelletTestMeasurement, CreateMeasurementPayload } from '../api/pelletTesting'
 
@@ -98,6 +99,7 @@ export default function ImageMeasurement({
   const [lineStart, setLineStart] = useState<Point | null>(null)
   const [lineEnd, setLineEnd] = useState<Point | null>(null)
   const [manualShotCount, setManualShotCount] = useState('')
+  const [detectStatus, setDetectStatus] = useState<string | null>(null)
 
   const rawDistance = Number(distanceToTarget) || distanceM
   const effectiveDistanceM = distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance
@@ -442,6 +444,24 @@ export default function ImageMeasurement({
     if (mm > 0 && d > 0) setPixelsPerMM(d / mm)
   }
 
+  const handleAutoDetect = useCallback(() => {
+    const img = imgRef.current
+    if (!img || pixelsPerMM <= 0) return
+    const tc = document.createElement('canvas')
+    tc.width = img.width; tc.height = img.height
+    const ctx = tc.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(img, 0, 0)
+    const imageData = ctx.getImageData(0, 0, img.width, img.height)
+    const holes = detectHoles(imageData, { pixelsPerMM, pelletDiameterMM })
+    if (holes.length > 0) {
+      setImpacts(holes.map(h => ({ x: h.centerX, y: h.centerY })))
+      setDetectStatus(`Detected ${holes.length} hole${holes.length === 1 ? '' : 's'}`)
+    } else {
+      setDetectStatus('No holes detected — try marking manually')
+    }
+  }, [pixelsPerMM, pelletDiameterMM])
+
   const generateAnnotatedBlob = useCallback((): Promise<Blob | null> => {
     const img = imgRef.current
     if (!img) return Promise.resolve(null)
@@ -666,6 +686,11 @@ export default function ImageMeasurement({
             </div>
 
             {measureMethod === 'impacts' && (
+              <>
+              <button onClick={() => { handleAutoDetect(); setSubMode('add_impact') }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#8B7355] text-white text-sm font-medium">
+                <Scan size={16} /> AUTO DETECT
+              </button>
+              {detectStatus && <p className="text-xs text-center text-gray-500">{detectStatus}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
                   ADD
@@ -674,6 +699,7 @@ export default function ImageMeasurement({
                   REMOVE
                 </button>
               </div>
+              </>
             )}
 
             {measureMethod === 'manual_line' && (

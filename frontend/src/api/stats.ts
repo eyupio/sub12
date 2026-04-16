@@ -5,6 +5,7 @@ export interface UserStats {
   best_score?: number
   best_x_count?: number
   avg_score?: number
+  rolling_10_avg?: number
 }
 
 export interface RifleStats {
@@ -20,6 +21,8 @@ export interface ScoreTrendPoint {
   best_score?: number
   std_dev: number
   card_count: number
+  avg_x_count: number
+  best_x_count?: number
 }
 
 export const statsApi = {

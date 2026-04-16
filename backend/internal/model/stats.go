@@ -1,10 +1,11 @@
 package model
 
 type UserStats struct {
-	CardsLogged int      `json:"cards_logged"`
-	BestScore   *int16   `json:"best_score,omitempty"`
-	BestXCount  *int16   `json:"best_x_count,omitempty"`
-	AvgScore    *float64 `json:"avg_score,omitempty"`
+	CardsLogged  int      `json:"cards_logged"`
+	BestScore    *int16   `json:"best_score,omitempty"`
+	BestXCount   *int16   `json:"best_x_count,omitempty"`
+	AvgScore     *float64 `json:"avg_score,omitempty"`
+	Rolling10Avg *float64 `json:"rolling_10_avg,omitempty"`
 }
 
 type RifleStats struct {
@@ -15,11 +16,13 @@ type RifleStats struct {
 }
 
 type ScoreTrendPoint struct {
-	Period    string  `json:"period"`
-	AvgScore  float64 `json:"avg_score"`
-	BestScore *int16  `json:"best_score,omitempty"`
-	StdDev    float64 `json:"std_dev"`
-	CardCount int     `json:"card_count"`
+	Period     string  `json:"period"`
+	AvgScore   float64 `json:"avg_score"`
+	BestScore  *int16  `json:"best_score,omitempty"`
+	StdDev     float64 `json:"std_dev"`
+	CardCount  int     `json:"card_count"`
+	AvgXCount  float64 `json:"avg_x_count"`
+	BestXCount *int16  `json:"best_x_count,omitempty"`
 }
 
 type ComboPerformanceSummary struct {

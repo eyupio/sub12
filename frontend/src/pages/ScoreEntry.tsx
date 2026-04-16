@@ -24,6 +24,8 @@ export default function ScoreEntry() {
   const [selectedShot, setSelectedShot] = useState<number | null>(null)
   const [shotAt, setShotAt] = useState(today())
   const [location, setLocation] = useState('')
+  const [windMph, setWindMph] = useState('')
+  const [tempCelsius, setTempCelsius] = useState('')
   const [notes, setNotes] = useState('')
   const [rifleId, setRifleId] = useState<string>('')
   const [pelletId, setPelletId] = useState<string>('')
@@ -219,6 +221,8 @@ export default function ScoreEntry() {
         shot_scores: shotScores,
         shot_xs: shotXs,
         location: location || undefined,
+        wind_mph: windMph ? Number(windMph) : undefined,
+        temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
         notes: notes || undefined,
         rifle_id: rifleId || undefined,
         pellet_id: pelletId || undefined,
@@ -433,6 +437,31 @@ export default function ScoreEntry() {
               placeholder="Range / club"
               className={`${inputCls} placeholder:text-muted`}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs tracking-wide text-muted mb-1">Wind (mph)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={windMph}
+                onChange={e => setWindMph(e.target.value)}
+                placeholder="e.g. 5"
+                className={`${inputCls} placeholder:text-muted`}
+              />
+            </div>
+            <div>
+              <label className="block text-xs tracking-wide text-muted mb-1">Temp (°C)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={tempCelsius}
+                onChange={e => setTempCelsius(e.target.value)}
+                placeholder="e.g. 18"
+                className={`${inputCls} placeholder:text-muted`}
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs tracking-wide text-muted mb-1">Notes</label>

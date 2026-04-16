@@ -9,7 +9,7 @@ import { statsApi, UserStats, RifleStats } from '../api/stats'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
 import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
-import { pelletTestApi, PelletTestStats } from '../api/pelletTesting'
+import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
 import { useAuthStore } from '../store/auth'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 
@@ -436,6 +436,11 @@ export default function Dashboard() {
     queryFn: () => pelletTestApi.stats(),
   })
 
+  const { data: comboData } = useQuery({
+    queryKey: ['combo-analytics'],
+    queryFn: () => pelletTestApi.comboAnalytics(),
+  })
+
   const recentCards = history?.items ?? []
   const rifles = riflesData?.items?.filter((r: Rifle) => r.is_active) ?? []
   const rifleStats = rifleStatsData?.items ?? []
@@ -503,17 +508,24 @@ export default function Dashboard() {
     ? [...enrichedRifleStats].sort((a, b) => b.card_count - a.card_count)[0]
     : undefined
 
-  // Performance strip items (all derived from existing 6 queries)
+  // Top combo: best rifle+pellet pairing by average group
+  const topCombo: ComboPerformanceSummary | undefined = comboData?.items?.[0]
+
+  // Performance strip items (all derived from existing queries)
   const perfStripItems: { label: string; value: string; sub?: string }[] = []
+  if (topCombo) {
+    perfStripItems.push({
+      label: 'Top Combo',
+      value: `${topCombo.rifle_name} + ${topCombo.pellet_name}`,
+      sub: topCombo.avg_group_mm != null ? `${topCombo.avg_group_mm.toFixed(2)}mm avg · ${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}` : `${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}`,
+    })
+  }
   if (mostUsedRifle) {
     perfStripItems.push({
       label: 'Most Used Rifle',
       value: `${mostUsedRifle.make} ${mostUsedRifle.model}`,
       sub: `${mostUsedRifle.card_count} card${mostUsedRifle.card_count !== 1 ? 's' : ''}`,
     })
-  }
-  if (pelletTestStats?.most_tested_pellet) {
-    perfStripItems.push({ label: 'Top Pellet', value: pelletTestStats.most_tested_pellet, sub: 'most tested' })
   }
   if (pelletTestStats?.best_group_mm != null) {
     perfStripItems.push({ label: 'Best Group', value: `${pelletTestStats.best_group_mm.toFixed(2)}mm`, sub: 'tightest measured' })
@@ -614,9 +626,11 @@ export default function Dashboard() {
           subtext={stats && stats.cards_logged > 0 ? 'Total sessions recorded' : 'Start logging'}
         />
         <StatCard
-          label="Avg Score"
-          value={stats?.avg_score != null ? stats.avg_score.toFixed(1) : '—'}
-          subtext={stats?.avg_score != null
+          label={stats?.rolling_10_avg != null ? 'Recent Form' : 'Avg Score'}
+          value={stats?.rolling_10_avg != null ? stats.rolling_10_avg.toFixed(1) : stats?.avg_score != null ? stats.avg_score.toFixed(1) : '—'}
+          subtext={stats?.rolling_10_avg != null
+            ? 'Rolling 10-card average'
+            : stats?.avg_score != null
             ? `Last ${recentCards.length > 0 ? recentCards.length : stats.cards_logged} cards`
             : 'Log 1 card to calculate'}
           trend={trendDelta != null ? (trendDelta > 0 ? 'up' : trendDelta < 0 ? 'down' : null) : null}

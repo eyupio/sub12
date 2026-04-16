@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Area, ComposedChart,
 } from 'recharts'
 import { ChevronLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
@@ -33,6 +33,8 @@ export default function ScoreTrends() {
     lower: parseFloat(Math.max(0, p.avg_score - p.std_dev).toFixed(2)),
     cards: p.card_count,
     std_dev: p.std_dev,
+    avgX: p.avg_x_count,
+    bestX: p.best_x_count,
   }))
 
   const first = points[0]?.avg_score
@@ -44,6 +46,15 @@ export default function ScoreTrends() {
 
   const mostConsistent = points.length > 0
     ? points.reduce((a, b) => a.std_dev < b.std_dev ? a : b)
+    : null
+
+  const firstX = points[0]?.avg_x_count
+  const lastX = points[points.length - 1]?.avg_x_count
+  const xTrendDelta = firstX != null && lastX != null && points.length >= 2
+    ? lastX - firstX
+    : null
+  const xTrendPct = firstX != null && firstX > 0 && xTrendDelta != null
+    ? Math.round((xTrendDelta / firstX) * 100)
     : null
 
   return (
@@ -95,7 +106,7 @@ export default function ScoreTrends() {
 
       {/* Summary cards */}
       {points.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-surface border border-subtle rounded p-3 space-y-1">
             <p className="text-[10px] tracking-widest uppercase text-muted">Trend</p>
             {trendDelta != null ? (
@@ -110,6 +121,25 @@ export default function ScoreTrends() {
                   trendDelta > 0 ? 'text-[var(--success-text)]' : trendDelta < 0 ? 'text-[var(--error-text)]' : 'text-muted'
                 }`}>
                   {trendDelta > 0 ? '+' : ''}{trendDelta.toFixed(1)}
+                </span>
+              </div>
+            ) : <span className="text-muted font-mono text-sm">—</span>}
+          </div>
+
+          <div className="bg-surface border border-subtle rounded p-3 space-y-1">
+            <p className="text-[10px] tracking-widest uppercase text-muted">X-Count Trend</p>
+            {xTrendPct != null ? (
+              <div className="flex items-center gap-1.5">
+                {xTrendPct > 0
+                  ? <TrendingUp size={16} className="text-[var(--success-text)]" />
+                  : xTrendPct < 0
+                  ? <TrendingDown size={16} className="text-[var(--error-text)]" />
+                  : <Minus size={16} className="text-muted" />
+                }
+                <span className={`font-mono text-sm ${
+                  xTrendPct > 0 ? 'text-[var(--success-text)]' : xTrendPct < 0 ? 'text-[var(--error-text)]' : 'text-muted'
+                }`}>
+                  {xTrendPct > 0 ? '+' : ''}{xTrendPct}%
                 </span>
               </div>
             ) : <span className="text-muted font-mono text-sm">—</span>}
@@ -227,6 +257,60 @@ export default function ScoreTrends() {
         )}
       </div>
 
+      {/* X-Count chart */}
+      {!isLoading && points.length > 0 && (
+        <div className="bg-surface border border-subtle rounded p-4 space-y-3">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">X-Count per Period</h2>
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #333)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: 'var(--color-text-muted, #888)' }}
+                  tickFormatter={(v: string) => period === 'week' ? v.slice(5) : v.slice(0, 7)}
+                />
+                <YAxis
+                  domain={[0, 'auto']}
+                  tick={{ fontSize: 10, fill: 'var(--color-text-muted, #888)' }}
+                  label={{ value: 'X count', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--color-text-muted, #888)' } }}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--color-bg-surface, #1a1a1a)', border: '1px solid var(--color-border-subtle, #333)', borderRadius: 6, fontSize: 11 }}
+                  labelStyle={{ color: 'var(--color-text-muted, #888)' }}
+                  formatter={(value, name) => {
+                    if (value == null) return null
+                    const numericValue = typeof value === 'number' ? value : Number(value)
+                    if (name === 'avgX') return [numericValue.toFixed(1), 'Avg X-Count']
+                    if (name === 'bestX') return [numericValue, 'Best X-Count']
+                    return [numericValue, String(name)]
+                  }}
+                />
+                <Bar
+                  dataKey="avgX"
+                  fill="#c9a84c"
+                  fillOpacity={0.7}
+                  radius={[3, 3, 0, 0]}
+                  name="avgX"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="bestX"
+                  stroke="#22c55e"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  name="bestX"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-[10px] text-muted">
+            Bar = average X-count per period · Dashed green = best X-count per period
+          </p>
+        </div>
+      )}
+
       {/* Data table */}
       {points.length > 0 && (
         <div className="bg-surface border border-subtle rounded overflow-hidden">
@@ -236,6 +320,7 @@ export default function ScoreTrends() {
                 <th className="px-4 py-2.5 text-left text-[10px] tracking-widest uppercase text-muted font-normal">Period</th>
                 <th className="px-4 py-2.5 text-right text-[10px] tracking-widest uppercase text-muted font-normal">Avg</th>
                 <th className="px-4 py-2.5 text-right text-[10px] tracking-widest uppercase text-muted font-normal">Best</th>
+                <th className="px-4 py-2.5 text-right text-[10px] tracking-widest uppercase text-muted font-normal">Avg X</th>
                 <th className="px-4 py-2.5 text-right text-[10px] tracking-widest uppercase text-muted font-normal">σ</th>
                 <th className="px-4 py-2.5 text-right text-[10px] tracking-widest uppercase text-muted font-normal">Cards</th>
               </tr>
@@ -246,6 +331,7 @@ export default function ScoreTrends() {
                   <td className="px-4 py-2.5 font-mono text-muted">{p.period}</td>
                   <td className="px-4 py-2.5 font-mono text-right text-secondary">{p.avg_score.toFixed(1)}</td>
                   <td className="px-4 py-2.5 font-mono text-right text-secondary">{p.best_score ?? '—'}</td>
+                  <td className="px-4 py-2.5 font-mono text-right text-[var(--brass)]">{p.avg_x_count.toFixed(1)}</td>
                   <td className="px-4 py-2.5 font-mono text-right text-muted">{p.std_dev.toFixed(2)}</td>
                   <td className="px-4 py-2.5 font-mono text-right text-muted">{p.card_count}</td>
                 </tr>
