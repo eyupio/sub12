@@ -355,23 +355,25 @@ export default function ClubDetail() {
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-6 lg:space-y-0">
         {/* Standings */}
-        <div className="space-y-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
+        <div className="space-y-1">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">
             Top Performers
           </h2>
-          <StandingsTable standings={standingsData?.items ?? []} />
+          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
+            <StandingsTable standings={standingsData?.items ?? []} />
+          </div>
         </div>
 
         {/* Members */}
-        <div className="space-y-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
+        <div className="space-y-1">
+          <h2 className="text-[11px] tracking-widest uppercase text-muted">
             Members
           </h2>
           {!club.is_member && (
             <p className="text-sm text-muted py-4 text-center">Join to see the member list.</p>
           )}
-          {club.is_member && (
-            <div>
+          {club.is_member && (membersData?.items ?? []).length > 0 && (
+            <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
               {(membersData?.items ?? []).map(member => (
                 <MemberRow
                   key={member.user_id}
@@ -383,17 +385,17 @@ export default function ClubDetail() {
                   onRemoved={() => {}}
                 />
               ))}
-              {membersData?.items.length === 0 && (
-                <p className="text-sm text-muted text-center py-4">No members yet.</p>
-              )}
             </div>
+          )}
+          {club.is_member && (membersData?.items ?? []).length === 0 && (
+            <p className="text-sm text-muted text-center py-4">No members yet.</p>
           )}
         </div>
       </div>
 
       {/* Leagues (members only) */}
-      {club.is_member && <div className="space-y-3">
-        <div className="flex items-center justify-between border-b border-subtle pb-2">
+      {club.is_member && <div className="space-y-1">
+        <div className="flex items-center justify-between">
           <h2 className="text-[11px] tracking-widest uppercase text-muted">
             Leagues
           </h2>
@@ -473,28 +475,32 @@ export default function ClubDetail() {
           </p>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(leaguesData?.items ?? []).map((league: League) => (
-            <Link
-              key={league.id}
-              to="/leagues/$id"
-              params={{ id: league.id }}
-              className="flex items-center gap-3 p-3 rounded border border-subtle bg-card hover:border-[var(--brass)]/30 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--brass)]/10 border border-[var(--brass)]/20 flex items-center justify-center shrink-0">
-                <Trophy size={18} className="text-[var(--brass)]/60" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-secondary truncate">{league.name}</p>
-                <div className="flex items-center gap-2 text-[10px] text-muted">
-                  <span>{league.type}</span>
-                  <span>&middot;</span>
-                  <span>{league.member_count} member{league.member_count !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {(leaguesData?.items ?? []).length > 0 && (
+          <div className="border border-subtle rounded bg-surface p-3 lg:p-4 mt-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(leaguesData?.items ?? []).map((league: League) => (
+                <Link
+                  key={league.id}
+                  to="/leagues/$id"
+                  params={{ id: league.id }}
+                  className="flex items-center gap-3 p-3 rounded border border-subtle bg-card hover:border-[var(--brass)]/30 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--brass)]/10 border border-[var(--brass)]/20 flex items-center justify-center shrink-0">
+                    <Trophy size={18} className="text-[var(--brass)]/60" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-secondary truncate">{league.name}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-muted">
+                      <span>{league.type}</span>
+                      <span>&middot;</span>
+                      <span>{league.member_count} member{league.member_count !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>}
 
       {/* Club Feed */}
