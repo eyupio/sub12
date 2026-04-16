@@ -18,8 +18,10 @@ type League struct {
 type CreateLeagueInput struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
-	Type        string  `json:"type"`    // "public" or "private"; defaults to "public"
-	ClubID      *string `json:"club_id"` // optional: host this league under a club
+	Type        string  `json:"type"`         // "public" or "private"; defaults to "public"
+	ClubID      *string `json:"club_id"`      // optional: host this league under a club
+	ScoringRule *string `json:"scoring_rule"` // optional: "highest" or "average"; defaults to "highest"
+	JoinPolicy  *string `json:"join_policy"`  // optional: "open", "invite_code", or "approval"; defaults to "open"
 }
 
 type LeagueStanding struct {

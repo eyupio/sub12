@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, ChevronDown, ChevronRight, Plus, Check, X, Shield, Camera, Trash2 } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2 } from 'lucide-react'
 import { leagueApi, LeagueConfig, League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -10,7 +10,6 @@ const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 tex
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
-const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2 px-3 rounded transition-colors'
 
 // ---------------------------------------------------------------------------
 // League Image Section
@@ -76,15 +75,18 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
 }
 
 // ---------------------------------------------------------------------------
-// Config Section
+// Rules Section (consolidated from General + Score Verification)
 // ---------------------------------------------------------------------------
 
-function ConfigSection({ leagueId, config }: { leagueId: string; config: LeagueConfig }) {
+function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueConfig }) {
   const queryClient = useQueryClient()
+  const [scoringRule, setScoringRule] = useState(config.scoring_rule)
+  const [maxSubs, setMaxSubs] = useState(config.max_submissions_per_round)
   const [startsOn, setStartsOn] = useState(config.starts_on ?? '')
   const [endsOn, setEndsOn] = useState(config.ends_on ?? '')
-  const [maxSubs, setMaxSubs] = useState(config.max_submissions_per_round)
-  const [scoringRule, setScoringRule] = useState(config.scoring_rule)
+  const [requireVerification, setRequireVerification] = useState(config.require_score_verification)
+  const [confirmations, setConfirmations] = useState(config.required_confirmations)
+  const [requireImage, setRequireImage] = useState(config.require_image_upload)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -102,32 +104,19 @@ function ConfigSection({ leagueId, config }: { leagueId: string; config: LeagueC
   function handleSave() {
     setError('')
     mutation.mutate({
+      scoring_rule: scoringRule,
+      max_submissions_per_round: maxSubs,
       starts_on: startsOn || undefined,
       ends_on: endsOn || undefined,
-      max_submissions_per_round: maxSubs,
-      scoring_rule: scoringRule,
+      require_score_verification: requireVerification,
+      required_confirmations: confirmations,
+      require_image_upload: requireImage,
     })
   }
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">General</h2>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <label className={labelCls}>Start Date</label>
-          <input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} className={inputCls} />
-        </div>
-        <div className="space-y-1.5">
-          <label className={labelCls}>End Date</label>
-          <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} className={inputCls} />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <label className={labelCls}>Max Submissions Per Round</label>
-        <input type="number" min={1} value={maxSubs} onChange={e => setMaxSubs(Number(e.target.value))} className={inputCls} />
-      </div>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Rules</h2>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Scoring Rule</label>
@@ -143,17 +132,68 @@ function ConfigSection({ leagueId, config }: { leagueId: string; config: LeagueC
                   : 'bg-surface border-subtle text-muted hover:text-secondary',
               ].join(' ')}
             >
-              {rule}
+              {rule === 'highest' ? 'Best Score' : 'Average'}
             </button>
           ))}
         </div>
       </div>
 
+      <div className="space-y-1.5">
+        <label className={labelCls}>Max Submissions</label>
+        <input type="number" min={1} value={maxSubs} onChange={e => setMaxSubs(Number(e.target.value))} className={inputCls} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label className={labelCls}>Competition Start</label>
+          <input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} className={inputCls} />
+        </div>
+        <div className="space-y-1.5">
+          <label className={labelCls}>Competition End</label>
+          <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} className={inputCls} />
+        </div>
+      </div>
+
+      <div className="border-t border-subtle" />
+
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={requireVerification}
+          onChange={e => setRequireVerification(e.target.checked)}
+          className="accent-[var(--brass)] w-4 h-4"
+        />
+        <span className="text-sm text-secondary">Require score verification</span>
+      </label>
+
+      {requireVerification && (
+        <div className="space-y-1.5 pl-7">
+          <label className={labelCls}>Confirmations Required</label>
+          <input
+            type="number"
+            min={1}
+            value={confirmations}
+            onChange={e => setConfirmations(Number(e.target.value))}
+            className={inputCls}
+          />
+        </div>
+      )}
+
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={requireImage}
+          onChange={e => setRequireImage(e.target.checked)}
+          className="accent-[var(--brass)] w-4 h-4"
+        />
+        <span className="text-sm text-secondary">Require image upload with submissions</span>
+      </label>
+
       {error && <p className="text-red-400 text-xs">{error}</p>}
       {saved && <p className="text-green-400 text-xs">Saved</p>}
 
       <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary}>
-        {mutation.isPending ? 'Saving...' : 'Save General'}
+        {mutation.isPending ? 'Saving...' : 'Save Rules'}
       </button>
     </div>
   )
@@ -282,256 +322,6 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
               <X size={14} />
             </button>
           </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Score Verification Section
-// ---------------------------------------------------------------------------
-
-function VerificationSection({ leagueId, config }: { leagueId: string; config: LeagueConfig }) {
-  const queryClient = useQueryClient()
-  const [requireVerification, setRequireVerification] = useState(config.require_score_verification)
-  const [confirmations, setConfirmations] = useState(config.required_confirmations)
-  const [requireImage, setRequireImage] = useState(config.require_image_upload)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      leagueApi.updateConfig(leagueId, {
-        require_score_verification: requireVerification,
-        required_confirmations: confirmations,
-        require_image_upload: requireImage,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'config'] })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    },
-    onError: () => setError('Failed to save.'),
-  })
-
-  return (
-    <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Score Verification</h2>
-
-      <label className="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={requireVerification}
-          onChange={e => setRequireVerification(e.target.checked)}
-          className="accent-[var(--brass)] w-4 h-4"
-        />
-        <span className="text-sm text-secondary">Require independent user confirmations</span>
-      </label>
-
-      {requireVerification && (
-        <div className="space-y-1.5 pl-7">
-          <label className={labelCls}>Number of Confirmations Required</label>
-          <input
-            type="number"
-            min={1}
-            value={confirmations}
-            onChange={e => setConfirmations(Number(e.target.value))}
-            className={inputCls}
-          />
-        </div>
-      )}
-
-      <label className="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={requireImage}
-          onChange={e => setRequireImage(e.target.checked)}
-          className="accent-[var(--brass)] w-4 h-4"
-        />
-        <span className="text-sm text-secondary">Require image upload with submissions</span>
-      </label>
-
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-      {saved && <p className="text-green-400 text-xs">Saved</p>}
-
-      <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className={btnPrimary}>
-        {mutation.isPending ? 'Saving...' : 'Save Verification'}
-      </button>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Seasons Section
-// ---------------------------------------------------------------------------
-
-function SeasonsSection({ leagueId }: { leagueId: string }) {
-  const queryClient = useQueryClient()
-  const [showNew, setShowNew] = useState(false)
-  const [name, setName] = useState('')
-  const [startsOn, setStartsOn] = useState('')
-  const [endsOn, setEndsOn] = useState('')
-  const [expandedSeason, setExpandedSeason] = useState<string | null>(null)
-
-  const { data } = useQuery({
-    queryKey: ['leagues', leagueId, 'seasons'],
-    queryFn: () => leagueApi.listSeasons(leagueId),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: () => leagueApi.createSeason(leagueId, { name, starts_on: startsOn, ends_on: endsOn || undefined }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons'] })
-      setShowNew(false)
-      setName('')
-      setStartsOn('')
-      setEndsOn('')
-    },
-  })
-
-  const seasons = data?.items ?? []
-
-  return (
-    <div className={sectionCls}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Seasons</h2>
-        <button onClick={() => setShowNew(!showNew)} className="text-[var(--brass)] hover:text-[var(--brass)] transition-colors">
-          <Plus size={16} />
-        </button>
-      </div>
-
-      {showNew && (
-        <div className="space-y-3 bg-surface rounded p-3">
-          <input type="text" placeholder="Season name" value={name} onChange={e => setName(e.target.value)} className={inputCls} autoFocus />
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className={labelCls}>Start</label>
-              <input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} className={inputCls} />
-            </div>
-            <div className="space-y-1">
-              <label className={labelCls}>End</label>
-              <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={!name.trim() || !startsOn || createMutation.isPending}
-              className={btnPrimary}
-            >
-              {createMutation.isPending ? 'Creating...' : 'Add Season'}
-            </button>
-            <button onClick={() => setShowNew(false)} className={btnSecondary}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {seasons.length === 0 && !showNew && (
-        <p className="text-muted text-xs">No seasons yet.</p>
-      )}
-
-      {seasons.map(season => (
-        <div key={season.id} className="border border-subtle rounded">
-          <button
-            onClick={() => setExpandedSeason(expandedSeason === season.id ? null : season.id)}
-            className="w-full flex items-center justify-between p-3 text-left"
-          >
-            <div>
-              <p className="text-sm text-secondary">{season.name}</p>
-              <p className="text-[11px] text-muted">
-                {season.starts_on}{season.ends_on ? ` — ${season.ends_on}` : ''}
-                {season.is_active && <span className="ml-2 text-green-400">Active</span>}
-              </p>
-            </div>
-            {expandedSeason === season.id ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
-          </button>
-          {expandedSeason === season.id && (
-            <RoundsSection leagueId={leagueId} seasonId={season.id} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function RoundsSection({ leagueId, seasonId }: { leagueId: string; seasonId: string }) {
-  const queryClient = useQueryClient()
-  const [showNew, setShowNew] = useState(false)
-  const [name, setName] = useState('')
-  const [opensAt, setOpensAt] = useState('')
-  const [closesAt, setClosesAt] = useState('')
-
-  const { data } = useQuery({
-    queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'],
-    queryFn: () => leagueApi.listRounds(leagueId, seasonId),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      leagueApi.createRound(leagueId, seasonId, {
-        name,
-        opens_at: opensAt || undefined,
-        closes_at: closesAt || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'] })
-      setShowNew(false)
-      setName('')
-      setOpensAt('')
-      setClosesAt('')
-    },
-  })
-
-  const rounds = data?.items ?? []
-
-  return (
-    <div className="px-3 pb-3 space-y-2 border-t border-subtle">
-      <div className="flex items-center justify-between pt-2">
-        <p className="text-[11px] tracking-widest uppercase text-muted">Rounds</p>
-        <button onClick={() => setShowNew(!showNew)} className="text-[var(--brass)] hover:text-[var(--brass)] transition-colors">
-          <Plus size={14} />
-        </button>
-      </div>
-
-      {showNew && (
-        <div className="space-y-2 bg-surface rounded p-2.5">
-          <input type="text" placeholder="Round name" value={name} onChange={e => setName(e.target.value)} className={inputCls} autoFocus />
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className={labelCls}>Opens</label>
-              <input type="datetime-local" value={opensAt} onChange={e => setOpensAt(e.target.value)} className={inputCls} />
-            </div>
-            <div className="space-y-1">
-              <label className={labelCls}>Closes</label>
-              <input type="datetime-local" value={closesAt} onChange={e => setClosesAt(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={!name.trim() || createMutation.isPending}
-              className={btnPrimary}
-            >
-              {createMutation.isPending ? 'Adding...' : 'Add Round'}
-            </button>
-            <button onClick={() => setShowNew(false)} className={btnSecondary}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {rounds.length === 0 && !showNew && (
-        <p className="text-muted text-xs">No rounds.</p>
-      )}
-
-      {rounds.map(round => (
-        <div key={round.id} className="bg-surface rounded p-2.5">
-          <p className="text-sm text-secondary">{round.name}</p>
-          <p className="text-[11px] text-muted">
-            {round.opens_at ? round.opens_at : 'No start'}
-            {' — '}
-            {round.closes_at ? round.closes_at : 'No end'}
-          </p>
         </div>
       ))}
     </div>
@@ -668,10 +458,8 @@ export default function LeagueSettings() {
       <p className="text-xs text-muted">{league.name}</p>
 
       <LeagueImageSection leagueId={id} league={league} />
-      <ConfigSection leagueId={id} config={config} />
+      <RulesSection leagueId={id} config={config} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
-      <VerificationSection leagueId={id} config={config} />
-      <SeasonsSection leagueId={id} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
     </div>
   )

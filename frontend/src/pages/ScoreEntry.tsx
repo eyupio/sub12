@@ -51,25 +51,11 @@ export default function ScoreEntry() {
     enabled: !!leagueId,
   })
 
-  const { data: seasonsData } = useQuery({
-    queryKey: ['leagues', leagueId, 'seasons'],
-    queryFn: () => leagueApi.listSeasons(leagueId!),
-    enabled: !!leagueId,
-  })
-
-  const activeSeason = seasonsData?.items?.find(s => s.is_active) ?? seasonsData?.items?.[0]
-
-  const { data: roundsData } = useQuery({
-    queryKey: ['leagues', leagueId, 'seasons', activeSeason?.id, 'rounds'],
-    queryFn: () => leagueApi.listRounds(leagueId!, activeSeason!.id),
-    enabled: !!leagueId && !!activeSeason?.id,
-  })
-
-  // Ensure a default round exists for the league (handles legacy leagues with no seasons).
+  // Ensure a default round exists for score submission
   const { data: ensuredRound } = useQuery({
     queryKey: ['leagues', leagueId, 'ensure-round'],
     queryFn: () => leagueApi.ensureDefaultRound(leagueId!),
-    enabled: !!leagueId && seasonsData !== undefined && (!activeSeason || (roundsData !== undefined && (roundsData?.items ?? []).length === 0)),
+    enabled: !!leagueId,
   })
 
   // League config for require_image_upload enforcement
@@ -80,15 +66,7 @@ export default function ScoreEntry() {
   })
   const requireImage = leagueId && leagueConfig?.require_image_upload
 
-  // Pick the round: use search param, or find the currently open round, or latest, or ensured default
-  const rounds = roundsData?.items ?? []
-  const leagueRoundId = roundIdParam
-    ?? rounds.find(r => {
-      const now = new Date().toISOString()
-      return (!r.opens_at || r.opens_at <= now) && (!r.closes_at || r.closes_at >= now)
-    })?.id
-    ?? rounds[rounds.length - 1]?.id
-    ?? ensuredRound?.round_id
+  const leagueRoundId = roundIdParam ?? ensuredRound?.round_id
 
   const shotScores = shots.map(s => s.score)
   const shotXs = shots.map(s => s.x)
@@ -271,19 +249,7 @@ export default function ScoreEntry() {
             <p className="text-xs text-[var(--brass)] tracking-wide flex items-center gap-1.5">
               <Trophy size={12} />
               {league.name}
-              {activeSeason && <span className="text-muted"> · {activeSeason.name}</span>}
-              {leagueRoundId && rounds.length > 0 && (
-                <span className="text-muted"> · {rounds.find(r => r.id === leagueRoundId)?.name}</span>
-              )}
             </p>
-            {leagueRoundId && rounds.length > 0 && (() => {
-              const round = rounds.find(r => r.id === leagueRoundId)
-              return round?.closes_at ? (
-                <p className="text-[10px] text-muted tracking-wide">
-                  Round closes {new Date(round.closes_at).toLocaleDateString()}
-                </p>
-              ) : null
-            })()}
             {requireImage && !imageFile && (
               <p className="text-[10px] text-amber-600 dark:text-amber-400 tracking-wide">
                 This league requires a score card photo
