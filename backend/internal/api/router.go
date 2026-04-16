@@ -252,6 +252,7 @@ func NewRouter(
 			r.Delete("/clubs/{id}/members/{userId}", clh.RemoveMember)
 			r.Post("/clubs/{id}/image", clh.UploadImage)
 			r.Post("/clubs/{id}/leagues", clh.CreateLeague)
+			r.Get("/clubs/{id}/leagues", clh.ListLeagues)
 			r.Get("/clubs/{id}/posts", postH.ListByClub)
 
 			// Achievements
@@ -318,7 +319,6 @@ func NewRouter(
 			r.Get("/clubs", clh.List)
 			r.Get("/clubs/{id}", clh.GetByID)
 			r.Get("/clubs/{id}/standings", clh.GetStandings)
-			r.Get("/clubs/{id}/leagues", clh.ListLeagues)
 		})
 	})
 

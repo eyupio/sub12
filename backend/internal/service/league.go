@@ -24,6 +24,7 @@ var (
 	ErrAlreadyConfirmed = errors.New("already confirmed this score")
 	ErrCannotConfirmOwn = errors.New("cannot confirm your own score")
 	ErrReasonRequired   = errors.New("reason is required for rejection")
+	ErrNotClubMember    = errors.New("club membership required")
 )
 
 type LeagueService struct {
@@ -68,6 +69,10 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 		}
 		if !isAdmin {
 			return nil, fmt.Errorf("%w: must be a club admin to create a league under this club", ErrNotAdmin)
+		}
+		// Club leagues default to private
+		if input.Type == "" {
+			input.Type = "private"
 		}
 	}
 	return s.leagues.Create(ctx, userID, input)
@@ -121,7 +126,23 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 	if err != nil {
 		return nil, err
 	}
-	// Private leagues require membership to view
+
+	// Club-scoped leagues require club membership
+	if league.ClubID != nil && *league.ClubID != "" {
+		if viewerID == "" {
+			return nil, ErrLeagueNotFound
+		}
+		isClubMember, err := s.clubs.IsMember(ctx, *league.ClubID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if !isClubMember {
+			return nil, ErrLeagueNotFound
+		}
+		return league, nil
+	}
+
+	// Non-club private leagues require league membership to view
 	if league.Type == "private" && viewerID != "" {
 		isMember, err := s.leagues.IsMember(ctx, id, viewerID)
 		if err != nil {
@@ -145,12 +166,23 @@ func (s *LeagueService) ListPublic(ctx context.Context) ([]*model.League, error)
 // Returns (joined, pending, err).
 func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode string) (bool, bool, error) {
 	// Verify league exists
-	_, err := s.leagues.GetByID(ctx, leagueID)
+	league, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return false, false, ErrLeagueNotFound
 	}
 	if err != nil {
 		return false, false, err
+	}
+
+	// Club leagues require club membership to join
+	if league.ClubID != nil && *league.ClubID != "" {
+		isClubMember, err := s.clubs.IsMember(ctx, *league.ClubID, userID)
+		if err != nil {
+			return false, false, err
+		}
+		if !isClubMember {
+			return false, false, ErrNotClubMember
+		}
 	}
 
 	// Check if already a member

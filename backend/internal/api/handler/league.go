@@ -156,6 +156,10 @@ func (h *LeagueHandler) Join(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "join request already pending")
 			return
 		}
+		if errors.Is(err, service.ErrNotClubMember) {
+			writeError(w, http.StatusForbidden, "club membership required to join this league")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to join league")
 		return
 	}
@@ -172,6 +176,17 @@ func (h *LeagueHandler) Standings(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
 	if !isUUID(leagueID) {
 		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	// Gate: verify access (club membership / private league check)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify league access")
 		return
 	}
 
@@ -200,6 +215,17 @@ func (h *LeagueHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
 	if !isUUID(leagueID) {
 		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	// Gate: verify access (club membership / private league check)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify league access")
 		return
 	}
 
@@ -409,6 +435,17 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Gate: verify access (club membership / private league check)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify league access")
+		return
+	}
+
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	verification := r.URL.Query().Get("verification")
@@ -438,6 +475,17 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
 	if !isUUID(leagueID) {
 		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	// Gate: verify access (club membership / private league check)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify league access")
 		return
 	}
 

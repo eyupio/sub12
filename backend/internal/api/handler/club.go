@@ -206,7 +206,24 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/clubs/{id}/leagues
 func (h *ClubHandler) ListLeagues(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	clubID := chi.URLParam(r, "id")
+
+	isMember, err := h.svc.IsMember(r.Context(), clubID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check membership")
+		return
+	}
+	if !isMember {
+		writeError(w, http.StatusForbidden, "club membership required")
+		return
+	}
+
 	leagues, err := h.leagues.ListByClub(r.Context(), clubID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list club leagues")

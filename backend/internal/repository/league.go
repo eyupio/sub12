@@ -110,7 +110,7 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id
-		WHERE l.type = 'public'
+		WHERE l.type = 'public' AND l.club_id IS NULL
 		GROUP BY l.id
 		ORDER BY l.created_at DESC
 	`)
