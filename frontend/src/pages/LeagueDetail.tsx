@@ -116,6 +116,15 @@ export default function LeagueDetail() {
 
   const isLeaguePrivate = leagueError instanceof ApiError && leagueError.status === 404
 
+  // When the league detail is denied, fall back to the public summary so the
+  // UI can render a members-only banner with join CTA instead of a 404.
+  const { data: leagueSummary } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'summary'],
+    queryFn: () => leagueApi.summary(leagueId!),
+    enabled: !!leagueId && isLeaguePrivate,
+    retry: false,
+  })
+
   const { data: config } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid', 'config'],
     queryFn: () => leagueApi.getConfig(leagueId!),
@@ -205,10 +214,39 @@ export default function LeagueDetail() {
     return (
       <div className="p-4 lg:p-8 max-w-md mx-auto text-center space-y-3">
         <Lock className="mx-auto text-muted" size={32} />
-        <h1 className="text-lg tracking-widest uppercase text-secondary">Private League</h1>
-        <p className="text-sm text-muted">
-          This league is private or no longer exists. Ask an admin for an invite.
+        <h1 className="text-lg tracking-widest uppercase text-secondary">
+          {leagueSummary?.name ?? 'Private League'}
+        </h1>
+        {leagueSummary?.description && (
+          <p className="text-sm text-muted">{leagueSummary.description}</p>
+        )}
+        <p className="text-xs text-muted">
+          {leagueSummary
+            ? `This league is private — members only. ${leagueSummary.member_count} member${leagueSummary.member_count === 1 ? '' : 's'}.`
+            : 'This league is private or no longer exists. Ask an admin for an invite.'}
         </p>
+        {leagueSummary && leagueId && (
+          <div className="pt-1 space-y-2 max-w-xs mx-auto">
+            {leagueSummary.join_policy === 'invite_code' && (
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="INVITE CODE"
+                className="w-full bg-surface border border-subtle rounded px-2 py-1.5 text-sm text-secondary text-center font-mono tracking-widest focus:outline-none focus:border-[var(--brass)]/50"
+              />
+            )}
+            {currentUser && (
+              <button
+                onClick={() => joinMutation.mutate()}
+                disabled={joinMutation.isPending || (leagueSummary.join_policy === 'invite_code' && !joinCode)}
+                className="w-full px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+              >
+                {leagueSummary.join_policy === 'approval' ? 'Request to join' : 'Join league'}
+              </button>
+            )}
+          </div>
+        )}
         <Link
           to="/leagues"
           className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"

@@ -289,6 +289,65 @@ func (r *UserRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// SoftDelete marks the user as deleted for GDPR-compliant account removal.
+// The row is retained (to preserve referential integrity for score cards,
+// comments, etc.) but the login path rejects the user and public reads
+// treat the profile as absent. Display name is scrubbed to a tombstone.
+func (r *UserRepository) SoftDelete(ctx context.Context, id string) error {
+	ct, err := r.db.Exec(ctx, `
+		UPDATE users
+		SET deleted_at            = NOW(),
+		    deletion_requested_at = COALESCE(deletion_requested_at, NOW()),
+		    email                 = 'deleted-' || id || '@removed.invalid',
+		    password_hash         = NULL,
+		    display_name          = 'Deleted user',
+		    bio                   = NULL,
+		    location              = NULL,
+		    club                  = NULL,
+		    avatar_url            = NULL,
+		    profile_visibility    = 'private',
+		    feed_opt_out          = TRUE,
+		    updated_at            = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`, id)
+	if err != nil {
+		return fmt.Errorf("soft delete user: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// IsDeleted reports whether a user has been soft-deleted.
+func (r *UserRepository) IsDeleted(ctx context.Context, id string) (bool, error) {
+	var deleted bool
+	err := r.db.QueryRow(ctx, `
+		SELECT deleted_at IS NOT NULL FROM users WHERE id = $1
+	`, id).Scan(&deleted)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrNotFound
+		}
+		return false, fmt.Errorf("is deleted: %w", err)
+	}
+	return deleted, nil
+}
+
+// CreateExportRequest records that a user requested a copy of their data.
+func (r *UserRepository) CreateExportRequest(ctx context.Context, userID string) (string, error) {
+	var id string
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO data_export_requests (user_id, status, completed_at)
+		VALUES ($1, 'completed', NOW())
+		RETURNING id
+	`, userID).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("create export request: %w", err)
+	}
+	return id, nil
+}
+
 // isUniqueViolation checks for PostgreSQL unique constraint error (code 23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

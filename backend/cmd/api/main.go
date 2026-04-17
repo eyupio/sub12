@@ -156,12 +156,19 @@ func main() {
 	// construction to avoid cycles.
 	socialSvc.SetNotifications(notificationSvc)
 
+	// Wire the export aggregators into UserService so GDPR data-export
+	// can include score cards, posts, clubs and leagues without forcing
+	// those repos through every UserService constructor.
+	userSvc.SetExportRepos(scoreCardRepo, postRepo, clubRepo, leagueRepo)
+
 	rl := middleware.NewRateLimiter(middleware.RateLimitConfig{
-		Enabled:         cfg.RateLimitEnabled,
-		FollowPerMin:    cfg.RateLimitFollowPerMin,
-		CommentPerMin:   cfg.RateLimitCommentPerMin,
-		PostPerMin:      cfg.RateLimitPostPerMin,
-		ReportPerMin:    cfg.RateLimitReportPerMin,
+		Enabled:             cfg.RateLimitEnabled,
+		FollowPerMin:        cfg.RateLimitFollowPerMin,
+		CommentPerMin:       cfg.RateLimitCommentPerMin,
+		PostPerMin:          cfg.RateLimitPostPerMin,
+		ReportPerMin:        cfg.RateLimitReportPerMin,
+		LikePerMin:          cfg.RateLimitLikePerMin,
+		SocialTogglePerMin:  cfg.RateLimitSocialTogglePerMin,
 	}, rdb)
 
 	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, muteRepo, rl, imageRepo)

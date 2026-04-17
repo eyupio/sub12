@@ -24,6 +24,7 @@ var (
 	ErrInvalidEmailChangeToken = errors.New("invalid or expired email change token")
 	ErrInvalidRole             = errors.New("role must be 'user' or 'admin'")
 	ErrCannotTargetSelf        = errors.New("cannot perform this action on your own account")
+	ErrAccountDeleted          = errors.New("account has been deleted")
 )
 
 const emailChangeTTL = 24 * time.Hour
@@ -34,6 +35,14 @@ type UserService struct {
 	emailSender       *EmailSenderService
 	log               zerolog.Logger
 	frontendURL       string
+
+	// Optional repositories wired post-construction via SetExportRepos to
+	// power the GDPR data-export endpoint without forcing every caller to
+	// pass these through the constructor.
+	scoreCards *repository.ScoreCardRepository
+	posts      *repository.PostRepository
+	clubs      *repository.ClubRepository
+	leagues    *repository.LeagueRepository
 }
 
 func NewUserService(
@@ -50,6 +59,73 @@ func NewUserService(
 		log:               log,
 		frontendURL:       strings.TrimRight(frontendURL, "/"),
 	}
+}
+
+// SetExportRepos wires the repositories needed to aggregate a GDPR data
+// export. Wired post-construction to avoid ballooning the constructor.
+func (s *UserService) SetExportRepos(scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, clubs *repository.ClubRepository, leagues *repository.LeagueRepository) {
+	s.scoreCards = scoreCards
+	s.posts = posts
+	s.clubs = clubs
+	s.leagues = leagues
+}
+
+// RequestDeletion performs a GDPR-compliant account deletion. The user row
+// is soft-deleted so references (score cards, comments, league memberships)
+// remain intact and existing login/auth paths reject the account.
+func (s *UserService) RequestDeletion(ctx context.Context, userID string) error {
+	if err := s.users.SoftDelete(ctx, userID); err != nil {
+		return err
+	}
+	s.log.Info().Str("event", "account_deleted").Str("user_id", userID).Msg("audit")
+	return nil
+}
+
+// ExportData aggregates the authenticated user's core records into a single
+// JSON-serializable payload. Missing optional repositories degrade gracefully
+// (the corresponding section is emitted as an empty list).
+func (s *UserService) ExportData(ctx context.Context, userID string) (map[string]any, error) {
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	payload := map[string]any{
+		"generated_at": time.Now().UTC(),
+		"user":         user,
+	}
+	if s.scoreCards != nil {
+		cards, err := s.scoreCards.ListByUser(ctx, userID, 1000, 0, "all", "")
+		if err != nil {
+			return nil, fmt.Errorf("export score cards: %w", err)
+		}
+		payload["score_cards"] = cards
+	}
+	if s.posts != nil {
+		posts, err := s.posts.ListByUser(ctx, userID, 1000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("export posts: %w", err)
+		}
+		payload["posts"] = posts
+	}
+	if s.clubs != nil {
+		clubs, err := s.clubs.ListByUser(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("export clubs: %w", err)
+		}
+		payload["clubs"] = clubs
+	}
+	if s.leagues != nil {
+		leagues, err := s.leagues.ListByUser(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("export leagues: %w", err)
+		}
+		payload["leagues"] = leagues
+	}
+	if _, err := s.users.CreateExportRequest(ctx, userID); err != nil {
+		s.log.Warn().Err(err).Str("user_id", userID).Msg("export_request_audit_failed")
+	}
+	s.log.Info().Str("event", "data_exported").Str("user_id", userID).Msg("audit")
+	return payload, nil
 }
 
 // GetPublicProfile returns the public-facing profile for any user by ID.

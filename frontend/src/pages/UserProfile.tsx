@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useParams, useRouter, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, MapPin, Users, UserPlus, UserMinus, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
 import { achievementApi, Achievement } from '../api/achievements'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ReportDialog } from '../components/ReportDialog'
 
 const achievementIconMap: Record<string, typeof Target> = {
   target: Target,
@@ -90,6 +91,7 @@ export default function UserProfile() {
   const [showFollowers, setShowFollowers] = useState(false)
   const [showFollowing, setShowFollowing] = useState(false)
   const [confirmUnfollow, setConfirmUnfollow] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['user-profile', id],
@@ -272,6 +274,13 @@ export default function UserProfile() {
                         {showMenu && (
                           <div className="absolute right-0 top-full mt-1 bg-surface border border-subtle rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
                             <button
+                              onClick={() => { setShowMenu(false); setShowReport(true) }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:bg-surface-hover transition-colors"
+                            >
+                              <AlertTriangle size={12} />
+                              Report
+                            </button>
+                            <button
                               onClick={() => blockMutation.mutate()}
                               disabled={blockMutation.isPending}
                               className="w-full flex items-center gap-2 px-3 py-2 text-[11px] tracking-widest uppercase text-[var(--error-text)] hover:bg-surface-hover transition-colors disabled:opacity-40"
@@ -366,6 +375,15 @@ export default function UserProfile() {
             }}
             onCancel={() => setConfirmUnfollow(false)}
           />
+
+          {id && (
+            <ReportDialog
+              open={showReport}
+              targetType="user"
+              targetId={id}
+              onClose={() => setShowReport(false)}
+            />
+          )}
         </>
       )}
     </div>

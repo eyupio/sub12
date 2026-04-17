@@ -627,3 +627,30 @@ func (s *LeagueService) AdminDeleteLeague(ctx context.Context, id string) error 
 func (s *LeagueService) AdminRemoveMember(ctx context.Context, leagueID, userID string) error {
 	return s.leagues.AdminRemoveMember(ctx, leagueID, userID)
 }
+
+// SummaryByID returns a minimal public summary of a league regardless of
+// visibility so the UI can render a members-only banner with a join CTA
+// without leaking members, standings or posts.
+func (s *LeagueService) SummaryByID(ctx context.Context, id string) (*model.LeagueSummary, error) {
+	league, err := s.leagues.GetByID(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	summary := &model.LeagueSummary{
+		ID:          league.ID,
+		Name:        league.Name,
+		Description: league.Description,
+		ImageURL:    league.ImageURL,
+		Type:        league.Type,
+		JoinPolicy:  "open",
+		MemberCount: league.MemberCount,
+		ClubID:      league.ClubID,
+	}
+	if cfg, err := s.leagues.GetConfig(ctx, id); err == nil && cfg != nil {
+		summary.JoinPolicy = cfg.JoinPolicy
+	}
+	return summary, nil
+}

@@ -154,6 +154,17 @@ export interface ScoreCardLeague {
   name: string
 }
 
+export interface LeagueSummary {
+  id: string
+  name: string
+  description?: string
+  image_url?: string
+  type: string
+  join_policy: string
+  member_count: number
+  club_id?: string
+}
+
 export const leagueApi = {
   // My leagues (dashboard)
   listMine: () =>
@@ -165,6 +176,11 @@ export const leagueApi = {
 
   get: (id: string) =>
     api.get<League>(`/leagues/${id}`),
+
+  // Minimal public-safe summary for rendering a members-only banner
+  // on private leagues without leaking members/standings/posts.
+  summary: (id: string) =>
+    api.get<LeagueSummary>(`/leagues/${id}/summary`),
 
   create: (payload: CreateLeaguePayload) =>
     api.post<League>('/leagues', payload),

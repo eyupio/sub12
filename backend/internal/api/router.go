@@ -145,19 +145,21 @@ func NewRouter(
 			r.Patch("/pellet-tests/{id}/detections/{detectionId}", pth.UpdateDetection)
 			r.Delete("/pellet-tests/{id}/detections/{detectionId}", pth.DeleteDetection)
 
-			// User profiles
+			// User profiles (auth-only mutations; reads are public via OptionalAuthenticate below)
 			uh := handler.NewUser(users, social, images)
 			r.Patch("/users/me", uh.UpdateMe)
 			r.Post("/users/me/avatar", uh.UploadAvatar)
 			r.Post("/users/me/email", uh.RequestEmailChange)
 			r.Post("/users/me/email/confirm", uh.ConfirmEmailChange)
+			r.Delete("/users/me", uh.DeleteMe)
+			r.Post("/users/me/export", uh.RequestExport)
+			r.Get("/users/me/export/{id}", uh.GetExport)
 			r.Get("/users", uh.SearchUsers)
-			r.Get("/users/{id}", uh.GetProfile)
 
 			// Social follows
 			socialH := handler.NewSocial(social)
 			r.With(rl.Limit("follow")).Post("/users/{id}/follow", socialH.Follow)
-			r.Delete("/users/{id}/follow", socialH.Unfollow)
+			r.With(rl.Limit("social_toggle")).Delete("/users/{id}/follow", socialH.Unfollow)
 			r.Get("/users/{id}/followers", socialH.ListFollowers)
 			r.Get("/users/{id}/following", socialH.ListFollowing)
 			r.Get("/users/me/follow-requests", socialH.ListFollowRequests)
@@ -165,14 +167,14 @@ func NewRouter(
 
 			// Block
 			blockH := handler.NewBlock(blocks)
-			r.Post("/users/{id}/block", blockH.Block)
-			r.Delete("/users/{id}/block", blockH.Unblock)
+			r.With(rl.Limit("social_toggle")).Post("/users/{id}/block", blockH.Block)
+			r.With(rl.Limit("social_toggle")).Delete("/users/{id}/block", blockH.Unblock)
 			r.Get("/users/me/blocks", blockH.ListBlocked)
 
 			// Mute (feed-only hide; keeps interaction intact unlike block)
 			muteH := handler.NewMute(mutes)
-			r.Post("/users/{id}/mute", muteH.Mute)
-			r.Delete("/users/{id}/mute", muteH.Unmute)
+			r.With(rl.Limit("social_toggle")).Post("/users/{id}/mute", muteH.Mute)
+			r.With(rl.Limit("social_toggle")).Delete("/users/{id}/mute", muteH.Unmute)
 			r.Get("/users/me/mutes", muteH.ListMuted)
 
 			// Notifications
@@ -200,12 +202,12 @@ func NewRouter(
 
 			// Likes
 			lkh := handler.NewLike(likes)
-			r.Post("/score-cards/{id}/like", lkh.LikeScoreCard)
-			r.Delete("/score-cards/{id}/like", lkh.UnlikeScoreCard)
-			r.Post("/comments/{id}/like", lkh.LikeComment)
-			r.Delete("/comments/{id}/like", lkh.UnlikeComment)
-			r.Post("/posts/{id}/like", lkh.LikePost)
-			r.Delete("/posts/{id}/like", lkh.UnlikePost)
+			r.With(rl.Limit("like")).Post("/score-cards/{id}/like", lkh.LikeScoreCard)
+			r.With(rl.Limit("like")).Delete("/score-cards/{id}/like", lkh.UnlikeScoreCard)
+			r.With(rl.Limit("like")).Post("/comments/{id}/like", lkh.LikeComment)
+			r.With(rl.Limit("like")).Delete("/comments/{id}/like", lkh.UnlikeComment)
+			r.With(rl.Limit("like")).Post("/posts/{id}/like", lkh.LikePost)
+			r.With(rl.Limit("like")).Delete("/posts/{id}/like", lkh.UnlikePost)
 
 			// Posts
 			postH := handler.NewPost(posts)
@@ -221,23 +223,18 @@ func NewRouter(
 			activityH := handler.NewActivity(activity)
 			r.Get("/feed", activityH.GetFeed)
 
-			// Leagues
+			// Leagues (mutations — reads are public via OptionalAuthenticate below)
 			lh := handler.NewLeague(leagues, images)
 			r.Get("/users/me/leagues", lh.ListMyLeagues)
 			r.Post("/leagues", lh.Create)
-			r.Get("/leagues/{id}", lh.Get)
 			r.Patch("/leagues/{id}", lh.Update)
 			r.Post("/leagues/{id}/join", lh.Join)
-			r.Get("/leagues/{id}/standings", lh.Standings)
-			r.Get("/leagues/{id}/scores", lh.ListScores)
 			r.Post("/leagues/{id}/ensure-round", lh.EnsureDefaultRound)
 			r.Post("/leagues/{id}/image", lh.UploadImage)
-			r.Get("/leagues/{id}/posts", postH.ListByLeague)
 
 			// League config & management
 			r.Get("/leagues/{id}/config", lh.GetConfig)
 			r.Patch("/leagues/{id}/config", lh.UpdateConfig)
-			r.Get("/leagues/{id}/members", lh.ListMembers)
 			r.Delete("/leagues/{id}/members/{userId}", lh.RemoveMember)
 
 			// Seasons & rounds
@@ -346,6 +343,23 @@ func NewRouter(
 			r.Get("/clubs/{id}", clh.GetByID)
 			r.Get("/clubs/{id}/summary", clh.Summary)
 			r.Get("/clubs/{id}/standings", clh.GetStandings)
+
+			// League reads mirror club semantics: the detail endpoint honors
+			// private-league gating via the service layer; the summary endpoint
+			// returns a minimal public-safe shape used to render the
+			// "members-only" banner with a join CTA.
+			publicLH := handler.NewLeague(leagues, images)
+			r.Get("/leagues/{id}", publicLH.Get)
+			r.Get("/leagues/{id}/summary", publicLH.Summary)
+			r.Get("/leagues/{id}/standings", publicLH.Standings)
+			r.Get("/leagues/{id}/scores", publicLH.ListScores)
+			r.Get("/leagues/{id}/members", publicLH.ListMembers)
+
+			// Public user profile. Service redacts private profiles via
+			// `is_private:true` so UIs can show a "request to follow" state
+			// instead of falling through to 404.
+			uh := handler.NewUser(users, social, images)
+			r.Get("/users/{id}", uh.GetProfile)
 		})
 	})
 

@@ -12,11 +12,13 @@ import (
 
 // RateLimitConfig holds the per-bucket limits read from envconfig.
 type RateLimitConfig struct {
-	Enabled         bool
-	FollowPerMin    int
-	CommentPerMin   int
-	PostPerMin      int
-	ReportPerMin    int
+	Enabled             bool
+	FollowPerMin        int
+	CommentPerMin       int
+	PostPerMin          int
+	ReportPerMin        int
+	LikePerMin          int
+	SocialTogglePerMin  int
 }
 
 // RateLimiter is a simple token-bucket per (bucket, user) that prefers Redis
@@ -81,6 +83,10 @@ func (rl *RateLimiter) bucketLimit(bucket string) int {
 		return rl.cfg.PostPerMin
 	case "report":
 		return rl.cfg.ReportPerMin
+	case "like":
+		return rl.cfg.LikePerMin
+	case "social_toggle":
+		return rl.cfg.SocialTogglePerMin
 	}
 	return 0
 }

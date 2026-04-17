@@ -15,6 +15,19 @@ type League struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// LeagueSummary is the minimal public-facing view of a league used to render a
+// "members-only" banner without leaking members, standings or posts.
+type LeagueSummary struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+	Type        string  `json:"type"`
+	JoinPolicy  string  `json:"join_policy"`
+	MemberCount int     `json:"member_count"`
+	ClubID      *string `json:"club_id,omitempty"`
+}
+
 type CreateLeagueInput struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
