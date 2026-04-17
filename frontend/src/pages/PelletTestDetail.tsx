@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2 } from 'lucide-react'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2, X } from 'lucide-react'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { ShareDialog } from '../components/ShareDialog'
