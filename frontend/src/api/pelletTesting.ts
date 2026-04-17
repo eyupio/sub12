@@ -187,6 +187,22 @@ export interface PelletTestMeasurement {
   auto_group_size_mm?: number
   auto_group_size_moa?: number
   detection_confidence?: number
+  aim_point_x?: number
+  aim_point_y?: number
+  point_a_x?: number
+  point_a_y?: number
+  point_b_x?: number
+  point_b_y?: number
+  rotation_degrees: number
+  line_start_x?: number
+  line_start_y?: number
+  line_end_x?: number
+  line_end_y?: number
+  marker_size?: string
+  distance_m?: number
+  distance_unit?: 'meters' | 'yards'
+  measure_method: 'impacts' | 'manual_line'
+  display_unit?: 'mm' | 'cm'
   created_at: string
   updated_at: string
 }
@@ -208,6 +224,22 @@ export interface CreateMeasurementPayload {
   bbox_height?: number
   manual_group_size_mm?: number
   manual_shot_count?: number
+  aim_point_x?: number
+  aim_point_y?: number
+  point_a_x?: number
+  point_a_y?: number
+  point_b_x?: number
+  point_b_y?: number
+  rotation_degrees?: number
+  line_start_x?: number
+  line_start_y?: number
+  line_end_x?: number
+  line_end_y?: number
+  marker_size?: string
+  distance_m?: number
+  distance_unit?: 'meters' | 'yards'
+  measure_method?: 'impacts' | 'manual_line'
+  display_unit?: 'mm' | 'cm'
 }
 
 export interface UpdateMeasurementPayload {
@@ -216,6 +248,31 @@ export interface UpdateMeasurementPayload {
   bbox_y?: number
   bbox_width?: number
   bbox_height?: number
+  calibration_type?: string
+  reference_diameter_mm?: number
+  reference_pixels?: number
+  pixels_per_mm?: number
+  ref_center_x?: number
+  ref_center_y?: number
+  ref_radius_pixels?: number
+  manual_group_size_mm?: number
+  manual_shot_count?: number
+  aim_point_x?: number
+  aim_point_y?: number
+  point_a_x?: number
+  point_a_y?: number
+  point_b_x?: number
+  point_b_y?: number
+  rotation_degrees?: number
+  line_start_x?: number
+  line_start_y?: number
+  line_end_x?: number
+  line_end_y?: number
+  marker_size?: string
+  distance_m?: number
+  distance_unit?: 'meters' | 'yards'
+  measure_method?: 'impacts' | 'manual_line'
+  display_unit?: 'mm' | 'cm'
 }
 
 // ── Detection (PT-3) ────────────────────────────────────────────────────────────
@@ -479,6 +536,10 @@ export const pelletTestApi = {
     api.patch<PelletTestMeasurement>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}`, payload),
   deleteMeasurement: (sessionId: string, imageId: string, measurementId: string) =>
     api.del<void>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}`),
+  getSessionScoring: (sessionId: string) =>
+    api.get<{ measurements: PelletTestMeasurement[]; detections: PelletTestDetection[] }>(
+      `/pellet-tests/${sessionId}/scoring`,
+    ),
 
   // Comparison & Timeline
   compare: (rifleId: string, pelletA: string, pelletB: string) =>
@@ -489,6 +550,8 @@ export const pelletTestApi = {
   // Detections (PT-3)
   createDetections: (sessionId: string, imageId: string, measurementId: string, payload: CreateDetectionsBatchPayload) =>
     api.post<{ items: PelletTestDetection[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/detections`, payload),
+  replaceDetections: (sessionId: string, imageId: string, measurementId: string, payload: CreateDetectionsBatchPayload) =>
+    api.put<{ items: PelletTestDetection[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/detections`, payload),
   listDetections: (sessionId: string, imageId: string, measurementId: string) =>
     api.get<{ items: PelletTestDetection[] }>(`/pellet-tests/${sessionId}/images/${imageId}/measurements/${measurementId}/detections`),
   updateDetection: (sessionId: string, detectionId: string, payload: UpdateDetectionPayload) =>

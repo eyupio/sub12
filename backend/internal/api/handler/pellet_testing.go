@@ -546,6 +546,55 @@ func (h *PelletTestHandler) CreateDetections(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusCreated, map[string]any{"items": detections})
 }
 
+// PUT /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections
+func (h *PelletTestHandler) ReplaceDetections(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+	measurementID := chi.URLParam(r, "measurementId")
+
+	var in model.CreateDetectionsBatchInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	detections, err := h.svc.ReplaceDetections(r.Context(), measurementID, sessionID, userID, &in)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session or measurement not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to replace detections")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": detections})
+}
+
+// GET /api/v1/pellet-tests/{id}/scoring
+func (h *PelletTestHandler) GetSessionScoring(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	sessionID := chi.URLParam(r, "id")
+
+	scoring, err := h.svc.GetSessionScoring(r.Context(), sessionID, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to load session scoring")
+		return
+	}
+	writeJSON(w, http.StatusOK, scoring)
+}
+
 // GET /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections
 func (h *PelletTestHandler) ListDetections(w http.ResponseWriter, r *http.Request) {
 	_, ok := middleware.UserIDFromContext(r.Context())

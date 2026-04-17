@@ -1,0 +1,17 @@
+ALTER TABLE pellet_test_measurements
+    ADD COLUMN IF NOT EXISTS aim_point_x       NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS aim_point_y       NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS point_a_x         NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS point_a_y         NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS point_b_x         NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS point_b_y         NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS rotation_degrees  INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS line_start_x      NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS line_start_y      NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS line_end_x        NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS line_end_y        NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS marker_size       TEXT,
+    ADD COLUMN IF NOT EXISTS distance_m        NUMERIC(8,2),
+    ADD COLUMN IF NOT EXISTS distance_unit     TEXT,
+    ADD COLUMN IF NOT EXISTS measure_method    TEXT NOT NULL DEFAULT 'impacts',
+    ADD COLUMN IF NOT EXISTS display_unit      TEXT;

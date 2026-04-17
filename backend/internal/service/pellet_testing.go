@@ -209,16 +209,28 @@ func (s *PelletTestService) CreateMeasurement(ctx context.Context, sessionID, us
 		sizeMM := diag / in.PixelsPerMM
 		in.MeasuredSizeMM = &sizeMM
 
-		// Calculate MOA from session distance
-		session, err := s.repo.GetByID(ctx, sessionID, userID)
+		distanceM, err := s.distanceForMeasurement(ctx, sessionID, userID, in.DistanceM)
 		if err != nil {
 			return nil, err
 		}
-		moa := calcMOA(sizeMM, session.DistanceM)
+		moa := calcMOA(sizeMM, distanceM)
 		in.MeasuredSizeMOA = &moa
 	}
 
 	return s.repo.CreateMeasurement(ctx, sessionID, userID, imageID, in)
+}
+
+// distanceForMeasurement prefers the per-measurement override when set, falling
+// back to the session's configured distance.
+func (s *PelletTestService) distanceForMeasurement(ctx context.Context, sessionID, userID string, override *float64) (float64, error) {
+	if override != nil && *override > 0 {
+		return *override, nil
+	}
+	session, err := s.repo.GetByID(ctx, sessionID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return session.DistanceM, nil
 }
 
 func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imageID string) ([]*model.PelletTestMeasurement, error) {
@@ -245,16 +257,63 @@ func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID
 			sizeMM := diag / found.PixelsPerMM
 			in.MeasuredSizeMM = &sizeMM
 
-			session, err := s.repo.GetByID(ctx, sessionID, userID)
+			distanceM, err := s.distanceForMeasurement(ctx, sessionID, userID, in.DistanceM)
 			if err != nil {
 				return nil, err
 			}
-			moa := calcMOA(sizeMM, session.DistanceM)
+			moa := calcMOA(sizeMM, distanceM)
 			in.MeasuredSizeMOA = &moa
 		}
 	}
 
 	return s.repo.UpdateMeasurement(ctx, measurementID, sessionID, userID, in)
+}
+
+type SessionScoring struct {
+	Measurements []*model.PelletTestMeasurement `json:"measurements"`
+	Detections   []*model.PelletTestDetection   `json:"detections"`
+}
+
+func (s *PelletTestService) GetSessionScoring(ctx context.Context, sessionID, userID string) (*SessionScoring, error) {
+	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
+	measurements, err := s.repo.GetMeasurementsBySession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	detections, err := s.repo.ListDetectionsBySession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if measurements == nil {
+		measurements = []*model.PelletTestMeasurement{}
+	}
+	if detections == nil {
+		detections = []*model.PelletTestDetection{}
+	}
+	return &SessionScoring{Measurements: measurements, Detections: detections}, nil
+}
+
+func (s *PelletTestService) ReplaceDetections(ctx context.Context, measurementID, sessionID, userID string, in *model.CreateDetectionsBatchInput) ([]*model.PelletTestDetection, error) {
+	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
+
+	detections, err := s.repo.ReplaceDetectionsForMeasurement(ctx, measurementID, sessionID, in.Detections)
+	if err != nil {
+		return nil, err
+	}
+
+	autoGroupMM, autoGroupMOA, avgConfidence := s.computeAutoGroupSize(ctx, sessionID, userID, detections)
+	method := in.DetectionMethod
+	if method == "" {
+		method = "manual"
+	}
+	if err := s.repo.UpdateMeasurementDetectionMeta(ctx, measurementID, method, len(detections), autoGroupMM, autoGroupMOA, avgConfidence); err != nil {
+		return nil, err
+	}
+	return detections, nil
 }
 
 func (s *PelletTestService) DeleteMeasurement(ctx context.Context, measurementID, sessionID, userID string) error {

@@ -1,0 +1,17 @@
+ALTER TABLE pellet_test_measurements
+    DROP COLUMN IF EXISTS aim_point_x,
+    DROP COLUMN IF EXISTS aim_point_y,
+    DROP COLUMN IF EXISTS point_a_x,
+    DROP COLUMN IF EXISTS point_a_y,
+    DROP COLUMN IF EXISTS point_b_x,
+    DROP COLUMN IF EXISTS point_b_y,
+    DROP COLUMN IF EXISTS rotation_degrees,
+    DROP COLUMN IF EXISTS line_start_x,
+    DROP COLUMN IF EXISTS line_start_y,
+    DROP COLUMN IF EXISTS line_end_x,
+    DROP COLUMN IF EXISTS line_end_y,
+    DROP COLUMN IF EXISTS marker_size,
+    DROP COLUMN IF EXISTS distance_m,
+    DROP COLUMN IF EXISTS distance_unit,
+    DROP COLUMN IF EXISTS measure_method,
+    DROP COLUMN IF EXISTS display_unit;

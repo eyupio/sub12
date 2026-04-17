@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, X, Check, Crosshair, Download, Share2 } from 'lucide-react'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2 } from 'lucide-react'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { ShareDialog } from '../components/ShareDialog'
@@ -11,9 +11,11 @@ import {
   PelletTestImage,
   type CreateMeasurementPayload,
   type PelletTestMeasurement,
+  type PelletTestDetection,
 } from '../api/pelletTesting'
 import type { DetectedHole } from '../utils/holeDetection'
 import ImageMeasurement from '../components/ImageMeasurement'
+import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
@@ -81,11 +83,30 @@ export default function PelletTestDetail() {
     enabled: !!session?.rifle_id && !!session?.pellet_id,
   })
 
-  const { data: measurementsData, isLoading: measurementsLoading } = useQuery({
-    queryKey: ['pellet-tests', id, 'images', measureImage?.id, 'measurements'],
-    queryFn: () => pelletTestApi.getMeasurements(id!, measureImage!.id),
-    enabled: !!id && !!measureImage?.id,
+  const { data: scoring } = useQuery({
+    queryKey: ['pellet-tests', id, 'scoring'],
+    queryFn: () => pelletTestApi.getSessionScoring(id!),
+    enabled: !!id,
   })
+
+  const measurementsByImage = useMemo(() => {
+    const m = new Map<string, PelletTestMeasurement>()
+    for (const x of scoring?.measurements ?? []) {
+      const prev = m.get(x.image_id)
+      if (!prev || x.created_at > prev.created_at) m.set(x.image_id, x)
+    }
+    return m
+  }, [scoring])
+
+  const detectionsByMeasurement = useMemo(() => {
+    const m = new Map<string, PelletTestDetection[]>()
+    for (const d of scoring?.detections ?? []) {
+      const arr = m.get(d.measurement_id) ?? []
+      arr.push(d)
+      m.set(d.measurement_id, arr)
+    }
+    return m
+  }, [scoring])
 
   const handleExport = async () => {
     try {
@@ -193,8 +214,10 @@ export default function PelletTestDetail() {
   })
 
   const saveMeasurementMutation = useMutation({
-    mutationFn: async ({ imageId, payload, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
-      const measurement = await pelletTestApi.createMeasurement(id!, imageId, payload)
+    mutationFn: async ({ imageId, payload, measurementId, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; measurementId?: string; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
+      const measurement = measurementId
+        ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
+        : await pelletTestApi.createMeasurement(id!, imageId, payload)
       if (analyzedDistanceValue && analyzedDistanceValue > 0) {
         await pelletTestApi.update(id!, {
           distance_value: analyzedDistanceValue,
@@ -210,9 +233,9 @@ export default function PelletTestDetail() {
       }
       return measurement
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
       setMeasureImage(null)
       setPendingMeasuredGroupId(null)
     },
@@ -225,6 +248,7 @@ export default function PelletTestDetail() {
     mutationFn: async ({
       imageId,
       payload,
+      measurementId,
       detections,
       annotatedBlob,
       analyzedSizeMM,
@@ -234,6 +258,7 @@ export default function PelletTestDetail() {
     }: {
       imageId: string
       payload: CreateMeasurementPayload
+      measurementId?: string
       detections: DetectedHole[]
       annotatedBlob: Blob | null
       analyzedSizeMM?: number | null
@@ -241,9 +266,11 @@ export default function PelletTestDetail() {
       analyzedDistanceValue?: number
       analyzedDistanceUnit?: 'meters' | 'yards'
     }) => {
-      const measurement = await pelletTestApi.createMeasurement(id!, imageId, payload)
+      const measurement = measurementId
+        ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
+        : await pelletTestApi.createMeasurement(id!, imageId, payload)
 
-      await pelletTestApi.createDetections(id!, imageId, measurement.id, {
+      const detectionsPayload = {
         detection_method: 'auto',
         detections: detections.map(detection => ({
           center_x: detection.centerX,
@@ -252,7 +279,12 @@ export default function PelletTestDetail() {
           diameter_mm: detection.diameterMM,
           confidence: detection.confidence,
         })),
-      })
+      }
+      if (measurementId) {
+        await pelletTestApi.replaceDetections(id!, imageId, measurement.id, detectionsPayload)
+      } else {
+        await pelletTestApi.createDetections(id!, imageId, measurement.id, detectionsPayload)
+      }
 
       if (annotatedBlob) {
         await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
@@ -274,9 +306,9 @@ export default function PelletTestDetail() {
 
       return measurement
     },
-    onSuccess: (_measurement, variables) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'images', variables.imageId, 'measurements'] })
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
       setMeasureImage(null)
       setPendingMeasuredGroupId(null)
     },
@@ -316,10 +348,12 @@ export default function PelletTestDetail() {
 
   const groups = session.groups ?? []
   const images = session.images ?? []
-  const existingMeasurement: PelletTestMeasurement | undefined =
-    measurementsData?.items && measurementsData.items.length > 0
-      ? measurementsData.items[measurementsData.items.length - 1]
-      : undefined
+  const existingMeasurement: PelletTestMeasurement | undefined = measureImage
+    ? measurementsByImage.get(measureImage.id)
+    : undefined
+  const existingDetections: PelletTestDetection[] | undefined = existingMeasurement
+    ? detectionsByMeasurement.get(existingMeasurement.id)
+    : undefined
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
@@ -595,26 +629,22 @@ export default function PelletTestDetail() {
 
         {images.length > 0 && (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-            {images.map((img: PelletTestImage) => (
-              <div key={img.id} className="relative group">
-                <img src={img.image_url} alt="" className="rounded border border-subtle w-full aspect-square object-cover cursor-pointer" onClick={() => setMeasureImage(img)} />
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMeasureImage(img) }}
-                  className="absolute bottom-1 left-1 bg-page/80 backdrop-blur rounded-full p-1 text-[var(--brass)] opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Measure image"
-                  title="Open measurement tool"
-                >
-                  <Crosshair size={14} />
-                </button>
-                <button
-                  onClick={() => setPendingDelete({ kind: 'image', id: img.id })}
-                  className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
-                  aria-label="Remove photo"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+            {images.map((img: PelletTestImage) => {
+              const m = measurementsByImage.get(img.id)
+              const dets = m ? detectionsByMeasurement.get(m.id) : undefined
+              return (
+                <ScoredImageCard
+                  key={img.id}
+                  image={img}
+                  measurement={m}
+                  detections={dets}
+                  sessionDistanceM={session.distance_m}
+                  sessionDistanceUnit={session.distance_unit}
+                  onOpen={() => setMeasureImage(img)}
+                  onDelete={() => setPendingDelete({ kind: 'image', id: img.id })}
+                />
+              )
+            })}
           </div>
         )}
 
@@ -630,38 +660,34 @@ export default function PelletTestDetail() {
 
       {/* Measurement Modal */}
       {measureImage && session && (
-        measurementsLoading ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-page">
-            <p className="text-sm text-muted">Loading measurement…</p>
-          </div>
-        ) : (
-          <ImageMeasurement
-            key={`${measureImage.id}:${existingMeasurement?.id ?? 'new'}`}
-            imageUrl={measureImage.image_url}
-            distanceM={session.distance_m}
-            sessionId={id!}
-            imageId={measureImage.id}
-            existingMeasurement={existingMeasurement}
-            onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount, analyzedDistanceValue: analysisMeta.distanceValue, analyzedDistanceUnit: analysisMeta.distanceUnit })}
-            onSaveDetections={(payload, detections, annotatedBlob, analysisMeta) =>
-              saveDetectionsMutation.mutate({
-                imageId: measureImage.id,
-                payload,
-                detections,
-                annotatedBlob,
-                analyzedSizeMM: analysisMeta.groupSizeMM,
-                analyzedShotCount: analysisMeta.shotCount,
-                analyzedDistanceValue: analysisMeta.distanceValue,
-                analyzedDistanceUnit: analysisMeta.distanceUnit,
-              })
-            }
-            isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
-            saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
-            onClose={() => { setMeasureImage(null); setPendingMeasuredGroupId(null) }}
-            defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
-            defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
-          />
-        )
+        <ImageMeasurement
+          key={`${measureImage.id}:${existingMeasurement?.id ?? 'new'}`}
+          imageUrl={measureImage.image_url}
+          distanceM={session.distance_m}
+          sessionId={id!}
+          imageId={measureImage.id}
+          existingMeasurement={existingMeasurement}
+          existingDetections={existingDetections}
+          onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, measurementId: existingMeasurement?.id, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount, analyzedDistanceValue: analysisMeta.distanceValue, analyzedDistanceUnit: analysisMeta.distanceUnit })}
+          onSaveDetections={(payload, detections, annotatedBlob, analysisMeta) =>
+            saveDetectionsMutation.mutate({
+              imageId: measureImage.id,
+              payload,
+              measurementId: existingMeasurement?.id,
+              detections,
+              annotatedBlob,
+              analyzedSizeMM: analysisMeta.groupSizeMM,
+              analyzedShotCount: analysisMeta.shotCount,
+              analyzedDistanceValue: analysisMeta.distanceValue,
+              analyzedDistanceUnit: analysisMeta.distanceUnit,
+            })
+          }
+          isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
+          saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
+          onClose={() => { setMeasureImage(null); setPendingMeasuredGroupId(null) }}
+          defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
+          defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
+        />
       )}
 
       {showShare && id && (

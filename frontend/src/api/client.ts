@@ -125,6 +125,8 @@ export const api = {
     request<T>(path, { method: 'POST', body, ...init }),
   patch: <T>(path: string, body: unknown, init?: RequestOptions) =>
     request<T>(path, { method: 'PATCH', body, ...init }),
+  put: <T>(path: string, body: unknown, init?: RequestOptions) =>
+    request<T>(path, { method: 'PUT', body, ...init }),
   del: <T>(path: string, init?: RequestOptions) => request<T>(path, { method: 'DELETE', ...init }),
   upload: <T>(path: string, formData: FormData) => requestMultipart<T>(path, formData),
 }
