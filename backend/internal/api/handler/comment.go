@@ -66,8 +66,9 @@ func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 // ListReplies handles GET /api/v1/comments/{id}/replies
 func (h *CommentHandler) ListReplies(w http.ResponseWriter, r *http.Request) {
 	commentID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 
-	replies, err := h.svc.ListReplies(r.Context(), commentID)
+	replies, err := h.svc.ListReplies(r.Context(), commentID, viewerID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list replies")
 		return

@@ -101,6 +101,25 @@ func (s *PostService) GetByID(ctx context.Context, id string, viewerID *string) 
 	return post, nil
 }
 
+// CanViewPostID loads the post and evaluates whether viewerID may see it. Used
+// by services that already have the post ID (e.g. comments, likes) to enforce
+// the same visibility rules as GetByID without duplicating logic. Returns
+// repository.ErrNotFound for deny so callers can 404 instead of leaking existence.
+func (s *PostService) CanViewPostID(ctx context.Context, postID string, viewerID *string) (*model.Post, error) {
+	post, err := s.posts.GetByID(ctx, postID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := s.canViewPost(ctx, post, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return post, nil
+}
+
 // canViewPost returns true when viewerID may see post. Authors always see their
 // own content (including hidden); everyone else is gated on visibility and the
 // hidden flag.

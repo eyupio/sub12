@@ -89,7 +89,6 @@ func main() {
 	postRepo := repository.NewPostRepository(pool)
 
 	commentRepo := repository.NewCommentRepository(pool)
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, blockRepo)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -130,9 +129,6 @@ func main() {
 
 	imageRepo := repository.NewImageRepository(pool)
 
-	likeRepo := repository.NewLikeRepository(pool)
-	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, blockRepo)
-
 	socialRepo := repository.NewSocialRepository(pool)
 	socialSvc := service.NewSocialService(socialRepo, blockRepo)
 	blockSvc := service.NewBlockService(blockRepo, socialRepo)
@@ -143,6 +139,11 @@ func main() {
 
 	clubSvc := service.NewClubService(clubRepo, activitySvc)
 	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, socialRepo, activitySvc)
+
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo)
+
+	likeRepo := repository.NewLikeRepository(pool)
+	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)
 
 	muteRepo := repository.NewMuteRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)

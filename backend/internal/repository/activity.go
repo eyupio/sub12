@@ -67,6 +67,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			WHERE a.visibility = 'public'
 			  AND u.feed_opt_out = FALSE
+			  AND u.profile_visibility <> 'private'
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $1
 			      UNION
@@ -123,6 +124,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 				UNION
 				SELECT blocked_id FROM user_blocks WHERE blocker_id = $1
 			)
+			AND (u.feed_opt_out = FALSE OR a.user_id = $1)
 			AND (a.visibility IN ('public', 'followers') OR a.user_id = $1)
 			AND ($3 = '' OR a.created_at < $3::timestamptz)
 			ORDER BY a.created_at DESC

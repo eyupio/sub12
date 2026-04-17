@@ -61,6 +61,7 @@ export interface Comment {
   body: string
   like_count: number
   reply_count: number
+  is_liked: boolean
   created_at: string
   updated_at: string
 }

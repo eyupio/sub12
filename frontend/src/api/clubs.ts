@@ -113,4 +113,7 @@ export const clubsApi = {
 
   decideJoinRequest: (clubId: string, requestId: string, decision: 'approved' | 'rejected') =>
     api.post<{ decided: boolean }>(`/clubs/${clubId}/join-requests/${requestId}/decide`, { decision }),
+
+  regenerateJoinCode: (id: string) =>
+    api.post<{ join_code: string }>(`/clubs/${id}/join-code`, {}),
 }

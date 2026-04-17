@@ -19,11 +19,12 @@ type CommentService struct {
 	comments   *repository.CommentRepository
 	scoreCards *repository.ScoreCardRepository
 	posts      *repository.PostRepository
+	postSvc    *PostService
 	blocks     *repository.BlockRepository
 }
 
-func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, blocks *repository.BlockRepository) *CommentService {
-	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, blocks: blocks}
+func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, postSvc *PostService, blocks *repository.BlockRepository) *CommentService {
+	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, postSvc: postSvc, blocks: blocks}
 }
 
 func (s *CommentService) validateBody(body string) (string, error) {
@@ -64,8 +65,12 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 			}
 		}
 	case "post":
-		post, err := s.posts.GetByID(ctx, targetID, nil)
+		viewer := userID
+		post, err := s.postSvc.CanViewPostID(ctx, targetID, &viewer)
 		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrCommentDenied
+			}
 			return nil, err
 		}
 		if post.UserID != userID {
@@ -118,7 +123,12 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 			}
 		}
 	case "post":
-		post, err := s.posts.GetByID(ctx, targetID, nil)
+		var viewerPtr *string
+		if viewerID != "" {
+			v := viewerID
+			viewerPtr = &v
+		}
+		post, err := s.postSvc.CanViewPostID(ctx, targetID, viewerPtr)
 		if err != nil {
 			return nil, err
 		}
@@ -132,12 +142,12 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 			}
 		}
 	}
-	return s.comments.ListByTarget(ctx, targetID, targetType)
+	return s.comments.ListByTargetWithViewer(ctx, targetID, targetType, viewerID)
 }
 
 // ListReplies returns replies to a specific comment.
-func (s *CommentService) ListReplies(ctx context.Context, commentID string) ([]*model.Comment, error) {
-	return s.comments.ListReplies(ctx, commentID)
+func (s *CommentService) ListReplies(ctx context.Context, commentID, viewerID string) ([]*model.Comment, error) {
+	return s.comments.ListRepliesWithViewer(ctx, commentID, viewerID)
 }
 
 // Update edits a comment owned by userID.

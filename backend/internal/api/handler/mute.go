@@ -58,10 +58,10 @@ func (h *MuteHandler) ListMuted(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	ids, err := h.repo.ListMuted(r.Context(), userID)
+	items, err := h.repo.ListMutedWithProfile(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list mutes")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": ids})
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }

@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
 import { achievementApi, Achievement } from '../api/achievements'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const achievementIconMap: Record<string, typeof Target> = {
   target: Target,
@@ -88,6 +89,7 @@ export default function UserProfile() {
   const [showMenu, setShowMenu] = useState(false)
   const [showFollowers, setShowFollowers] = useState(false)
   const [showFollowing, setShowFollowing] = useState(false)
+  const [confirmUnfollow, setConfirmUnfollow] = useState(false)
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['user-profile', id],
@@ -166,7 +168,7 @@ export default function UserProfile() {
     if (profile.is_following) {
       return (
         <button
-          onClick={() => followMutation.mutate()}
+          onClick={() => setConfirmUnfollow(true)}
           disabled={followMutation.isPending}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:border-[var(--error-text)]/40 hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
         >
@@ -246,10 +248,15 @@ export default function UserProfile() {
               {/* Info */}
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-lg font-medium text-primary">{profile.display_name}</p>
                     {profile.profile_visibility === 'private' && (
                       <span title="Private profile"><Lock size={14} className="text-muted" /></span>
+                    )}
+                    {profile.follows_you && !isOwnProfile && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-surface-hover border border-subtle text-[9px] tracking-widest uppercase text-muted">
+                        Follows you
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -347,6 +354,18 @@ export default function UserProfile() {
               onClose={() => setShowFollowing(false)}
             />
           )}
+
+          <ConfirmDialog
+            open={confirmUnfollow}
+            title="Unfollow user?"
+            message={`Stop following ${profile.display_name}? You will no longer see their activity in your For You feed.`}
+            confirmLabel="Unfollow"
+            onConfirm={() => {
+              setConfirmUnfollow(false)
+              followMutation.mutate()
+            }}
+            onCancel={() => setConfirmUnfollow(false)}
+          />
         </>
       )}
     </div>

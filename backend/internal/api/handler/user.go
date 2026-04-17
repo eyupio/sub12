@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -21,6 +22,29 @@ type UserHandler struct {
 
 func NewUser(svc *service.UserService, social *service.SocialService, images *repository.ImageRepository) *UserHandler {
 	return &UserHandler{svc: svc, social: social, images: images}
+}
+
+// GET /api/v1/users?q=...&limit=...
+func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	q := r.URL.Query().Get("q")
+
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	results, err := h.svc.SearchUsers(r.Context(), q, viewerID, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to search users")
+		return
+	}
+	if results == nil {
+		results = []*model.PublicProfile{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": results})
 }
 
 // GET /api/v1/users/{id}

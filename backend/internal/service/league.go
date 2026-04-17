@@ -439,6 +439,29 @@ func (s *LeagueService) RegenerateJoinCode(ctx context.Context, leagueID, userID
 	return s.leagues.RegenerateJoinCode(ctx, leagueID)
 }
 
+// UpdateLeague applies a partial update to owner-editable league fields.
+// Requires the caller to be a league admin.
+func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID string, in *model.UpdateLeagueBasicsInput) (*model.League, error) {
+	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+		return nil, err
+	}
+	if in.Name != nil {
+		trimmed := strings.TrimSpace(*in.Name)
+		if trimmed == "" {
+			return nil, fmt.Errorf("%w: name cannot be blank", ErrInvalidLeague)
+		}
+		in.Name = &trimmed
+	}
+	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
+		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
+	}
+	l, err := s.leagues.UpdateBasics(ctx, leagueID, in)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	return l, err
+}
+
 // ---------------------------------------------------------------------------
 // Image
 // ---------------------------------------------------------------------------

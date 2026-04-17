@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -378,6 +380,27 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 		return nil, fmt.Errorf("admin update club: %w", err)
 	}
 	return &club, nil
+}
+
+// RegenerateJoinCode replaces the club join code with a fresh random value and returns it.
+func (r *ClubRepository) RegenerateJoinCode(ctx context.Context, clubID string) (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate random code: %w", err)
+	}
+	code := hex.EncodeToString(b)
+
+	ct, err := r.db.Exec(ctx,
+		`UPDATE clubs SET join_code = $2, updated_at = NOW() WHERE id = $1`,
+		clubID, code,
+	)
+	if err != nil {
+		return "", fmt.Errorf("update join code: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return "", ErrNotFound
+	}
+	return code, nil
 }
 
 // AdminDelete removes a club by ID.

@@ -241,6 +241,31 @@ func (r *LeagueRepository) AdminUpdate(ctx context.Context, id string, in *model
 	return &l, nil
 }
 
+// UpdateBasics updates owner-editable league fields (name, description, type)
+// without a platform-admin check. Unset pointer fields are left unchanged.
+func (r *LeagueRepository) UpdateBasics(ctx context.Context, id string, in *model.UpdateLeagueBasicsInput) (*model.League, error) {
+	var l model.League
+	err := r.db.QueryRow(ctx, `
+		UPDATE leagues
+		SET name        = COALESCE($2, name),
+		    description = COALESCE($3, description),
+		    type        = COALESCE($4::league_type, type),
+		    updated_at  = NOW()
+		WHERE id = $1
+		RETURNING id, name, description, type::text, image_url, club_id, created_by, created_at,
+		          (SELECT COUNT(*) FROM league_members WHERE league_id = $1)::int
+	`, id, in.Name, in.Description, in.Type).Scan(
+		&l.ID, &l.Name, &l.Description, &l.Type, &l.ImageURL, &l.ClubID, &l.CreatedBy, &l.CreatedAt, &l.MemberCount,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update league basics: %w", err)
+	}
+	return &l, nil
+}
+
 // AdminDelete removes a league by ID.
 func (r *LeagueRepository) AdminDelete(ctx context.Context, id string) error {
 	ct, err := r.db.Exec(ctx, `DELETE FROM leagues WHERE id = $1`, id)

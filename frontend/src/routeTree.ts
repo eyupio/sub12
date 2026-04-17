@@ -19,6 +19,7 @@ import BatchReport from './pages/BatchReport'
 import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
 import Profile from './pages/Profile'
 import UserProfile from './pages/UserProfile'
+import Users from './pages/Users'
 import Feed from './pages/Feed'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -171,6 +172,12 @@ const userProfileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/users/$id',
   component: UserProfile,
+})
+
+const usersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/users',
+  component: Users,
 })
 
 const feedRoute = createRoute({
@@ -344,6 +351,7 @@ export const routeTree = rootRoute.addChildren([
     clubSettingsRoute,
     profileRoute,
     userProfileRoute,
+    usersRoute,
     feedRoute,
     adminEmailSettingsRoute,
     adminEmailTemplatesRoute,

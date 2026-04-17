@@ -14,6 +14,7 @@ type FollowStats struct {
 	FollowerCount  int  `json:"follower_count"`
 	FollowingCount int  `json:"following_count"`
 	IsFollowing    bool `json:"is_following"` // true when the requesting user follows this profile
+	FollowsYou     bool `json:"follows_you"`  // true when this profile follows the requesting user
 }
 
 // PublicProfileWithFollow extends PublicProfile with social context.
@@ -52,4 +53,12 @@ type FollowListItem struct {
 	UserID      string  `json:"user_id"`
 	DisplayName string  `json:"display_name"`
 	AvatarURL   *string `json:"avatar_url,omitempty"`
+}
+
+// UserMute is a muted user with enough profile data to render a list row.
+type UserMute struct {
+	MutedID     string    `json:"muted_id"`
+	DisplayName string    `json:"display_name,omitempty"`
+	AvatarURL   *string   `json:"avatar_url,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }

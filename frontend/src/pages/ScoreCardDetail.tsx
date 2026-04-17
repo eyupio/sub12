@@ -367,6 +367,9 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
               <span className="text-[11px] font-medium text-secondary">{r.display_name}</span>
               <span className="text-[10px] text-muted">
                 {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 5000 && (
+                  <span className="ml-1 italic">(edited)</span>
+                )}
               </span>
             </div>
             <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
@@ -489,6 +492,9 @@ function CommentsSection({ cardId }: { cardId: string }) {
                   <span className="text-xs font-medium text-secondary">{c.display_name}</span>
                   <span className="text-[10px] text-muted">
                     {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 5000 && (
+                      <span className="ml-1 italic">(edited)</span>
+                    )}
                   </span>
                 </div>
 
@@ -542,7 +548,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
                     </div>
                     {/* Comment actions: like + reply toggle */}
                     <div className="flex items-center gap-3 mt-1">
-                      <LikeButton targetId={c.id} targetType="comment" initialLiked={false} initialCount={c.like_count} size={14} />
+                      <LikeButton targetId={c.id} targetType="comment" initialLiked={c.is_liked} initialCount={c.like_count} size={14} />
                       <button
                         onClick={() => toggleReplies(c.id)}
                         className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary transition-colors"

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut, Check, X as XIcon } from 'lucide-react'
+import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut, Check, X as XIcon, RefreshCw } from 'lucide-react'
 import { clubsApi, type Club, type ClubMember } from '../api/clubs'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -160,6 +160,15 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
     onError: () => toast('Failed to update privacy', 'error'),
   })
 
+  const regenMutation = useMutation({
+    mutationFn: () => clubsApi.regenerateJoinCode(clubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      toast('Join code regenerated', 'success')
+    },
+    onError: () => toast('Failed to regenerate code', 'error'),
+  })
+
   return (
     <div className={sectionCls}>
       <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Joining</h2>
@@ -215,6 +224,26 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
           {club.join_policy === 'approval' && 'Admins review and approve each join request.'}
         </p>
       </div>
+
+      {club.join_policy === 'invite_code' && (
+        <div className="space-y-1.5">
+          <label className={labelCls}>Join Code</label>
+          <div className="flex items-center gap-2 bg-surface rounded p-3 border border-subtle">
+            <code className="font-mono text-sm text-[var(--brass)] flex-1">{club.join_code || '—'}</code>
+            <button
+              type="button"
+              onClick={() => regenMutation.mutate()}
+              disabled={regenMutation.isPending}
+              className="text-muted hover:text-secondary transition-colors disabled:opacity-40"
+              title="Regenerate code"
+              aria-label="Regenerate join code"
+            >
+              <RefreshCw size={14} className={regenMutation.isPending ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <p className="text-[10px] text-muted">Regenerating invalidates the previous code.</p>
+        </div>
+      )}
     </div>
   )
 }

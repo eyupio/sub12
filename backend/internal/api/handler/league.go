@@ -617,6 +617,47 @@ func (h *LeagueHandler) DecideJoinRequest(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"decided": true})
 }
 
+// PATCH /api/v1/leagues/{id}
+func (h *LeagueHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	var input model.UpdateLeagueBasicsInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	league, err := h.svc.UpdateLeague(r.Context(), leagueID, userID, &input)
+	if err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidLeague) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update league")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, league)
+}
+
 // POST /api/v1/leagues/{id}/join-code
 func (h *LeagueHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

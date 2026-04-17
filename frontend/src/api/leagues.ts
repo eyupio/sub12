@@ -169,6 +169,9 @@ export const leagueApi = {
   create: (payload: CreateLeaguePayload) =>
     api.post<League>('/leagues', payload),
 
+  update: (id: string, payload: { name?: string; description?: string; type?: 'public' | 'private' }) =>
+    api.patch<League>(`/leagues/${id}`, payload),
+
   join: (id: string, joinCode?: string) =>
     api.post<{ joined?: boolean; pending?: boolean }>(`/leagues/${id}/join`, { join_code: joinCode }),
 

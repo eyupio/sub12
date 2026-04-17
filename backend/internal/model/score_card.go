@@ -69,6 +69,7 @@ type Comment struct {
 	Body        string    `json:"body"`
 	LikeCount   int       `json:"like_count"`
 	ReplyCount  int       `json:"reply_count"`
+	IsLiked     bool      `json:"is_liked"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

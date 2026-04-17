@@ -170,6 +170,45 @@ func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) (*mo
 	return &u, nil
 }
 
+// Search finds users whose display_name prefix-matches query. Private profiles
+// are excluded from prefix matches but still findable by exact display_name.
+// Users blocked in either direction relative to viewerID are excluded.
+func (r *UserRepository) Search(ctx context.Context, query, viewerID string, limit int) ([]*model.PublicProfile, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, display_name, bio, location, club, avatar_url,
+		       profile_visibility, show_follower_counts, created_at
+		FROM users
+		WHERE LOWER(display_name) LIKE LOWER($1) || '%'
+		  AND (profile_visibility <> 'private' OR LOWER(display_name) = LOWER($1))
+		  AND ($2 = ''
+		       OR id NOT IN (
+		           SELECT blocker_id FROM user_blocks WHERE blocked_id = $2::uuid
+		           UNION
+		           SELECT blocked_id FROM user_blocks WHERE blocker_id = $2::uuid
+		       ))
+		ORDER BY display_name ASC
+		LIMIT $3
+	`, query, viewerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search users: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*model.PublicProfile
+	for rows.Next() {
+		var p model.PublicProfile
+		if err := rows.Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club,
+			&p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		results = append(results, &p)
+	}
+	return results, rows.Err()
+}
+
 // ListAll returns a paginated list of all users for admin use, plus the total count.
 func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
 	var total int
