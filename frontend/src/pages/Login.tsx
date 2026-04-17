@@ -19,7 +19,6 @@ export default function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(null)
     setLoading(true)
     try {
       const { user, tokens } = await authApi.login(email, password)
@@ -44,7 +43,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && (
-            <div className="bg-[var(--error-bg)] border border-[var(--error-border)] rounded px-4 py-3 text-sm text-[var(--error-text)] tracking-wide">
+            <div role="alert" className="bg-[var(--error-bg)] border border-[var(--error-border)] rounded px-4 py-3 text-sm text-[var(--error-text)] tracking-wide">
               {error}
             </div>
           )}
