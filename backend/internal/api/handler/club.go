@@ -186,29 +186,55 @@ func (h *ClubHandler) Join(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clubID := chi.URLParam(r, "id")
-	err := h.svc.Join(r.Context(), clubID, userID)
+
+	var body struct {
+		JoinCode string `json:"join_code"`
+	}
+	_ = decodeJSON(r, &body)
+
+	joined, pending, err := h.svc.Join(r.Context(), clubID, userID, body.JoinCode)
 	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
 		if errors.Is(err, service.ErrClubAlreadyMember) {
 			writeError(w, http.StatusConflict, "already a member of this club")
+			return
+		}
+		if errors.Is(err, service.ErrClubInvalidCode) {
+			writeError(w, http.StatusForbidden, "invalid or missing join code")
+			return
+		}
+		if errors.Is(err, service.ErrClubPendingRequest) {
+			writeError(w, http.StatusConflict, "join request already pending")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to join club")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"joined": true})
+	if pending {
+		writeJSON(w, http.StatusAccepted, map[string]any{"pending": true})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"joined": joined})
 }
 
 // GET /api/v1/clubs/{id}/members
 func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
-	_, ok := middleware.UserIDFromContext(r.Context())
+	viewerID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	clubID := chi.URLParam(r, "id")
-	members, err := h.svc.ListMembers(r.Context(), clubID)
+	members, err := h.svc.ListMembers(r.Context(), clubID, viewerID)
 	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list members")
 		return
 	}
@@ -220,9 +246,14 @@ func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/clubs/{id}/standings
 func (h *ClubHandler) GetStandings(w http.ResponseWriter, r *http.Request) {
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	clubID := chi.URLParam(r, "id")
-	standings, err := h.svc.GetStandings(r.Context(), clubID)
+	standings, err := h.svc.GetStandings(r.Context(), clubID, viewerID)
 	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to get standings")
 		return
 	}
@@ -230,6 +261,71 @@ func (h *ClubHandler) GetStandings(w http.ResponseWriter, r *http.Request) {
 		standings = []*model.ClubStanding{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": standings})
+}
+
+// GET /api/v1/clubs/{id}/join-requests
+func (h *ClubHandler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	status := r.URL.Query().Get("status")
+
+	requests, err := h.svc.ListJoinRequests(r.Context(), clubID, userID, status)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list join requests")
+		return
+	}
+	if requests == nil {
+		requests = []*model.ClubJoinRequest{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": requests})
+}
+
+// POST /api/v1/clubs/{id}/join-requests/{requestId}/decide
+func (h *ClubHandler) DecideJoinRequest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+	requestID := chi.URLParam(r, "requestId")
+
+	var body struct {
+		Decision string `json:"decision"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	err := h.svc.DecideJoinRequest(r.Context(), clubID, requestID, userID, body.Decision)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "request not found")
+			return
+		}
+		if errors.Is(err, service.ErrClubInvalidDecide) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to decide request")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"decided": true})
 }
 
 // DELETE /api/v1/clubs/{id}/members/{userId}

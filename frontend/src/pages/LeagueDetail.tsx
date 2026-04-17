@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
@@ -107,11 +107,14 @@ export default function LeagueDetail() {
     setJoinCode(initialJoinCode)
   }, [initialJoinCode])
 
-  const { data: league, isLoading: leagueLoading } = useQuery({
+  const { data: league, isLoading: leagueLoading, error: leagueError } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid'],
     queryFn: () => leagueApi.get(leagueId!),
     enabled: !!leagueId,
+    retry: false,
   })
+
+  const isLeaguePrivate = leagueError instanceof ApiError && leagueError.status === 404
 
   const { data: config } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid', 'config'],
@@ -194,6 +197,24 @@ export default function LeagueDetail() {
         <p className="text-sm text-muted">
           This invite link is malformed. Open the league again from the app or ask for a fresh invite link.
         </p>
+      </div>
+    )
+  }
+
+  if (isLeaguePrivate) {
+    return (
+      <div className="p-4 lg:p-8 max-w-md mx-auto text-center space-y-3">
+        <Lock className="mx-auto text-muted" size={32} />
+        <h1 className="text-lg tracking-widest uppercase text-secondary">Private League</h1>
+        <p className="text-sm text-muted">
+          This league is private or no longer exists. Ask an admin for an invite.
+        </p>
+        <Link
+          to="/leagues"
+          className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+        >
+          &larr; Back to leagues
+        </Link>
       </div>
     )
   }

@@ -165,23 +165,42 @@ func (s *SocialService) ListFollowing(ctx context.Context, profileUserID, viewer
 
 // checkListAccess verifies the viewer can see follower/following lists.
 func (s *SocialService) checkListAccess(ctx context.Context, profileUserID, viewerID string) error {
+	return s.CanViewProfile(ctx, profileUserID, viewerID)
+}
+
+// CanViewProfile returns nil if the viewer can see private content on the profile
+// (follower/following lists, achievements, etc.). Returns repository.ErrNotFound
+// for blocked interactions (to avoid enumeration) and ErrAccessDenied for
+// privacy violations.
+func (s *SocialService) CanViewProfile(ctx context.Context, profileUserID, viewerID string) error {
 	if viewerID == profileUserID {
 		return nil
 	}
-	// Check block
-	blocked, err := s.blocks.IsBlocked(ctx, viewerID, profileUserID)
-	if err != nil {
-		return err
+	// Block check is bidirectional.
+	if viewerID != "" {
+		blocked, err := s.blocks.IsBlocked(ctx, viewerID, profileUserID)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return repository.ErrNotFound
+		}
+		reverse, err := s.blocks.IsBlocked(ctx, profileUserID, viewerID)
+		if err != nil {
+			return err
+		}
+		if reverse {
+			return repository.ErrNotFound
+		}
 	}
-	if blocked {
-		return repository.ErrNotFound
-	}
-	// Check privacy
 	vis, err := s.social.GetProfileVisibility(ctx, profileUserID)
 	if err != nil {
 		return err
 	}
 	if vis == "private" {
+		if viewerID == "" {
+			return ErrAccessDenied
+		}
 		isFollowing, err := s.social.IsFollowing(ctx, viewerID, profileUserID)
 		if err != nil {
 			return err

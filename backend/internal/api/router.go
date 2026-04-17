@@ -246,6 +246,10 @@ func NewRouter(
 			r.Get("/clubs/{id}/leagues", clh.ListLeagues)
 			r.Get("/clubs/{id}/posts", postH.ListByClub)
 
+			// Club join requests (admin)
+			r.Get("/clubs/{id}/join-requests", clh.ListJoinRequests)
+			r.Post("/clubs/{id}/join-requests/{requestId}/decide", clh.DecideJoinRequest)
+
 			// Achievements
 			ah := handler.NewAchievement(achievements)
 			r.Get("/users/me/achievements", ah.ListMine)
@@ -292,9 +296,6 @@ func NewRouter(
 			})
 		})
 
-		// Public comment read (no auth required)
-		r.Get("/score-cards/{id}/comments", commentH.List)
-
 		// Public league routes (no auth required)
 		lh := handler.NewLeague(leagues, images)
 		r.Get("/leagues", lh.List)
@@ -303,9 +304,11 @@ func NewRouter(
 		pth := handler.NewPelletTest(pelletTests, images)
 		r.Get("/pellet-tests/public-leaderboard", pth.PublicLeaderboard)
 
-		// Public club routes (no auth required; viewer context optional)
+		// Public routes where viewer context is used for privacy enforcement.
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.OptionalAuthenticate(auth))
+			// Comment read: honors score card visibility and block state.
+			r.Get("/score-cards/{id}/comments", commentH.List)
 			clh := handler.NewClub(clubs, leagues, images)
 			r.Get("/clubs", clh.List)
 			r.Get("/clubs/{id}", clh.GetByID)

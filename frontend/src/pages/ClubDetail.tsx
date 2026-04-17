@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock } from 'lucide-react'
+import { ApiError } from '../api/client'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
 import type { League } from '../api/leagues'
@@ -163,10 +164,14 @@ export default function ClubDetail() {
   const [joinError, setJoinError] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
 
-  const { data: club, isLoading } = useQuery({
+  const { data: club, isLoading, error: clubError } = useQuery({
     queryKey: ['club', id],
     queryFn: () => clubsApi.get(id),
+    retry: false,
   })
+
+  const isPrivateOrNotFound =
+    clubError instanceof ApiError && clubError.status === 404
 
   const { data: standingsData } = useQuery({
     queryKey: ['club', id, 'standings'],
@@ -203,14 +208,26 @@ export default function ClubDetail() {
     },
   })
 
+  const [joinCodeInput, setJoinCodeInput] = useState('')
   const joinMutation = useMutation({
-    mutationFn: () => clubsApi.join(id),
-    onSuccess: () => {
+    mutationFn: () => clubsApi.join(id, joinCodeInput || undefined),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['club', id] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
-      toast('Joined club', 'success')
+      if (data.pending) {
+        toast('Join request submitted — awaiting admin approval', 'success')
+      } else {
+        toast('Joined club', 'success')
+      }
+      setJoinCodeInput('')
     },
-    onError: () => setJoinError('Failed to join club. You may already be a member.'),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        setJoinError(err.message || 'Failed to join club.')
+      } else {
+        setJoinError('Failed to join club.')
+      }
+    },
   })
 
   const uploadMutation = useMutation({
@@ -246,12 +263,32 @@ export default function ClubDetail() {
   }
 
   if (!club) {
+    if (isPrivateOrNotFound) {
+      return (
+        <div className="p-4 lg:p-8 max-w-md mx-auto text-center space-y-3">
+          <Lock className="mx-auto text-muted" size={32} />
+          <h1 className="text-lg tracking-widest uppercase text-secondary">Private Club</h1>
+          <p className="text-sm text-muted">
+            This club is private or no longer exists. Ask an admin for an invite.
+          </p>
+          <Link
+            to="/clubs"
+            className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+          >
+            &larr; Back to clubs
+          </Link>
+        </div>
+      )
+    }
     return (
       <div className="p-4 lg:p-8 text-center text-muted text-sm">
         Club not found.
       </div>
     )
   }
+
+  const needsJoinCode = !club.is_member && club.join_policy === 'invite_code'
+  const joinLabel = club.join_policy === 'approval' ? 'Request' : 'Join'
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
@@ -294,9 +331,20 @@ export default function ClubDetail() {
         </div>
 
         <div className="flex-1 min-w-0 space-y-1">
-          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary truncate">
-            {club.name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary truncate">
+              {club.name}
+            </h1>
+            {club.type === 'private' && (
+              <span
+                className="flex items-center gap-1 text-[9px] tracking-widest uppercase border border-subtle text-muted px-1.5 py-0.5 rounded shrink-0"
+                title="Private club — only members can see content"
+              >
+                <Lock size={10} />
+                Private
+              </span>
+            )}
+          </div>
           {club.description && (
             <p className="text-sm text-muted">{club.description}</p>
           )}
@@ -309,14 +357,26 @@ export default function ClubDetail() {
         <div className="shrink-0 flex flex-col items-end gap-2">
           {!club.is_member && user && (
             <div className="space-y-1">
+              {needsJoinCode && (
+                <input
+                  type="text"
+                  value={joinCodeInput}
+                  onChange={e => setJoinCodeInput(e.target.value)}
+                  placeholder="Join code"
+                  className="w-32 bg-surface border border-subtle rounded px-2 py-1 text-xs text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50"
+                />
+              )}
               <button
                 onClick={() => { setJoinError(''); joinMutation.mutate() }}
-                disabled={joinMutation.isPending}
+                disabled={joinMutation.isPending || (needsJoinCode && !joinCodeInput.trim())}
                 className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
               >
-                {joinMutation.isPending ? 'Joining…' : 'Join'}
+                {joinMutation.isPending ? 'Joining…' : joinLabel}
               </button>
               {joinError && <p className="text-[10px] text-[var(--error-text)] text-right">{joinError}</p>}
+              {club.join_policy === 'approval' && !joinError && (
+                <p className="text-[10px] text-muted text-right">Admins approve requests</p>
+              )}
             </div>
           )}
           <div className="flex items-center gap-2">

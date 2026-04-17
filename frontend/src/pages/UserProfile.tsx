@@ -119,6 +119,9 @@ export default function UserProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-profile', id] })
+      queryClient.invalidateQueries({ queryKey: ['followers', id] })
+      queryClient.invalidateQueries({ queryKey: ['following', id] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
     },
   })
 
@@ -129,6 +132,9 @@ export default function UserProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-profile', id] })
+      queryClient.invalidateQueries({ queryKey: ['followers', id] })
+      queryClient.invalidateQueries({ queryKey: ['following', id] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
       setShowMenu(false)
     },
   })

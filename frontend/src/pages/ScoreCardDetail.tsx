@@ -5,6 +5,7 @@ import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, 
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
+import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -635,6 +636,13 @@ export default function ScoreCardDetail() {
     enabled: !!card?.league_round_id,
   })
 
+  const notOwnCard = !!card && !!currentUser && card.user_id !== currentUser.id
+  const { data: cardAuthor } = useQuery({
+    queryKey: ['user-profile', card?.user_id],
+    queryFn: () => usersApi.getProfile(card!.user_id),
+    enabled: notOwnCard,
+  })
+
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles(), enabled: editing })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
 
@@ -753,6 +761,12 @@ export default function ScoreCardDetail() {
           </button>
         )}
       </div>
+
+      {cardAuthor?.is_blocked && (
+        <div className="rounded-lg border border-[var(--error-text)]/30 bg-[var(--error-text)]/5 px-4 py-3 text-xs tracking-wide text-[var(--error-text)]">
+          You have blocked this user. Unblock them from their profile to restore interactions.
+        </div>
+      )}
 
       {/* Edit mode */}
       {editing && (

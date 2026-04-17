@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut } from 'lucide-react'
+import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut, Check, X as XIcon } from 'lucide-react'
 import { clubsApi, type Club, type ClubMember } from '../api/clubs'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -138,6 +138,165 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
       <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary}>
         {mutation.isPending ? 'Saving...' : 'Save'}
       </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Privacy Section
+// ---------------------------------------------------------------------------
+
+function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: (input: { type?: 'public' | 'private'; join_policy?: 'open' | 'invite_code' | 'approval' }) =>
+      clubsApi.update(clubId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Privacy updated', 'success')
+    },
+    onError: () => toast('Failed to update privacy', 'error'),
+  })
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Joining</h2>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Visibility</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['public', 'private'] as const).map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ type: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                club.type === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">
+          {club.type === 'private'
+            ? 'Private clubs are hidden from the directory. Only members see content.'
+            : 'Public clubs appear in the club directory.'}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Join Policy</label>
+        <div className="grid grid-cols-3 gap-2">
+          {(['open', 'invite_code', 'approval'] as const).map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ join_policy: value })}
+              className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                club.join_policy === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value === 'invite_code' ? 'Code' : value}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">
+          {club.join_policy === 'open' && 'Anyone can join instantly.'}
+          {club.join_policy === 'invite_code' && 'Members need the join code to join.'}
+          {club.join_policy === 'approval' && 'Admins review and approve each join request.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Join Requests Section
+// ---------------------------------------------------------------------------
+
+function JoinRequestsSection({ clubId }: { clubId: string }) {
+  const queryClient = useQueryClient()
+
+  const { data } = useQuery({
+    queryKey: ['club', clubId, 'join-requests', 'pending'],
+    queryFn: () => clubsApi.listJoinRequests(clubId, 'pending'),
+  })
+
+  const decideMutation = useMutation({
+    mutationFn: ({ requestId, decision }: { requestId: string; decision: 'approved' | 'rejected' }) =>
+      clubsApi.decideJoinRequest(clubId, requestId, decision),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId, 'join-requests', 'pending'] })
+      queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      toast('Request decided', 'success')
+    },
+    onError: () => toast('Failed to decide request', 'error'),
+  })
+
+  const requests = data?.items ?? []
+
+  return (
+    <div className={sectionCls}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[11px] tracking-widest uppercase text-muted">Pending Join Requests</h2>
+        <span className="text-[11px] text-muted font-mono">{requests.length}</span>
+      </div>
+
+      {requests.length === 0 && (
+        <p className="text-sm text-muted text-center py-4">No pending requests.</p>
+      )}
+
+      {requests.map(req => (
+        <div key={req.id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {req.avatar_url ? (
+              <img src={req.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-[var(--brass)]/10 flex items-center justify-center shrink-0">
+                <span className="text-[9px] text-[var(--brass)]">
+                  {(req.display_name?.[0] ?? '?').toUpperCase()}
+                </span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm text-secondary truncate">{req.display_name ?? 'Member'}</p>
+              <p className="text-[10px] text-muted font-mono">
+                {new Date(req.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => decideMutation.mutate({ requestId: req.id, decision: 'approved' })}
+              disabled={decideMutation.isPending}
+              className="p-1.5 rounded border border-[var(--success-text)]/30 text-[var(--success-text)] hover:bg-[var(--success-text)]/10 transition-colors disabled:opacity-40"
+              title="Approve"
+              aria-label={`Approve ${req.display_name ?? 'request'}`}
+            >
+              <Check size={13} />
+            </button>
+            <button
+              onClick={() => decideMutation.mutate({ requestId: req.id, decision: 'rejected' })}
+              disabled={decideMutation.isPending}
+              className="p-1.5 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 transition-colors disabled:opacity-40"
+              title="Reject"
+              aria-label={`Reject ${req.display_name ?? 'request'}`}
+            >
+              <XIcon size={13} />
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -393,6 +552,8 @@ export default function ClubSettings() {
 
       <ClubImageSection clubId={id} club={club} />
       <GeneralInfoSection clubId={id} club={club} />
+      <PrivacySection clubId={id} club={club} />
+      {club.join_policy === 'approval' && <JoinRequestsSection clubId={id} />}
       <MembersSection clubId={id} currentUserId={currentUser!.id} />
       <LeaveSection clubId={id} members={members} currentUserId={currentUser!.id} />
     </div>

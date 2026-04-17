@@ -136,6 +136,10 @@ func main() {
 	socialSvc := service.NewSocialService(socialRepo, blockRepo)
 	blockSvc := service.NewBlockService(blockRepo, socialRepo)
 
+	// Wire social into achievement service for profile-visibility enforcement on
+	// GET /users/{id}/achievements. Done post-construction to avoid a cycle.
+	achievementSvc.SetSocial(socialSvc)
+
 	clubSvc := service.NewClubService(clubRepo, activitySvc)
 	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, activitySvc)
 
