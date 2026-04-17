@@ -95,4 +95,8 @@ export const usersApi = {
   // Search
   search: (q: string, limit = 20) =>
     api.get<{ items: PublicProfile[] }>(`/users?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  // GDPR
+  deleteMe: () => api.del<void>('/users/me'),
+  exportMe: () => api.post<Record<string, unknown>>('/users/me/export', {}),
 }

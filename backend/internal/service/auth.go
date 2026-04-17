@@ -117,6 +117,10 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 		return nil, nil, ErrInvalidCredentials
 	}
 
+	if deleted, err := s.users.IsDeleted(ctx, user.ID); err == nil && deleted {
+		return nil, nil, ErrInvalidCredentials
+	}
+
 	tokens, err := s.issueTokens(ctx, user.ID)
 	if err != nil {
 		return nil, nil, err

@@ -169,6 +169,59 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "confirmation email sent"})
 }
 
+// DELETE /api/v1/users/me
+func (h *UserHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err := h.svc.RequestDeletion(r.Context(), userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "account not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete account")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /api/v1/users/me/export
+//
+// Returns a downloadable JSON blob containing the requesting user's core
+// records (profile, score cards, posts, clubs, leagues). The export is
+// produced synchronously — the `data_export_requests` table records the
+// audit trail for later review.
+func (h *UserHandler) RequestExport(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	payload, err := h.svc.ExportData(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "account not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to export data")
+		return
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="sub12-data-export.json"`)
+	writeJSON(w, http.StatusOK, payload)
+}
+
+// GET /api/v1/users/me/export/{id}
+//
+// Placeholder for future asynchronous exports. For now we return 410 Gone
+// — exports are delivered synchronously by POST /users/me/export. The
+// route is kept so the client can still poll by ID without a 404 surprise
+// once async processing lands.
+func (h *UserHandler) GetExport(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusGone, "exports are delivered synchronously via POST /users/me/export")
+}
+
 // POST /api/v1/users/me/email/confirm
 func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
 	var body struct {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Lock, ShieldOff } from 'lucide-react'
+import { ChevronLeft, Download, Lock, ShieldOff, Trash2 } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi } from '../api/users'
@@ -11,8 +11,11 @@ type VisibilityOption = 'public' | 'followers' | 'private'
 
 export default function PrivacyCenter() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const updateUser = useAuthStore((s) => s.updateUser)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
 
   const [profileVisibility, setProfileVisibility] = useState(user?.profile_visibility ?? 'public')
   const [defaultScoreVisibility, setDefaultScoreVisibility] = useState<VisibilityOption>(
@@ -73,6 +76,33 @@ export default function PrivacyCenter() {
       queryClient.invalidateQueries({ queryKey: ['mutes'] })
       toast('User unmuted', 'success')
     },
+  })
+
+  const exportMutation = useMutation({
+    mutationFn: () => usersApi.exportMe(),
+    onSuccess: (payload) => {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `sub12-data-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast('Download started', 'success')
+    },
+    onError: () => toast('Failed to export data', 'error'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => usersApi.deleteMe(),
+    onSuccess: () => {
+      toast('Your account has been deleted', 'success')
+      clearAuth()
+      navigate({ to: '/' })
+    },
+    onError: () => toast('Failed to delete account', 'error'),
   })
 
   if (!user) return null
@@ -219,6 +249,48 @@ export default function PrivacyCenter() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
+        <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+          <Download size={12} /> Your data
+        </h2>
+        <p className="text-xs text-muted">
+          Download a JSON copy of your profile, score cards, posts, clubs and leagues.
+        </p>
+        <button
+          onClick={() => exportMutation.mutate()}
+          disabled={exportMutation.isPending}
+          className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-40"
+        >
+          {exportMutation.isPending ? 'Preparing…' : 'Download my data'}
+        </button>
+      </section>
+
+      <section className="space-y-3 p-4 rounded border border-[var(--error-text)]/30 bg-surface">
+        <h2 className="text-[11px] tracking-widest uppercase text-[var(--error-text)] flex items-center gap-2">
+          <Trash2 size={12} /> Delete my account
+        </h2>
+        <p className="text-xs text-muted">
+          Permanent. Your profile is removed, your score cards become anonymous, and you will no
+          longer appear in other users' feeds or lists. Type <span className="font-mono">DELETE</span> to confirm.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder="DELETE"
+            className="flex-1 bg-page border border-subtle rounded px-2 py-1.5 text-sm text-secondary focus:outline-none focus:border-[var(--error-text)]/40"
+          />
+          <button
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteConfirm !== 'DELETE' || deleteMutation.isPending}
+            className="px-3 py-1.5 rounded bg-[var(--error-text)] text-white text-[11px] tracking-widest uppercase font-medium disabled:opacity-30"
+          >
+            {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
       </section>
     </div>
   )

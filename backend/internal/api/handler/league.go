@@ -117,6 +117,26 @@ func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, league)
 }
 
+// GET /api/v1/leagues/{id}/summary - minimal info for rendering the
+// members-only banner on private leagues, parallel to clubs.
+func (h *LeagueHandler) Summary(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	summary, err := h.svc.SummaryByID(r.Context(), leagueID)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get league summary")
+		return
+	}
+	writeJSON(w, http.StatusOK, summary)
+}
+
 // POST /api/v1/leagues/{id}/join
 func (h *LeagueHandler) Join(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

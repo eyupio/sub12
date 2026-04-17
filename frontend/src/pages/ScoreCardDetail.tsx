@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
@@ -12,6 +12,7 @@ import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LikeButton } from '../components/LikeButton'
 import { ShareDialog } from '../components/ShareDialog'
+import { ReportDialog } from '../components/ReportDialog'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -622,6 +623,7 @@ export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
   const [showLightbox, setShowLightbox] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [showReport, setShowReport] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
@@ -1032,6 +1034,15 @@ export default function ScoreCardDetail() {
         >
           <Share2 size={18} /> Share
         </button>
+        {card.user_id !== currentUser?.id && (
+          <button
+            onClick={() => setShowReport(true)}
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-[var(--error-text)] transition-colors"
+            aria-label="Report score card"
+          >
+            <AlertTriangle size={18} />
+          </button>
+        )}
       </div>
 
       {showShare && (
@@ -1042,6 +1053,13 @@ export default function ScoreCardDetail() {
           onClose={() => setShowShare(false)}
         />
       )}
+
+      <ReportDialog
+        open={showReport}
+        targetType="score_card"
+        targetId={id}
+        onClose={() => setShowReport(false)}
+      />
 
       {/* Comments */}
       <CommentsSection cardId={id} />
