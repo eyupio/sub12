@@ -713,6 +713,16 @@ export default function Profile() {
       {/* Privacy & Feed */}
       <PrivacySettings />
 
+      <div className="flex flex-wrap gap-2 text-[11px] tracking-widest uppercase">
+        <Link to="/settings/privacy" className="text-[var(--brass)] hover:opacity-80">
+          → Advanced privacy settings
+        </Link>
+        <span className="text-muted">·</span>
+        <Link to="/settings/notifications" className="text-[var(--brass)] hover:opacity-80">
+          → Notification preferences
+        </Link>
+      </div>
+
       {/* Unit Preferences */}
       <UnitPreferences />
 

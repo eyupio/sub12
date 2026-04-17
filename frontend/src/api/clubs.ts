@@ -69,6 +69,9 @@ export const clubsApi = {
   get: (id: string) =>
     api.get<Club>(`/clubs/${id}`),
 
+  summary: (id: string) =>
+    api.get<{ id: string; name: string; description?: string; image_url?: string; type: string; join_policy: string; member_count: number }>(`/clubs/${id}/summary`),
+
   create: (input: CreateClubInput) =>
     api.post<Club>('/clubs', input),
 

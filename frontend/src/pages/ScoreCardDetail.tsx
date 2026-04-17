@@ -379,10 +379,11 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
           <textarea
             value={replyBody}
             onChange={(e) => setReplyBody(e.target.value)}
-            placeholder="Reply…"
+            placeholder="Reply… (⌘/Ctrl + Enter to post)"
+            aria-label="Reply body"
             rows={1}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && replyBody.trim()) {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && replyBody.trim()) {
                 e.preventDefault()
                 replyMutation.mutate()
               }
@@ -575,10 +576,11 @@ function CommentsSection({ cardId }: { cardId: string }) {
           <textarea
             value={newBody}
             onChange={(e) => setNewBody(e.target.value)}
-            placeholder="Add a comment…"
+            placeholder="Add a comment… (⌘/Ctrl + Enter to post)"
+            aria-label="Comment body"
             rows={1}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && newBody.trim()) {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && newBody.trim()) {
                 e.preventDefault()
                 createMutation.mutate()
               }

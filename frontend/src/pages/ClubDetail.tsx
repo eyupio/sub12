@@ -9,8 +9,78 @@ import type { League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
+
+function PrivateClubSummary({ clubId }: { clubId: string }) {
+  const queryClient = useQueryClient()
+  const [joinCode, setJoinCode] = useState('')
+  const [joinError, setJoinError] = useState('')
+  const { data, isLoading } = useQuery({
+    queryKey: ['club-summary', clubId],
+    queryFn: () => clubsApi.summary(clubId),
+    retry: false,
+  })
+
+  const joinMutation = useMutation({
+    mutationFn: () => clubsApi.join(clubId, joinCode || undefined),
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast(r.pending ? 'Join request submitted' : 'Joined club', 'success')
+    },
+    onError: (err) => setJoinError(err instanceof ApiError ? err.message : 'Failed to join club.'),
+  })
+
+  if (isLoading) {
+    return (
+      <div className="p-4 lg:p-8 max-w-md mx-auto">
+        <div className="h-48 rounded border border-subtle bg-surface animate-pulse" />
+      </div>
+    )
+  }
+  if (!data) {
+    return (
+      <div className="p-4 lg:p-8 text-center text-muted text-sm">
+        Club not found.
+      </div>
+    )
+  }
+
+  const needsCode = data.join_policy === 'invite_code'
+  return (
+    <div className="p-4 lg:p-8 max-w-md mx-auto space-y-4">
+      <MembersOnlyBanner
+        kind="club"
+        name={data.name}
+        description={data.description}
+        memberCount={data.member_count}
+        joinPolicy={data.join_policy}
+        onJoinClick={needsCode ? undefined : () => joinMutation.mutate()}
+      />
+      {needsCode && (
+        <div className="space-y-2">
+          <label className="block text-[10px] tracking-widest uppercase text-muted">Invite code</label>
+          <input
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50"
+          />
+          <button
+            onClick={() => joinMutation.mutate()}
+            disabled={joinMutation.isPending || !joinCode}
+            className="w-full px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+          >
+            {joinMutation.isPending ? 'Joining…' : 'Join with code'}
+          </button>
+          {joinError && <p className="text-xs text-[var(--error-text)]">{joinError}</p>}
+        </div>
+      )}
+      <Link to="/clubs" className="block text-center text-[11px] tracking-widest uppercase text-muted hover:text-secondary">&larr; Back to clubs</Link>
+    </div>
+  )
+}
 
 function StandingsTable({ standings }: { standings: ClubStanding[] }) {
   if (standings.length === 0) {
@@ -173,7 +243,7 @@ export default function ClubDetail() {
   const isPrivateOrNotFound =
     clubError instanceof ApiError && clubError.status === 404
 
-  const { data: standingsData } = useQuery({
+  const { data: standingsData, isLoading: standingsLoading, isError: standingsError, refetch: refetchStandings } = useQuery({
     queryKey: ['club', id, 'standings'],
     queryFn: () => clubsApi.getStandings(id),
     enabled: !!id,
@@ -264,21 +334,7 @@ export default function ClubDetail() {
 
   if (!club) {
     if (isPrivateOrNotFound) {
-      return (
-        <div className="p-4 lg:p-8 max-w-md mx-auto text-center space-y-3">
-          <Lock className="mx-auto text-muted" size={32} />
-          <h1 className="text-lg tracking-widest uppercase text-secondary">Private Club</h1>
-          <p className="text-sm text-muted">
-            This club is private or no longer exists. Ask an admin for an invite.
-          </p>
-          <Link
-            to="/clubs"
-            className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-          >
-            &larr; Back to clubs
-          </Link>
-        </div>
-      )
+      return <PrivateClubSummary clubId={id} />
     }
     return (
       <div className="p-4 lg:p-8 text-center text-muted text-sm">
@@ -422,7 +478,25 @@ export default function ClubDetail() {
             Top Performers
           </h2>
           <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
-            <StandingsTable standings={standingsData?.items ?? []} />
+            {standingsLoading ? (
+              <div className="space-y-px py-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-10 bg-surface-hover rounded animate-pulse" />
+                ))}
+              </div>
+            ) : standingsError ? (
+              <div className="py-3 space-y-2">
+                <p className="text-[var(--error-text)] text-sm">Failed to load standings.</p>
+                <button
+                  onClick={() => refetchStandings()}
+                  className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <StandingsTable standings={standingsData?.items ?? []} />
+            )}
           </div>
         </div>
 

@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	api "github.com/jnnngs/sub-12/backend/internal/api"
+	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/config"
 	"github.com/jnnngs/sub-12/backend/internal/db"
 	"github.com/jnnngs/sub-12/backend/internal/db/seed"
@@ -141,9 +142,28 @@ func main() {
 	achievementSvc.SetSocial(socialSvc)
 
 	clubSvc := service.NewClubService(clubRepo, activitySvc)
-	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, activitySvc)
+	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, socialRepo, activitySvc)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, imageRepo)
+	muteRepo := repository.NewMuteRepository(pool)
+	notificationRepo := repository.NewNotificationRepository(pool)
+	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, log.Logger)
+
+	reportRepo := repository.NewReportRepository(pool)
+	moderationSvc := service.NewModerationService(reportRepo, postRepo)
+
+	// Wire notifications into services that fan out events. Done after
+	// construction to avoid cycles.
+	socialSvc.SetNotifications(notificationSvc)
+
+	rl := middleware.NewRateLimiter(middleware.RateLimitConfig{
+		Enabled:         cfg.RateLimitEnabled,
+		FollowPerMin:    cfg.RateLimitFollowPerMin,
+		CommentPerMin:   cfg.RateLimitCommentPerMin,
+		PostPerMin:      cfg.RateLimitPostPerMin,
+		ReportPerMin:    cfg.RateLimitReportPerMin,
+	}, rdb)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, muteRepo, rl, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

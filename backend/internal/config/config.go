@@ -34,6 +34,14 @@ type Config struct {
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`
+
+	// Rate limiting (per-user, per-minute). RATELIMIT_ENABLED defaults to true
+	// in production; tests can set RATELIMIT_ENABLED=false.
+	RateLimitEnabled       bool `envconfig:"RATELIMIT_ENABLED" default:"true"`
+	RateLimitFollowPerMin  int  `envconfig:"RATELIMIT_FOLLOW_PER_MIN" default:"10"`
+	RateLimitCommentPerMin int  `envconfig:"RATELIMIT_COMMENT_PER_MIN" default:"20"`
+	RateLimitPostPerMin    int  `envconfig:"RATELIMIT_POST_PER_MIN" default:"10"`
+	RateLimitReportPerMin  int  `envconfig:"RATELIMIT_REPORT_PER_MIN" default:"5"`
 }
 
 // DSN returns the PostgreSQL key=value connection string (for pgxpool).

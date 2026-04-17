@@ -10,20 +10,22 @@ import (
 )
 
 var (
-	ErrPostBodyEmpty   = errors.New("post body cannot be empty")
-	ErrPostBodyTooLong = errors.New("post body exceeds maximum length of 5000 characters")
-	ErrPostDenied      = errors.New("you do not have permission to post here")
+	ErrPostBodyEmpty        = errors.New("post body cannot be empty")
+	ErrPostBodyTooLong      = errors.New("post body exceeds maximum length of 5000 characters")
+	ErrPostDenied           = errors.New("you do not have permission to post here")
+	ErrPostInvalidVisibility = errors.New("invalid post visibility")
 )
 
 type PostService struct {
 	posts    *repository.PostRepository
 	leagues  *repository.LeagueRepository
 	clubs    *repository.ClubRepository
+	social   *repository.SocialRepository
 	activity *ActivityService
 }
 
-func NewPostService(posts *repository.PostRepository, leagues *repository.LeagueRepository, clubs *repository.ClubRepository, activity *ActivityService) *PostService {
-	return &PostService{posts: posts, leagues: leagues, clubs: clubs, activity: activity}
+func NewPostService(posts *repository.PostRepository, leagues *repository.LeagueRepository, clubs *repository.ClubRepository, social *repository.SocialRepository, activity *ActivityService) *PostService {
+	return &PostService{posts: posts, leagues: leagues, clubs: clubs, social: social, activity: activity}
 }
 
 // Create validates and persists a new post.
@@ -36,6 +38,17 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 		return nil, ErrPostBodyTooLong
 	}
 	input.Body = body
+
+	if input.Visibility == "" {
+		if input.LeagueID != nil || input.ClubID != nil {
+			input.Visibility = model.PostVisibilityMembers
+		} else {
+			input.Visibility = model.PostVisibilityPublic
+		}
+	}
+	if !model.IsValidPostVisibility(input.Visibility) {
+		return nil, ErrPostInvalidVisibility
+	}
 
 	// Validate membership for scoped posts
 	if input.LeagueID != nil {
@@ -71,9 +84,72 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 	return post, nil
 }
 
-// GetByID retrieves a post by ID.
+// GetByID retrieves a post by ID, enforcing visibility rules. A viewer is the
+// author for owner-only operations. Hidden posts surface as ErrNotFound for
+// non-authors; the author still sees the post so the UI can render a moderation
+// banner.
 func (s *PostService) GetByID(ctx context.Context, id string, viewerID *string) (*model.Post, error) {
-	return s.posts.GetByID(ctx, id, viewerID)
+	post, err := s.posts.GetByID(ctx, id, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if ok, err := s.canViewPost(ctx, post, viewerID); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return post, nil
+}
+
+// canViewPost returns true when viewerID may see post. Authors always see their
+// own content (including hidden); everyone else is gated on visibility and the
+// hidden flag.
+func (s *PostService) canViewPost(ctx context.Context, post *model.Post, viewerID *string) (bool, error) {
+	if viewerID != nil && *viewerID == post.UserID {
+		return true, nil
+	}
+	if post.HiddenAt != nil {
+		return false, nil
+	}
+	visibility := post.Visibility
+	if visibility == "" || visibility == model.PostVisibilityInherit {
+		if post.LeagueID != nil || post.ClubID != nil {
+			visibility = model.PostVisibilityMembers
+		} else {
+			visibility = model.PostVisibilityPublic
+		}
+	}
+	switch visibility {
+	case model.PostVisibilityPublic:
+		return true, nil
+	case model.PostVisibilityPrivate:
+		return false, nil
+	case model.PostVisibilityFollowers:
+		if viewerID == nil {
+			return false, nil
+		}
+		return s.social.IsFollowing(ctx, *viewerID, post.UserID)
+	case model.PostVisibilityMembers:
+		if viewerID == nil {
+			return false, nil
+		}
+		if post.LeagueID != nil {
+			isMember, err := s.leagues.IsMember(ctx, *post.LeagueID, *viewerID)
+			if err != nil {
+				return false, err
+			}
+			return isMember, nil
+		}
+		if post.ClubID != nil {
+			isMember, err := s.clubs.IsMember(ctx, *post.ClubID, *viewerID)
+			if err != nil {
+				return false, err
+			}
+			return isMember, nil
+		}
+		return false, nil
+	}
+	return false, nil
 }
 
 // ListByLeague returns posts for a league. Private leagues are only visible
@@ -170,9 +246,10 @@ func (s *PostService) Share(ctx context.Context, userID string, input *model.Sha
 	}
 
 	createInput := &model.CreatePostInput{
-		Body:     body,
-		LeagueID: input.LeagueID,
-		ClubID:   input.ClubID,
+		Body:       body,
+		LeagueID:   input.LeagueID,
+		ClubID:     input.ClubID,
+		Visibility: input.Visibility,
 		Attachments: []model.CreateAttachmentInput{
 			{
 				Type:     input.TargetType,

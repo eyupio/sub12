@@ -38,6 +38,10 @@ func NewRouter(
 	blocks *service.BlockService,
 	likes *service.LikeService,
 	posts *service.PostService,
+	notifications *service.NotificationService,
+	moderation *service.ModerationService,
+	mutes *repository.MuteRepository,
+	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -149,7 +153,7 @@ func NewRouter(
 
 			// Social follows
 			socialH := handler.NewSocial(social)
-			r.Post("/users/{id}/follow", socialH.Follow)
+			r.With(rl.Limit("follow")).Post("/users/{id}/follow", socialH.Follow)
 			r.Delete("/users/{id}/follow", socialH.Unfollow)
 			r.Get("/users/{id}/followers", socialH.ListFollowers)
 			r.Get("/users/{id}/following", socialH.ListFollowing)
@@ -162,13 +166,31 @@ func NewRouter(
 			r.Delete("/users/{id}/block", blockH.Unblock)
 			r.Get("/users/me/blocks", blockH.ListBlocked)
 
+			// Mute (feed-only hide; keeps interaction intact unlike block)
+			muteH := handler.NewMute(mutes)
+			r.Post("/users/{id}/mute", muteH.Mute)
+			r.Delete("/users/{id}/mute", muteH.Unmute)
+			r.Get("/users/me/mutes", muteH.ListMuted)
+
+			// Notifications
+			notifH := handler.NewNotification(notifications)
+			r.Get("/notifications", notifH.List)
+			r.Get("/notifications/unread-count", notifH.UnreadCount)
+			r.Post("/notifications/read", notifH.MarkRead)
+			r.Get("/notifications/preferences", notifH.GetPreferences)
+			r.Patch("/notifications/preferences", notifH.UpdatePreferences)
+
+			// Moderation: user-submitted reports
+			reportH := handler.NewReport(moderation)
+			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
+
 			// Score card comments (write operations — auth required)
-			r.Post("/score-cards/{id}/comments", commentH.Create)
+			r.With(rl.Limit("comment")).Post("/score-cards/{id}/comments", commentH.Create)
 			r.Patch("/score-cards/{id}/comments/{commentId}", commentH.Update)
 			r.Delete("/score-cards/{id}/comments/{commentId}", commentH.Delete)
 
 			// Generic comment operations (replies, edit/delete by comment ID)
-			r.Post("/comments/{id}/replies", commentH.Reply)
+			r.With(rl.Limit("comment")).Post("/comments/{id}/replies", commentH.Reply)
 			r.Get("/comments/{id}/replies", commentH.ListReplies)
 			r.Patch("/comments/{id}", commentH.Update)
 			r.Delete("/comments/{id}", commentH.Delete)
@@ -184,12 +206,12 @@ func NewRouter(
 
 			// Posts
 			postH := handler.NewPost(posts)
-			r.Post("/posts", postH.Create)
-			r.Post("/posts/share", postH.Share)
+			r.With(rl.Limit("post")).Post("/posts", postH.Create)
+			r.With(rl.Limit("post")).Post("/posts/share", postH.Share)
 			r.Get("/posts/{id}", postH.Get)
 			r.Patch("/posts/{id}", postH.Update)
 			r.Delete("/posts/{id}", postH.Delete)
-			r.Post("/posts/{id}/comments", commentH.CreateOnPost)
+			r.With(rl.Limit("comment")).Post("/posts/{id}/comments", commentH.CreateOnPost)
 			r.Get("/posts/{id}/comments", commentH.ListOnPost)
 
 			// Activity feed
@@ -276,6 +298,11 @@ func NewRouter(
 				r.Patch("/admin/users/{id}/role", auh.UpdateRole)
 				r.Delete("/admin/users/{id}", auh.Delete)
 
+				// Moderation queue
+				reportAdminH := handler.NewReport(moderation)
+				r.Get("/admin/reports", reportAdminH.AdminList)
+				r.Post("/admin/reports/{id}/decide", reportAdminH.AdminDecide)
+
 				// League management
 				alh := handler.NewAdminLeagues(leagues)
 				r.Get("/admin/leagues", alh.List)
@@ -312,6 +339,7 @@ func NewRouter(
 			clh := handler.NewClub(clubs, leagues, images)
 			r.Get("/clubs", clh.List)
 			r.Get("/clubs/{id}", clh.GetByID)
+			r.Get("/clubs/{id}/summary", clh.Summary)
 			r.Get("/clubs/{id}/standings", clh.GetStandings)
 		})
 	})

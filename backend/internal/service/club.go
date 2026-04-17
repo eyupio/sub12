@@ -66,6 +66,28 @@ func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club,
 	return s.repo.List(ctx, viewerID)
 }
 
+// SummaryByID returns a minimal public summary of any club, including private
+// ones. Used to render a members-only banner with a join CTA without
+// exposing members, standings or posts.
+func (s *ClubService) SummaryByID(ctx context.Context, clubID string) (*model.ClubSummary, error) {
+	club, err := s.repo.GetByID(ctx, clubID, "")
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrClubNotFound
+		}
+		return nil, err
+	}
+	return &model.ClubSummary{
+		ID:          club.ID,
+		Name:        club.Name,
+		Description: club.Description,
+		ImageURL:    club.ImageURL,
+		Type:        club.Type,
+		JoinPolicy:  club.JoinPolicy,
+		MemberCount: club.MemberCount,
+	}, nil
+}
+
 func (s *ClubService) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {
 	return s.repo.ListByUser(ctx, userID)
 }

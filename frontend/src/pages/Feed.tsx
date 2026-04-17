@@ -321,6 +321,7 @@ export default function Feed() {
     isFetchingNextPage,
     isLoading,
     isError,
+    refetch,
   } = useInfiniteQuery({
     queryKey: ['feed', filter, entityId],
     queryFn: ({ pageParam }) => activityApi.getFeed(20, pageParam as string | undefined, filter, entityId || undefined),
@@ -337,21 +338,27 @@ export default function Feed() {
       <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feed</h1>
 
       {/* Filter tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {FILTER_TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => handleFilterChange(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] tracking-widest uppercase whitespace-nowrap transition-colors border ${
-              filter === key
-                ? 'border-[var(--brass)]/40 text-[var(--brass)] bg-[var(--brass)]/5'
-                : 'border-subtle text-muted hover:text-secondary hover:border-[var(--brass)]/20'
-            }`}
-          >
-            <Icon size={12} />
-            {label}
-          </button>
-        ))}
+      <div role="tablist" aria-label="Feed filter" className="flex gap-1.5 overflow-x-auto pb-1">
+        {FILTER_TABS.map(({ key, label, icon: Icon }) => {
+          const selected = filter === key
+          return (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={selected}
+              aria-controls="feed-panel"
+              onClick={() => handleFilterChange(key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] tracking-widest uppercase whitespace-nowrap transition-colors border ${
+                selected
+                  ? 'border-[var(--brass)]/40 text-[var(--brass)] bg-[var(--brass)]/5'
+                  : 'border-subtle text-muted hover:text-secondary hover:border-[var(--brass)]/20'
+              }`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Entity selector for league/club */}
@@ -369,7 +376,16 @@ export default function Feed() {
       )}
 
       {isError && (
-        <p className="text-[var(--error-text)] text-sm">Failed to load feed.</p>
+        <div role="alert" className="flex flex-col items-center gap-3 py-8">
+          <p className="text-[var(--error-text)] text-sm">Failed to load feed.</p>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Try again
+          </button>
+        </div>
       )}
 
       {!isLoading && !needsEntity && items.length === 0 && (
@@ -385,7 +401,7 @@ export default function Feed() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div id="feed-panel" role="tabpanel" className="space-y-3">
         {items.map((item) => (
           <ActivityCard key={item.id} item={item} />
         ))}

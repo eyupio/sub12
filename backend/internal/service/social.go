@@ -17,12 +17,19 @@ var (
 )
 
 type SocialService struct {
-	social *repository.SocialRepository
-	blocks *repository.BlockRepository
+	social        *repository.SocialRepository
+	blocks        *repository.BlockRepository
+	notifications *NotificationService // optional; may be nil in tests
 }
 
 func NewSocialService(social *repository.SocialRepository, blocks *repository.BlockRepository) *SocialService {
 	return &SocialService{social: social, blocks: blocks}
+}
+
+// SetNotifications wires a notification service post-construction to avoid
+// import cycles between social and notification services.
+func (s *SocialService) SetNotifications(n *NotificationService) {
+	s.notifications = n
 }
 
 // Follow creates a follow relationship, or a follow request for private profiles.
@@ -53,12 +60,26 @@ func (s *SocialService) Follow(ctx context.Context, followerID, followingID stri
 		if err != nil {
 			return false, false, err
 		}
+		if s.notifications != nil {
+			s.notifications.Fanout(ctx, NotifEvent{
+				RecipientID: followingID,
+				ActorID:     followerID,
+				Type:        model.NotificationTypeFollowRequest,
+			})
+		}
 		return false, true, nil
 	}
 
 	// Public profile: instant follow
 	if err := s.social.Follow(ctx, followerID, followingID); err != nil {
 		return false, false, err
+	}
+	if s.notifications != nil {
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: followingID,
+			ActorID:     followerID,
+			Type:        model.NotificationTypeFollowAccepted,
+		})
 	}
 	return true, false, nil
 }
@@ -120,6 +141,13 @@ func (s *SocialService) GetPublicProfile(ctx context.Context, profileUserID, vie
 		result.PublicProfile.Club = nil
 	}
 
+	// Optionally zero out follower/following counts for users who opted out.
+	// Owners and followers (for private profiles) still see the real counts.
+	if !profile.ShowFollowerCounts && viewerID != profileUserID && !stats.IsFollowing {
+		result.FollowStats.FollowerCount = 0
+		result.FollowStats.FollowingCount = 0
+	}
+
 	return result, nil
 }
 
@@ -142,6 +170,13 @@ func (s *SocialService) DecideFollowRequest(ctx context.Context, requestID, user
 	if decision == "accepted" {
 		if err := s.social.Follow(ctx, fr.RequesterID, fr.TargetID); err != nil {
 			return nil, err
+		}
+		if s.notifications != nil {
+			s.notifications.Fanout(ctx, NotifEvent{
+				RecipientID: fr.RequesterID,
+				ActorID:     fr.TargetID,
+				Type:        model.NotificationTypeFollowAccepted,
+			})
 		}
 	}
 	return fr, nil

@@ -54,6 +54,22 @@ func (h *ClubHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, club)
 }
 
+// GET /api/v1/clubs/{id}/summary - minimal info for rendering the
+// members-only banner on private clubs.
+func (h *ClubHandler) Summary(w http.ResponseWriter, r *http.Request) {
+	clubID := chi.URLParam(r, "id")
+	summary, err := h.svc.SummaryByID(r.Context(), clubID)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get club summary")
+		return
+	}
+	writeJSON(w, http.StatusOK, summary)
+}
+
 // POST /api/v1/clubs
 func (h *ClubHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
