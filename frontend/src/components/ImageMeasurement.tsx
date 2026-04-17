@@ -3,7 +3,8 @@ import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize, Scan } from 'luci
 import { mmToMOA, mmToMRAD, yardsToMeters, metersToYards } from '../utils/ballistics'
 import { detectHoles } from '../utils/holeDetection'
 import type { DetectedHole } from '../utils/holeDetection'
-import type { PelletTestMeasurement, CreateMeasurementPayload } from '../api/pelletTesting'
+import { CALIBER_MAP } from '../utils/caliber'
+import type { PelletTestMeasurement, PelletTestDetection, CreateMeasurementPayload } from '../api/pelletTesting'
 
 interface Props {
   imageUrl: string
@@ -11,6 +12,7 @@ interface Props {
   sessionId: string
   imageId: string
   existingMeasurement?: PelletTestMeasurement
+  existingDetections?: PelletTestDetection[]
   onSave: (payload: CreateMeasurementPayload, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
   onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
   onClose: () => void
@@ -24,7 +26,6 @@ type WizardStep = 1 | 2 | 3 | 4 | 5
 type SubMode = 'idle' | 'set_aim' | 'set_point_a' | 'set_point_b' | 'add_impact' | 'remove_impact' | 'draw_line_start' | 'draw_line_end'
 interface Point { x: number; y: number }
 
-const CALIBER_MAP: Record<string, number> = { '.177': 4.5, '.20': 5.08, '.22': 5.5, '.25': 6.35 }
 const RED = '#ef4444'
 const YELLOW = '#eab308'
 const DRAG_THRESHOLD = 5
@@ -44,6 +45,8 @@ function computeGroupSizeFromImpacts(impacts: Point[], ppmm: number, pelletMM: n
 export default function ImageMeasurement({
   imageUrl,
   distanceM,
+  existingMeasurement,
+  existingDetections,
   onSave,
   onSaveDetections,
   onClose,
@@ -169,6 +172,68 @@ export default function ImageMeasurement({
   }, [canvasSize, rotation])
 
   useEffect(() => { if (imageLoaded) fitToView() }, [imageLoaded, fitToView])
+
+  // Hydrate wizard from an existing measurement (edit mode) — runs once per mount.
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (!imageLoaded || !existingMeasurement || hydratedRef.current) return
+    hydratedRef.current = true
+    const em = existingMeasurement
+    setRotation(em.rotation_degrees ?? 0)
+    if (em.aim_point_x != null && em.aim_point_y != null) setAimPoint({ x: em.aim_point_x, y: em.aim_point_y })
+    const paX = em.point_a_x ?? em.ref_center_x
+    const paY = em.point_a_y ?? em.ref_center_y
+    if (paX != null && paY != null) setPointA({ x: paX, y: paY })
+    if (em.point_b_x != null && em.point_b_y != null) setPointB({ x: em.point_b_x, y: em.point_b_y })
+    if (em.pixels_per_mm > 0) setPixelsPerMM(em.pixels_per_mm)
+    const cUnit = (em.display_unit ?? defaultMeasurementUnit ?? 'cm') as 'cm' | 'mm'
+    setCalibUnit(cUnit)
+    setDisplayUnit(cUnit)
+    if (em.reference_diameter_mm > 0) {
+      const refValue = cUnit === 'cm' ? em.reference_diameter_mm / 10 : em.reference_diameter_mm
+      setCalibDistance(String(Math.round(refValue * 1000) / 1000))
+    }
+    if (em.marker_size) setMarkerSize(em.marker_size)
+    const dUnit = (em.distance_unit ?? defaultDistanceUnit ?? 'meters') as 'meters' | 'yards'
+    setDistanceUnit(dUnit)
+    if (em.distance_m != null) {
+      const shown = dUnit === 'yards' ? metersToYards(em.distance_m) : em.distance_m
+      setDistanceToTarget(String(Math.round(shown * 10) / 10))
+    }
+    const method = (em.measure_method ?? 'impacts') as 'impacts' | 'manual_line'
+    setMeasureMethod(method)
+    if (method === 'manual_line') {
+      if (em.line_start_x != null && em.line_start_y != null) setLineStart({ x: em.line_start_x, y: em.line_start_y })
+      if (em.line_end_x != null && em.line_end_y != null) setLineEnd({ x: em.line_end_x, y: em.line_end_y })
+      if (em.manual_shot_count != null) setManualShotCount(String(em.manual_shot_count))
+    } else if (existingDetections && existingDetections.length > 0) {
+      setImpacts(existingDetections.map(d => ({ x: d.center_x, y: d.center_y })))
+    }
+    setStep(5)
+    setSubMode('idle')
+  }, [imageLoaded, existingMeasurement, existingDetections, defaultDistanceUnit, defaultMeasurementUnit])
+
+  const handleReset = useCallback(() => {
+    setAimPoint(null)
+    setPointA(null)
+    setPointB(null)
+    setImpacts([])
+    setLineStart(null)
+    setLineEnd(null)
+    setManualShotCount('')
+    setPixelsPerMM(0)
+    setCalibDistance('')
+    setRotation(0)
+    setMarkerSize('.22')
+    setDistanceToTarget(String(distanceM))
+    setDistanceUnit(defaultDistanceUnit ?? 'meters')
+    setCalibUnit(defaultMeasurementUnit ?? 'cm')
+    setDisplayUnit(defaultMeasurementUnit ?? 'mm')
+    setMeasureMethod('impacts')
+    setDetectStatus(null)
+    setStep(1)
+    setSubMode('set_aim')
+  }, [distanceM, defaultDistanceUnit, defaultMeasurementUnit])
 
   // Computed analysis values
   const centroid = useMemo(() => {
@@ -493,10 +558,26 @@ export default function ImageMeasurement({
       ref_center_x: pointA.x,
       ref_center_y: pointA.y,
       ref_radius_pixels: 0,
+      aim_point_x: aimPoint?.x,
+      aim_point_y: aimPoint?.y,
+      point_a_x: pointA.x,
+      point_a_y: pointA.y,
+      point_b_x: pointB?.x,
+      point_b_y: pointB?.y,
+      rotation_degrees: rotation,
+      marker_size: markerSize,
+      distance_m: effectiveDistanceM,
+      distance_unit: distanceUnit,
+      measure_method: measureMethod,
+      display_unit: displayUnit,
     }
     if (measureMethod === 'manual_line') {
       onSave({
         ...payload,
+        line_start_x: lineStart?.x,
+        line_start_y: lineStart?.y,
+        line_end_x: lineEnd?.x,
+        line_end_y: lineEnd?.y,
         manual_group_size_mm: manualGroupSizeMM ?? undefined,
         manual_shot_count: Number(manualShotCount) || 0,
       }, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
@@ -511,7 +592,7 @@ export default function ImageMeasurement({
       const blob = await generateAnnotatedBlob()
       onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
     } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit }) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit])
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit, aimPoint, rotation, markerSize, effectiveDistanceM, displayUnit, lineStart, lineEnd])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
@@ -572,7 +653,17 @@ export default function ImageMeasurement({
       <div className="flex items-center justify-between px-4 py-3 bg-[#2a2a2a] border-b border-white/10">
         <button onClick={goBack} className="text-white p-1"><ArrowLeft size={20} /></button>
         <span className="text-white font-medium text-sm tracking-wide">{stepTitles[step]}</span>
-        <button onClick={onClose} className="text-white p-1"><XIcon size={20} /></button>
+        <div className="flex items-center gap-2">
+          {existingMeasurement && (
+            <button
+              onClick={handleReset}
+              className="text-white/80 hover:text-white text-[11px] tracking-widest uppercase px-2 py-1 rounded border border-white/20"
+            >
+              Reset
+            </button>
+          )}
+          <button onClick={onClose} className="text-white p-1"><XIcon size={20} /></button>
+        </div>
       </div>
 
       {/* Canvas */}

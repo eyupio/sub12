@@ -191,6 +191,22 @@ type PelletTestMeasurement struct {
 	AutoGroupSizeMM     *float64  `json:"auto_group_size_mm,omitempty"`
 	AutoGroupSizeMOA    *float64  `json:"auto_group_size_moa,omitempty"`
 	DetectionConfidence *float64  `json:"detection_confidence,omitempty"`
+	AimPointX           *float64  `json:"aim_point_x,omitempty"`
+	AimPointY           *float64  `json:"aim_point_y,omitempty"`
+	PointAX             *float64  `json:"point_a_x,omitempty"`
+	PointAY             *float64  `json:"point_a_y,omitempty"`
+	PointBX             *float64  `json:"point_b_x,omitempty"`
+	PointBY             *float64  `json:"point_b_y,omitempty"`
+	RotationDegrees     int       `json:"rotation_degrees"`
+	LineStartX          *float64  `json:"line_start_x,omitempty"`
+	LineStartY          *float64  `json:"line_start_y,omitempty"`
+	LineEndX            *float64  `json:"line_end_x,omitempty"`
+	LineEndY            *float64  `json:"line_end_y,omitempty"`
+	MarkerSize          *string   `json:"marker_size,omitempty"`
+	DistanceM           *float64  `json:"distance_m,omitempty"`
+	DistanceUnit        *string   `json:"distance_unit,omitempty"`
+	MeasureMethod       string    `json:"measure_method"`
+	DisplayUnit         *string   `json:"display_unit,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -214,6 +230,22 @@ type CreatePelletTestMeasurementInput struct {
 	ManualShotCount     *int     `json:"manual_shot_count"`
 	MeasuredSizeMM      *float64 `json:"-"`
 	MeasuredSizeMOA     *float64 `json:"-"`
+	AimPointX           *float64 `json:"aim_point_x"`
+	AimPointY           *float64 `json:"aim_point_y"`
+	PointAX             *float64 `json:"point_a_x"`
+	PointAY             *float64 `json:"point_a_y"`
+	PointBX             *float64 `json:"point_b_x"`
+	PointBY             *float64 `json:"point_b_y"`
+	RotationDegrees     int      `json:"rotation_degrees"`
+	LineStartX          *float64 `json:"line_start_x"`
+	LineStartY          *float64 `json:"line_start_y"`
+	LineEndX            *float64 `json:"line_end_x"`
+	LineEndY            *float64 `json:"line_end_y"`
+	MarkerSize          *string  `json:"marker_size"`
+	DistanceM           *float64 `json:"distance_m"`
+	DistanceUnit        *string  `json:"distance_unit"`
+	MeasureMethod       string   `json:"measure_method"`
+	DisplayUnit         *string  `json:"display_unit"`
 }
 
 type UpdatePelletTestMeasurementInput struct {
@@ -224,6 +256,33 @@ type UpdatePelletTestMeasurementInput struct {
 	BboxHeight      *float64 `json:"bbox_height"`
 	MeasuredSizeMM  *float64 `json:"-"`
 	MeasuredSizeMOA *float64 `json:"-"`
+
+	CalibrationType     *string  `json:"calibration_type"`
+	ReferenceDiameterMM *float64 `json:"reference_diameter_mm"`
+	ReferencePixels     *float64 `json:"reference_pixels"`
+	PixelsPerMM         *float64 `json:"pixels_per_mm"`
+	RefCenterX          *float64 `json:"ref_center_x"`
+	RefCenterY          *float64 `json:"ref_center_y"`
+	RefRadiusPixels     *float64 `json:"ref_radius_pixels"`
+	ManualGroupSizeMM   *float64 `json:"manual_group_size_mm"`
+	ManualShotCount     *int     `json:"manual_shot_count"`
+
+	AimPointX       *float64 `json:"aim_point_x"`
+	AimPointY       *float64 `json:"aim_point_y"`
+	PointAX         *float64 `json:"point_a_x"`
+	PointAY         *float64 `json:"point_a_y"`
+	PointBX         *float64 `json:"point_b_x"`
+	PointBY         *float64 `json:"point_b_y"`
+	RotationDegrees *int     `json:"rotation_degrees"`
+	LineStartX      *float64 `json:"line_start_x"`
+	LineStartY      *float64 `json:"line_start_y"`
+	LineEndX        *float64 `json:"line_end_x"`
+	LineEndY        *float64 `json:"line_end_y"`
+	MarkerSize      *string  `json:"marker_size"`
+	DistanceM       *float64 `json:"distance_m"`
+	DistanceUnit    *string  `json:"distance_unit"`
+	MeasureMethod   *string  `json:"measure_method"`
+	DisplayUnit     *string  `json:"display_unit"`
 }
 
 // ── Comparison & Timeline ───────────────────────────────────────────────────────

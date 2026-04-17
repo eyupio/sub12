@@ -501,6 +501,11 @@ const measurementCols = `id, image_id, session_id, group_id,
 	measured_size_mm, measured_size_moa,
 	detection_method, annotated_image_id, detected_hole_count,
 	auto_group_size_mm, auto_group_size_moa, detection_confidence,
+	aim_point_x, aim_point_y,
+	point_a_x, point_a_y, point_b_x, point_b_y,
+	rotation_degrees,
+	line_start_x, line_start_y, line_end_x, line_end_y,
+	marker_size, distance_m, distance_unit, measure_method, display_unit,
 	created_at, updated_at`
 
 func scanMeasurement(row pgx.Row) (*model.PelletTestMeasurement, error) {
@@ -515,6 +520,11 @@ func scanMeasurement(row pgx.Row) (*model.PelletTestMeasurement, error) {
 		&m.MeasuredSizeMM, &m.MeasuredSizeMOA,
 		&m.DetectionMethod, &m.AnnotatedImageID, &m.DetectedHoleCount,
 		&m.AutoGroupSizeMM, &m.AutoGroupSizeMOA, &m.DetectionConfidence,
+		&m.AimPointX, &m.AimPointY,
+		&m.PointAX, &m.PointAY, &m.PointBX, &m.PointBY,
+		&m.RotationDegrees,
+		&m.LineStartX, &m.LineStartY, &m.LineEndX, &m.LineEndY,
+		&m.MarkerSize, &m.DistanceM, &m.DistanceUnit, &m.MeasureMethod, &m.DisplayUnit,
 		&m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
@@ -543,6 +553,10 @@ func (r *PelletTestRepository) CreateMeasurement(ctx context.Context, sessionID,
 		return nil, ErrNotFound
 	}
 
+	measureMethod := in.MeasureMethod
+	if measureMethod == "" {
+		measureMethod = "impacts"
+	}
 	m, err := scanMeasurement(r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_measurements (image_id, session_id, group_id,
 			calibration_type, target_preset, reference_ring_name,
@@ -550,8 +564,14 @@ func (r *PelletTestRepository) CreateMeasurement(ctx context.Context, sessionID,
 			ref_center_x, ref_center_y, ref_radius_pixels,
 			bbox_x, bbox_y, bbox_width, bbox_height,
 			manual_group_size_mm, manual_shot_count,
-			measured_size_mm, measured_size_moa)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+			measured_size_mm, measured_size_moa,
+			aim_point_x, aim_point_y,
+			point_a_x, point_a_y, point_b_x, point_b_y,
+			rotation_degrees,
+			line_start_x, line_start_y, line_end_x, line_end_y,
+			marker_size, distance_m, distance_unit, measure_method, display_unit)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+			$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
 		RETURNING `+measurementCols+`
 	`, imageID, sessionID, in.GroupID,
 		in.CalibrationType, in.TargetPreset, in.ReferenceRingName,
@@ -559,7 +579,12 @@ func (r *PelletTestRepository) CreateMeasurement(ctx context.Context, sessionID,
 		in.RefCenterX, in.RefCenterY, in.RefRadiusPixels,
 		in.BboxX, in.BboxY, in.BboxWidth, in.BboxHeight,
 		in.ManualGroupSizeMM, in.ManualShotCount,
-		in.MeasuredSizeMM, in.MeasuredSizeMOA))
+		in.MeasuredSizeMM, in.MeasuredSizeMOA,
+		in.AimPointX, in.AimPointY,
+		in.PointAX, in.PointAY, in.PointBX, in.PointBY,
+		in.RotationDegrees,
+		in.LineStartX, in.LineStartY, in.LineEndX, in.LineEndY,
+		in.MarkerSize, in.DistanceM, in.DistanceUnit, measureMethod, in.DisplayUnit))
 	if err != nil {
 		return nil, fmt.Errorf("create measurement: %w", err)
 	}
@@ -602,19 +627,52 @@ func (r *PelletTestRepository) UpdateMeasurement(ctx context.Context, measuremen
 
 	m, err := scanMeasurement(r.db.QueryRow(ctx, `
 		UPDATE pellet_test_measurements SET
-			group_id         = COALESCE($4, group_id),
-			bbox_x           = COALESCE($5, bbox_x),
-			bbox_y           = COALESCE($6, bbox_y),
-			bbox_width       = COALESCE($7, bbox_width),
-			bbox_height      = COALESCE($8, bbox_height),
-			measured_size_mm  = COALESCE($9, measured_size_mm),
-			measured_size_moa = COALESCE($10, measured_size_moa),
-			updated_at       = NOW()
+			group_id              = COALESCE($4, group_id),
+			bbox_x                = COALESCE($5, bbox_x),
+			bbox_y                = COALESCE($6, bbox_y),
+			bbox_width            = COALESCE($7, bbox_width),
+			bbox_height           = COALESCE($8, bbox_height),
+			measured_size_mm      = COALESCE($9, measured_size_mm),
+			measured_size_moa     = COALESCE($10, measured_size_moa),
+			calibration_type      = COALESCE($11, calibration_type),
+			reference_diameter_mm = COALESCE($12, reference_diameter_mm),
+			reference_pixels      = COALESCE($13, reference_pixels),
+			pixels_per_mm         = COALESCE($14, pixels_per_mm),
+			ref_center_x          = COALESCE($15, ref_center_x),
+			ref_center_y          = COALESCE($16, ref_center_y),
+			ref_radius_pixels     = COALESCE($17, ref_radius_pixels),
+			manual_group_size_mm  = COALESCE($18, manual_group_size_mm),
+			manual_shot_count     = COALESCE($19, manual_shot_count),
+			aim_point_x           = COALESCE($20, aim_point_x),
+			aim_point_y           = COALESCE($21, aim_point_y),
+			point_a_x             = COALESCE($22, point_a_x),
+			point_a_y             = COALESCE($23, point_a_y),
+			point_b_x             = COALESCE($24, point_b_x),
+			point_b_y             = COALESCE($25, point_b_y),
+			rotation_degrees      = COALESCE($26, rotation_degrees),
+			line_start_x          = COALESCE($27, line_start_x),
+			line_start_y          = COALESCE($28, line_start_y),
+			line_end_x            = COALESCE($29, line_end_x),
+			line_end_y            = COALESCE($30, line_end_y),
+			marker_size           = COALESCE($31, marker_size),
+			distance_m            = COALESCE($32, distance_m),
+			distance_unit         = COALESCE($33, distance_unit),
+			measure_method        = COALESCE($34, measure_method),
+			display_unit          = COALESCE($35, display_unit),
+			updated_at            = NOW()
 		WHERE id = $1 AND session_id = $2
 		RETURNING `+measurementCols+`
 	`, measurementID, sessionID, userID,
 		in.GroupID, in.BboxX, in.BboxY, in.BboxWidth, in.BboxHeight,
-		in.MeasuredSizeMM, in.MeasuredSizeMOA))
+		in.MeasuredSizeMM, in.MeasuredSizeMOA,
+		in.CalibrationType, in.ReferenceDiameterMM, in.ReferencePixels, in.PixelsPerMM,
+		in.RefCenterX, in.RefCenterY, in.RefRadiusPixels,
+		in.ManualGroupSizeMM, in.ManualShotCount,
+		in.AimPointX, in.AimPointY,
+		in.PointAX, in.PointAY, in.PointBX, in.PointBY,
+		in.RotationDegrees,
+		in.LineStartX, in.LineStartY, in.LineEndX, in.LineEndY,
+		in.MarkerSize, in.DistanceM, in.DistanceUnit, in.MeasureMethod, in.DisplayUnit))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -850,6 +908,93 @@ func (r *PelletTestRepository) DeleteDetection(ctx context.Context, detectionID,
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (r *PelletTestRepository) GetMeasurementsBySession(ctx context.Context, sessionID string) ([]*model.PelletTestMeasurement, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT `+measurementCols+`
+		FROM pellet_test_measurements
+		WHERE session_id = $1
+		ORDER BY created_at
+	`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list session measurements: %w", err)
+	}
+	defer rows.Close()
+
+	var measurements []*model.PelletTestMeasurement
+	for rows.Next() {
+		m, err := scanMeasurement(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan measurement: %w", err)
+		}
+		measurements = append(measurements, m)
+	}
+	return measurements, rows.Err()
+}
+
+func (r *PelletTestRepository) ListDetectionsBySession(ctx context.Context, sessionID string) ([]*model.PelletTestDetection, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence, is_confirmed, is_rejected, created_at
+		FROM pellet_test_detections
+		WHERE session_id = $1
+		ORDER BY created_at
+	`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list session detections: %w", err)
+	}
+	defer rows.Close()
+
+	var detections []*model.PelletTestDetection
+	for rows.Next() {
+		var d model.PelletTestDetection
+		if err := rows.Scan(
+			&d.ID, &d.MeasurementID, &d.SessionID,
+			&d.CenterX, &d.CenterY, &d.RadiusPixels,
+			&d.DiameterMM, &d.Confidence,
+			&d.IsConfirmed, &d.IsRejected, &d.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan detection: %w", err)
+		}
+		detections = append(detections, &d)
+	}
+	return detections, rows.Err()
+}
+
+func (r *PelletTestRepository) ReplaceDetectionsForMeasurement(ctx context.Context, measurementID, sessionID string, detections []model.CreateDetectionInput) ([]*model.PelletTestDetection, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `DELETE FROM pellet_test_detections WHERE measurement_id = $1 AND session_id = $2`, measurementID, sessionID); err != nil {
+		return nil, fmt.Errorf("delete detections: %w", err)
+	}
+
+	results := make([]*model.PelletTestDetection, 0, len(detections))
+	for _, d := range detections {
+		var det model.PelletTestDetection
+		err := tx.QueryRow(ctx, `
+			INSERT INTO pellet_test_detections (measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, measurement_id, session_id, center_x, center_y, radius_pixels, diameter_mm, confidence, is_confirmed, is_rejected, created_at
+		`, measurementID, sessionID, d.CenterX, d.CenterY, d.RadiusPixels, d.DiameterMM, d.Confidence).Scan(
+			&det.ID, &det.MeasurementID, &det.SessionID,
+			&det.CenterX, &det.CenterY, &det.RadiusPixels,
+			&det.DiameterMM, &det.Confidence,
+			&det.IsConfirmed, &det.IsRejected, &det.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("insert detection: %w", err)
+		}
+		results = append(results, &det)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+	return results, nil
 }
 
 func (r *PelletTestRepository) UpdateMeasurementDetectionMeta(ctx context.Context, measurementID string, method string, holeCount int, autoGroupMM, autoGroupMOA, confidence *float64) error {
