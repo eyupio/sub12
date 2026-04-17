@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Send, Globe, Users as UsersIcon, UserCheck, Lock } from 'lucide-react'
 import { postApi, CreatePostPayload, PostVisibility } from '../api/posts'
@@ -38,8 +38,12 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
   const queryClient = useQueryClient()
   const [body, setBody] = useState('')
   const scoped = !!(leagueId || clubId)
-  const options = getVisibilityOptions(scoped)
+  const options = useMemo(() => getVisibilityOptions(scoped), [scoped])
   const [visibility, setVisibility] = useState<PostVisibility>(options[0].value)
+
+  useEffect(() => {
+    setVisibility(options[0].value)
+  }, [options])
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -54,6 +58,7 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey })
       setBody('')
+      setVisibility(options[0].value)
       toast('Posted', 'success')
     },
     onError: () => toast('Failed to create post', 'error'),

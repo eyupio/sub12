@@ -149,6 +149,7 @@ func NewRouter(
 			r.Post("/users/me/avatar", uh.UploadAvatar)
 			r.Post("/users/me/email", uh.RequestEmailChange)
 			r.Post("/users/me/email/confirm", uh.ConfirmEmailChange)
+			r.Get("/users", uh.SearchUsers)
 			r.Get("/users/{id}", uh.GetProfile)
 
 			// Social follows
@@ -223,6 +224,7 @@ func NewRouter(
 			r.Get("/users/me/leagues", lh.ListMyLeagues)
 			r.Post("/leagues", lh.Create)
 			r.Get("/leagues/{id}", lh.Get)
+			r.Patch("/leagues/{id}", lh.Update)
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Get("/leagues/{id}/standings", lh.Standings)
 			r.Get("/leagues/{id}/scores", lh.ListScores)
@@ -271,6 +273,7 @@ func NewRouter(
 			// Club join requests (admin)
 			r.Get("/clubs/{id}/join-requests", clh.ListJoinRequests)
 			r.Post("/clubs/{id}/join-requests/{requestId}/decide", clh.DecideJoinRequest)
+			r.Post("/clubs/{id}/join-code", clh.RegenerateJoinCode)
 
 			// Achievements
 			ah := handler.NewAchievement(achievements)

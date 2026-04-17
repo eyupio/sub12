@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/jnnngs/sub-12/backend/internal/model"
 )
 
 type MuteRepository struct {
@@ -80,4 +82,33 @@ func (r *MuteRepository) ListMuted(ctx context.Context, muterID string) ([]strin
 		ids = []string{}
 	}
 	return ids, nil
+}
+
+// ListMutedWithProfile returns muted users enriched with display name and
+// avatar, newest first. Used to render the Privacy Center list.
+func (r *MuteRepository) ListMutedWithProfile(ctx context.Context, muterID string) ([]*model.UserMute, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT m.muted_id, u.display_name, u.avatar_url, m.created_at
+		FROM user_mutes m
+		JOIN users u ON u.id = m.muted_id
+		WHERE m.muter_id = $1
+		ORDER BY m.created_at DESC
+	`, muterID)
+	if err != nil {
+		return nil, fmt.Errorf("list muted with profile: %w", err)
+	}
+	defer rows.Close()
+
+	items := []*model.UserMute{}
+	for rows.Next() {
+		var m model.UserMute
+		if err := rows.Scan(&m.MutedID, &m.DisplayName, &m.AvatarURL, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan muted row: %w", err)
+		}
+		items = append(items, &m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("muted rows: %w", err)
+	}
+	return items, nil
 }

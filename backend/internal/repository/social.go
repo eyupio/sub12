@@ -67,9 +67,12 @@ func (r *SocialRepository) GetFollowStats(ctx context.Context, profileUserID, vi
 			(SELECT COUNT(*) FROM user_follows WHERE following_id = $1) AS follower_count,
 			(SELECT COUNT(*) FROM user_follows WHERE follower_id  = $1) AS following_count,
 			CASE WHEN $2 = '' THEN false
-			     ELSE EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2 AND following_id = $1)
-			END AS is_following
-	`, profileUserID, viewerID).Scan(&stats.FollowerCount, &stats.FollowingCount, &stats.IsFollowing)
+			     ELSE EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $2::uuid AND following_id = $1)
+			END AS is_following,
+			CASE WHEN $2 = '' THEN false
+			     ELSE EXISTS(SELECT 1 FROM user_follows WHERE follower_id = $1 AND following_id = $2::uuid)
+			END AS follows_you
+	`, profileUserID, viewerID).Scan(&stats.FollowerCount, &stats.FollowingCount, &stats.IsFollowing, &stats.FollowsYou)
 	if err != nil {
 		return nil, fmt.Errorf("get follow stats: %w", err)
 	}

@@ -4,8 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// likeTables is the fixed set of tables likes can target. The table name is
+// interpolated into SQL, so this whitelist prevents injection via targetType.
+var likeTables = map[string]string{
+	"score_card": "score_cards",
+	"post":       "posts",
+	"comment":    "comments",
+}
 
 type LikeRepository struct {
 	db *pgxpool.Pool
@@ -60,4 +69,75 @@ func (r *LikeRepository) DecrementLikeCount(ctx context.Context, targetID, table
 	query := fmt.Sprintf(`UPDATE %s SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, table)
 	_, err := r.db.Exec(ctx, query, targetID)
 	return err
+}
+
+// LikeTx inserts a like and increments the target's like_count in a single
+// transaction, preventing counter drift under concurrent calls. Returns true if
+// a new like row was created.
+func (r *LikeRepository) LikeTx(ctx context.Context, userID, targetID, targetType string) (bool, error) {
+	table, ok := likeTables[targetType]
+	if !ok {
+		return false, fmt.Errorf("invalid like target type: %s", targetType)
+	}
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin like tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO likes (user_id, target_id, target_type)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, target_id, target_type) DO NOTHING
+	`, userID, targetID, targetType)
+	if err != nil {
+		return false, fmt.Errorf("insert like: %w", err)
+	}
+	created := tag.RowsAffected() > 0
+	if created {
+		if _, err := tx.Exec(ctx,
+			fmt.Sprintf(`UPDATE %s SET like_count = like_count + 1 WHERE id = $1`, table),
+			targetID,
+		); err != nil {
+			return false, fmt.Errorf("increment like_count: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit like tx: %w", err)
+	}
+	return created, nil
+}
+
+// UnlikeTx removes a like and decrements the target's like_count in a single
+// transaction. Returns true if a like row was removed.
+func (r *LikeRepository) UnlikeTx(ctx context.Context, userID, targetID, targetType string) (bool, error) {
+	table, ok := likeTables[targetType]
+	if !ok {
+		return false, fmt.Errorf("invalid like target type: %s", targetType)
+	}
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin unlike tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	tag, err := tx.Exec(ctx, `
+		DELETE FROM likes WHERE user_id = $1 AND target_id = $2 AND target_type = $3
+	`, userID, targetID, targetType)
+	if err != nil {
+		return false, fmt.Errorf("delete like: %w", err)
+	}
+	removed := tag.RowsAffected() > 0
+	if removed {
+		if _, err := tx.Exec(ctx,
+			fmt.Sprintf(`UPDATE %s SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, table),
+			targetID,
+		); err != nil {
+			return false, fmt.Errorf("decrement like_count: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit unlike tx: %w", err)
+	}
+	return removed, nil
 }

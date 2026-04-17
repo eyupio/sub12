@@ -132,6 +132,33 @@ func (h *ClubHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, club)
 }
 
+// POST /api/v1/clubs/{id}/join-code
+func (h *ClubHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	code, err := h.svc.RegenerateJoinCode(r.Context(), clubID, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to regenerate join code")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"join_code": code})
+}
+
 // DELETE /api/v1/clubs/{id}/members/me
 func (h *ClubHandler) Leave(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

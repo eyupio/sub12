@@ -76,6 +76,57 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
 }
 
 // ---------------------------------------------------------------------------
+// Privacy Section
+// ---------------------------------------------------------------------------
+
+function PrivacySection({ leagueId, league }: { leagueId: string; league: League }) {
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: (input: { type?: 'public' | 'private' }) =>
+      leagueApi.update(leagueId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      queryClient.invalidateQueries({ queryKey: ['leagues'] })
+      toast('Privacy updated', 'success')
+    },
+    onError: () => toast('Failed to update privacy', 'error'),
+  })
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy</h2>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Visibility</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['public', 'private'] as const).map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ type: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                league.type === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">
+          {league.type === 'private'
+            ? 'Private leagues are hidden from the directory. Only members see standings and scores.'
+            : 'Public leagues appear in the leagues directory.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Rules Section (consolidated from General + Score Verification)
 // ---------------------------------------------------------------------------
 
@@ -463,6 +514,7 @@ export default function LeagueSettings() {
       <p className="text-xs text-muted">{league.name}</p>
 
       <LeagueImageSection leagueId={id} league={league} />
+      <PrivacySection leagueId={id} league={league} />
       <RulesSection leagueId={id} config={config} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />

@@ -16,6 +16,7 @@ export interface FollowStats {
   follower_count: number
   following_count: number
   is_following: boolean
+  follows_you: boolean
 }
 
 export interface PublicProfileWithFollow extends PublicProfile, FollowStats {
@@ -90,4 +91,8 @@ export const usersApi = {
   listFollowRequests: () => api.get<{ items: FollowRequest[] }>('/users/me/follow-requests'),
   decideFollowRequest: (id: string, decision: 'accepted' | 'rejected') =>
     api.post<FollowRequest>(`/users/me/follow-requests/${id}/decide`, { decision }),
+
+  // Search
+  search: (q: string, limit = 20) =>
+    api.get<{ items: PublicProfile[] }>(`/users?q=${encodeURIComponent(q)}&limit=${limit}`),
 }

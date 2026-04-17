@@ -392,6 +392,14 @@ export default function Feed() {
         <div className="text-center py-12 space-y-2">
           <p className="text-secondary">{empty.title}</p>
           <p className="text-sm text-muted">{empty.subtitle}</p>
+          {filter === 'for_you' && (
+            <Link
+              to="/users"
+              className="inline-block mt-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/10 transition-colors"
+            >
+              Find people to follow
+            </Link>
+          )}
         </div>
       )}
 

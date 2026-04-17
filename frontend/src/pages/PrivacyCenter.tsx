@@ -195,13 +195,22 @@ export default function PrivacyCenter() {
           <p className="text-xs text-muted">You haven't muted anyone.</p>
         ) : (
           <ul className="space-y-2">
-            {mutes?.items.map((id) => (
-              <li key={id} className="flex items-center justify-between gap-2">
-                <Link to="/users/$id" params={{ id }} className="text-sm text-secondary truncate hover:text-[var(--brass)]">
-                  {id}
+            {mutes?.items.map((m) => (
+              <li key={m.muted_id} className="flex items-center justify-between gap-2">
+                <Link
+                  to="/users/$id"
+                  params={{ id: m.muted_id }}
+                  className="flex items-center gap-2 text-sm text-secondary truncate hover:text-[var(--brass)]"
+                >
+                  {m.avatar_url ? (
+                    <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-6 h-6 rounded-full bg-surface-hover" />
+                  )}
+                  <span className="truncate">{m.display_name || m.muted_id}</span>
                 </Link>
                 <button
-                  onClick={() => unmuteMutation.mutate(id)}
+                  onClick={() => unmuteMutation.mutate(m.muted_id)}
                   className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80"
                 >
                   Unmute

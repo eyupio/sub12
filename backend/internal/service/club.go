@@ -283,6 +283,22 @@ func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string
 	return club, nil
 }
 
+// RegenerateJoinCode rotates the club's invite code. Admins only.
+func (s *ClubService) RegenerateJoinCode(ctx context.Context, clubID, requesterID string) (string, error) {
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return "", err
+	}
+	if !isAdmin {
+		return "", ErrClubNotAdmin
+	}
+	code, err := s.repo.RegenerateJoinCode(ctx, clubID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return "", ErrClubNotFound
+	}
+	return code, err
+}
+
 // LeaveClub allows a member to remove themselves from a club.
 func (s *ClubService) LeaveClub(ctx context.Context, clubID, userID string) error {
 	isMember, err := s.repo.IsMember(ctx, clubID, userID)

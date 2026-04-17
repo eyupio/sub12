@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign } from 'lucide-react'
@@ -72,21 +71,35 @@ export default function Notifications() {
     },
   })
 
-  // Mark everything read on first render so the bell clears itself quickly.
-  useEffect(() => {
-    markAllMutation.mutate()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const markOneMutation = useMutation({
+    mutationFn: (id: string) => notificationsApi.markRead([id]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
 
   const items = data?.pages.flatMap((p) => p.items) ?? []
+  const hasUnread = items.some((n) => !n.read_at)
 
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Notifications</h1>
-        <Link to="/settings/notifications" className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary">
-          Settings
-        </Link>
+        <div className="flex items-center gap-4">
+          {hasUnread && (
+            <button
+              type="button"
+              onClick={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending}
+              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary disabled:opacity-40"
+            >
+              Mark all read
+            </button>
+          )}
+          <Link to="/settings/notifications" className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary">
+            Settings
+          </Link>
+        </div>
       </div>
 
       {isLoading && (
@@ -135,9 +148,20 @@ export default function Notifications() {
               )}
             </div>
           )
+          const handleClick = () => {
+            if (unread) markOneMutation.mutate(n.id)
+          }
           return (
             <li key={n.id}>
-              {href ? <Link to={href}>{content}</Link> : content}
+              {href ? (
+                <Link to={href} onClick={handleClick}>
+                  {content}
+                </Link>
+              ) : (
+                <button type="button" onClick={handleClick} className="w-full text-left">
+                  {content}
+                </button>
+              )}
             </li>
           )
         })}

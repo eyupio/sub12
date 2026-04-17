@@ -70,6 +70,19 @@ func (s *UserService) GetPublicProfile(ctx context.Context, id string) (*model.P
 	}, nil
 }
 
+// SearchUsers finds users by display_name prefix. Queries shorter than 2
+// characters after trimming return no results to avoid unbounded scans.
+func (s *UserService) SearchUsers(ctx context.Context, query, viewerID string, limit int) ([]*model.PublicProfile, error) {
+	trimmed := strings.TrimSpace(query)
+	if len([]rune(trimmed)) < 2 {
+		return []*model.PublicProfile{}, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	return s.users.Search(ctx, trimmed, viewerID, limit)
+}
+
 // UpdateMe applies a partial update to the authenticated user's own profile.
 func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateProfileInput) (*model.User, error) {
 	if in.DisplayName != nil && strings.TrimSpace(*in.DisplayName) == "" {

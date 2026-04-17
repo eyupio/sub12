@@ -29,13 +29,13 @@ func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, us
 		)
 		SELECT ins.id, ins.target_id, ins.target_type, ins.parent_id, ins.user_id,
 		       u.display_name, u.avatar_url,
-		       ins.body, ins.like_count, 0 AS reply_count, ins.created_at, ins.updated_at
+		       ins.body, ins.like_count, 0 AS reply_count, FALSE AS is_liked, ins.created_at, ins.updated_at
 		FROM ins
 		JOIN users u ON u.id = ins.user_id
 	`, targetID, targetType, userID, body, parentID).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create comment: %w", err)
@@ -43,19 +43,24 @@ func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, us
 	return &c, nil
 }
 
-// ListByTarget returns top-level comments for a target, oldest first.
-func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetType string) ([]*model.Comment, error) {
+// ListByTargetWithViewer returns top-level comments for a target, oldest first,
+// including an is_liked flag scoped to viewerID (empty for anonymous viewers).
+func (r *CommentRepository) ListByTargetWithViewer(ctx context.Context, targetID, targetType, viewerID string) ([]*model.Comment, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT c.id, c.target_id, c.target_type, c.parent_id, c.user_id,
 		       u.display_name, u.avatar_url,
 		       c.body, c.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       CASE WHEN $3 = '' THEN FALSE
+		            ELSE EXISTS (SELECT 1 FROM likes l
+		                         WHERE l.target_id = c.id AND l.target_type = 'comment' AND l.user_id = $3::uuid)
+		       END AS is_liked,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
 		WHERE c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL AND c.hidden_at IS NULL
 		ORDER BY c.created_at ASC
-	`, targetID, targetType)
+	`, targetID, targetType, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
@@ -67,7 +72,7 @@ func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetTy
 		if err := rows.Scan(
 			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 			&c.DisplayName, &c.AvatarURL,
-			&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
 		}
@@ -82,19 +87,29 @@ func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetTy
 	return comments, nil
 }
 
-// ListReplies returns replies to a specific comment, oldest first.
-func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([]*model.Comment, error) {
+// ListByTarget returns top-level comments for a target, oldest first.
+func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetType string) ([]*model.Comment, error) {
+	return r.ListByTargetWithViewer(ctx, targetID, targetType, "")
+}
+
+// ListRepliesWithViewer returns replies to a specific comment, oldest first,
+// including an is_liked flag scoped to viewerID (empty for anonymous viewers).
+func (r *CommentRepository) ListRepliesWithViewer(ctx context.Context, parentID, viewerID string) ([]*model.Comment, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT c.id, c.target_id, c.target_type, c.parent_id, c.user_id,
 		       u.display_name, u.avatar_url,
 		       c.body, c.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       CASE WHEN $2 = '' THEN FALSE
+		            ELSE EXISTS (SELECT 1 FROM likes l
+		                         WHERE l.target_id = c.id AND l.target_type = 'comment' AND l.user_id = $2::uuid)
+		       END AS is_liked,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
 		WHERE c.parent_id = $1 AND c.hidden_at IS NULL
 		ORDER BY c.created_at ASC
-	`, parentID)
+	`, parentID, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("list replies: %w", err)
 	}
@@ -106,7 +121,7 @@ func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([
 		if err := rows.Scan(
 			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 			&c.DisplayName, &c.AvatarURL,
-			&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan reply: %w", err)
 		}
@@ -121,6 +136,11 @@ func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([
 	return comments, nil
 }
 
+// ListReplies returns replies to a specific comment, oldest first.
+func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([]*model.Comment, error) {
+	return r.ListRepliesWithViewer(ctx, parentID, "")
+}
+
 // GetByID retrieves a single comment by ID.
 func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*model.Comment, error) {
 	var c model.Comment
@@ -129,6 +149,7 @@ func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*mod
 		       u.display_name, u.avatar_url,
 		       c.body, c.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
+		       FALSE AS is_liked,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
@@ -136,7 +157,7 @@ func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*mod
 	`, commentID).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -161,13 +182,14 @@ func (r *CommentRepository) Update(ctx context.Context, commentID, userID, body 
 		       u.display_name, u.avatar_url,
 		       upd.body, upd.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = upd.id) AS reply_count,
+		       FALSE AS is_liked,
 		       upd.created_at, upd.updated_at
 		FROM upd
 		JOIN users u ON u.id = upd.user_id
 	`, commentID, userID, body).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {

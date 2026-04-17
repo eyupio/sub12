@@ -24,6 +24,13 @@ type CreateLeagueInput struct {
 	JoinPolicy  *string `json:"join_policy"`  // optional: "open", "invite_code", or "approval"; defaults to "open"
 }
 
+// UpdateLeagueBasicsInput captures owner-editable fields on the league record.
+type UpdateLeagueBasicsInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Type        *string `json:"type"`
+}
+
 type LeagueStanding struct {
 	Rank        int       `json:"rank"`
 	UserID      string    `json:"user_id"`
