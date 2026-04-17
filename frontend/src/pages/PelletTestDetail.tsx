@@ -62,7 +62,11 @@ export default function PelletTestDetail() {
   const [newGroupNotes, setNewGroupNotes] = useState('')
   const [newGroupMethod, setNewGroupMethod] = useState<'manual' | 'image'>('manual')
   const [newGroupImageId, setNewGroupImageId] = useState('')
-  const [pendingMeasuredGroupId, setPendingMeasuredGroupId] = useState<string | null>(null)
+  type PendingGroupSync =
+    | { mode: 'update'; groupId: string }
+    | { mode: 'create'; shotCount: number; notes?: string }
+    | null
+  const [pendingGroupSync, setPendingGroupSync] = useState<PendingGroupSync>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -150,31 +154,22 @@ export default function PelletTestDetail() {
     },
   })
 
-  const addImageGroupMutation = useMutation({
-    mutationFn: async () => {
-      const group = await pelletTestApi.createGroup(id!, {
-        shot_count: newShotCount,
-        group_size_mm: Number(newGroupSize),
-        notes: withSourceTag(newGroupNotes || undefined, 'manual'),
-      })
-      return group
-    },
-    onSuccess: (group) => {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-      const picked = (session?.images ?? []).find(img => img.id === newGroupImageId)
-      if (picked) {
-        setPendingMeasuredGroupId(group.id)
-        setMeasureImage(picked)
-      }
-      setAddingGroup(false)
-      setNewGroupSize('')
-      setNewShotCount(5)
-      setNewGroupNotes('')
-      setNewGroupMethod('manual')
-      setNewGroupImageId('')
-    },
-  })
+  const startImageGroupMeasurement = () => {
+    const picked = (session?.images ?? []).find(img => img.id === newGroupImageId)
+    if (!picked) return
+    setPendingGroupSync({
+      mode: 'create',
+      shotCount: newShotCount,
+      notes: newGroupNotes || undefined,
+    })
+    setMeasureImage(picked)
+    setAddingGroup(false)
+    setNewGroupSize('')
+    setNewShotCount(5)
+    setNewGroupNotes('')
+    setNewGroupMethod('manual')
+    setNewGroupImageId('')
+  }
 
   const deleteGroupMutation = useMutation({
     mutationFn: (groupId: string) => pelletTestApi.deleteGroup(id!, groupId),
@@ -224,23 +219,36 @@ export default function PelletTestDetail() {
           distance_unit: analyzedDistanceUnit ?? 'meters',
         })
       }
-      if (pendingMeasuredGroupId && analyzedSizeMM && analyzedSizeMM > 0) {
-        await syncMeasuredGroupMutation.mutateAsync({
-          groupId: pendingMeasuredGroupId,
-          sizeMM: analyzedSizeMM,
-          shotCount: analyzedShotCount ?? 0,
-        })
+      if (pendingGroupSync && analyzedSizeMM && analyzedSizeMM > 0) {
+        const resolvedShotCount = analyzedShotCount && analyzedShotCount > 0
+          ? analyzedShotCount
+          : (pendingGroupSync.mode === 'create' ? pendingGroupSync.shotCount : newShotCount)
+        if (pendingGroupSync.mode === 'update') {
+          await syncMeasuredGroupMutation.mutateAsync({
+            groupId: pendingGroupSync.groupId,
+            sizeMM: analyzedSizeMM,
+            shotCount: resolvedShotCount,
+          })
+        } else {
+          await pelletTestApi.createGroup(id!, {
+            shot_count: resolvedShotCount,
+            group_size_mm: analyzedSizeMM,
+            notes: withSourceTag(pendingGroupSync.notes, 'image'),
+          })
+        }
       }
       return measurement
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
       qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
+      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
       setMeasureImage(null)
-      setPendingMeasuredGroupId(null)
+      setPendingGroupSync(null)
     },
     onError: () => {
       toast('Failed to save measurement.', 'error')
+      setPendingGroupSync(null)
     },
   })
 
@@ -296,12 +304,23 @@ export default function PelletTestDetail() {
         })
       }
 
-      if (pendingMeasuredGroupId && analyzedSizeMM && analyzedSizeMM > 0) {
-        await syncMeasuredGroupMutation.mutateAsync({
-          groupId: pendingMeasuredGroupId,
-          sizeMM: analyzedSizeMM,
-          shotCount: analyzedShotCount ?? 0,
-        })
+      if (pendingGroupSync && analyzedSizeMM && analyzedSizeMM > 0) {
+        const resolvedShotCount = analyzedShotCount && analyzedShotCount > 0
+          ? analyzedShotCount
+          : (pendingGroupSync.mode === 'create' ? pendingGroupSync.shotCount : newShotCount)
+        if (pendingGroupSync.mode === 'update') {
+          await syncMeasuredGroupMutation.mutateAsync({
+            groupId: pendingGroupSync.groupId,
+            sizeMM: analyzedSizeMM,
+            shotCount: resolvedShotCount,
+          })
+        } else {
+          await pelletTestApi.createGroup(id!, {
+            shot_count: resolvedShotCount,
+            group_size_mm: analyzedSizeMM,
+            notes: withSourceTag(pendingGroupSync.notes, 'image'),
+          })
+        }
       }
 
       return measurement
@@ -309,11 +328,13 @@ export default function PelletTestDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
       qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
+      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
       setMeasureImage(null)
-      setPendingMeasuredGroupId(null)
+      setPendingGroupSync(null)
     },
     onError: () => {
       toast('Failed to save detections.', 'error')
+      setPendingGroupSync(null)
     },
   })
 
@@ -551,15 +572,17 @@ export default function PelletTestDetail() {
 
         {addingGroup && (
           <div className="p-3 rounded border border-subtle bg-surface space-y-2 mb-3">
-                <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${newGroupMethod === 'image' ? 'grid-cols-1' : 'grid-cols-2'}`}>
               <div>
                 <label className="text-[10px] text-muted tracking-wide">Shots</label>
                 <input type="number" min="1" value={newShotCount} onChange={e => setNewShotCount(Number(e.target.value) || 5)} className={inputCls} />
               </div>
-              <div>
-                <label className="text-[10px] text-muted tracking-wide">Size (mm)</label>
-                <input type="number" step="0.01" min="0" value={newGroupSize} onChange={e => setNewGroupSize(e.target.value)} placeholder="0.00" className={inputCls} />
-              </div>
+              {newGroupMethod === 'manual' && (
+                <div>
+                  <label className="text-[10px] text-muted tracking-wide">Size (mm)</label>
+                  <input type="number" step="0.01" min="0" value={newGroupSize} onChange={e => setNewGroupSize(e.target.value)} placeholder="0.00" className={inputCls} />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setNewGroupMethod('manual')} className={`py-2 rounded text-[11px] tracking-widest uppercase border ${newGroupMethod === 'manual' ? 'border-[var(--brass)] text-[var(--brass)] bg-[var(--brass)]/10' : 'border-subtle text-muted'}`}>
@@ -578,8 +601,16 @@ export default function PelletTestDetail() {
             <input type="text" value={newGroupNotes} onChange={e => setNewGroupNotes(e.target.value)} placeholder="Notes (optional)" className={`${inputCls} text-xs`} />
             {addGroupMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to add group.</p>}
             <div className="flex gap-2">
-              <button onClick={() => newGroupMethod === 'image' ? addImageGroupMutation.mutate() : addGroupMutation.mutate()} disabled={addGroupMutation.isPending || addImageGroupMutation.isPending || !newGroupSize || Number(newGroupSize) <= 0 || (newGroupMethod === 'image' && !newGroupImageId)} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40">
-                <Check size={13} /> {addGroupMutation.isPending || addImageGroupMutation.isPending ? 'Saving…' : newGroupMethod === 'image' ? 'Analyze image' : 'Save'}
+              <button
+                onClick={() => newGroupMethod === 'image' ? startImageGroupMeasurement() : addGroupMutation.mutate()}
+                disabled={
+                  addGroupMutation.isPending ||
+                  (newGroupMethod === 'manual' && (!newGroupSize || Number(newGroupSize) <= 0)) ||
+                  (newGroupMethod === 'image' && !newGroupImageId)
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+              >
+                <Check size={13} /> {addGroupMutation.isPending ? 'Saving…' : newGroupMethod === 'image' ? 'Analyze image' : 'Save'}
               </button>
               <button onClick={() => setAddingGroup(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
                 <X size={13} /> Cancel
@@ -684,7 +715,7 @@ export default function PelletTestDetail() {
           }
           isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
           saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
-          onClose={() => { setMeasureImage(null); setPendingMeasuredGroupId(null) }}
+          onClose={() => { setMeasureImage(null); setPendingGroupSync(null) }}
           defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
           defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
         />
