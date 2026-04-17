@@ -9,6 +9,8 @@ export interface PostAttachment {
   sort_order: number
 }
 
+export type PostVisibility = 'public' | 'followers' | 'members' | 'private' | 'inherit'
+
 export interface Post {
   id: string
   user_id: string
@@ -17,6 +19,8 @@ export interface Post {
   body: string
   league_id?: string
   club_id?: string
+  visibility: PostVisibility
+  hidden_at?: string
   like_count: number
   comment_count: number
   is_liked: boolean
@@ -29,6 +33,7 @@ export interface CreatePostPayload {
   body: string
   league_id?: string
   club_id?: string
+  visibility?: PostVisibility
   attachments?: { type: string; target_id?: string; image_url?: string }[]
 }
 
@@ -38,6 +43,7 @@ export interface SharePayload {
   body?: string
   league_id?: string
   club_id?: string
+  visibility?: PostVisibility
 }
 
 export const postApi = {

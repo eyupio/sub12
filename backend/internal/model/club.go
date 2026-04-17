@@ -2,6 +2,18 @@ package model
 
 import "time"
 
+// ClubSummary is the minimal public-facing view of a club used to render a
+// "members-only" banner without leaking members, standings or posts.
+type ClubSummary struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+	Type        string  `json:"type"`
+	JoinPolicy  string  `json:"join_policy"`
+	MemberCount int     `json:"member_count"`
+}
+
 type Club struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`

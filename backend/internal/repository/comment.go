@@ -53,7 +53,7 @@ func (r *CommentRepository) ListByTarget(ctx context.Context, targetID, targetTy
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
-		WHERE c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL
+		WHERE c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL AND c.hidden_at IS NULL
 		ORDER BY c.created_at ASC
 	`, targetID, targetType)
 	if err != nil {
@@ -92,7 +92,7 @@ func (r *CommentRepository) ListReplies(ctx context.Context, parentID string) ([
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
-		WHERE c.parent_id = $1
+		WHERE c.parent_id = $1 AND c.hidden_at IS NULL
 		ORDER BY c.created_at ASC
 	`, parentID)
 	if err != nil {

@@ -2,6 +2,15 @@ package model
 
 import "time"
 
+// Post visibility constants mirror the CHECK on posts.visibility.
+const (
+	PostVisibilityInherit   = "inherit"
+	PostVisibilityPublic    = "public"
+	PostVisibilityFollowers = "followers"
+	PostVisibilityMembers   = "members"
+	PostVisibilityPrivate   = "private"
+)
+
 type Post struct {
 	ID           string           `json:"id"`
 	UserID       string           `json:"user_id"`
@@ -10,6 +19,8 @@ type Post struct {
 	Body         string           `json:"body"`
 	LeagueID     *string          `json:"league_id,omitempty"`
 	ClubID       *string          `json:"club_id,omitempty"`
+	Visibility   string           `json:"visibility"`
+	HiddenAt     *time.Time       `json:"hidden_at,omitempty"`
 	LikeCount    int              `json:"like_count"`
 	CommentCount int              `json:"comment_count"`
 	IsLiked      bool             `json:"is_liked"`
@@ -27,10 +38,11 @@ type PostAttachment struct {
 }
 
 type CreatePostInput struct {
-	Body        string                    `json:"body"`
-	LeagueID    *string                   `json:"league_id,omitempty"`
-	ClubID      *string                   `json:"club_id,omitempty"`
-	Attachments []CreateAttachmentInput   `json:"attachments,omitempty"`
+	Body        string                  `json:"body"`
+	LeagueID    *string                 `json:"league_id,omitempty"`
+	ClubID      *string                 `json:"club_id,omitempty"`
+	Visibility  string                  `json:"visibility,omitempty"`
+	Attachments []CreateAttachmentInput `json:"attachments,omitempty"`
 }
 
 type CreateAttachmentInput struct {
@@ -45,4 +57,14 @@ type ShareInput struct {
 	Body       string  `json:"body"`
 	LeagueID   *string `json:"league_id,omitempty"`
 	ClubID     *string `json:"club_id,omitempty"`
+	Visibility string  `json:"visibility,omitempty"`
+}
+
+// IsValidPostVisibility returns true if v is one of the allowed visibility values.
+func IsValidPostVisibility(v string) bool {
+	switch v {
+	case PostVisibilityInherit, PostVisibilityPublic, PostVisibilityFollowers, PostVisibilityMembers, PostVisibilityPrivate:
+		return true
+	}
+	return false
 }

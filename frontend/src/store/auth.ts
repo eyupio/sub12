@@ -13,6 +13,7 @@ interface User {
   profile_visibility?: string
   default_score_visibility?: string
   feed_opt_out?: boolean
+  show_follower_counts?: boolean
   default_distance_unit?: string
   default_measurement_unit?: string
 }

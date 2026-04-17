@@ -26,13 +26,17 @@ func (r *PostRepository) Create(ctx context.Context, userID string, input *model
 	}
 	defer tx.Rollback(ctx)
 
+	visibility := input.Visibility
+	if visibility == "" {
+		visibility = model.PostVisibilityInherit
+	}
 	var post model.Post
 	err = tx.QueryRow(ctx, `
-		INSERT INTO posts (user_id, body, league_id, club_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, user_id, body, league_id, club_id, like_count, comment_count, created_at, updated_at
-	`, userID, input.Body, input.LeagueID, input.ClubID).Scan(
-		&post.ID, &post.UserID, &post.Body, &post.LeagueID, &post.ClubID,
+		INSERT INTO posts (user_id, body, league_id, club_id, visibility)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, user_id, body, league_id, club_id, visibility, like_count, comment_count, created_at, updated_at
+	`, userID, input.Body, input.LeagueID, input.ClubID, visibility).Scan(
+		&post.ID, &post.UserID, &post.Body, &post.LeagueID, &post.ClubID, &post.Visibility,
 		&post.LikeCount, &post.CommentCount, &post.CreatedAt, &post.UpdatedAt,
 	)
 	if err != nil {
@@ -83,7 +87,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string, viewerID *strin
 
 	err := r.db.QueryRow(ctx, fmt.Sprintf(`
 		SELECT p.id, p.user_id, u.display_name, u.avatar_url,
-		       p.body, p.league_id, p.club_id,
+		       p.body, p.league_id, p.club_id, p.visibility, p.hidden_at,
 		       p.like_count, p.comment_count,
 		       %s AS is_liked,
 		       p.created_at, p.updated_at
@@ -92,7 +96,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string, viewerID *strin
 		WHERE p.id = $1
 	`, isLikedSubquery), args...).Scan(
 		&post.ID, &post.UserID, &post.DisplayName, &post.AvatarURL,
-		&post.Body, &post.LeagueID, &post.ClubID,
+		&post.Body, &post.LeagueID, &post.ClubID, &post.Visibility, &post.HiddenAt,
 		&post.LikeCount, &post.CommentCount, &post.IsLiked,
 		&post.CreatedAt, &post.UpdatedAt,
 	)
@@ -129,12 +133,12 @@ func (r *PostRepository) ListByUser(ctx context.Context, userID string, limit, o
 func (r *PostRepository) list(ctx context.Context, where string, arg any, limit, offset int) ([]*model.Post, error) {
 	query := fmt.Sprintf(`
 		SELECT p.id, p.user_id, u.display_name, u.avatar_url,
-		       p.body, p.league_id, p.club_id,
+		       p.body, p.league_id, p.club_id, p.visibility, p.hidden_at,
 		       p.like_count, p.comment_count,
 		       p.created_at, p.updated_at
 		FROM posts p
 		JOIN users u ON u.id = p.user_id
-		WHERE %s
+		WHERE %s AND p.hidden_at IS NULL
 		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`, where)
@@ -150,7 +154,7 @@ func (r *PostRepository) list(ctx context.Context, where string, arg any, limit,
 		var p model.Post
 		if err := rows.Scan(
 			&p.ID, &p.UserID, &p.DisplayName, &p.AvatarURL,
-			&p.Body, &p.LeagueID, &p.ClubID,
+			&p.Body, &p.LeagueID, &p.ClubID, &p.Visibility, &p.HiddenAt,
 			&p.LikeCount, &p.CommentCount,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
@@ -183,17 +187,17 @@ func (r *PostRepository) Update(ctx context.Context, id, userID, body string) (*
 		WITH upd AS (
 			UPDATE posts SET body = $3, updated_at = NOW()
 			WHERE id = $1 AND user_id = $2
-			RETURNING id, user_id, body, league_id, club_id, like_count, comment_count, created_at, updated_at
+			RETURNING id, user_id, body, league_id, club_id, visibility, hidden_at, like_count, comment_count, created_at, updated_at
 		)
 		SELECT upd.id, upd.user_id, u.display_name, u.avatar_url,
-		       upd.body, upd.league_id, upd.club_id,
+		       upd.body, upd.league_id, upd.club_id, upd.visibility, upd.hidden_at,
 		       upd.like_count, upd.comment_count,
 		       upd.created_at, upd.updated_at
 		FROM upd
 		JOIN users u ON u.id = upd.user_id
 	`, id, userID, body).Scan(
 		&post.ID, &post.UserID, &post.DisplayName, &post.AvatarURL,
-		&post.Body, &post.LeagueID, &post.ClubID,
+		&post.Body, &post.LeagueID, &post.ClubID, &post.Visibility, &post.HiddenAt,
 		&post.LikeCount, &post.CommentCount,
 		&post.CreatedAt, &post.UpdatedAt,
 	)
@@ -211,6 +215,24 @@ func (r *PostRepository) Update(ctx context.Context, id, userID, body string) (*
 	}
 
 	return &post, nil
+}
+
+// SetHidden flips the hidden_at flag for a post. Used by the moderation flow.
+func (r *PostRepository) SetHidden(ctx context.Context, id string, hidden bool) error {
+	var query string
+	if hidden {
+		query = `UPDATE posts SET hidden_at = NOW() WHERE id = $1`
+	} else {
+		query = `UPDATE posts SET hidden_at = NULL WHERE id = $1`
+	}
+	tag, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("set hidden: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Delete removes a post, enforcing ownership.

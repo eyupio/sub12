@@ -7,6 +7,7 @@ import { authApi } from '../api/auth'
 import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
 import { ToastContainer } from './Toast'
+import { NotificationBell } from './NotificationBell'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -117,13 +118,13 @@ export default function Layout({ children }: PropsWithChildren) {
           />
         </div>
 
-        <nav className="flex-1 py-4 px-3 space-y-1">
+        <nav className="flex-1 py-4 px-3 space-y-1" aria-label="Primary">
           {navItems.map(({ to, icon: Icon, label }) => (
             <Link
               key={to}
               to={to}
               className={navLinkBase}
-              activeProps={{ className: navLinkActive }}
+              activeProps={{ className: navLinkActive, 'aria-current': 'page' }}
             >
               <Icon size={20} />
               <span>{label}</span>
@@ -134,14 +135,17 @@ export default function Layout({ children }: PropsWithChildren) {
         <div className="px-4 py-4 border-t border-subtle space-y-3">
           <div className="flex items-center justify-between">
             <ThemeToggle />
-            <button
-              onClick={handleLogout}
-              className="text-muted hover:text-secondary transition-colors"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut size={17} />
-            </button>
+            <div className="flex items-center gap-3">
+              <NotificationBell />
+              <button
+                onClick={handleLogout}
+                className="text-muted hover:text-secondary transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={17} />
+              </button>
+            </div>
           </div>
           {user && (
             <p className="text-xs text-muted tracking-wide truncate">{user.display_name}</p>
@@ -162,6 +166,7 @@ export default function Layout({ children }: PropsWithChildren) {
             {user && (
               <span className="text-sm text-muted hidden sm:block tracking-wide">{user.display_name}</span>
             )}
+            <NotificationBell />
             <ThemeToggle />
             <button
               onClick={handleLogout}
@@ -187,14 +192,14 @@ export default function Layout({ children }: PropsWithChildren) {
         </main>
 
         {/* Mobile bottom nav \u2014 5 items max */}
-        <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
+        <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
             {mobileNavItems.map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
                 to={to}
                 className="h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-muted hover:text-[var(--brass)] transition-colors"
-                activeProps={{ className: 'h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-[var(--brass)]' }}
+                activeProps={{ className: 'h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-[var(--brass)]', 'aria-current': 'page' }}
               >
                 <Icon size={22} />
                 <span className="max-w-full truncate text-[11px] tracking-wide">{label}</span>

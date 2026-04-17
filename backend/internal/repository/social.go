@@ -111,10 +111,10 @@ func (r *SocialRepository) ListFollowing(ctx context.Context, userID string) ([]
 func (r *SocialRepository) GetPublicProfile(ctx context.Context, userID string) (*model.PublicProfile, error) {
 	var p model.PublicProfile
 	err := r.db.QueryRow(ctx,
-		`SELECT id, display_name, bio, location, club, avatar_url, profile_visibility, created_at
+		`SELECT id, display_name, bio, location, club, avatar_url, profile_visibility, show_follower_counts, created_at
 		 FROM users WHERE id = $1`,
 		userID,
-	).Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.ProfileVisibility, &p.CreatedAt)
+	).Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound

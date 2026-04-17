@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send } from 'lucide-react'
-import { postApi, CreatePostPayload } from '../api/posts'
+import { Send, Globe, Users as UsersIcon, UserCheck, Lock } from 'lucide-react'
+import { postApi, CreatePostPayload, PostVisibility } from '../api/posts'
 import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
 
 interface PostComposerProps {
   leagueId?: string
@@ -10,10 +11,35 @@ interface PostComposerProps {
   queryKey: unknown[]
 }
 
+interface VisibilityOption {
+  value: PostVisibility
+  label: string
+  description: string
+  icon: typeof Globe
+}
+
+function getVisibilityOptions(scoped: boolean): VisibilityOption[] {
+  if (scoped) {
+    return [
+      { value: 'members', label: 'Members', description: 'Only this group', icon: UsersIcon },
+      { value: 'public', label: 'Public', description: 'Anyone with the link', icon: Globe },
+      { value: 'private', label: 'Only me', description: 'Not visible to anyone else', icon: Lock },
+    ]
+  }
+  return [
+    { value: 'public', label: 'Public', description: 'Everyone', icon: Globe },
+    { value: 'followers', label: 'Followers', description: 'Only people who follow you', icon: UserCheck },
+    { value: 'private', label: 'Only me', description: 'Not visible to anyone else', icon: Lock },
+  ]
+}
+
 export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [body, setBody] = useState('')
+  const scoped = !!(leagueId || clubId)
+  const options = getVisibilityOptions(scoped)
+  const [visibility, setVisibility] = useState<PostVisibility>(options[0].value)
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -21,13 +47,16 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
         body: body.trim(),
         league_id: leagueId,
         club_id: clubId,
+        visibility,
       }
       return postApi.create(payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey })
       setBody('')
+      toast('Posted', 'success')
     },
+    onError: () => toast('Failed to create post', 'error'),
   })
 
   if (!currentUser) return null
@@ -52,10 +81,11 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="What's on your mind?"
+          placeholder="What's on your mind? (⌘/Ctrl + Enter to post)"
+          aria-label="Post body"
           rows={2}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.ctrlKey && body.trim()) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && body.trim()) {
               e.preventDefault()
               mutation.mutate()
             }
@@ -63,7 +93,22 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
           className="flex-1 bg-page border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none placeholder-muted"
         />
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <label className="flex items-center gap-2 text-[11px] tracking-wide text-muted">
+          <span className="tracking-widest uppercase">Visibility</span>
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as PostVisibility)}
+            aria-label="Post visibility"
+            className="bg-page border border-subtle rounded px-2 py-1 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50"
+          >
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value} title={opt.description}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || !body.trim()}

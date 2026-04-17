@@ -36,7 +36,7 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	post, err := h.svc.Create(r.Context(), userID, &input)
 	if err != nil {
-		if errors.Is(err, service.ErrPostBodyEmpty) || errors.Is(err, service.ErrPostBodyTooLong) {
+		if errors.Is(err, service.ErrPostBodyEmpty) || errors.Is(err, service.ErrPostBodyTooLong) || errors.Is(err, service.ErrPostInvalidVisibility) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}

@@ -38,6 +38,9 @@ import ClubDetail from './pages/ClubDetail'
 import ClubSettings from './pages/ClubSettings'
 import ScoreTrends from './pages/ScoreTrends'
 import ComboAnalytics from './pages/ComboAnalytics'
+import Notifications from './pages/Notifications'
+import PrivacyCenter from './pages/PrivacyCenter'
+import NotificationSettings from './pages/NotificationSettings'
 import NotFound from './pages/NotFound'
 
 // Guard: redirect to /login if not authenticated
@@ -255,6 +258,24 @@ const adminClubDetailRoute = createRoute({
   component: AdminClubDetail,
 })
 
+const notificationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/notifications',
+  component: Notifications,
+})
+
+const settingsPrivacyRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings/privacy',
+  component: PrivacyCenter,
+})
+
+const settingsNotificationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings/notifications',
+  component: NotificationSettings,
+})
+
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
@@ -332,6 +353,9 @@ export const routeTree = rootRoute.addChildren([
     adminLeagueDetailRoute,
     adminClubsRoute,
     adminClubDetailRoute,
+    notificationsRoute,
+    settingsPrivacyRoute,
+    settingsNotificationsRoute,
     confirmEmailRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
