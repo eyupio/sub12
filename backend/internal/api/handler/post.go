@@ -160,10 +160,15 @@ func (h *PostHandler) Share(w http.ResponseWriter, r *http.Request) {
 // ListByLeague handles GET /api/v1/leagues/{id}/posts
 func (h *PostHandler) ListByLeague(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	limit, offset := parsePagination(r, 50, 100)
 
-	posts, err := h.svc.ListByLeague(r.Context(), leagueID, limit, offset)
+	posts, err := h.svc.ListByLeague(r.Context(), leagueID, viewerID, limit, offset)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list posts")
 		return
 	}
@@ -174,10 +179,15 @@ func (h *PostHandler) ListByLeague(w http.ResponseWriter, r *http.Request) {
 // ListByClub handles GET /api/v1/clubs/{id}/posts
 func (h *PostHandler) ListByClub(w http.ResponseWriter, r *http.Request) {
 	clubID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	limit, offset := parsePagination(r, 50, 100)
 
-	posts, err := h.svc.ListByClub(r.Context(), clubID, limit, offset)
+	posts, err := h.svc.ListByClub(r.Context(), clubID, viewerID, limit, offset)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list posts")
 		return
 	}

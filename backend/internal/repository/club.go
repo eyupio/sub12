@@ -2,8 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -24,15 +27,29 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 	}
 	defer tx.Rollback(ctx)
 
+	clubType := "public"
+	if input.Type != nil && *input.Type == "private" {
+		clubType = "private"
+	}
+	joinPolicy := "open"
+	if input.JoinPolicy != nil {
+		switch *input.JoinPolicy {
+		case "open", "invite_code", "approval":
+			joinPolicy = *input.JoinPolicy
+		}
+	}
+
 	var club model.Club
 	err = tx.QueryRow(ctx, `
-		INSERT INTO clubs (name, description, created_by)
-		VALUES ($1, $2, $3)
-		RETURNING id, name, description, image_url, join_code, created_by,
-		          created_at::text, updated_at::text
-	`, input.Name, input.Description, userID).Scan(
+		INSERT INTO clubs (name, description, created_by, type, join_policy)
+		VALUES ($1, $2, $3, $4::club_type, $5::club_join_policy)
+		RETURNING id, name, description, image_url, join_code,
+		          type::text, join_policy::text,
+		          created_by, created_at::text, updated_at::text
+	`, input.Name, input.Description, userID, clubType, joinPolicy).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.JoinCode, &club.Type, &club.JoinPolicy,
+		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert club: %w", err)
@@ -61,17 +78,22 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		// Unauthenticated: skip member/admin subqueries to avoid invalid UUID cast
 		err := r.db.QueryRow(ctx, `
 			SELECT
-				c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
-				c.created_at::text, c.updated_at::text,
+				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.type::text, c.join_policy::text,
+				c.created_by, c.created_at::text, c.updated_at::text,
 				(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count
 			FROM clubs c
 			WHERE c.id = $1
 		`, clubID).Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+			&club.JoinCode, &club.Type, &club.JoinPolicy,
+			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount,
 		)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrNotFound
+			}
 			return nil, fmt.Errorf("get club: %w", err)
 		}
 		return &club, nil
@@ -79,8 +101,9 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 
 	err := r.db.QueryRow(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
-			c.created_at::text, c.updated_at::text,
+			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.type::text, c.join_policy::text,
+			c.created_by, c.created_at::text, c.updated_at::text,
 			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
 			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false) AS is_admin,
 			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid) AS is_member
@@ -88,10 +111,14 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		WHERE c.id = $1
 	`, clubID, viewerID).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.JoinCode, &club.Type, &club.JoinPolicy,
+		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 		&club.MemberCount, &club.IsAdmin, &club.IsMember,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 		return nil, fmt.Errorf("get club: %w", err)
 	}
 	return &club, nil
@@ -99,13 +126,16 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 
 func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
 	if viewerID == "" {
+		// Public clubs directory: hide private clubs from unauthenticated viewers.
 		rows, err := r.db.Query(ctx, `
 			SELECT
-				c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
-				c.created_at::text, c.updated_at::text,
+				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.type::text, c.join_policy::text,
+				c.created_by, c.created_at::text, c.updated_at::text,
 				COUNT(cm.user_id)::int AS member_count
 			FROM clubs c
 			LEFT JOIN club_members cm ON cm.club_id = c.id
+			WHERE c.type = 'public'
 			GROUP BY c.id
 			ORDER BY c.created_at DESC
 		`)
@@ -119,7 +149,8 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 			var club model.Club
 			if err := rows.Scan(
 				&club.ID, &club.Name, &club.Description, &club.ImageURL,
-				&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+				&club.JoinCode, &club.Type, &club.JoinPolicy,
+				&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 				&club.MemberCount,
 			); err != nil {
 				return nil, fmt.Errorf("scan club: %w", err)
@@ -129,15 +160,19 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		return clubs, rows.Err()
 	}
 
+	// Authenticated viewers see public clubs + private clubs they belong to.
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
-			c.created_at::text, c.updated_at::text,
+			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.type::text, c.join_policy::text,
+			c.created_by, c.created_at::text, c.updated_at::text,
 			COUNT(cm.user_id)::int AS member_count,
 			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $1::uuid), false) AS is_admin,
 			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $1::uuid) AS is_member
 		FROM clubs c
 		LEFT JOIN club_members cm ON cm.club_id = c.id
+		WHERE c.type = 'public'
+		   OR EXISTS (SELECT 1 FROM club_members cm2 WHERE cm2.club_id = c.id AND cm2.user_id = $1::uuid)
 		GROUP BY c.id
 		ORDER BY c.created_at DESC
 	`, viewerID)
@@ -151,7 +186,8 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		var club model.Club
 		if err := rows.Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+			&club.JoinCode, &club.Type, &club.JoinPolicy,
+			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount, &club.IsAdmin, &club.IsMember,
 		); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
@@ -164,8 +200,9 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code, c.created_by,
-			c.created_at::text, c.updated_at::text,
+			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.type::text, c.join_policy::text,
+			c.created_by, c.created_at::text, c.updated_at::text,
 			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
 			cm.is_admin
 		FROM clubs c
@@ -182,7 +219,8 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 		var club model.Club
 		if err := rows.Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+			&club.JoinCode, &club.Type, &club.JoinPolicy,
+			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount, &club.IsAdmin,
 		); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
@@ -312,24 +350,31 @@ func (r *ClubRepository) UpdateMemberRole(ctx context.Context, clubID, userID st
 	return nil
 }
 
-// AdminUpdate applies a partial update (name/description) to any club.
+// AdminUpdate applies a partial update to any club.
 func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
 	var club model.Club
 	err := r.db.QueryRow(ctx, `
 		UPDATE clubs
 		SET name        = COALESCE($2, name),
 		    description = COALESCE($3, description),
+		    type        = COALESCE($4::club_type, type),
+		    join_policy = COALESCE($5::club_join_policy, join_policy),
 		    updated_at  = NOW()
 		WHERE id = $1
-		RETURNING id, name, description, image_url, join_code, created_by,
-		          created_at::text, updated_at::text,
+		RETURNING id, name, description, image_url, join_code,
+		          type::text, join_policy::text,
+		          created_by, created_at::text, updated_at::text,
 		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
-	`, id, in.Name, in.Description).Scan(
+	`, id, in.Name, in.Description, in.Type, in.JoinPolicy).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.JoinCode, &club.Type, &club.JoinPolicy,
+		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 		&club.MemberCount,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 		return nil, fmt.Errorf("admin update club: %w", err)
 	}
 	return &club, nil
@@ -345,4 +390,110 @@ func (r *ClubRepository) AdminDelete(ctx context.Context, id string) error {
 		return fmt.Errorf("club not found")
 	}
 	return nil
+}
+
+// CreateJoinRequest inserts a pending join request for an approval-based club.
+// Returns ErrConflict if the same user already has a pending/approved request.
+func (r *ClubRepository) CreateJoinRequest(ctx context.Context, clubID, userID string) (*model.ClubJoinRequest, error) {
+	var req model.ClubJoinRequest
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO club_join_requests (club_id, user_id)
+		VALUES ($1, $2)
+		RETURNING id, club_id, user_id, status, decided_by, decided_at, created_at
+	`, clubID, userID).Scan(
+		&req.ID, &req.ClubID, &req.UserID, &req.Status,
+		&req.DecidedBy, &req.DecidedAt, &req.CreatedAt,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("create club join request: %w", err)
+	}
+	return &req, nil
+}
+
+// ListJoinRequests returns join requests for a club, optionally filtered by status.
+func (r *ClubRepository) ListJoinRequests(ctx context.Context, clubID, status string) ([]*model.ClubJoinRequest, error) {
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if status != "" {
+		rows, err = r.db.Query(ctx, `
+			SELECT jr.id, jr.club_id, jr.user_id, u.display_name, u.avatar_url,
+			       jr.status, jr.decided_by, jr.decided_at, jr.created_at
+			FROM club_join_requests jr
+			JOIN users u ON u.id = jr.user_id
+			WHERE jr.club_id = $1 AND jr.status = $2
+			ORDER BY jr.created_at DESC
+		`, clubID, status)
+	} else {
+		rows, err = r.db.Query(ctx, `
+			SELECT jr.id, jr.club_id, jr.user_id, u.display_name, u.avatar_url,
+			       jr.status, jr.decided_by, jr.decided_at, jr.created_at
+			FROM club_join_requests jr
+			JOIN users u ON u.id = jr.user_id
+			WHERE jr.club_id = $1
+			ORDER BY jr.created_at DESC
+		`, clubID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list club join requests: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.ClubJoinRequest
+	for rows.Next() {
+		var req model.ClubJoinRequest
+		if err := rows.Scan(
+			&req.ID, &req.ClubID, &req.UserID, &req.DisplayName, &req.AvatarURL,
+			&req.Status, &req.DecidedBy, &req.DecidedAt, &req.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan club join request: %w", err)
+		}
+		items = append(items, &req)
+	}
+	return items, rows.Err()
+}
+
+// DecideJoinRequest updates a pending join request to approved or rejected.
+// On approval the caller is responsible for inserting the club_members row.
+func (r *ClubRepository) DecideJoinRequest(ctx context.Context, requestID, adminID, decision string) (*model.ClubJoinRequest, error) {
+	var req model.ClubJoinRequest
+	err := r.db.QueryRow(ctx, `
+		UPDATE club_join_requests
+		SET status = $2, decided_by = $3::uuid, decided_at = NOW()
+		WHERE id = $1 AND status = 'pending'
+		RETURNING id, club_id, user_id, status, decided_by, decided_at, created_at
+	`, requestID, decision, adminID).Scan(
+		&req.ID, &req.ClubID, &req.UserID, &req.Status,
+		&req.DecidedBy, &req.DecidedAt, &req.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("decide club join request: %w", err)
+	}
+	return &req, nil
+}
+
+// GetJoinRequestStatus returns the user's latest request status for a club, or
+// empty string if none exists.
+func (r *ClubRepository) GetJoinRequestStatus(ctx context.Context, clubID, userID string) (string, error) {
+	var status string
+	err := r.db.QueryRow(ctx, `
+		SELECT status FROM club_join_requests
+		WHERE club_id = $1 AND user_id = $2
+		ORDER BY created_at DESC LIMIT 1
+	`, clubID, userID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get join request status: %w", err)
+	}
+	return status, nil
 }

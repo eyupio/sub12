@@ -11,12 +11,17 @@ import (
 )
 
 var (
-	ErrClubNotFound      = errors.New("club not found")
-	ErrClubAlreadyMember = errors.New("already a member of this club")
-	ErrClubNotAdmin      = errors.New("admin access required")
-	ErrClubNotMember     = errors.New("not a member of this club")
-	ErrClubLastAdmin     = errors.New("cannot leave as the last admin; promote another member first")
-	ErrInvalidClub       = errors.New("club name is required")
+	ErrClubNotFound       = errors.New("club not found")
+	ErrClubAlreadyMember  = errors.New("already a member of this club")
+	ErrClubNotAdmin       = errors.New("admin access required")
+	ErrClubNotMember      = errors.New("not a member of this club")
+	ErrClubLastAdmin      = errors.New("cannot leave as the last admin; promote another member first")
+	ErrInvalidClub        = errors.New("club name is required")
+	ErrClubInvalidType    = errors.New("type must be 'public' or 'private'")
+	ErrClubInvalidPolicy  = errors.New("join_policy must be 'open', 'invite_code', or 'approval'")
+	ErrClubPendingRequest = errors.New("join request already pending")
+	ErrClubInvalidCode    = errors.New("invalid join code")
+	ErrClubInvalidDecide  = errors.New("decision must be 'approved' or 'rejected'")
 )
 
 type ClubService struct {
@@ -32,13 +37,27 @@ func (s *ClubService) Create(ctx context.Context, userID string, input *model.Cr
 	if input.Name == "" {
 		return nil, ErrInvalidClub
 	}
+	if input.Type != nil && *input.Type != "public" && *input.Type != "private" {
+		return nil, ErrClubInvalidType
+	}
+	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
+		return nil, ErrClubInvalidPolicy
+	}
 	return s.repo.Create(ctx, userID, input)
 }
 
+// GetByID returns a club when the viewer is allowed to see it. Private clubs
+// are visible only to members; non-members receive ErrClubNotFound.
 func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*model.Club, error) {
 	club, err := s.repo.GetByID(ctx, clubID, viewerID)
 	if err != nil {
-		return nil, fmt.Errorf("club not found: %w", ErrClubNotFound)
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrClubNotFound
+		}
+		return nil, err
+	}
+	if club.Type == "private" && !club.IsMember {
+		return nil, ErrClubNotFound
 	}
 	return club, nil
 }
@@ -51,40 +70,154 @@ func (s *ClubService) ListByUser(ctx context.Context, userID string) ([]*model.C
 	return s.repo.ListByUser(ctx, userID)
 }
 
-func (s *ClubService) Join(ctx context.Context, clubID, userID string) error {
+// Join routes through the club's join policy.
+// Returns (joined, pending, err).
+func (s *ClubService) Join(ctx context.Context, clubID, userID, joinCode string) (bool, bool, error) {
+	club, err := s.repo.GetByID(ctx, clubID, "")
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return false, false, ErrClubNotFound
+		}
+		return false, false, err
+	}
+
 	member, err := s.repo.IsMember(ctx, clubID, userID)
 	if err != nil {
-		return err
+		return false, false, err
 	}
 	if member {
-		return ErrClubAlreadyMember
+		return false, false, ErrClubAlreadyMember
 	}
+
+	switch club.JoinPolicy {
+	case "open":
+		// fall through to instant join below
+	case "invite_code":
+		if joinCode == "" || joinCode != club.JoinCode {
+			return false, false, ErrClubInvalidCode
+		}
+	case "approval":
+		_, err := s.repo.CreateJoinRequest(ctx, clubID, userID)
+		if errors.Is(err, repository.ErrConflict) {
+			return false, false, ErrClubPendingRequest
+		}
+		if err != nil {
+			return false, false, err
+		}
+		return false, true, nil
+	default:
+		return false, false, fmt.Errorf("unknown club join policy")
+	}
+
 	if err := s.repo.Join(ctx, clubID, userID); err != nil {
-		return err
+		return false, false, err
 	}
 	if s.activity != nil {
-		club, _ := s.repo.GetByID(ctx, clubID, "")
-		clubName := ""
-		if club != nil {
-			clubName = club.Name
-		}
 		cid, tt := clubID, "club"
-		meta := model.JoinedClubMeta{ClubName: clubName}
+		meta := model.JoinedClubMeta{ClubName: club.Name}
 		go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 	}
-	return nil
+	return true, false, nil
 }
 
 func (s *ClubService) IsMember(ctx context.Context, clubID, userID string) (bool, error) {
 	return s.repo.IsMember(ctx, clubID, userID)
 }
 
-func (s *ClubService) ListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
+// ListMembers returns club members. Private clubs are gated to members only.
+func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID string) ([]*model.ClubMember, error) {
+	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {
+		return nil, err
+	}
 	return s.repo.ListMembers(ctx, clubID)
 }
 
-func (s *ClubService) GetStandings(ctx context.Context, clubID string) ([]*model.ClubStanding, error) {
+// GetStandings returns club standings. Private clubs are gated to members only.
+func (s *ClubService) GetStandings(ctx context.Context, clubID, viewerID string) ([]*model.ClubStanding, error) {
+	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {
+		return nil, err
+	}
 	return s.repo.GetStandings(ctx, clubID)
+}
+
+// ensureClubAccess enforces that viewers can see content from private clubs
+// only when they are members.
+func (s *ClubService) ensureClubAccess(ctx context.Context, clubID, viewerID string) error {
+	club, err := s.repo.GetByID(ctx, clubID, "")
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrClubNotFound
+		}
+		return err
+	}
+	if club.Type != "private" {
+		return nil
+	}
+	if viewerID == "" {
+		return ErrClubNotFound
+	}
+	isMember, err := s.repo.IsMember(ctx, clubID, viewerID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return ErrClubNotFound
+	}
+	return nil
+}
+
+// ListJoinRequests returns pending (or filtered) join requests for admins.
+func (s *ClubService) ListJoinRequests(ctx context.Context, clubID, requesterID, status string) ([]*model.ClubJoinRequest, error) {
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !isAdmin {
+		return nil, ErrClubNotAdmin
+	}
+	return s.repo.ListJoinRequests(ctx, clubID, status)
+}
+
+// DecideJoinRequest accepts or rejects a join request; on approval the
+// requester is added as a member.
+func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, adminID, decision string) error {
+	if decision != "approved" && decision != "rejected" {
+		return ErrClubInvalidDecide
+	}
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, adminID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrClubNotAdmin
+	}
+	req, err := s.repo.DecideJoinRequest(ctx, requestID, adminID, decision)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrClubNotFound
+		}
+		return err
+	}
+	if req.ClubID != clubID {
+		// Request belongs to a different club; treat as not-found.
+		return ErrClubNotFound
+	}
+	if decision == "approved" {
+		if err := s.repo.Join(ctx, clubID, req.UserID); err != nil {
+			return err
+		}
+		if s.activity != nil {
+			club, _ := s.repo.GetByID(ctx, clubID, "")
+			clubName := ""
+			if club != nil {
+				clubName = club.Name
+			}
+			cid, tt := clubID, "club"
+			meta := model.JoinedClubMeta{ClubName: clubName}
+			go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
+		}
+	}
+	return nil
 }
 
 func (s *ClubService) RemoveMember(ctx context.Context, clubID, requesterID, targetID string) error {
@@ -201,4 +334,9 @@ func (s *ClubService) AdminDeleteClub(ctx context.Context, id string) error {
 // AdminRemoveMember removes a club member without checking club admin status.
 func (s *ClubService) AdminRemoveMember(ctx context.Context, clubID, userID string) error {
 	return s.repo.RemoveMember(ctx, clubID, userID)
+}
+
+// AdminListMembers lists members for a club without the private-club viewer gate.
+func (s *ClubService) AdminListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
+	return s.repo.ListMembers(ctx, clubID)
 }

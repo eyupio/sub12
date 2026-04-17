@@ -22,10 +22,17 @@ type AchievementService struct {
 	achievements AchievementRepo
 	cards        CardCountRepo
 	activity     *ActivityService // nil disables feed ingestion
+	social       *SocialService   // nil disables privacy enforcement
 }
 
 func NewAchievementService(achievements *repository.AchievementRepository, cards CardCountRepo, activity *ActivityService) *AchievementService {
 	return &AchievementService{achievements: achievements, cards: cards, activity: activity}
+}
+
+// SetSocial wires the social service used for profile-visibility enforcement.
+// Called after construction to avoid a circular dependency with SocialService.
+func (s *AchievementService) SetSocial(social *SocialService) {
+	s.social = social
 }
 
 // EvaluateForScoreCard checks all achievement rules against the newly created card
@@ -92,7 +99,13 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 }
 
 // ListForUser returns all achievements earned by a user.
-func (s *AchievementService) ListForUser(ctx context.Context, userID string) ([]*model.UserAchievement, error) {
+// viewerID may be empty; it is used to enforce profile visibility and block checks.
+func (s *AchievementService) ListForUser(ctx context.Context, userID, viewerID string) ([]*model.UserAchievement, error) {
+	if s.social != nil && viewerID != userID {
+		if err := s.social.CanViewProfile(ctx, userID, viewerID); err != nil {
+			return nil, err
+		}
+	}
 	items, err := s.achievements.ListForUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list achievements: %w", err)

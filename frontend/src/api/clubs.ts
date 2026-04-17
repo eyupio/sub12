@@ -7,6 +7,8 @@ export interface Club {
   description?: string
   image_url?: string
   join_code: string
+  type: string
+  join_policy: string
   created_by: string
   created_at: string
   updated_at: string
@@ -34,9 +36,30 @@ export interface ClubStanding {
   card_count: number
 }
 
+export interface ClubJoinRequest {
+  id: string
+  club_id: string
+  user_id: string
+  display_name?: string
+  avatar_url?: string
+  status: string
+  decided_by?: string
+  decided_at?: string
+  created_at: string
+}
+
 export interface CreateClubInput {
   name: string
   description?: string
+  type?: 'public' | 'private'
+  join_policy?: 'open' | 'invite_code' | 'approval'
+}
+
+export interface UpdateClubInput {
+  name?: string
+  description?: string
+  type?: 'public' | 'private'
+  join_policy?: 'open' | 'invite_code' | 'approval'
 }
 
 export const clubsApi = {
@@ -49,8 +72,8 @@ export const clubsApi = {
   create: (input: CreateClubInput) =>
     api.post<Club>('/clubs', input),
 
-  join: (id: string) =>
-    api.post<{ joined: boolean }>(`/clubs/${id}/join`, {}),
+  join: (id: string, joinCode?: string) =>
+    api.post<{ joined?: boolean; pending?: boolean }>(`/clubs/${id}/join`, { join_code: joinCode ?? '' }),
 
   listMembers: (id: string) =>
     api.get<{ items: ClubMember[] }>(`/clubs/${id}/members`),
@@ -73,7 +96,7 @@ export const clubsApi = {
   createLeague: (clubId: string, payload: Omit<CreateLeaguePayload, 'club_id'>) =>
     api.post<League>(`/clubs/${clubId}/leagues`, payload),
 
-  update: (id: string, input: { name?: string; description?: string }) =>
+  update: (id: string, input: UpdateClubInput) =>
     api.patch<Club>(`/clubs/${id}`, input),
 
   leave: (id: string) =>
@@ -81,4 +104,10 @@ export const clubsApi = {
 
   updateMember: (clubId: string, userId: string, input: { is_admin: boolean }) =>
     api.patch<{ updated: boolean }>(`/clubs/${clubId}/members/${userId}`, input),
+
+  listJoinRequests: (clubId: string, status = 'pending') =>
+    api.get<{ items: ClubJoinRequest[] }>(`/clubs/${clubId}/join-requests?status=${encodeURIComponent(status)}`),
+
+  decideJoinRequest: (clubId: string, requestId: string, decision: 'approved' | 'rejected') =>
+    api.post<{ decided: boolean }>(`/clubs/${clubId}/join-requests/${requestId}/decide`, { decision }),
 }

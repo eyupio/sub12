@@ -48,9 +48,14 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 // List handles GET /api/v1/score-cards/{id}/comments
 func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 
-	comments, err := h.svc.ListByTarget(r.Context(), targetID, "score_card")
+	comments, err := h.svc.ListByTarget(r.Context(), targetID, "score_card", viewerID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list comments")
 		return
 	}
@@ -197,9 +202,14 @@ func (h *CommentHandler) CreateOnPost(w http.ResponseWriter, r *http.Request) {
 // ListOnPost handles GET /api/v1/posts/{id}/comments
 func (h *CommentHandler) ListOnPost(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 
-	comments, err := h.svc.ListByTarget(r.Context(), targetID, "post")
+	comments, err := h.svc.ListByTarget(r.Context(), targetID, "post", viewerID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list comments")
 		return
 	}

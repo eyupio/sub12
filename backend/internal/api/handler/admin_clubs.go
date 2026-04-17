@@ -85,7 +85,7 @@ func (h *AdminClubsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/admin/clubs/{id}/members
 func (h *AdminClubsHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	members, err := h.svc.ListMembers(r.Context(), id)
+	members, err := h.svc.AdminListMembers(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list members")
 		return

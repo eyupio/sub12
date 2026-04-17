@@ -76,18 +76,63 @@ func (s *PostService) GetByID(ctx context.Context, id string, viewerID *string) 
 	return s.posts.GetByID(ctx, id, viewerID)
 }
 
-// ListByLeague returns posts for a league.
-func (s *PostService) ListByLeague(ctx context.Context, leagueID string, limit, offset int) ([]*model.Post, error) {
+// ListByLeague returns posts for a league. Private leagues are only visible
+// to members; non-members receive repository.ErrNotFound.
+func (s *PostService) ListByLeague(ctx context.Context, leagueID, viewerID string, limit, offset int) ([]*model.Post, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
+	}
+	league, err := s.leagues.GetByID(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	if league.ClubID != nil && *league.ClubID != "" {
+		if viewerID == "" {
+			return nil, repository.ErrNotFound
+		}
+		isClubMember, err := s.clubs.IsMember(ctx, *league.ClubID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if !isClubMember {
+			return nil, repository.ErrNotFound
+		}
+	} else if league.Type == "private" {
+		if viewerID == "" {
+			return nil, repository.ErrNotFound
+		}
+		isMember, err := s.leagues.IsMember(ctx, leagueID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if !isMember {
+			return nil, repository.ErrNotFound
+		}
 	}
 	return s.posts.ListByLeague(ctx, leagueID, limit, offset)
 }
 
-// ListByClub returns posts for a club.
-func (s *PostService) ListByClub(ctx context.Context, clubID string, limit, offset int) ([]*model.Post, error) {
+// ListByClub returns posts for a club. Private clubs are only visible to
+// members; non-members receive repository.ErrNotFound.
+func (s *PostService) ListByClub(ctx context.Context, clubID, viewerID string, limit, offset int) ([]*model.Post, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
+	}
+	club, err := s.clubs.GetByID(ctx, clubID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if club.Type == "private" {
+		if viewerID == "" {
+			return nil, repository.ErrNotFound
+		}
+		isMember, err := s.clubs.IsMember(ctx, clubID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if !isMember {
+			return nil, repository.ErrNotFound
+		}
 	}
 	return s.posts.ListByClub(ctx, clubID, limit, offset)
 }

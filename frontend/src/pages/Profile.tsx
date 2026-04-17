@@ -191,6 +191,7 @@ function PrivacySettings() {
     mutationFn: (input: UpdateProfileInput) => usersApi.updateMe(input),
     onSuccess: (updated) => {
       updateUser({
+        profile_visibility: updated.profile_visibility,
         default_score_visibility: updated.default_score_visibility,
         feed_opt_out: updated.feed_opt_out,
       })
@@ -207,11 +208,43 @@ function PrivacySettings() {
     { value: 'private', label: 'Private', icon: Lock },
   ]
 
+  const isPrivateProfile = user?.profile_visibility === 'private'
+
   return (
     <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
       <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Feed</h2>
 
       <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-secondary">Private profile</p>
+            <p className="text-[10px] text-muted mt-0.5">
+              Only your followers can see your bio, location, club, and achievements.
+              New followers will need to request access.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              mutation.mutate({
+                profile_visibility: isPrivateProfile ? 'public' : 'private',
+              })
+            }
+            disabled={mutation.isPending}
+            className={`relative w-10 h-5 rounded-full transition-colors ${
+              isPrivateProfile
+                ? 'bg-[var(--brass)]'
+                : 'bg-[var(--surface-hover)]'
+            }`}
+            aria-label="Toggle private profile"
+          >
+            <span
+              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                isPrivateProfile ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+
         <div>
           <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
             Default Score Visibility

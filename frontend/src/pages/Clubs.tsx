@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, ChevronRight, X } from 'lucide-react'
+import { Plus, Users, ChevronRight, X, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [type, setType] = useState<'public' | 'private'>('public')
+  const [joinPolicy, setJoinPolicy] = useState<'open' | 'invite_code' | 'approval'>('open')
   const [error, setError] = useState('')
 
   const mutation = useMutation({
@@ -23,7 +25,12 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setError('')
     if (!name.trim()) { setError('Name is required'); return }
-    mutation.mutate({ name: name.trim(), description: description.trim() || undefined })
+    mutation.mutate({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      type,
+      join_policy: joinPolicy,
+    })
   }
 
   return (
@@ -61,6 +68,56 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          <div className="space-y-1.5">
+            <label className="text-[11px] tracking-widest uppercase text-muted">Visibility</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['public', 'private'] as const).map(value => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setType(value)}
+                  className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                    type === value
+                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      : 'border-subtle text-muted hover:text-secondary'
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted">
+              {type === 'private'
+                ? 'Private clubs are hidden from the directory and only visible to members.'
+                : 'Public clubs are listed in the directory and visible to everyone.'}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] tracking-widest uppercase text-muted">Join Policy</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['open', 'invite_code', 'approval'] as const).map(value => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setJoinPolicy(value)}
+                  className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors ${
+                    joinPolicy === value
+                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      : 'border-subtle text-muted hover:text-secondary'
+                  }`}
+                >
+                  {value === 'invite_code' ? 'Code' : value}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted">
+              {joinPolicy === 'open' && 'Anyone can join instantly.'}
+              {joinPolicy === 'invite_code' && 'Members need the join code to join.'}
+              {joinPolicy === 'approval' && 'Admins review and approve each join request.'}
+            </p>
+          </div>
+
           {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
 
           <button
@@ -95,7 +152,12 @@ function ClubCard({ club }: { club: Club }) {
         </div>
       )}
       <div className="space-y-0.5 min-w-0 flex-1">
-        <p className="text-sm text-secondary font-medium truncate">{club.name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm text-secondary font-medium truncate">{club.name}</p>
+          {club.type === 'private' && (
+            <Lock size={11} className="text-muted shrink-0" aria-label="Private club" />
+          )}
+        </div>
         {club.description && (
           <p className="text-[11px] text-muted truncate">{club.description}</p>
         )}
