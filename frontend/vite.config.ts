@@ -37,7 +37,7 @@ export default defineConfig({
           /^\/sitemap\.xml$/,
           /^\/siteindex\.xml$/,
           /^\/robots\.txt$/,
-          /^\/[a-f0-9]+\.txt$/,
+          /^\/[a-fA-F0-9]+\.txt$/,
         ],
         // Cache API responses for offline score entry
         runtimeCaching: [
