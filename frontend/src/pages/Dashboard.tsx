@@ -677,31 +677,37 @@ export default function Dashboard() {
             body="Track each platform independently. See which rifle is producing your best scores and how many cards you've logged per setup."
             cta={{ label: 'Add rifle', to: '/gear' }}
           />
-        ) : enrichedRifleStats.length === 0 ? (
+        ) : (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {rifles.slice(0, 6).map((rifle: Rifle) => (
-                <RifleProfileCard key={rifle.id} rifle={rifle} mode="dashboard" />
-              ))}
+              {enrichedRifleStats.map(rs => {
+                const rifle = rifleMap.get(rs.rifle_id)
+                return rifle ? (
+                  <RifleProfileCard
+                    key={rs.rifle_id}
+                    rifle={rifle}
+                    stats={rs}
+                    mode="dashboard"
+                    globalBest={globalBest}
+                  />
+                ) : null
+              })}
+              {rifles
+                .filter(r => !enrichedRifleStats.some(rs => rs.rifle_id === r.id))
+                .map((rifle: Rifle) => (
+                  <RifleProfileCard
+                    key={rifle.id}
+                    rifle={rifle}
+                    mode="dashboard"
+                    globalBest={globalBest}
+                  />
+                ))}
             </div>
-            <p className="text-[11px] text-muted tracking-wide">
-              Log a card with a rifle selected to start building per-platform stats.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {enrichedRifleStats.map(rs => {
-              const rifle = rifleMap.get(rs.rifle_id)
-              return rifle ? (
-                <RifleProfileCard
-                  key={rs.rifle_id}
-                  rifle={rifle}
-                  stats={rs}
-                  mode="dashboard"
-                  globalBest={globalBest}
-                />
-              ) : null
-            })}
+            {enrichedRifleStats.length === 0 && (
+              <p className="text-[11px] text-muted tracking-wide">
+                Log a card with a rifle selected to start building per-platform stats.
+              </p>
+            )}
           </div>
         )}
       </div>
