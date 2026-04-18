@@ -174,7 +174,7 @@ func main() {
 		notificationSvc, emailSenderSvc, cfg.CORSOrigin, log.Logger,
 	)
 	supportTicketRepo := repository.NewSupportTicketRepository(pool)
-	supportTicketSvc := service.NewSupportTicketService(supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc)
+	supportTicketSvc := service.NewSupportTicketService(supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, emailSenderSvc, cfg.CORSOrigin)
 
 	// Wire notifications into services that fan out events. Done after
 	// construction to avoid cycles.

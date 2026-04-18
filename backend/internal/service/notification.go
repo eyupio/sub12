@@ -107,6 +107,11 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	if !prefs.EmailEnabledForType(ev.Type) {
 		return
 	}
+	if isTicketNotificationType(ev.Type) {
+		// Ticket-related emails are rendered by SupportTicketService using
+		// ticket-specific templates instead of notification_generic.
+		return
+	}
 	if s.users == nil || s.emailer == nil {
 		return
 	}
@@ -129,6 +134,19 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 			s.logger.Warn().Err(err).Str("type", evType).Msg("send notification email failed")
 		}
 	}(recipient.Email, recipient.DisplayName, subject, body, ev.Type)
+}
+
+func isTicketNotificationType(t string) bool {
+	switch t {
+	case model.NotificationTypeTicketCreated,
+		model.NotificationTypeTicketReplied,
+		model.NotificationTypeTicketAssigned,
+		model.NotificationTypeTicketStatusChanged,
+		model.NotificationTypeFeatureRequestStateChanged:
+		return true
+	default:
+		return false
+	}
 }
 
 // notificationEmailContent maps a NotifEvent to a user-facing email subject
