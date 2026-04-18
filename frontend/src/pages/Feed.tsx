@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import {
   Target, Trophy, MessageSquare, Star, RefreshCw,
   Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck, Send,
-  Lightbulb, CheckCircle,
+  Lightbulb, CheckCircle, AlertTriangle,
 } from 'lucide-react'
 import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
@@ -17,6 +17,7 @@ import { StarBadge } from '../components/StarBadge'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { LikeButton } from '../components/LikeButton'
+import { ReportDialog } from '../components/ReportDialog'
 
 const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
   { key: 'public', label: 'Public', icon: Globe },
@@ -32,6 +33,7 @@ function ActivityCard({ item }: { item: ActivityItem }) {
   const queryClient = useQueryClient()
   const [showComments, setShowComments] = useState(false)
   const [newComment, setNewComment] = useState('')
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
 
   const isScoreCard = item.target_type === 'score_card' && !!item.target_id
   const canInteract = !!currentUser && isScoreCard
@@ -355,9 +357,21 @@ function ActivityCard({ item }: { item: ActivityItem }) {
                     : c.display_name.slice(0, 2).toUpperCase()
                   }
                 </div>
-                <div className="flex-1 rounded bg-surface-hover px-2 py-1">
-                  <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
-                  <span className="text-xs text-secondary">{c.body}</span>
+                <div className="flex-1 rounded bg-surface-hover px-2 py-1 flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
+                    <span className="text-xs text-secondary">{c.body}</span>
+                  </div>
+                  {currentUser && currentUser.id !== c.user_id && (
+                    <button
+                      onClick={() => setReportTargetId(c.id)}
+                      className="p-0.5 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
+                      aria-label="Report comment"
+                      title="Report inappropriate comment"
+                    >
+                      <AlertTriangle size={11} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -391,6 +405,13 @@ function ActivityCard({ item }: { item: ActivityItem }) {
           </div>
         )}
       </div>
+
+      <ReportDialog
+        open={reportTargetId !== null}
+        targetType="comment"
+        targetId={reportTargetId ?? ''}
+        onClose={() => setReportTargetId(null)}
+      />
     </div>
   )
 }
