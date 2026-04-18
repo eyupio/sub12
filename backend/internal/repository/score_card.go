@@ -310,6 +310,49 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 	return &card, nil
 }
 
+// Delete removes a score card owned by the given user. FK cascades take care
+// of score_confirmations and score_card_actions; polymorphic rows in likes,
+// comments, and activities are cleaned up explicitly in the same transaction.
+func (r *ScoreCardRepository) Delete(ctx context.Context, id, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx,
+		`DELETE FROM score_cards WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete score card: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM likes WHERE target_id = $1 AND target_type = 'score_card'`, id,
+	); err != nil {
+		return fmt.Errorf("delete score card likes: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM comments WHERE target_id = $1 AND target_type = 'score_card'`, id,
+	); err != nil {
+		return fmt.Errorf("delete score card comments: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM activities WHERE target_id = $1 AND target_type = 'score_card'`, id,
+	); err != nil {
+		return fmt.Errorf("delete score card activities: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
+}
+
 // UpdateImageURL sets the card_image_url for a score card.
 func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL string) error {
 	_, err := r.db.Exec(ctx,

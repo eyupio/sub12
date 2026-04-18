@@ -85,6 +85,9 @@ export const scoreCardApi = {
   update: (id: string, payload: CreateScoreCardPayload) =>
     api.patch<ScoreCard>(`/score-cards/${id}`, payload),
 
+  remove: (id: string) =>
+    api.del<void>(`/score-cards/${id}`),
+
   uploadImage: (cardId: string, file: File) => {
     const formData = new FormData()
     formData.append('image', file)

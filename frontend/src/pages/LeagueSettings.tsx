@@ -262,6 +262,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
   const [requireVerification, setRequireVerification] = useState(config.require_score_verification)
   const [confirmations, setConfirmations] = useState(config.required_confirmations)
   const [requireImage, setRequireImage] = useState(config.require_image_upload)
+  const [lockAfterVerification, setLockAfterVerification] = useState(config.lock_edits_after_verification)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -286,6 +287,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
       require_score_verification: requireVerification,
       required_confirmations: confirmations,
       require_image_upload: requireImage,
+      lock_edits_after_verification: lockAfterVerification,
     })
   }
 
@@ -362,6 +364,19 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
           className="accent-[var(--brass)] w-4 h-4"
         />
         <span className="text-sm text-secondary">Require image upload with submissions</span>
+      </label>
+
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={lockAfterVerification}
+          onChange={e => setLockAfterVerification(e.target.checked)}
+          className="accent-[var(--brass)] w-4 h-4 mt-0.5"
+        />
+        <span className="text-sm text-secondary">
+          Lock score edits after verification
+          <span className="block text-xs text-muted">Once a score reaches verified status, owners can no longer edit or delete it.</span>
+        </span>
       </label>
 
       {error && <p className="text-red-400 text-xs">{error}</p>}

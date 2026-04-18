@@ -11,8 +11,9 @@ import (
 
 
 var (
-	ErrInvalidCard       = errors.New("invalid score card")
-	ErrMaxSubmissions    = errors.New("maximum submissions per round reached")
+	ErrInvalidCard    = errors.New("invalid score card")
+	ErrMaxSubmissions = errors.New("maximum submissions per round reached")
+	ErrEditsLocked    = errors.New("score card is locked by league policy")
 )
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
@@ -23,6 +24,7 @@ type ScoreCardRepo interface {
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
+	Delete(ctx context.Context, id, userID string) error
 	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
 }
 
@@ -196,7 +198,51 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 		}
 	}
 
+	if err := s.ensureNotLocked(ctx, id, userID); err != nil {
+		return nil, err
+	}
+
 	return s.cards.Update(ctx, id, userID, input, totalScore, xCount)
+}
+
+// Delete removes a score card, enforcing the league's lock-edits-after-verification
+// policy when the card is a verified league submission.
+func (s *ScoreCardService) Delete(ctx context.Context, id, userID string) error {
+	if err := s.ensureNotLocked(ctx, id, userID); err != nil {
+		return err
+	}
+	return s.cards.Delete(ctx, id, userID)
+}
+
+// ensureNotLocked returns ErrEditsLocked when the card is verified and its
+// league has lock_edits_after_verification enabled. It silently allows the
+// action for personal cards, unverified league cards, or when the league
+// config is unavailable.
+func (s *ScoreCardService) ensureNotLocked(ctx context.Context, id, userID string) error {
+	card, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
+		return err
+	}
+	if card.LeagueRoundID == nil || *card.LeagueRoundID == "" {
+		return nil
+	}
+	if card.Verification != "verified" {
+		return nil
+	}
+	if s.leagueRepo == nil {
+		return nil
+	}
+	cfg, err := s.leagueRepo.GetConfigByRoundID(ctx, *card.LeagueRoundID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("check lock policy: %w", err)
+	}
+	if cfg != nil && cfg.LockEditsAfterVerification {
+		return ErrEditsLocked
+	}
+	return nil
 }
 
 // UpdateImageURL updates the card_image_url for a score card owned by the given user.
