@@ -327,7 +327,7 @@ func (s *ModerationService) fanout(report *model.Report) {
 	go func(rep model.Report) {
 		ctx := context.Background()
 		recipients := map[string]struct{}{}
-		communityName := "Sub-12"
+		communityName := "sub12.io"
 		reportPath := fmt.Sprintf("/admin/reports#%s", rep.ID)
 
 		if rep.LeagueID != nil {

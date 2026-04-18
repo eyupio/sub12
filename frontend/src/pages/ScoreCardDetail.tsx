@@ -15,8 +15,6 @@ import { FlagDialog } from '../components/FlagDialog'
 import { LikeButton } from '../components/LikeButton'
 import { ShareDialog } from '../components/ShareDialog'
 import { ReportDialog } from '../components/ReportDialog'
-import { FlagDialog } from '../components/FlagDialog'
-import { clubsApi } from '../api/clubs'
 import { Flag } from 'lucide-react'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 

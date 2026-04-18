@@ -141,15 +141,15 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 	}
 	switch ev.Type {
 	case model.NotificationTypeFollowRequest:
-		return "New follow request on Sub-12", actor + " wants to follow you on Sub-12."
+		return "New follow request on sub12.io", actor + " wants to follow you on sub12.io."
 	case model.NotificationTypeFollowAccepted:
-		return "New follower on Sub-12", actor + " is now following you on Sub-12."
+		return "New follower on sub12.io", actor + " is now following you on sub12.io."
 	case model.NotificationTypeCommentOnCard:
 		return "New comment on your score card", actor + " commented on your score card."
 	case model.NotificationTypeReplyToMyComment:
 		return "New reply to your comment", actor + " replied to your comment."
 	case model.NotificationTypeLikeOnMyContent:
-		return "Someone liked your content", actor + " liked your content on Sub-12."
+		return "Someone liked your content", actor + " liked your content on sub12.io."
 	case model.NotificationTypeScoreVerified:
 		return "Your score was verified", "A league admin verified your score card."
 	case model.NotificationTypeScoreRejected:
@@ -161,9 +161,9 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 	case model.NotificationTypeClubJoinApproved:
 		return "Club join approved", "Your request to join a club was approved."
 	case model.NotificationTypeMention:
-		return "You were mentioned on Sub-12", actor + " mentioned you on Sub-12."
+		return "You were mentioned on sub12.io", actor + " mentioned you on sub12.io."
 	}
-	return "New Sub-12 notification", "You have a new notification on Sub-12."
+	return "New sub12.io notification", "You have a new notification on sub12.io."
 }
 
 // List returns a page of notifications for the recipient.

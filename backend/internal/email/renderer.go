@@ -12,24 +12,24 @@ const layout = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#0C0C0C;font-family:'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0C0C0C;padding:32px 16px;">
   <tr><td align="center">
-    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#161616;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 45px rgba(0,0,0,0.45);">
       <tr>
-        <td style="background:#18181b;padding:24px 32px;">
-          <span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:0.05em;">Sub-12</span>
+        <td style="background:linear-gradient(135deg,#111111,#161616);padding:24px 32px;border-bottom:1px solid rgba(212,164,74,0.35);">
+          <span style="color:#D4A44A;font-size:22px;font-weight:700;letter-spacing:0.03em;">sub12.io</span>
         </td>
       </tr>
       <tr>
-        <td style="padding:32px;color:#18181b;font-size:15px;line-height:1.7;">
+        <td style="padding:32px;color:#F5F5F0;font-size:15px;line-height:1.7;">
           {{.content}}
         </td>
       </tr>
       <tr>
-        <td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
-          Sub-12 &mdash; Target Shooting Companion &nbsp;&middot;&nbsp;
-          <a href="https://sub12.io" style="color:#71717a;text-decoration:none;">sub12.io</a>
+        <td style="padding:16px 32px;border-top:1px solid rgba(255,255,255,0.08);font-size:12px;color:#888888;">
+          sub12.io &mdash; Target Shooting Companion &nbsp;&middot;&nbsp;
+          <a href="https://sub12.io" style="color:#D4A44A;text-decoration:none;">sub12.io</a>
         </td>
       </tr>
     </table>

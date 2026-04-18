@@ -445,6 +445,9 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
         </div>
       )}
 
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {saved && <p className="text-green-400 text-xs">Saved</p>}
+
       <label className="flex items-start gap-3 cursor-pointer select-none py-1">
         <input
           type="checkbox"
@@ -459,9 +462,6 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
           </span>
         </span>
       </label>
-
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-      {saved && <p className="text-green-400 text-xs">Saved</p>}
 
       <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className={btnPrimary}>
         {saveMutation.isPending ? 'Saving...' : 'Save Join Policy'}

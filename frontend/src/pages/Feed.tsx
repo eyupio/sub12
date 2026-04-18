@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Target, Trophy, MessageSquare, Star, RefreshCw,
-  Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck,
+  Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck, Send,
 } from 'lucide-react'
 import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
+import { scoreCardApi } from '../api/scoreCards'
+import { useAuthStore } from '../store/auth'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { StarBadge } from '../components/StarBadge'
+import { LikeButton } from '../components/LikeButton'
 
 const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
   { key: 'public', label: 'Public', icon: Globe },
@@ -21,6 +25,28 @@ const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
 function ActivityCard({ item }: { item: ActivityItem }) {
   const prefs = useRegionalPrefs()
   const date = formatDate(item.created_at, prefs)
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [showComments, setShowComments] = useState(false)
+  const [newComment, setNewComment] = useState('')
+
+  const isScoreCard = item.target_type === 'score_card' && !!item.target_id
+  const canInteract = !!currentUser && isScoreCard
+
+  const { data: commentsData } = useQuery({
+    queryKey: ['score-cards', item.target_id, 'comments'],
+    queryFn: () => scoreCardApi.listComments(item.target_id!),
+    enabled: showComments && isScoreCard,
+  })
+
+  const commentMutation = useMutation({
+    mutationFn: () => scoreCardApi.createComment(item.target_id!, newComment.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', item.target_id, 'comments'] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      setNewComment('')
+    },
+  })
 
   const initials = item.display_name
     .split(' ')
@@ -231,14 +257,23 @@ function ActivityCard({ item }: { item: ActivityItem }) {
     }
   }
 
+  const comments = commentsData?.items ?? []
+
   return (
     <div className="flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
-      {/* Avatar */}
-      <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-        {item.avatar_url
-          ? <img src={item.avatar_url} alt={item.display_name} className="w-full h-full object-cover" />
-          : initials
-        }
+      {/* Avatar with star badge */}
+      <div className="flex-shrink-0">
+        <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
+          {item.avatar_url
+            ? <img src={item.avatar_url} alt={item.display_name} className="w-full h-full object-cover" />
+            : initials
+          }
+        </div>
+        {item.star_level > 0 && (
+          <div className="flex justify-center mt-0.5">
+            <StarBadge level={item.star_level} size={8} />
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -247,6 +282,74 @@ function ActivityCard({ item }: { item: ActivityItem }) {
           <span className="text-[10px] tracking-widest uppercase text-muted">{date}</span>
         </div>
         {renderContent()}
+
+        {/* Social actions — only for score card activity items */}
+        {canInteract && (
+          <div className="flex items-center gap-4 mt-2 pt-2 border-t border-subtle">
+            <LikeButton
+              targetId={item.target_id!}
+              targetType="score_card"
+              initialLiked={item.is_liked}
+              initialCount={item.like_count}
+              size={14}
+            />
+            <button
+              onClick={() => setShowComments((v) => !v)}
+              aria-label={`${showComments ? 'Hide' : 'View'} comments`}
+              className="flex items-center gap-1.5 text-xs text-muted hover:text-secondary transition-colors"
+            >
+              <MessageSquare size={14} />
+              {item.comment_count > 0 && <span>{item.comment_count}</span>}
+            </button>
+          </div>
+        )}
+
+        {/* Inline comment section */}
+        {showComments && isScoreCard && (
+          <div className="mt-3 space-y-2">
+            {comments.map((c) => (
+              <div key={c.id} className="flex gap-2">
+                <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
+                  {c.avatar_url
+                    ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
+                    : c.display_name.slice(0, 2).toUpperCase()
+                  }
+                </div>
+                <div className="flex-1 rounded bg-surface-hover px-2 py-1">
+                  <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
+                  <span className="text-xs text-secondary">{c.body}</span>
+                </div>
+              </div>
+            ))}
+
+            {currentUser && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (newComment.trim()) commentMutation.mutate()
+                }}
+                className="flex gap-2 mt-2"
+              >
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment…"
+                  className="flex-1 rounded border border-subtle bg-surface px-2 py-1 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+                  maxLength={500}
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || commentMutation.isPending}
+                  aria-label="Post comment"
+                  className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                >
+                  <Send size={12} />
+                </button>
+              </form>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

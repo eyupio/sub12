@@ -25,8 +25,8 @@ ALTER TABLE notification_preferences
 INSERT INTO email_templates (key, subject_template, html_template, text_template, is_enabled)
 VALUES (
     'notification_report_filed',
-    '[Sub-12] New report in {{.community_name}}',
-    '<p>Hi {{.display_name}},</p><p>A member of {{.community_name}} has flagged {{.target_label}} for review.</p><p>Reason: <strong>{{.reason}}</strong></p><p><a href="{{.report_link}}">Open the report</a></p><p>— Sub-12 Moderation</p>',
+    '[sub12.io] New report in {{.community_name}}',
+    '<p>Hi {{.display_name}},</p><p>A member of {{.community_name}} has flagged {{.target_label}} for review.</p><p>Reason: <strong>{{.reason}}</strong></p><p><a href="{{.report_link}}">Open the report</a></p><p>— sub12.io Moderation</p>',
     'Hi {{.display_name}},
 
 A member of {{.community_name}} has flagged {{.target_label}} for review.
@@ -35,7 +35,7 @@ Reason: {{.reason}}
 
 Open the report: {{.report_link}}
 
-— Sub-12 Moderation
+— sub12.io Moderation
 ',
     FALSE
 )

@@ -135,14 +135,16 @@ func (s *UserService) GetPublicProfile(ctx context.Context, id string) (*model.P
 		return nil, err
 	}
 	return &model.PublicProfile{
-		ID:                u.ID,
-		DisplayName:       u.DisplayName,
-		Bio:               u.Bio,
-		Location:          u.Location,
-		Club:              u.Club,
-		AvatarURL:         u.AvatarURL,
-		ProfileVisibility: u.ProfileVisibility,
-		CreatedAt:         u.CreatedAt,
+		ID:                 u.ID,
+		DisplayName:        u.DisplayName,
+		Bio:                u.Bio,
+		Location:           u.Location,
+		Club:               u.Club,
+		AvatarURL:          u.AvatarURL,
+		ProfileVisibility:  u.ProfileVisibility,
+		ShowFollowerCounts: u.ShowFollowerCounts,
+		StarLevel:          u.StarLevel,
+		CreatedAt:          u.CreatedAt,
 	}, nil
 }
 
