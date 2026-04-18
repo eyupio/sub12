@@ -431,23 +431,21 @@ export default function LeagueDetail() {
         <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
       )}
 
-      {/* Invite link — shown to members when league has an invite code */}
+      {/* Join code — shown to members when league has an invite code */}
       {isMember && league?.join_code && (
-        <div className="border border-subtle rounded p-3 bg-surface">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
-            className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-            title="Copy invite link"
-            aria-label="Copy invite link"
-          >
-            {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
-            {copied ? 'Copied!' : 'Copy invite link'}
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(league.join_code!)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+          }}
+          className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          title="Copy join code"
+          aria-label="Copy join code"
+        >
+          {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
+          {copied ? 'Copied!' : `Code: ${league.join_code}`}
+        </button>
       )}
 
       {/* Submit Score — shown to members */}
