@@ -106,6 +106,10 @@ func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	league, err := h.svc.GetByID(r.Context(), leagueID, viewerID)
 	if err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
@@ -201,6 +205,10 @@ func (h *LeagueHandler) Standings(w http.ResponseWriter, r *http.Request) {
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
@@ -240,6 +248,10 @@ func (h *LeagueHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
@@ -457,6 +469,10 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
@@ -499,6 +515,10 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return

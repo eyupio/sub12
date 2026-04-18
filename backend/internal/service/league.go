@@ -26,6 +26,7 @@ var (
 	ErrReasonRequired   = errors.New("reason is required for rejection")
 	ErrNotClubMember    = errors.New("club membership required")
 	ErrLeagueLastAdmin  = errors.New("cannot leave as the last admin; promote another member first")
+	ErrUnauthenticated  = errors.New("authentication required")
 )
 
 type LeagueService struct {
@@ -157,7 +158,7 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 	// Club-scoped leagues require club membership
 	if league.ClubID != nil && *league.ClubID != "" {
 		if viewerID == "" {
-			return nil, ErrLeagueNotFound
+			return nil, ErrUnauthenticated
 		}
 		isClubMember, err := s.clubs.IsMember(ctx, *league.ClubID, viewerID)
 		if err != nil {
@@ -180,7 +181,7 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 		}
 	}
 	if league.Type == "private" && viewerID == "" {
-		return nil, ErrLeagueNotFound
+		return nil, ErrUnauthenticated
 	}
 	return league, nil
 }
