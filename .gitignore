@@ -18,6 +18,7 @@ backend/tmp/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/**/*.tsbuildinfo
 frontend/coverage/
 frontend/ios/
 frontend/android/

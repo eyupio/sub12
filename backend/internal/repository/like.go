@@ -141,3 +141,33 @@ func (r *LikeRepository) UnlikeTx(ctx context.Context, userID, targetID, targetT
 	}
 	return removed, nil
 }
+
+// CountGivenByUser returns the total number of likes a user has given.
+func (r *LikeRepository) CountGivenByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM likes WHERE user_id = $1
+	`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count likes given: %w", err)
+	}
+	return count, nil
+}
+
+// CountReceivedByOwner returns the total number of likes received on all content
+// owned by userID (score_cards and posts).
+func (r *LikeRepository) CountReceivedByOwner(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(like_count), 0)
+		FROM (
+			SELECT like_count FROM score_cards WHERE user_id = $1
+			UNION ALL
+			SELECT like_count FROM posts WHERE user_id = $1
+		) t
+	`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count likes received: %w", err)
+	}
+	return count, nil
+}

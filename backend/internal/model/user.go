@@ -16,6 +16,7 @@ type User struct {
 	DefaultScoreVisibility string    `json:"default_score_visibility"`
 	FeedOptOut             bool      `json:"feed_opt_out"`
 	ShowFollowerCounts     bool      `json:"show_follower_counts"`
+	StarLevel              int       `json:"star_level"`
 	DefaultDistanceUnit    string    `json:"default_distance_unit"`
 	DefaultMeasurementUnit string    `json:"default_measurement_unit"`
 	DateFormat             string    `json:"date_format"`
@@ -35,6 +36,7 @@ type PublicProfile struct {
 	AvatarURL          *string   `json:"avatar_url,omitempty"`
 	ProfileVisibility  string    `json:"profile_visibility"`
 	ShowFollowerCounts bool      `json:"show_follower_counts"`
+	StarLevel          int       `json:"star_level"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
