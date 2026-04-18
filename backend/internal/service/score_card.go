@@ -36,15 +36,28 @@ type LeagueConfigRepo interface {
 	GetByID(ctx context.Context, id string) (*model.League, error)
 }
 
+// UserProfileReader returns the profile-visibility flag needed when deciding
+// whether to expose a public item to anonymous viewers.
+type UserProfileReader interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
+}
+
 type ScoreCardService struct {
 	cards       ScoreCardRepo
 	leagueRepo  LeagueConfigRepo    // optional; nil skips league rule enforcement
+	users       UserProfileReader   // optional; nil skips owner-privacy checks
 	activity    *ActivityService    // optional; nil disables feed ingestion
 	achievement *AchievementService // optional; nil disables achievement evaluation
 }
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
 	return &ScoreCardService{cards: cards, leagueRepo: leagueRepo, activity: activity, achievement: achievement}
+}
+
+// SetUserReader wires a user lookup so GetForViewer can enforce the owner's
+// profile_visibility when deciding whether to expose a public card.
+func (s *ScoreCardService) SetUserReader(users UserProfileReader) {
+	s.users = users
 }
 
 // Create validates the input and persists a new score card.
@@ -154,6 +167,33 @@ func (s *ScoreCardService) GetPublicByID(ctx context.Context, id string) (*model
 			return nil, repository.ErrNotFound
 		}
 		return nil, err
+	}
+	return card, nil
+}
+
+// GetForViewer returns a score card when either the viewer owns it or the
+// card is public and the owner's profile is not private. Anonymous callers
+// pass viewerID="". Returns repository.ErrNotFound when the viewer isn't
+// allowed to see the card.
+func (s *ScoreCardService) GetForViewer(ctx context.Context, id, viewerID string) (*model.ScoreCard, error) {
+	card, err := s.cards.GetPublicByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if viewerID != "" && viewerID == card.UserID {
+		return card, nil
+	}
+	if card.Visibility != "public" {
+		return nil, repository.ErrNotFound
+	}
+	if s.users != nil {
+		owner, err := s.users.GetByID(ctx, card.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if owner.ProfileVisibility == "private" {
+			return nil, repository.ErrNotFound
+		}
 	}
 	return card, nil
 }

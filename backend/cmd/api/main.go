@@ -106,6 +106,7 @@ func main() {
 	)
 
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
+	scoreCardSvc.SetUserReader(userRepo)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -119,6 +120,7 @@ func main() {
 	leagueSvc := service.NewLeagueService(leagueRepo, clubRepo, activitySvc)
 
 	pelletTestSvc := service.NewPelletTestService(pelletTestRepo, activitySvc, achievementSvc)
+	pelletTestSvc.SetUserReader(userRepo)
 
 	smtpRepo := repository.NewSMTPRepository(pool)
 	smtpSvc := service.NewSMTPService(smtpRepo)

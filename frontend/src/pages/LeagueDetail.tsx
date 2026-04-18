@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearch, useNavigate, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock, LogOut } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock, LogOut, Share2 } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ShareDialog } from '../components/ShareDialog'
 import { toast } from '../store/toast'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { HelpIcon } from '../components/Tooltip'
@@ -110,6 +111,7 @@ export default function LeagueDetail() {
   const [copied, setCopied] = useState(false)
   const [scoreFilter, setScoreFilter] = useState<string>('')
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [showShare, setShowShare] = useState(false)
 
   useEffect(() => {
     setJoinCode(initialJoinCode)
@@ -327,6 +329,14 @@ export default function LeagueDetail() {
             </>
           )}
         </div>
+        <button
+          onClick={() => setShowShare(true)}
+          className="text-muted hover:text-[var(--brass)] transition-colors"
+          title="Share league"
+          aria-label="Share league"
+        >
+          <Share2 size={18} />
+        </button>
         {canLeave && (
           <button
             onClick={() => setConfirmLeave(true)}
@@ -348,6 +358,15 @@ export default function LeagueDetail() {
           </Link>
         )}
       </div>
+
+      {showShare && league && leagueId && (
+        <ShareDialog
+          targetId={leagueId}
+          targetType="league"
+          targetLabel={league.name}
+          onClose={() => setShowShare(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={confirmLeave}

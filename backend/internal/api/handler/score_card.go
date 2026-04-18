@@ -80,7 +80,8 @@ func (h *ScoreCardHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/score-cards/{id}
 func (h *ScoreCardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	card, err := h.svc.GetPublicByID(r.Context(), id)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	card, err := h.svc.GetForViewer(r.Context(), id, viewerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "score card not found")

@@ -34,6 +34,10 @@ services:
       REDIS_URL: redis://redis:6379
       SEED_ADMIN: ${SEED_ADMIN:-false}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Lets the share-meta handler fetch the SPA index.html from the
+      # frontend container at startup so per-page Open Graph tags can be
+      # injected for shared links.
+      FRONTEND_ORIGIN: http://frontend:8080
     # No host port — the frontend nginx proxies /api/ to this container
     # internally. Expose 8080 here only if you need direct curl access.
     depends_on:
