@@ -148,6 +148,22 @@ func (r *SupportTicketRepository) GetByID(ctx context.Context, id string) (*mode
 	return t, nil
 }
 
+func (r *SupportTicketRepository) GetParticipant(ctx context.Context, ticketID, userID string) (*model.SupportTicketParticipant, error) {
+	p := &model.SupportTicketParticipant{}
+	err := r.db.QueryRow(ctx, `
+		SELECT ticket_id, user_id, role, last_read_at, created_at
+		FROM support_ticket_participants
+		WHERE ticket_id = $1 AND user_id = $2
+	`, ticketID, userID).Scan(&p.TicketID, &p.UserID, &p.Role, &p.LastReadAt, &p.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get support ticket participant: %w", err)
+	}
+	return p, nil
+}
+
 func (r *SupportTicketRepository) Update(ctx context.Context, id, actorID string, in *model.UpdateSupportTicketInput) (*model.SupportTicket, error) {
 	if in == nil {
 		return r.GetByID(ctx, id)
@@ -236,6 +252,84 @@ func (r *SupportTicketRepository) AddMessage(ctx context.Context, ticketID, auth
 	`, ticketID, authorID)
 	_, _ = r.db.Exec(ctx, `UPDATE support_tickets SET updated_at = NOW() WHERE id = $1`, ticketID)
 	return m, nil
+}
+
+func (r *SupportTicketRepository) ListMessages(ctx context.Context, ticketID string, includeInternal bool) ([]*model.SupportTicketMessage, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, ticket_id, author_id, body, internal_note, created_at
+		FROM support_ticket_messages
+		WHERE ticket_id = $1
+		  AND ($2 OR internal_note = FALSE)
+		ORDER BY created_at ASC
+	`, ticketID, includeInternal)
+	if err != nil {
+		return nil, fmt.Errorf("list support ticket messages: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*model.SupportTicketMessage{}
+	for rows.Next() {
+		item := &model.SupportTicketMessage{}
+		if err := rows.Scan(&item.ID, &item.TicketID, &item.AuthorID, &item.Body, &item.InternalNote, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan support ticket message: %w", err)
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *SupportTicketRepository) ListEvents(ctx context.Context, ticketID string) ([]*model.SupportTicketEvent, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, ticket_id, actor_id, event_type, from_value, to_value, metadata, created_at
+		FROM support_ticket_events
+		WHERE ticket_id = $1
+		ORDER BY created_at ASC
+	`, ticketID)
+	if err != nil {
+		return nil, fmt.Errorf("list support ticket events: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*model.SupportTicketEvent{}
+	for rows.Next() {
+		item := &model.SupportTicketEvent{}
+		if err := rows.Scan(&item.ID, &item.TicketID, &item.ActorID, &item.EventType, &item.FromValue, &item.ToValue, &item.Metadata, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan support ticket event: %w", err)
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *SupportTicketRepository) ListParticipants(ctx context.Context, ticketID string) ([]*model.SupportTicketParticipant, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT p.ticket_id, p.user_id, p.role, p.last_read_at, p.created_at,
+		       COALESCE((
+		           SELECT count(1)
+		           FROM support_ticket_messages m
+		           WHERE m.ticket_id = p.ticket_id
+		             AND m.internal_note = FALSE
+		             AND m.author_id <> p.user_id
+		             AND (p.last_read_at IS NULL OR m.created_at > p.last_read_at)
+		       ), 0) AS unread_count
+		FROM support_ticket_participants p
+		WHERE p.ticket_id = $1
+		ORDER BY p.created_at ASC
+	`, ticketID)
+	if err != nil {
+		return nil, fmt.Errorf("list support ticket participants: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*model.SupportTicketParticipant{}
+	for rows.Next() {
+		item := &model.SupportTicketParticipant{}
+		if err := rows.Scan(&item.TicketID, &item.UserID, &item.Role, &item.LastReadAt, &item.CreatedAt, &item.UnreadCount); err != nil {
+			return nil, fmt.Errorf("scan support ticket participant: %w", err)
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (r *SupportTicketRepository) MarkRead(ctx context.Context, ticketID, userID string, at *time.Time) error {

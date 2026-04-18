@@ -61,7 +61,7 @@ func (h *SupportTicketHandler) ListMine(w http.ResponseWriter, r *http.Request) 
 		ScopeID:       r.URL.Query().Get("scope_id"),
 		Limit:         limit,
 	}
-	items, err := h.svc.List(r.Context(), in)
+	items, err := h.svc.List(r.Context(), userID, in)
 	if err != nil {
 		h.writeValidationError(w, err)
 		return
@@ -70,11 +70,20 @@ func (h *SupportTicketHandler) ListMine(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *SupportTicketHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	id := chi.URLParam(r, "id")
-	item, err := h.svc.GetByID(r.Context(), id)
+	item, err := h.svc.GetByID(r.Context(), id, userID, false)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to load support ticket")
@@ -121,6 +130,10 @@ func (h *SupportTicketHandler) AddMessage(w http.ResponseWriter, r *http.Request
 	}
 	item, err := h.svc.AddMessage(r.Context(), id, userID, &in)
 	if err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
 		h.writeValidationError(w, err)
 		return
 	}
@@ -140,10 +153,134 @@ func (h *SupportTicketHandler) MarkRead(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := h.svc.MarkRead(r.Context(), id, userID, &in); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to mark support ticket read")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *SupportTicketHandler) AdminList(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	limit := 50
+	if s := r.URL.Query().Get("limit"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	in := &model.ListSupportTicketsInput{
+		Status:    r.URL.Query().Get("status"),
+		Category:  r.URL.Query().Get("category"),
+		ScopeType: r.URL.Query().Get("scope_type"),
+		ScopeID:   r.URL.Query().Get("scope_id"),
+		Limit:     limit,
+	}
+	if assigneeID := r.URL.Query().Get("assignee_id"); assigneeID != "" {
+		in.AssigneeID = &assigneeID
+	}
+	items, err := h.svc.List(r.Context(), userID, in)
+	if err != nil {
+		h.writeValidationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (h *SupportTicketHandler) AdminGet(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	item, err := h.svc.GetByID(r.Context(), id, userID, true)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to load support ticket")
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *SupportTicketHandler) AdminTransitionStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	var in struct {
+		Status string `json:"status"`
+	}
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	item, err := h.svc.Update(r.Context(), id, userID, &model.UpdateSupportTicketInput{Status: &in.Status})
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		h.writeValidationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *SupportTicketHandler) AdminAssign(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	var in struct {
+		AssigneeID   *string `json:"assignee_id"`
+		InternalNote string  `json:"internal_note"`
+	}
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	item, err := h.svc.Update(r.Context(), id, userID, &model.UpdateSupportTicketInput{AssigneeID: in.AssigneeID})
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		h.writeValidationError(w, err)
+		return
+	}
+	if note := in.InternalNote; note != "" {
+		_, _ = h.svc.AddMessage(r.Context(), id, userID, &model.AddSupportTicketMessageInput{
+			Body:         note,
+			InternalNote: true,
+		})
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (h *SupportTicketHandler) writeValidationError(w http.ResponseWriter, err error) {

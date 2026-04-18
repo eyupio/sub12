@@ -190,12 +190,23 @@ func NewRouter(
 			reportH := handler.NewReport(moderation)
 			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
 			supportH := handler.NewSupportTicket(supportTickets)
+			r.With(rl.Limit("report")).Post("/tickets", supportH.Create)
+			r.Get("/tickets", supportH.ListMine)
+			r.Get("/tickets/{id}", supportH.Get)
+			r.Post("/tickets/{id}/messages", supportH.AddMessage)
+			r.Post("/tickets/{id}/read", supportH.MarkRead)
+			// backwards-compatible legacy routes
 			r.With(rl.Limit("report")).Post("/support/tickets", supportH.Create)
 			r.Get("/support/tickets", supportH.ListMine)
 			r.Get("/support/tickets/{id}", supportH.Get)
-			r.Patch("/support/tickets/{id}", supportH.Update)
 			r.Post("/support/tickets/{id}/messages", supportH.AddMessage)
 			r.Post("/support/tickets/{id}/read", supportH.MarkRead)
+
+			// Support queue for platform and scoped league/club admins.
+			r.Get("/admin/tickets", supportH.AdminList)
+			r.Get("/admin/tickets/{id}", supportH.AdminGet)
+			r.Post("/admin/tickets/{id}/status", supportH.AdminTransitionStatus)
+			r.Post("/admin/tickets/{id}/assign", supportH.AdminAssign)
 
 			// League/club scoped moderation (admins of that community).
 			r.Get("/leagues/{id}/reports", reportH.ListForLeague)
