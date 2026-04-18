@@ -351,9 +351,6 @@ func (s *PelletTestService) GetComparison(ctx context.Context, userID, rifleID, 
 // ── Timeline ────────────────────────────────────────────────────────────────────
 
 func (s *PelletTestService) GetGroupTimeline(ctx context.Context, userID, rifleID string) ([]*model.GroupTimelinePoint, error) {
-	if rifleID == "" {
-		return nil, fmt.Errorf("%w: rifle_id is required", ErrInvalidPelletTest)
-	}
 	return s.repo.GetGroupTimeline(ctx, userID, rifleID)
 }
 

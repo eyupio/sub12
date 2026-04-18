@@ -309,6 +309,9 @@ type PelletComparisonSide struct {
 
 type GroupTimelinePoint struct {
 	TestDate     string   `json:"test_date"`
+	RifleID      string   `json:"rifle_id"`
+	RifleMake    string   `json:"rifle_make"`
+	RifleModel   string   `json:"rifle_model"`
 	PelletID     string   `json:"pellet_id"`
 	PelletBrand  string   `json:"pellet_brand"`
 	PelletModel  string   `json:"pellet_model"`

@@ -191,11 +191,9 @@ export default function PelletTesting() {
       </div>
 
       {/* Group Size Timeline */}
-      {rifles.length > 0 && (
-        <div className="p-4 rounded border border-subtle bg-surface">
-          <GroupSizeTimeline rifleId={rifles[0].id} />
-        </div>
-      )}
+      <div className="p-4 rounded border border-subtle bg-surface">
+        <GroupSizeTimeline />
+      </div>
     </div>
   )
 }

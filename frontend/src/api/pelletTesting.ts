@@ -466,6 +466,9 @@ export interface PelletComparisonData {
 
 export interface GroupTimelinePoint {
   test_date: string
+  rifle_id: string
+  rifle_make: string
+  rifle_model: string
   pellet_id: string
   pellet_name?: string
   pellet_brand: string
@@ -544,8 +547,10 @@ export const pelletTestApi = {
   // Comparison & Timeline
   compare: (rifleId: string, pelletA: string, pelletB: string) =>
     api.get<PelletComparisonData>(`/pellet-tests/compare?rifle_id=${rifleId}&pellet_a=${pelletA}&pellet_b=${pelletB}`),
-  timeline: (rifleId: string) =>
-    api.get<{ items: GroupTimelinePoint[] }>(`/pellet-tests/timeline?rifle_id=${rifleId}`),
+  timeline: (rifleId?: string) =>
+    api.get<{ items: GroupTimelinePoint[] }>(
+      rifleId ? `/pellet-tests/timeline?rifle_id=${rifleId}` : `/pellet-tests/timeline`,
+    ),
 
   // Detections (PT-3)
   createDetections: (sessionId: string, imageId: string, measurementId: string, payload: CreateDetectionsBatchPayload) =>

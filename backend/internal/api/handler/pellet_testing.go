@@ -487,7 +487,7 @@ func (h *PelletTestHandler) Compare(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, data)
 }
 
-// GET /api/v1/pellet-tests/timeline?rifle_id=X
+// GET /api/v1/pellet-tests/timeline?rifle_id=X (rifle_id optional)
 func (h *PelletTestHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -495,10 +495,6 @@ func (h *PelletTestHandler) Timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rifleID := r.URL.Query().Get("rifle_id")
-	if rifleID == "" {
-		writeError(w, http.StatusBadRequest, "rifle_id query parameter is required")
-		return
-	}
 
 	points, err := h.svc.GetGroupTimeline(r.Context(), userID, rifleID)
 	if err != nil {

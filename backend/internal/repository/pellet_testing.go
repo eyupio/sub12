@@ -778,9 +778,12 @@ func (r *PelletTestRepository) GetComparisonSide(ctx context.Context, userID, ri
 // ── Timeline ────────────────────────────────────────────────────────────────────
 
 func (r *PelletTestRepository) GetGroupTimeline(ctx context.Context, userID, rifleID string) ([]*model.GroupTimelinePoint, error) {
-	rows, err := r.db.Query(ctx, `
+	query := `
 		SELECT
 			s.test_date::text,
+			s.rifle_id,
+			ri.make,
+			ri.model,
 			s.pellet_id,
 			p.brand,
 			p.model,
@@ -789,10 +792,17 @@ func (r *PelletTestRepository) GetGroupTimeline(ctx context.Context, userID, rif
 			s.distance_m
 		FROM pellet_test_groups g
 		JOIN pellet_test_sessions s ON s.id = g.session_id
+		JOIN rifles ri ON ri.id = s.rifle_id
 		JOIN pellets p ON p.id = s.pellet_id
-		WHERE s.user_id = $1 AND s.rifle_id = $2
-		ORDER BY s.test_date, g.group_number
-	`, userID, rifleID)
+		WHERE s.user_id = $1`
+	args := []any{userID}
+	if rifleID != "" {
+		query += ` AND s.rifle_id = $2`
+		args = append(args, rifleID)
+	}
+	query += ` ORDER BY s.test_date, g.group_number`
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get group timeline: %w", err)
 	}
@@ -802,7 +812,9 @@ func (r *PelletTestRepository) GetGroupTimeline(ctx context.Context, userID, rif
 	for rows.Next() {
 		var pt model.GroupTimelinePoint
 		if err := rows.Scan(
-			&pt.TestDate, &pt.PelletID, &pt.PelletBrand, &pt.PelletModel,
+			&pt.TestDate,
+			&pt.RifleID, &pt.RifleMake, &pt.RifleModel,
+			&pt.PelletID, &pt.PelletBrand, &pt.PelletModel,
 			&pt.GroupSizeMM, &pt.GroupSizeMOA, &pt.DistanceM,
 		); err != nil {
 			return nil, fmt.Errorf("scan timeline point: %w", err)
