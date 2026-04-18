@@ -70,6 +70,8 @@ type Comment struct {
 	LikeCount   int       `json:"like_count"`
 	ReplyCount  int       `json:"reply_count"`
 	IsLiked     bool      `json:"is_liked"`
+	IsFlagged   bool      `json:"is_flagged,omitempty"`
+	FlagReason  *string   `json:"flag_reason,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

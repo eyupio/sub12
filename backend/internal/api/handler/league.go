@@ -519,6 +519,36 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": members})
 }
 
+// DELETE /api/v1/leagues/{id}/members/me
+func (h *LeagueHandler) Leave(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	if err := h.svc.LeaveLeague(r.Context(), leagueID, userID); err != nil {
+		if errors.Is(err, service.ErrNotMember) {
+			writeError(w, http.StatusNotFound, "not a member of this league")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueLastAdmin) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to leave league")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // DELETE /api/v1/leagues/{id}/members/{userId}
 func (h *LeagueHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

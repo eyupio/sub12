@@ -218,6 +218,71 @@ func (h *CommentHandler) ListOnPost(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": comments})
 }
 
+// Flag handles POST /api/v1/comments/{id}/flag. League/club admins (or global
+// admins) mark the comment as needing amendment.
+func (h *CommentHandler) Flag(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
+	commentID := chi.URLParam(r, "id")
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.FlagComment(r.Context(), userID, role, commentID, body.Reason); err != nil {
+		if errors.Is(err, service.ErrCommentFlagReasonEmpty) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrCommentForbidden) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "comment not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to flag comment")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"flagged": true})
+}
+
+// Unflag handles POST /api/v1/comments/{id}/unflag.
+func (h *CommentHandler) Unflag(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
+	commentID := chi.URLParam(r, "id")
+
+	if err := h.svc.UnflagComment(r.Context(), userID, role, commentID); err != nil {
+		if errors.Is(err, service.ErrCommentForbidden) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "comment not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to unflag comment")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"flagged": false})
+}
+
 func (h *CommentHandler) handleCreateError(w http.ResponseWriter, err error) {
 	if errors.Is(err, service.ErrCommentEmpty) || errors.Is(err, service.ErrCommentTooLong) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearch, Link } from '@tanstack/react-router'
+import { useParams, useSearch, useNavigate, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock, LogOut } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { toast } from '../store/toast'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -95,6 +97,7 @@ export default function LeagueDetail() {
   const { leagueId, inviteCode } = parseLeagueRouteId(rawId)
   const initialJoinCode = normalizeInviteCode(search?.code) || inviteCode
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const currentUser = useAuthStore(s => s.user)
   const [joinError, setJoinError] = useState('')
   const [joinSuccess, setJoinSuccess] = useState(false)
@@ -102,6 +105,7 @@ export default function LeagueDetail() {
   const [joinCode, setJoinCode] = useState(initialJoinCode)
   const [copied, setCopied] = useState(false)
   const [scoreFilter, setScoreFilter] = useState<string>('')
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   useEffect(() => {
     setJoinCode(initialJoinCode)
@@ -190,6 +194,32 @@ export default function LeagueDetail() {
       }
     },
   })
+
+  const adminCount = members?.items.filter(m => m.is_admin).length ?? 0
+
+  const leaveMutation = useMutation({
+    mutationFn: () => leagueApi.leave(leagueId!),
+    onSuccess: () => {
+      setConfirmLeave(false)
+      toast('Left league', 'success')
+      queryClient.invalidateQueries({ queryKey: ['leagues'] })
+      queryClient.invalidateQueries({ queryKey: ['users', 'me', 'leagues'] })
+      if (leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      }
+      navigate({ to: '/leagues' })
+    },
+    onError: (err: Error) => {
+      setConfirmLeave(false)
+      if (err instanceof ApiError && err.status === 409) {
+        toast('You are the last admin — promote another member before leaving.', 'error')
+      } else {
+        toast('Failed to leave league', 'error')
+      }
+    },
+  })
+
+  const canLeave = isMember && (!isAdmin || adminCount > 1)
 
   const joinPolicy = config?.join_policy ?? 'open'
   const scoringRule = config?.scoring_rule ?? 'highest'
@@ -285,6 +315,16 @@ export default function LeagueDetail() {
             </>
           )}
         </div>
+        {canLeave && (
+          <button
+            onClick={() => setConfirmLeave(true)}
+            className="text-muted hover:text-[var(--error-text)] transition-colors"
+            title="Leave league"
+            aria-label="Leave league"
+          >
+            <LogOut size={18} />
+          </button>
+        )}
         {isAdmin && (
             <Link
               to="/leagues/$id/settings"
@@ -296,6 +336,19 @@ export default function LeagueDetail() {
           </Link>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Leave league?"
+        message={
+          isAdmin
+            ? 'You will lose admin access and will need to rejoin (and be re-promoted) to return.'
+            : 'You will need to rejoin to submit scores or see members-only posts.'
+        }
+        confirmLabel="Leave"
+        onConfirm={() => leaveMutation.mutate()}
+        onCancel={() => setConfirmLeave(false)}
+      />
 
       {/* Join action */}
       {!isMember && !joinSuccess && !joinPending && (
