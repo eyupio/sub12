@@ -63,6 +63,8 @@ func NewRouter(
 	// Public sitemap.xml (no auth)
 	sitemapH := handler.NewSitemap(sitemap)
 	r.Get("/sitemap.xml", sitemapH.ServeXML)
+	// Legacy typo compatibility for old links/tools.
+	r.Get("/siteindex.xml", sitemapH.ServeXML)
 
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {

@@ -6,8 +6,6 @@ import { adminSitemapApi, SitemapSubmission } from '../api/adminSitemap'
 const PAGE_SIZE = 20
 
 const engines = [
-  { id: 'google', label: 'Google' },
-  { id: 'bing', label: 'Bing' },
   { id: 'indexnow', label: 'IndexNow' },
 ] as const
 
@@ -39,7 +37,7 @@ function StatusBadge({ code }: { code?: number }) {
 
 export default function AdminSitemap() {
   const queryClient = useQueryClient()
-  const [selected, setSelected] = useState<string[]>(['google', 'bing'])
+  const [selected, setSelected] = useState<string[]>(['indexnow'])
   const [offset, setOffset] = useState(0)
 
   const statsQuery = useQuery({
@@ -111,6 +109,9 @@ export default function AdminSitemap() {
       {/* Ping controls */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Submit Sitemap to Search Engines</h2>
+        <p className="text-xs text-muted">
+          IndexNow requires a configured key. Set <code>INDEXNOW_KEY</code> (and optionally <code>INDEXNOW_KEY_LOCATION</code>) on the API server before submitting.
+        </p>
         <div className="flex flex-wrap gap-3">
           {engines.map((e) => (
             <label key={e.id} className="flex items-center gap-2 cursor-pointer select-none">

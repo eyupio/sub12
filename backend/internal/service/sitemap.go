@@ -1,11 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -17,18 +20,22 @@ import (
 
 // SitemapService generates a dynamic sitemap.xml and pings search engines.
 type SitemapService struct {
-	repo    *repository.SitemapRepository
-	siteURL string
-	log     zerolog.Logger
-	client  *http.Client
+	repo                *repository.SitemapRepository
+	siteURL             string
+	indexNowKey         string
+	indexNowKeyLocation string
+	log                 zerolog.Logger
+	client              *http.Client
 }
 
-func NewSitemapService(repo *repository.SitemapRepository, siteURL string, log zerolog.Logger) *SitemapService {
+func NewSitemapService(repo *repository.SitemapRepository, siteURL, indexNowKey, indexNowKeyLocation string, log zerolog.Logger) *SitemapService {
 	return &SitemapService{
-		repo:    repo,
-		siteURL: strings.TrimRight(siteURL, "/"),
-		log:     log,
-		client:  &http.Client{Timeout: 15 * time.Second},
+		repo:                repo,
+		siteURL:             strings.TrimRight(siteURL, "/"),
+		indexNowKey:         strings.TrimSpace(indexNowKey),
+		indexNowKeyLocation: strings.TrimSpace(indexNowKeyLocation),
+		log:                 log,
+		client:              &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -149,14 +156,76 @@ func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engine
 	for _, engine := range engines {
 		engine = strings.ToLower(strings.TrimSpace(engine))
 
-		var pingURL string
+		var (
+			pingURL string
+			req     *http.Request
+		)
 		switch engine {
 		case "google":
-			pingURL = fmt.Sprintf("https://www.google.com/ping?sitemap=%s", sitemapURL)
+			msg := "google no longer supports sitemap ping endpoint; submit sitemap in Search Console"
+			s.log.Warn().Str("engine", engine).Msg(msg)
+			sub, insertErr := s.repo.InsertSubmission(ctx, engine, "", adminID, nil, nil, &msg)
+			if insertErr != nil {
+				s.log.Error().Err(insertErr).Str("engine", engine).Msg("failed to record sitemap submission")
+				continue
+			}
+			results = append(results, sub)
+			continue
 		case "bing":
-			pingURL = fmt.Sprintf("https://www.bing.com/ping?sitemap=%s", sitemapURL)
+			msg := "bing sitemap ping endpoint is deprecated; use IndexNow instead"
+			s.log.Warn().Str("engine", engine).Msg(msg)
+			sub, insertErr := s.repo.InsertSubmission(ctx, engine, "", adminID, nil, nil, &msg)
+			if insertErr != nil {
+				s.log.Error().Err(insertErr).Str("engine", engine).Msg("failed to record sitemap submission")
+				continue
+			}
+			results = append(results, sub)
+			continue
 		case "indexnow":
-			pingURL = fmt.Sprintf("https://api.indexnow.org/indexnow?url=%s&urlList=%s", s.siteURL, sitemapURL)
+			if s.indexNowKey == "" {
+				msg := "indexnow key is not configured (set INDEXNOW_KEY)"
+				sub, insertErr := s.repo.InsertSubmission(ctx, engine, "", adminID, nil, nil, &msg)
+				if insertErr != nil {
+					s.log.Error().Err(insertErr).Str("engine", engine).Msg("failed to record sitemap submission")
+					continue
+				}
+				results = append(results, sub)
+				continue
+			}
+			location := s.indexNowKeyLocation
+			if location == "" {
+				location = fmt.Sprintf("%s/%s.txt", s.siteURL, s.indexNowKey)
+			}
+			body := map[string]any{
+				"host":        mustHost(s.siteURL),
+				"key":         s.indexNowKey,
+				"keyLocation": location,
+				"urlList":     []string{sitemapURL},
+			}
+			raw, err := json.Marshal(body)
+			if err != nil {
+				msg := fmt.Sprintf("failed to build indexnow request: %v", err)
+				sub, insertErr := s.repo.InsertSubmission(ctx, engine, "", adminID, nil, nil, &msg)
+				if insertErr != nil {
+					s.log.Error().Err(insertErr).Str("engine", engine).Msg("failed to record sitemap submission")
+					continue
+				}
+				results = append(results, sub)
+				continue
+			}
+			pingURL = "https://api.indexnow.org/indexnow"
+			req, err = http.NewRequestWithContext(ctx, http.MethodPost, pingURL, bytes.NewReader(raw))
+			if err != nil {
+				msg := fmt.Sprintf("failed to build indexnow request: %v", err)
+				sub, insertErr := s.repo.InsertSubmission(ctx, engine, pingURL, adminID, nil, nil, &msg)
+				if insertErr != nil {
+					s.log.Error().Err(insertErr).Str("engine", engine).Msg("failed to record sitemap submission")
+					continue
+				}
+				results = append(results, sub)
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json; charset=utf-8")
 		default:
 			s.log.Warn().Str("engine", engine).Msg("unknown sitemap ping engine, skipping")
 			continue
@@ -165,7 +234,21 @@ func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engine
 		var statusCode *int16
 		var respBody, errMsg *string
 
-		resp, err := s.client.Get(pingURL)
+		if req == nil {
+			var err error
+			req, err = http.NewRequestWithContext(ctx, http.MethodGet, pingURL, nil)
+			if err != nil {
+				msg := err.Error()
+				errMsg = &msg
+				sub, insertErr := s.repo.InsertSubmission(ctx, engine, pingURL, adminID, statusCode, nil, errMsg)
+				if insertErr == nil {
+					results = append(results, sub)
+				}
+				continue
+			}
+		}
+
+		resp, err := s.client.Do(req)
 		if err != nil {
 			msg := err.Error()
 			errMsg = &msg
@@ -191,6 +274,14 @@ func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engine
 	}
 
 	return results, nil
+}
+
+func mustHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	return u.Host
 }
 
 // ListSubmissions returns paginated audit history.

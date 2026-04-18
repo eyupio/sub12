@@ -34,6 +34,10 @@ type Config struct {
 
 	// Public site URL used for sitemap generation and SEO pings.
 	SiteURL string `envconfig:"SITE_URL" default:"http://localhost:5173"`
+	// IndexNow key used to authenticate URL submission requests.
+	IndexNowKey string `envconfig:"INDEXNOW_KEY" default:""`
+	// Public URL where the IndexNow key file can be fetched.
+	IndexNowKeyLocation string `envconfig:"INDEXNOW_KEY_LOCATION" default:""`
 
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
@@ -41,13 +45,13 @@ type Config struct {
 
 	// Rate limiting (per-user, per-minute). RATELIMIT_ENABLED defaults to true
 	// in production; tests can set RATELIMIT_ENABLED=false.
-	RateLimitEnabled             bool `envconfig:"RATELIMIT_ENABLED" default:"true"`
-	RateLimitFollowPerMin        int  `envconfig:"RATELIMIT_FOLLOW_PER_MIN" default:"10"`
-	RateLimitCommentPerMin       int  `envconfig:"RATELIMIT_COMMENT_PER_MIN" default:"20"`
-	RateLimitPostPerMin          int  `envconfig:"RATELIMIT_POST_PER_MIN" default:"10"`
-	RateLimitReportPerMin        int  `envconfig:"RATELIMIT_REPORT_PER_MIN" default:"5"`
-	RateLimitLikePerMin          int  `envconfig:"RATELIMIT_LIKE_PER_MIN" default:"60"`
-	RateLimitSocialTogglePerMin  int  `envconfig:"RATELIMIT_SOCIAL_TOGGLE_PER_MIN" default:"30"`
+	RateLimitEnabled            bool `envconfig:"RATELIMIT_ENABLED" default:"true"`
+	RateLimitFollowPerMin       int  `envconfig:"RATELIMIT_FOLLOW_PER_MIN" default:"10"`
+	RateLimitCommentPerMin      int  `envconfig:"RATELIMIT_COMMENT_PER_MIN" default:"20"`
+	RateLimitPostPerMin         int  `envconfig:"RATELIMIT_POST_PER_MIN" default:"10"`
+	RateLimitReportPerMin       int  `envconfig:"RATELIMIT_REPORT_PER_MIN" default:"5"`
+	RateLimitLikePerMin         int  `envconfig:"RATELIMIT_LIKE_PER_MIN" default:"60"`
+	RateLimitSocialTogglePerMin int  `envconfig:"RATELIMIT_SOCIAL_TOGGLE_PER_MIN" default:"30"`
 
 	// Moderation flag grace window. When a comment or post is flagged by an
 	// admin, the author gets this long to amend (edit) before the sweeper
