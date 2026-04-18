@@ -2,8 +2,14 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Plus, Trash2 } from 'lucide-react'
-import { adminFaqApi, type FAQ, type CreateFAQInput } from '../api/adminFaq'
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import {
+  adminFaqApi,
+  type FAQ,
+  type CreateFAQInput,
+  type ReorderFAQItem,
+  type ReorderFAQSection,
+} from '../api/adminFaq'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
@@ -18,6 +24,8 @@ const btnSecondary =
   'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const btnDanger =
   'border border-red-500/50 hover:bg-red-500/10 text-red-400 text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
+const iconBtn =
+  'p-1 rounded border border-subtle hover:border-strong text-muted hover:text-primary disabled:opacity-30 disabled:hover:border-subtle disabled:hover:text-muted transition-colors'
 
 type FormState = {
   slug: string
@@ -60,13 +68,18 @@ export default function AdminFaqs() {
   const items = useMemo<FAQ[]>(() => listQuery.data?.items ?? [], [listQuery.data])
 
   const itemsByCategory = useMemo(() => {
-    const groups = new Map<string, FAQ[]>()
+    const groups = new Map<string, { order: number; list: FAQ[] }>()
     for (const item of items) {
-      const bucket = groups.get(item.category) ?? []
-      bucket.push(item)
+      const bucket = groups.get(item.category) ?? { order: item.category_order, list: [] }
+      bucket.list.push(item)
       groups.set(item.category, bucket)
     }
-    return Array.from(groups.entries())
+    for (const bucket of groups.values()) {
+      bucket.list.sort((a, b) => a.sort_order - b.sort_order || a.question.localeCompare(b.question))
+    }
+    return Array.from(groups.entries()).sort(
+      (a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]),
+    )
   }, [items])
 
   useEffect(() => {
@@ -167,6 +180,57 @@ export default function AdminFaqs() {
     onError: (err) => setServerError(parseError(err)),
   })
 
+  const reorderItemsMutation = useMutation({
+    mutationFn: (payload: ReorderFAQItem[]) => adminFaqApi.reorderItems(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-faqs'] })
+      queryClient.invalidateQueries({ queryKey: ['faqs'] })
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const reorderSectionsMutation = useMutation({
+    mutationFn: (payload: ReorderFAQSection[]) => adminFaqApi.reorderSections(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-faqs'] })
+      queryClient.invalidateQueries({ queryKey: ['faqs'] })
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  function moveSection(category: string, direction: -1 | 1) {
+    const index = itemsByCategory.findIndex(([c]) => c === category)
+    if (index < 0) return
+    const target = index + direction
+    if (target < 0 || target >= itemsByCategory.length) return
+    const reordered = itemsByCategory.map(([c]) => c)
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(target, 0, moved)
+    const payload: ReorderFAQSection[] = reordered.map((c, i) => ({
+      category: c,
+      category_order: (i + 1) * 10,
+    }))
+    reorderSectionsMutation.mutate(payload)
+  }
+
+  function moveItem(category: string, id: string, direction: -1 | 1) {
+    const bucket = itemsByCategory.find(([c]) => c === category)
+    if (!bucket) return
+    const list = bucket[1].list
+    const index = list.findIndex((x) => x.id === id)
+    if (index < 0) return
+    const target = index + direction
+    if (target < 0 || target >= list.length) return
+    const reordered = list.slice()
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(target, 0, moved)
+    const payload: ReorderFAQItem[] = reordered.map((faq, i) => ({
+      id: faq.id,
+      sort_order: (i + 1) * 10,
+    }))
+    reorderItemsMutation.mutate(payload)
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setServerError(null)
@@ -177,6 +241,8 @@ export default function AdminFaqs() {
     }
   }
 
+  const reorderBusy = reorderItemsMutation.isPending || reorderSectionsMutation.isPending
+
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5 flex items-center gap-2">
@@ -184,30 +250,71 @@ export default function AdminFaqs() {
         <HelpIcon content={pageHelp.adminFaqs} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <aside className="bg-surface border border-subtle rounded-lg p-3 space-y-2 h-fit">
           <button className={`${btnSecondary} w-full flex items-center justify-center gap-2`} onClick={startCreate}>
             <Plus size={14} /> New FAQ
           </button>
 
-          {itemsByCategory.map(([category, list]) => (
+          {itemsByCategory.map(([category, bucket], sectionIdx) => (
             <div key={category} className="space-y-1">
-              <h2 className="text-xs uppercase tracking-widest text-muted px-2 pt-2">{category}</h2>
-              {list.map((item) => (
+              <div className="flex items-center gap-1 px-2 pt-2">
+                <h2 className="text-xs uppercase tracking-widest text-muted flex-1 truncate">{category}</h2>
                 <button
-                  key={item.id}
-                  className={`w-full text-left rounded px-2.5 py-2 text-sm border transition-colors ${
-                    selectedId === item.id
-                      ? 'border-[var(--brass)]/50 text-[var(--brass)] bg-[var(--brass)]/10'
-                      : 'border-transparent text-secondary hover:bg-surface-hover'
-                  }`}
-                  onClick={() => loadItem(item)}
+                  type="button"
+                  className={iconBtn}
+                  title="Move section up"
+                  disabled={sectionIdx === 0 || reorderBusy}
+                  onClick={() => moveSection(category, -1)}
                 >
-                  <div className="font-medium truncate">{item.question}</div>
-                  <div className="text-[11px] text-muted truncate">
-                    {item.slug} · {item.is_published ? 'Published' : 'Draft'}
-                  </div>
+                  <ArrowUp size={12} />
                 </button>
+                <button
+                  type="button"
+                  className={iconBtn}
+                  title="Move section down"
+                  disabled={sectionIdx === itemsByCategory.length - 1 || reorderBusy}
+                  onClick={() => moveSection(category, 1)}
+                >
+                  <ArrowDown size={12} />
+                </button>
+              </div>
+              {bucket.list.map((item, itemIdx) => (
+                <div key={item.id} className="flex items-stretch gap-1">
+                  <button
+                    className={`flex-1 text-left rounded px-2.5 py-2 text-sm border transition-colors ${
+                      selectedId === item.id
+                        ? 'border-[var(--brass)]/50 text-[var(--brass)] bg-[var(--brass)]/10'
+                        : 'border-transparent text-secondary hover:bg-surface-hover'
+                    }`}
+                    onClick={() => loadItem(item)}
+                  >
+                    <div className="font-medium truncate">{item.question}</div>
+                    <div className="text-[11px] text-muted truncate">
+                      {item.slug} · {item.is_published ? 'Published' : 'Draft'}
+                    </div>
+                  </button>
+                  <div className="flex flex-col gap-1 justify-center">
+                    <button
+                      type="button"
+                      className={iconBtn}
+                      title="Move up"
+                      disabled={itemIdx === 0 || reorderBusy}
+                      onClick={() => moveItem(category, item.id, -1)}
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      className={iconBtn}
+                      title="Move down"
+                      disabled={itemIdx === bucket.list.length - 1 || reorderBusy}
+                      onClick={() => moveItem(category, item.id, 1)}
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           ))}

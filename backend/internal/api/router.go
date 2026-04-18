@@ -390,6 +390,8 @@ func NewRouter(
 
 				// FAQs
 				r.Get("/admin/faqs", faqH.AdminList)
+				r.Patch("/admin/faqs/reorder-items", faqH.AdminReorderItems)
+				r.Patch("/admin/faqs/reorder-sections", faqH.AdminReorderSections)
 				r.Get("/admin/faqs/{id}", faqH.AdminGet)
 				r.Post("/admin/faqs", faqH.AdminCreate)
 				r.Patch("/admin/faqs/{id}", faqH.AdminUpdate)

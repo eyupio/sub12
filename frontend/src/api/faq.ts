@@ -7,6 +7,7 @@ export interface FAQ {
   question: string
   answer_md: string
   sort_order: number
+  category_order: number
   is_published: boolean
   updated_by?: string
   created_at: string

@@ -90,6 +90,14 @@ func (s *FAQService) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
+func (s *FAQService) ReorderItems(ctx context.Context, items []model.ReorderFAQItem, updatedBy string) error {
+	return s.repo.ReorderItems(ctx, items, updatedBy)
+}
+
+func (s *FAQService) ReorderSections(ctx context.Context, sections []model.ReorderFAQSection, updatedBy string) error {
+	return s.repo.ReorderSections(ctx, sections, updatedBy)
+}
+
 func validateFAQ(item *model.FAQ) error {
 	if !faqSlugRe.MatchString(item.Slug) {
 		return fmt.Errorf("%w: slug must be lowercase kebab-case (a-z, 0-9, hyphens)", ErrInvalidFAQ)

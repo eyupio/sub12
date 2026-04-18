@@ -8,13 +8,15 @@ import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 
 function groupByCategory(items: FAQ[]): [string, FAQ[]][] {
-  const map = new Map<string, FAQ[]>()
+  const map = new Map<string, { order: number; list: FAQ[] }>()
   for (const item of items) {
-    const bucket = map.get(item.category) ?? []
-    bucket.push(item)
+    const bucket = map.get(item.category) ?? { order: item.category_order, list: [] }
+    bucket.list.push(item)
     map.set(item.category, bucket)
   }
   return Array.from(map.entries())
+    .sort((a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]))
+    .map(([category, bucket]) => [category, bucket.list] as [string, FAQ[]])
 }
 
 export default function Help() {
@@ -42,7 +44,7 @@ export default function Help() {
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered])
   const categories = useMemo(
-    () => Array.from(new Set(items.map((i) => i.category))),
+    () => groupByCategory(items).map(([cat]) => cat),
     [items],
   )
 
