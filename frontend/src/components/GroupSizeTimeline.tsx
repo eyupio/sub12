@@ -3,19 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { pelletTestApi, type GroupTimelinePoint } from '../api/pelletTesting'
 
-interface Props {
-  rifleId: string
-}
-
 const COLORS = ['#c9a84c', '#22c55e', '#3b82f6', '#f97316', '#a855f7', '#ef4444', '#06b6d4', '#eab308']
 
-export default function GroupSizeTimeline({ rifleId }: Props) {
+export default function GroupSizeTimeline() {
   const [unit, setUnit] = useState<'mm' | 'moa'>('mm')
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useQuery({
-    queryKey: ['pellet-timeline', rifleId],
-    queryFn: () => pelletTestApi.timeline(rifleId),
-    enabled: !!rifleId,
+    queryKey: ['pellet-timeline'],
+    queryFn: () => pelletTestApi.timeline(),
   })
 
   const points = data?.items ?? []
@@ -32,13 +28,13 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
     )
   }
 
-  const pelletLabel = (point: GroupTimelinePoint) =>
-    point.pellet_name ?? `${point.pellet_brand} ${point.pellet_model}`
+  const seriesKey = (point: GroupTimelinePoint) => {
+    const pellet = point.pellet_name ?? `${point.pellet_brand} ${point.pellet_model}`
+    return `${point.rifle_make} ${point.rifle_model} — ${pellet}`
+  }
 
-  // Group by pellet name to build separate series
-  const pelletNames = [...new Set(points.map((p: GroupTimelinePoint) => pelletLabel(p)))]
+  const seriesNames = [...new Set(points.map(seriesKey))]
 
-  // Build chart data: each date point has a value per pellet
   const dateMap = new Map<string, Record<string, number>>()
   for (const p of points) {
     const key = p.test_date
@@ -46,17 +42,25 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
     const entry = dateMap.get(key)!
     const value = unit === 'moa' ? p.group_size_moa : p.group_size_mm
     if (value == null) continue
-    const pelletName = pelletLabel(p)
-    // For same date + pellet, take the best (smallest) group
-    const existing = entry[pelletName]
+    const name = seriesKey(p)
+    const existing = entry[name]
     if (existing == null || value < existing) {
-      entry[pelletName] = Number(value.toFixed(3))
+      entry[name] = Number(value.toFixed(3))
     }
   }
 
   const chartData = [...dateMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, values]) => ({ date, ...values }))
+
+  const toggleSeries = (name: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   return (
     <div className="space-y-2">
@@ -97,9 +101,18 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
               labelStyle={{ color: 'var(--color-text-muted, #888)' }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 10, paddingTop: 8 }}
+              wrapperStyle={{ fontSize: 10, paddingTop: 8, cursor: 'pointer' }}
+              onClick={(entry) => {
+                const key = typeof entry?.dataKey === 'string' ? entry.dataKey : entry?.value
+                if (typeof key === 'string') toggleSeries(key)
+              }}
+              formatter={(value: string) => (
+                <span style={{ opacity: hidden.has(value) ? 0.4 : 1, textDecoration: hidden.has(value) ? 'line-through' : 'none' }}>
+                  {value}
+                </span>
+              )}
             />
-            {pelletNames.map((name, i) => (
+            {seriesNames.map((name, i) => (
               <Line
                 key={name}
                 type="monotone"
@@ -108,6 +121,7 @@ export default function GroupSizeTimeline({ rifleId }: Props) {
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 connectNulls
+                hide={hidden.has(name)}
               />
             ))}
           </LineChart>
