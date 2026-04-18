@@ -75,8 +75,12 @@ func TestEmailEnabledForType_PerType(t *testing.T) {
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
+		if !p.EmailEnabledForType(tc.typ) {
+			t.Errorf("%s: default email pref should be true, got false", tc.typ)
+		}
+		tc.setter(p, false)
 		if p.EmailEnabledForType(tc.typ) {
-			t.Errorf("%s: default email pref should be false, got true", tc.typ)
+			t.Errorf("%s: expected false after setter(false), got true", tc.typ)
 		}
 		tc.setter(p, true)
 		if !p.EmailEnabledForType(tc.typ) {
