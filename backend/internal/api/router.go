@@ -41,6 +41,7 @@ func NewRouter(
 	notifications *service.NotificationService,
 	moderation *service.ModerationService,
 	supportTickets *service.SupportTicketService,
+	featureRequests *service.FeatureRequestService,
 	sitemap *service.SitemapService,
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
@@ -195,6 +196,7 @@ func NewRouter(
 			reportH := handler.NewReport(moderation)
 			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
 			supportH := handler.NewSupportTicket(supportTickets)
+			featureH := handler.NewFeatureRequest(featureRequests)
 			r.With(rl.Limit("report")).Post("/tickets", supportH.Create)
 			r.Get("/tickets", supportH.ListMine)
 			r.Get("/tickets/{id}", supportH.Get)
@@ -212,6 +214,12 @@ func NewRouter(
 			r.Get("/admin/tickets/{id}", supportH.AdminGet)
 			r.Post("/admin/tickets/{id}/status", supportH.AdminTransitionStatus)
 			r.Post("/admin/tickets/{id}/assign", supportH.AdminAssign)
+			r.Post("/admin/tickets/{id}/feature-request", featureH.AdminCreateFromTicket)
+			r.Patch("/admin/feature-requests/{id}", featureH.AdminUpdate)
+
+			r.Get("/feature-requests", featureH.List)
+			r.Get("/feature-requests/ranking", featureH.Rank)
+			r.Post("/feature-requests/{id}/vote", featureH.Vote)
 
 			// League/club scoped moderation (admins of that community).
 			r.Get("/leagues/{id}/reports", reportH.ListForLeague)
