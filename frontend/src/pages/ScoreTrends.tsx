@@ -26,7 +26,7 @@ export default function ScoreTrends() {
   const points = trendsData?.items ?? []
 
   const chartData = points.map(p => ({
-    date: p.period.slice(0, 7) === p.period.slice(0, 7) ? p.period : p.period,
+    date: p.period,
     avg: p.avg_score,
     best: p.best_score,
     upper: parseFloat((p.avg_score + p.std_dev).toFixed(2)),
@@ -39,7 +39,9 @@ export default function ScoreTrends() {
 
   const first = points[0]?.avg_score
   const last = points[points.length - 1]?.avg_score
-  const trendDelta = first != null && last != null ? last - first : null
+  const trendDelta = first != null && last != null && points.length >= 2
+    ? last - first
+    : null
   const avgConsistency = points.length > 0
     ? (points.reduce((s, p) => s + p.std_dev, 0) / points.length).toFixed(2)
     : null
@@ -52,9 +54,6 @@ export default function ScoreTrends() {
   const lastX = points[points.length - 1]?.avg_x_count
   const xTrendDelta = firstX != null && lastX != null && points.length >= 2
     ? lastX - firstX
-    : null
-  const xTrendPct = firstX != null && firstX > 0 && xTrendDelta != null
-    ? Math.round((xTrendDelta / firstX) * 100)
     : null
 
   return (
@@ -128,18 +127,18 @@ export default function ScoreTrends() {
 
           <div className="bg-surface border border-subtle rounded p-3 space-y-1">
             <p className="text-[10px] tracking-widest uppercase text-muted">X-Count Trend</p>
-            {xTrendPct != null ? (
+            {xTrendDelta != null ? (
               <div className="flex items-center gap-1.5">
-                {xTrendPct > 0
+                {xTrendDelta > 0
                   ? <TrendingUp size={16} className="text-[var(--success-text)]" />
-                  : xTrendPct < 0
+                  : xTrendDelta < 0
                   ? <TrendingDown size={16} className="text-[var(--error-text)]" />
                   : <Minus size={16} className="text-muted" />
                 }
                 <span className={`font-mono text-sm ${
-                  xTrendPct > 0 ? 'text-[var(--success-text)]' : xTrendPct < 0 ? 'text-[var(--error-text)]' : 'text-muted'
+                  xTrendDelta > 0 ? 'text-[var(--success-text)]' : xTrendDelta < 0 ? 'text-[var(--error-text)]' : 'text-muted'
                 }`}>
-                  {xTrendPct > 0 ? '+' : ''}{xTrendPct}%
+                  {xTrendDelta > 0 ? '+' : ''}{xTrendDelta.toFixed(1)}
                 </span>
               </div>
             ) : <span className="text-muted font-mono text-sm">—</span>}
