@@ -179,7 +179,7 @@ func main() {
 	featureRequestSvc := service.NewFeatureRequestService(featureRequestRepo, supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc)
 
 	sitemapRepo := repository.NewSitemapRepository(pool)
-	sitemapSvc := service.NewSitemapService(sitemapRepo, cfg.SiteURL, log.Logger)
+	sitemapSvc := service.NewSitemapService(sitemapRepo, cfg.SiteURL, cfg.IndexNowKey, cfg.IndexNowKeyLocation, log.Logger)
 
 	// Wire notifications into services that fan out events. Done after
 	// construction to avoid cycles.

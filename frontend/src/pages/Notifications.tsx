@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy } from 'lucide-react'
 import { notificationsApi, Notification, NotificationType } from '../api/notifications'
-import { notificationLink } from '../api/notificationLinks'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
@@ -68,6 +67,34 @@ function notificationSentence(n: Notification): string {
     case 'feature_request_state_changed':
       return `${actor} updated a feature request status`
   }
+}
+
+export function notificationLink(n: Notification): string | null {
+  if (n.type === 'report_filed') {
+    if (n.league_id) return `/leagues/${n.league_id}/reports`
+    if (n.club_id) return `/clubs/${n.club_id}/reports`
+    return '/admin/support'
+  }
+
+  if (
+    n.type === 'ticket_created' ||
+    n.type === 'ticket_replied' ||
+    n.type === 'ticket_assigned' ||
+    n.type === 'ticket_status_changed'
+  ) {
+    return '/admin/support'
+  }
+
+  if (n.type === 'feature_request_state_changed') {
+    return '/feature-requests'
+  }
+
+  if (n.target_type === 'score_card' && n.target_id) return `/scores/${n.target_id}`
+  if (n.target_type === 'post') return '/feed'
+  if (n.target_type === 'user' && n.target_id) return `/users/${n.target_id}`
+  if (n.league_id) return `/leagues/${n.league_id}`
+  if (n.club_id) return `/clubs/${n.club_id}`
+  return null
 }
 
 export default function Notifications() {
