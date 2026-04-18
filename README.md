@@ -1,4 +1,4 @@
-# sub-12
+# sub12
 
 A modern platform for the UK airgun benchrest shooting community. Track scores, manage leagues, and log pellet/rifle combinations.
 
