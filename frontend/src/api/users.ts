@@ -9,6 +9,7 @@ export interface PublicProfile {
   avatar_url?: string
   profile_visibility: string
   show_follower_counts: boolean
+  star_level: number
   created_at: string
 }
 

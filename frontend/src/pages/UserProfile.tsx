@@ -9,6 +9,7 @@ import { achievementApi } from '../api/achievements'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ReportDialog } from '../components/ReportDialog'
 import { AchievementsSection } from '../components/AchievementsSection'
+import { StarBadge } from '../components/StarBadge'
 import { useRegionalPrefs } from '../utils/date'
 
 function FollowListModal({ title, items, onClose }: { title: string; items: FollowListItem[]; onClose: () => void }) {
@@ -211,17 +212,22 @@ export default function UserProfile() {
           <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6">
             <div className="flex items-start gap-4">
               {/* Avatar */}
-              <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle flex-shrink-0">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.display_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-surface-hover flex items-center justify-center text-muted text-xl font-medium">
-                    {initials}
-                  </div>
+              <div className="flex-shrink-0 flex flex-col items-center gap-1">
+                <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle">
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-surface-hover flex items-center justify-center text-muted text-xl font-medium">
+                      {initials}
+                    </div>
+                  )}
+                </div>
+                {profile.star_level > 0 && (
+                  <StarBadge level={profile.star_level} size={10} />
                 )}
               </div>
 
