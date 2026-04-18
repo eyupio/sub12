@@ -74,6 +74,9 @@ export const clubsApi = {
   list: () =>
     api.get<{ items: Club[] }>('/clubs'),
 
+  listMine: () =>
+    api.get<{ items: Club[] }>('/users/me/clubs'),
+
   get: (id: string) =>
     api.get<Club>(`/clubs/${id}`),
 

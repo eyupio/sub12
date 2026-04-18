@@ -1,7 +1,9 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { supportTicketsApi, SupportTicketCategory, SupportTicketPriority, SupportScopeType } from '../api/supportTickets'
+import { leagueApi } from '../api/leagues'
+import { clubsApi } from '../api/clubs'
 import { ApiError } from '../api/client'
 
 const categoryOptions: SupportTicketCategory[] = ['question', 'issue', 'feature']
@@ -21,10 +23,26 @@ export default function SupportCenter() {
     queryFn: () => supportTicketsApi.listMine(50),
   })
 
+  const myLeaguesQuery = useQuery({
+    queryKey: ['leagues', 'mine'],
+    queryFn: () => leagueApi.listMine(),
+    enabled: scopeType === 'league',
+  })
+
+  const myClubsQuery = useQuery({
+    queryKey: ['clubs', 'mine'],
+    queryFn: () => clubsApi.listMine(),
+    enabled: scopeType === 'club',
+  })
+
+  useEffect(() => {
+    setScopeID('')
+  }, [scopeType])
+
   const createMutation = useMutation({
     mutationFn: () => supportTicketsApi.create({
       scope_type: scopeType,
-      scope_id: scopeID || undefined,
+      scope_id: scopeType === 'platform' ? undefined : (scopeID || undefined),
       category,
       priority,
       title: title.trim(),
@@ -54,6 +72,10 @@ export default function SupportCenter() {
       setSubmitMessage('Please add both a title and description.')
       return
     }
+    if (scopeType !== 'platform' && !scopeID) {
+      setSubmitMessage(`Please select a ${scopeType}.`)
+      return
+    }
     createMutation.mutate()
   }
 
@@ -76,10 +98,50 @@ export default function SupportCenter() {
                 <option value="club">Club</option>
               </select>
             </label>
-            <label className="text-sm">
-              Scope ID (optional for league/club)
-              <input className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2" value={scopeID} onChange={e => setScopeID(e.target.value)} placeholder="UUID for league/club scope" />
-            </label>
+            {scopeType === 'league' && (
+              <label className="text-sm">
+                League
+                <select
+                  className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+                  value={scopeID}
+                  onChange={e => setScopeID(e.target.value)}
+                  disabled={myLeaguesQuery.isLoading}
+                >
+                  <option value="">
+                    {myLeaguesQuery.isLoading
+                      ? 'Loading leagues…'
+                      : (myLeaguesQuery.data?.items ?? []).length === 0
+                        ? "You're not a member of any leagues"
+                        : 'Select a league…'}
+                  </option>
+                  {(myLeaguesQuery.data?.items ?? []).map(league => (
+                    <option key={league.id} value={league.id}>{league.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {scopeType === 'club' && (
+              <label className="text-sm">
+                Club
+                <select
+                  className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+                  value={scopeID}
+                  onChange={e => setScopeID(e.target.value)}
+                  disabled={myClubsQuery.isLoading}
+                >
+                  <option value="">
+                    {myClubsQuery.isLoading
+                      ? 'Loading clubs…'
+                      : (myClubsQuery.data?.items ?? []).length === 0
+                        ? "You're not a member of any clubs"
+                        : 'Select a club…'}
+                  </option>
+                  {(myClubsQuery.data?.items ?? []).map(club => (
+                    <option key={club.id} value={club.id}>{club.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
