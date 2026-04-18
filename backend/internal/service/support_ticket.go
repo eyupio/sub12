@@ -19,10 +19,11 @@ var (
 )
 
 type SupportTicketService struct {
-	repo    *repository.SupportTicketRepository
-	leagues *repository.LeagueRepository
-	clubs   *repository.ClubRepository
-	users   *repository.UserRepository
+	repo          *repository.SupportTicketRepository
+	leagues       *repository.LeagueRepository
+	clubs         *repository.ClubRepository
+	users         *repository.UserRepository
+	notifications *NotificationService
 }
 
 func NewSupportTicketService(
@@ -30,8 +31,9 @@ func NewSupportTicketService(
 	leagues *repository.LeagueRepository,
 	clubs *repository.ClubRepository,
 	users *repository.UserRepository,
+	notifications *NotificationService,
 ) *SupportTicketService {
-	return &SupportTicketService{repo: repo, leagues: leagues, clubs: clubs, users: users}
+	return &SupportTicketService{repo: repo, leagues: leagues, clubs: clubs, users: users, notifications: notifications}
 }
 
 func (s *SupportTicketService) Create(ctx context.Context, requesterID string, in *model.CreateSupportTicketInput) (*model.SupportTicket, error) {
@@ -53,7 +55,12 @@ func (s *SupportTicketService) Create(ctx context.Context, requesterID string, i
 	if err := s.authorizeRequesterScope(ctx, requesterID, in.ScopeType, in.ScopeID); err != nil {
 		return nil, err
 	}
-	return s.repo.Create(ctx, requesterID, in)
+	ticket, err := s.repo.Create(ctx, requesterID, in)
+	if err != nil {
+		return nil, err
+	}
+	s.notifyScopeAdmins(ctx, ticket, requesterID, model.NotificationTypeTicketCreated)
+	return ticket, nil
 }
 
 func (s *SupportTicketService) List(ctx context.Context, viewerID string, in *model.ListSupportTicketsInput) ([]*model.SupportTicket, error) {
@@ -163,6 +170,22 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 	if err != nil {
 		return nil, err
 	}
+	if s.notifications != nil && in.AssigneeID != nil && updated.AssigneeID != nil && *updated.AssigneeID != "" && *updated.AssigneeID != actorID {
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: *updated.AssigneeID,
+			ActorID:     actorID,
+			Type:        model.NotificationTypeTicketAssigned,
+			TargetID:    &updated.ID,
+			TargetType:  ptrString("support_ticket"),
+		})
+	}
+	if in.Status != nil {
+		eventType := model.NotificationTypeTicketStatusChanged
+		if updated.Category == model.SupportCategoryFeature {
+			eventType = model.NotificationTypeFeatureRequestStateChanged
+		}
+		s.notifyParticipants(ctx, updated.ID, actorID, eventType)
+	}
 	s.normalizeUnread(updated)
 	return updated, nil
 }
@@ -182,7 +205,14 @@ func (s *SupportTicketService) AddMessage(ctx context.Context, ticketID, authorI
 	if !canAccess {
 		return nil, ErrNotAdmin
 	}
-	return s.repo.AddMessage(ctx, ticketID, authorID, in)
+	msg, err := s.repo.AddMessage(ctx, ticketID, authorID, in)
+	if err != nil {
+		return nil, err
+	}
+	if !in.InternalNote {
+		s.notifyParticipants(ctx, ticketID, authorID, model.NotificationTypeTicketReplied)
+	}
+	return msg, nil
 }
 
 func (s *SupportTicketService) MarkRead(ctx context.Context, ticketID, userID string, in *model.MarkSupportTicketReadInput) error {
@@ -298,6 +328,78 @@ func (s *SupportTicketService) isAdminForTicket(ctx context.Context, ticket *mod
 	default:
 		return false, nil
 	}
+}
+
+func (s *SupportTicketService) notifyParticipants(ctx context.Context, ticketID, actorID, eventType string) {
+	if s == nil || s.notifications == nil {
+		return
+	}
+	participants, err := s.repo.ListParticipants(ctx, ticketID)
+	if err != nil {
+		return
+	}
+	for _, p := range participants {
+		if p.UserID == "" || p.UserID == actorID {
+			continue
+		}
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: p.UserID,
+			ActorID:     actorID,
+			Type:        eventType,
+			TargetID:    &ticketID,
+			TargetType:  ptrString("support_ticket"),
+		})
+	}
+}
+
+func (s *SupportTicketService) notifyScopeAdmins(ctx context.Context, ticket *model.SupportTicket, actorID string, eventType string) {
+	if s == nil || s.notifications == nil || ticket == nil {
+		return
+	}
+	ids := []string{}
+	switch ticket.ScopeType {
+	case model.SupportScopeLeague:
+		if ticket.ScopeID == nil {
+			return
+		}
+		if out, err := s.leagues.ListAdminIDs(ctx, *ticket.ScopeID); err == nil {
+			ids = out
+		}
+	case model.SupportScopeClub:
+		if ticket.ScopeID == nil {
+			return
+		}
+		if out, err := s.clubs.ListAdminIDs(ctx, *ticket.ScopeID); err == nil {
+			ids = out
+		}
+	default:
+		return
+	}
+	for _, recipientID := range ids {
+		if recipientID == "" || recipientID == actorID {
+			continue
+		}
+		var leagueID, clubID *string
+		if ticket.ScopeType == model.SupportScopeLeague {
+			leagueID = ticket.ScopeID
+		}
+		if ticket.ScopeType == model.SupportScopeClub {
+			clubID = ticket.ScopeID
+		}
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: recipientID,
+			ActorID:     actorID,
+			Type:        eventType,
+			TargetID:    &ticket.ID,
+			TargetType:  ptrString("support_ticket"),
+			LeagueID:    leagueID,
+			ClubID:      clubID,
+		})
+	}
+}
+
+func ptrString(v string) *string {
+	return &v
 }
 
 func isValidSupportTransition(fromStatus, toStatus string) bool {

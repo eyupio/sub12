@@ -142,11 +142,14 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		SELECT user_id, follow_request, follow_accepted, comment_on_my_card,
 		       reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 		       score_amended, league_join_approved, club_join_approved, mention,
-		       report_filed, digest_email,
+		       report_filed, ticket_created, ticket_replied, ticket_assigned,
+		       ticket_status_changed, feature_request_state_changed, digest_email,
 		       follow_request_email, follow_accepted_email, comment_on_my_card_email,
 		       reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
 		       score_rejected_email, score_amended_email, league_join_approved_email,
-		       club_join_approved_email, mention_email,
+		       club_join_approved_email, mention_email, ticket_created_email,
+		       ticket_replied_email, ticket_assigned_email, ticket_status_changed_email,
+		       feature_request_state_changed_email,
 		       updated_at
 		FROM notification_preferences
 		WHERE user_id = $1
@@ -154,11 +157,14 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		&p.UserID, &p.FollowRequest, &p.FollowAccepted, &p.CommentOnMyCard,
 		&p.ReplyToMyComment, &p.LikeOnMyContent, &p.ScoreVerified, &p.ScoreRejected,
 		&p.ScoreAmended, &p.LeagueJoinApproved, &p.ClubJoinApproved, &p.Mention,
-		&p.ReportFiled, &p.DigestEmail,
+		&p.ReportFiled, &p.TicketCreated, &p.TicketReplied, &p.TicketAssigned,
+		&p.TicketStatusChanged, &p.FeatureRequestStateChanged, &p.DigestEmail,
 		&p.FollowRequestEmail, &p.FollowAcceptedEmail, &p.CommentOnMyCardEmail,
 		&p.ReplyToMyCommentEmail, &p.LikeOnMyContentEmail, &p.ScoreVerifiedEmail,
 		&p.ScoreRejectedEmail, &p.ScoreAmendedEmail, &p.LeagueJoinApprovedEmail,
-		&p.ClubJoinApprovedEmail, &p.MentionEmail,
+		&p.ClubJoinApprovedEmail, &p.MentionEmail, &p.TicketCreatedEmail,
+		&p.TicketRepliedEmail, &p.TicketAssignedEmail, &p.TicketStatusChangedEmail,
+		&p.FeatureRequestStateChangedEmail,
 		&p.UpdatedAt,
 	)
 	if err != nil {
@@ -212,6 +218,21 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.ReportFiled != nil {
 		current.ReportFiled = *in.ReportFiled
 	}
+	if in.TicketCreated != nil {
+		current.TicketCreated = *in.TicketCreated
+	}
+	if in.TicketReplied != nil {
+		current.TicketReplied = *in.TicketReplied
+	}
+	if in.TicketAssigned != nil {
+		current.TicketAssigned = *in.TicketAssigned
+	}
+	if in.TicketStatusChanged != nil {
+		current.TicketStatusChanged = *in.TicketStatusChanged
+	}
+	if in.FeatureRequestStateChanged != nil {
+		current.FeatureRequestStateChanged = *in.FeatureRequestStateChanged
+	}
 	if in.DigestEmail != nil {
 		current.DigestEmail = *in.DigestEmail
 	}
@@ -248,21 +269,40 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.MentionEmail != nil {
 		current.MentionEmail = *in.MentionEmail
 	}
+	if in.TicketCreatedEmail != nil {
+		current.TicketCreatedEmail = *in.TicketCreatedEmail
+	}
+	if in.TicketRepliedEmail != nil {
+		current.TicketRepliedEmail = *in.TicketRepliedEmail
+	}
+	if in.TicketAssignedEmail != nil {
+		current.TicketAssignedEmail = *in.TicketAssignedEmail
+	}
+	if in.TicketStatusChangedEmail != nil {
+		current.TicketStatusChangedEmail = *in.TicketStatusChangedEmail
+	}
+	if in.FeatureRequestStateChangedEmail != nil {
+		current.FeatureRequestStateChangedEmail = *in.FeatureRequestStateChangedEmail
+	}
 
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO notification_preferences (
 			user_id, follow_request, follow_accepted, comment_on_my_card,
 			reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 			score_amended, league_join_approved, club_join_approved, mention,
-			report_filed, digest_email,
+			report_filed, ticket_created, ticket_replied, ticket_assigned,
+			ticket_status_changed, feature_request_state_changed, digest_email,
 			follow_request_email, follow_accepted_email, comment_on_my_card_email,
 			reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
 			score_rejected_email, score_amended_email, league_join_approved_email,
-			club_join_approved_email, mention_email,
+			club_join_approved_email, mention_email, ticket_created_email,
+			ticket_replied_email, ticket_assigned_email, ticket_status_changed_email,
+			feature_request_state_changed_email,
 			updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+			$27, $28, $29, $30, $31, $32, $33, $34, $35,
 			NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
@@ -278,6 +318,11 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			club_join_approved         = EXCLUDED.club_join_approved,
 			mention                    = EXCLUDED.mention,
 			report_filed               = EXCLUDED.report_filed,
+			ticket_created             = EXCLUDED.ticket_created,
+			ticket_replied             = EXCLUDED.ticket_replied,
+			ticket_assigned            = EXCLUDED.ticket_assigned,
+			ticket_status_changed      = EXCLUDED.ticket_status_changed,
+			feature_request_state_changed = EXCLUDED.feature_request_state_changed,
 			digest_email               = EXCLUDED.digest_email,
 			follow_request_email       = EXCLUDED.follow_request_email,
 			follow_accepted_email      = EXCLUDED.follow_accepted_email,
@@ -290,16 +335,24 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			league_join_approved_email = EXCLUDED.league_join_approved_email,
 			club_join_approved_email   = EXCLUDED.club_join_approved_email,
 			mention_email              = EXCLUDED.mention_email,
+			ticket_created_email       = EXCLUDED.ticket_created_email,
+			ticket_replied_email       = EXCLUDED.ticket_replied_email,
+			ticket_assigned_email      = EXCLUDED.ticket_assigned_email,
+			ticket_status_changed_email = EXCLUDED.ticket_status_changed_email,
+			feature_request_state_changed_email = EXCLUDED.feature_request_state_changed_email,
 			updated_at                 = NOW()
 	`,
 		current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
 		current.ReplyToMyComment, current.LikeOnMyContent, current.ScoreVerified, current.ScoreRejected,
 		current.ScoreAmended, current.LeagueJoinApproved, current.ClubJoinApproved, current.Mention,
-		current.ReportFiled, current.DigestEmail,
+		current.ReportFiled, current.TicketCreated, current.TicketReplied, current.TicketAssigned,
+		current.TicketStatusChanged, current.FeatureRequestStateChanged, current.DigestEmail,
 		current.FollowRequestEmail, current.FollowAcceptedEmail, current.CommentOnMyCardEmail,
 		current.ReplyToMyCommentEmail, current.LikeOnMyContentEmail, current.ScoreVerifiedEmail,
 		current.ScoreRejectedEmail, current.ScoreAmendedEmail, current.LeagueJoinApprovedEmail,
-		current.ClubJoinApprovedEmail, current.MentionEmail,
+		current.ClubJoinApprovedEmail, current.MentionEmail, current.TicketCreatedEmail,
+		current.TicketRepliedEmail, current.TicketAssignedEmail, current.TicketStatusChangedEmail,
+		current.FeatureRequestStateChangedEmail,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("upsert prefs: %w", err)

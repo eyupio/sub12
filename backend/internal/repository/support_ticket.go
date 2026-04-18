@@ -72,7 +72,7 @@ func (r *SupportTicketRepository) List(ctx context.Context, in *model.ListSuppor
 		       ), 0) AS unread_count
 		FROM support_tickets t
 	`
-	args := []any{nil}
+	args := []any{in.ViewerID}
 	where := []string{}
 	if in.ParticipantID != nil && *in.ParticipantID != "" {
 		args[0] = *in.ParticipantID

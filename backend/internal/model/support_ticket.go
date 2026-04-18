@@ -97,6 +97,7 @@ type CreateSupportTicketInput struct {
 }
 
 type ListSupportTicketsInput struct {
+	ViewerID      string
 	RequesterID   *string
 	AssigneeID    *string
 	ParticipantID *string

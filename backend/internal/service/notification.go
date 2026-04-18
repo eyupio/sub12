@@ -162,6 +162,16 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 		return "Club join approved", "Your request to join a club was approved."
 	case model.NotificationTypeMention:
 		return "You were mentioned on sub12.io", actor + " mentioned you on sub12.io."
+	case model.NotificationTypeTicketCreated:
+		return "New support ticket", actor + " created a support ticket."
+	case model.NotificationTypeTicketReplied:
+		return "New reply on a support ticket", actor + " replied on a support ticket you're involved in."
+	case model.NotificationTypeTicketAssigned:
+		return "Support ticket assigned to you", actor + " assigned a support ticket to you."
+	case model.NotificationTypeTicketStatusChanged:
+		return "Support ticket status updated", actor + " updated a support ticket status."
+	case model.NotificationTypeFeatureRequestStateChanged:
+		return "Feature request status updated", actor + " updated the state of a feature request."
 	}
 	return "New sub12.io notification", "You have a new notification on sub12.io."
 }

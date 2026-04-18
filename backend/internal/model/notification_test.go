@@ -32,6 +32,11 @@ func TestEnabledForType_PerType(t *testing.T) {
 		{NotificationTypeLeagueJoinApproved, func(p *NotificationPreferences, v bool) { p.LeagueJoinApproved = v }},
 		{NotificationTypeClubJoinApproved, func(p *NotificationPreferences, v bool) { p.ClubJoinApproved = v }},
 		{NotificationTypeMention, func(p *NotificationPreferences, v bool) { p.Mention = v }},
+		{NotificationTypeTicketCreated, func(p *NotificationPreferences, v bool) { p.TicketCreated = v }},
+		{NotificationTypeTicketReplied, func(p *NotificationPreferences, v bool) { p.TicketReplied = v }},
+		{NotificationTypeTicketAssigned, func(p *NotificationPreferences, v bool) { p.TicketAssigned = v }},
+		{NotificationTypeTicketStatusChanged, func(p *NotificationPreferences, v bool) { p.TicketStatusChanged = v }},
+		{NotificationTypeFeatureRequestStateChanged, func(p *NotificationPreferences, v bool) { p.FeatureRequestStateChanged = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
@@ -62,6 +67,11 @@ func TestEmailEnabledForType_PerType(t *testing.T) {
 		{NotificationTypeLeagueJoinApproved, func(p *NotificationPreferences, v bool) { p.LeagueJoinApprovedEmail = v }},
 		{NotificationTypeClubJoinApproved, func(p *NotificationPreferences, v bool) { p.ClubJoinApprovedEmail = v }},
 		{NotificationTypeMention, func(p *NotificationPreferences, v bool) { p.MentionEmail = v }},
+		{NotificationTypeTicketCreated, func(p *NotificationPreferences, v bool) { p.TicketCreatedEmail = v }},
+		{NotificationTypeTicketReplied, func(p *NotificationPreferences, v bool) { p.TicketRepliedEmail = v }},
+		{NotificationTypeTicketAssigned, func(p *NotificationPreferences, v bool) { p.TicketAssignedEmail = v }},
+		{NotificationTypeTicketStatusChanged, func(p *NotificationPreferences, v bool) { p.TicketStatusChangedEmail = v }},
+		{NotificationTypeFeatureRequestStateChanged, func(p *NotificationPreferences, v bool) { p.FeatureRequestStateChangedEmail = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
