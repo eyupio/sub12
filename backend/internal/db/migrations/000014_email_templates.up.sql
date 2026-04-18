@@ -12,16 +12,16 @@ INSERT INTO email_templates (key, subject_template, html_template, text_template
 VALUES
     (
         'forgot_password',
-        'Reset your Sub-12 password',
+        'Reset your sub12.io password',
         '<p>Hello {{.display_name}},</p><p>Use this link to reset your password: <a href="{{.reset_link}}">Reset password</a>.</p>',
         E'Hello {{.display_name}},\n\nUse this link to reset your password: {{.reset_link}}',
         TRUE
     ),
     (
         'welcome',
-        'Welcome to Sub-12, {{.display_name}}!',
-        '<p>Welcome to Sub-12, {{.display_name}}!</p><p>We''re glad to have you.</p>',
-        E'Welcome to Sub-12, {{.display_name}}!\nWe''re glad to have you.',
+        'Welcome to sub12.io, {{.display_name}}!',
+        '<p>Welcome to sub12.io, {{.display_name}}!</p><p>We''re glad to have you.</p>',
+        E'Welcome to sub12.io, {{.display_name}}!\nWe''re glad to have you.',
         TRUE
     ),
     (

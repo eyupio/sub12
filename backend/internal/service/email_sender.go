@@ -59,7 +59,7 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
 
-	fromName := "Sub-12"
+	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
@@ -104,7 +104,7 @@ func (s *EmailSenderService) SendReportFiledNotification(ctx context.Context, to
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
 
-	fromName := "Sub-12"
+	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
@@ -145,7 +145,7 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
 
-	fromName := "Sub-12"
+	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
@@ -189,7 +189,7 @@ func (s *EmailSenderService) SendNotification(ctx context.Context, toEmail, disp
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
 
-	fromName := "Sub-12"
+	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
@@ -225,7 +225,7 @@ func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
 
-	fromName := "Sub-12"
+	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
@@ -234,11 +234,11 @@ func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
 	msg.WriteString("To: " + settings.FromEmail + "\r\n")
-	msg.WriteString("Subject: Sub-12 SMTP Test\r\n")
+	msg.WriteString("Subject: sub12.io SMTP Test\r\n")
 	msg.WriteString("MIME-Version: 1.0\r\n")
 	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
 	msg.WriteString("\r\n")
-	msg.WriteString("This is a test email from Sub-12 to verify your SMTP configuration is working correctly.")
+	msg.WriteString("This is a test email from sub12.io to verify your SMTP configuration is working correctly.")
 
 	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, settings.FromEmail, []byte(msg.String()))
 }

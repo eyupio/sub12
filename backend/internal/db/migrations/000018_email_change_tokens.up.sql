@@ -15,7 +15,7 @@ INSERT INTO email_templates (key, subject_template, html_template, text_template
 VALUES
     (
         'email_change_confirm',
-        'Confirm your new Sub-12 email address',
+        'Confirm your new sub12.io email address',
         '<p>Hello {{.display_name}},</p><p>You requested to change your email address to this one. Click the link below to confirm:</p><p><a href="{{.confirm_link}}">Confirm email change</a></p><p>This link expires at {{.expires_at}}. If you did not request this change, you can safely ignore this email.</p>',
         E'Hello {{.display_name}},\n\nYou requested to change your email address to this one. Use this link to confirm:\n\n{{.confirm_link}}\n\nThis link expires at {{.expires_at}}. If you did not request this change, you can safely ignore this email.',
         TRUE
