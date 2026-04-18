@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
@@ -346,6 +346,7 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
   const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
@@ -386,7 +387,19 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
                 )}
               </span>
             </div>
-            <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+              {currentUser && currentUser.id !== r.user_id && (
+                <button
+                  onClick={() => setReportTargetId(r.id)}
+                  className="p-1 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
+                  aria-label="Report reply"
+                  title="Report inappropriate reply"
+                >
+                  <AlertTriangle size={12} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -417,6 +430,13 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
           </button>
         </div>
       )}
+
+      <ReportDialog
+        open={reportTargetId !== null}
+        targetType="comment"
+        targetId={reportTargetId ?? ''}
+        onClose={() => setReportTargetId(null)}
+      />
     </div>
   )
 }
@@ -431,6 +451,7 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null)
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
 
   const flagMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => commentApi.flag(id, reason),
@@ -612,6 +633,16 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
                             </button>
                           )
                         )}
+                        {currentUser && currentUser.id !== c.user_id && (
+                          <button
+                            onClick={() => setReportTargetId(c.id)}
+                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors"
+                            aria-label="Report comment"
+                            title="Report inappropriate comment"
+                          >
+                            <AlertTriangle size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
                     {/* Comment actions: like + reply toggle */}
@@ -691,16 +722,25 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
           if (flagTargetId) await flagMutation.mutateAsync({ id: flagTargetId, reason })
         }}
       />
+
+      <ReportDialog
+        open={reportTargetId !== null}
+        targetType="comment"
+        targetId={reportTargetId ?? ''}
+        onClose={() => setReportTargetId(null)}
+      />
     </div>
   )
 }
 
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
+  const navigate = useNavigate()
   const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
   const [showLightbox, setShowLightbox] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
@@ -775,6 +815,33 @@ export default function ScoreCardDetail() {
       clearImage()
       setEditing(false)
       toast('Score card updated', 'success')
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 403) {
+        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+      }
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => scoreCardApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['activity'] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      if (cardLeague?.id) {
+        queryClient.invalidateQueries({ queryKey: ['leagues', cardLeague.id] })
+        queryClient.invalidateQueries({ queryKey: ['leagues', cardLeague.id, 'standings'] })
+      }
+      toast('Score card deleted', 'success')
+      navigate({ to: '/scores' })
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 403) {
+        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+      } else {
+        toast('Failed to delete score card', 'error')
+      }
     },
   })
 
@@ -868,9 +935,19 @@ export default function ScoreCardDetail() {
           {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
         </div>
         {isOwner && !editing && (
-          <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
-            <Pencil size={13} /> Edit
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
+              <Pencil size={13} /> Edit
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleteMutation.isPending}
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+              aria-label="Delete score card"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+          </div>
         )}
       </div>
 
@@ -1161,6 +1238,20 @@ export default function ScoreCardDetail() {
         targetType="score_card"
         targetId={id}
         onClose={() => setShowReport(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete score card?"
+        message={card.league_round_id
+          ? 'This removes the card, its league submission, comments, and likes. League standings will update accordingly. This cannot be undone.'
+          : 'This removes the card, its comments, and likes. This cannot be undone.'}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setShowDeleteConfirm(false)
+          deleteMutation.mutate()
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
       />
 
       {/* Comments */}
