@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { Comment } from './scoreCards'
 
 export type FeatureRequestStatus = 'submitted' | 'refining' | 'accepted' | 'rejected' | 'planned' | 'in_progress' | 'done' | 'implemented'
 
@@ -39,7 +40,11 @@ function queryString(params: QueryParams = {}) {
 export const featureRequestsApi = {
   list: (params?: QueryParams) => api.get<FeatureRequestListResponse>(`/feature-requests${queryString(params)}`),
   ranking: (params?: QueryParams) => api.get<FeatureRequestListResponse>(`/feature-requests/ranking${queryString(params)}`),
+  get: (id: string) => api.get<FeatureRequest>(`/feature-requests/${id}`),
   vote: (id: string, upvote: boolean) => api.post<FeatureRequest>(`/feature-requests/${id}/vote`, { upvote }),
+  listComments: (id: string) => api.get<{ items: Comment[] }>(`/feature-requests/${id}/comments`),
+  createComment: (id: string, body: string, parentId?: string) =>
+    api.post<Comment>(`/feature-requests/${id}/comments`, { body, parent_id: parentId }),
   adminCreateFromTicket: (ticketID: string, payload: { title: string; refined_description: string; owner_admin_id?: string }) =>
     api.post<FeatureRequest>(`/admin/tickets/${ticketID}/feature-request`, payload),
   adminUpdate: (id: string, payload: Partial<Pick<FeatureRequest, 'title' | 'refined_description' | 'status' | 'owner_admin_id'>>) =>

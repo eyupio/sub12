@@ -48,6 +48,7 @@ import NotificationSettings from './pages/NotificationSettings'
 import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
 import FeatureBoard from './pages/FeatureBoard'
+import FeatureRequestDetail from './pages/FeatureRequestDetail'
 import SupportCenter from './pages/SupportCenter'
 import SupportTicketDetail from './pages/SupportTicketDetail'
 import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
@@ -327,6 +328,12 @@ const featureBoardRoute = createRoute({
   component: FeatureBoard,
 })
 
+const featureRequestDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/feature-requests/$id',
+  component: FeatureRequestDetail,
+})
+
 const supportCenterRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/support',
@@ -433,6 +440,7 @@ export const routeTree = rootRoute.addChildren([
     supportCenterRoute,
     supportTicketDetailRoute,
     featureBoardRoute,
+    featureRequestDetailRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
     confirmEmailRoute,

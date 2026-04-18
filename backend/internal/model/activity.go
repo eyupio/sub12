@@ -9,15 +9,17 @@ import (
 type ActivityType = string
 
 const (
-	ActivityScorePosted         ActivityType = "score_posted"
-	ActivityPersonalBest        ActivityType = "personal_best"
-	ActivityJoinedLeague        ActivityType = "joined_league"
-	ActivityCommented           ActivityType = "commented"
-	ActivityJoinedClub          ActivityType = "joined_club"
-	ActivityPelletTestPosted    ActivityType = "pellet_test_posted"
-	ActivityLeagueRoundOpened   ActivityType = "league_round_opened"
-	ActivityLeagueSeasonStarted ActivityType = "league_season_started"
-	ActivityAchievementEarned   ActivityType = "achievement_earned"
+	ActivityScorePosted              ActivityType = "score_posted"
+	ActivityPersonalBest             ActivityType = "personal_best"
+	ActivityJoinedLeague             ActivityType = "joined_league"
+	ActivityCommented                ActivityType = "commented"
+	ActivityJoinedClub               ActivityType = "joined_club"
+	ActivityPelletTestPosted         ActivityType = "pellet_test_posted"
+	ActivityLeagueRoundOpened        ActivityType = "league_round_opened"
+	ActivityLeagueSeasonStarted      ActivityType = "league_season_started"
+	ActivityAchievementEarned        ActivityType = "achievement_earned"
+	ActivityFeatureRequestCreated    ActivityType = "feature_request_created"
+	ActivityFeatureRequestImplemented ActivityType = "feature_request_implemented"
 )
 
 // FeedFilter controls which slice of the activity feed to return.
@@ -100,6 +102,14 @@ type AchievementEarnedMeta struct {
 	AchievementName        string `json:"achievement_name"`
 	AchievementIcon        string `json:"achievement_icon,omitempty"`
 	AchievementDescription string `json:"achievement_description,omitempty"`
+}
+
+// FeatureRequestMeta is the JSONB metadata for ActivityFeatureRequestCreated and
+// ActivityFeatureRequestImplemented events.
+type FeatureRequestMeta struct {
+	Title     string `json:"title"`
+	Status    string `json:"status,omitempty"`
+	ScopeType string `json:"scope_type,omitempty"`
 }
 
 // FeedResponse is the paginated response for GET /api/v1/feed.

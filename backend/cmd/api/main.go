@@ -158,7 +158,9 @@ func main() {
 	clubSvc := service.NewClubService(clubRepo, activitySvc, achievementSvc)
 	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, socialRepo, activitySvc)
 
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, achievementSvc)
+	featureRequestRepo := repository.NewFeatureRequestRepository(pool)
+
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, featureRequestRepo, achievementSvc)
 
 	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)
 	// Wire achievements into likes so that liking content can trigger award checks.
@@ -175,8 +177,7 @@ func main() {
 	)
 	supportTicketRepo := repository.NewSupportTicketRepository(pool)
 	supportTicketSvc := service.NewSupportTicketService(supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, emailSenderSvc, cfg.CORSOrigin)
-	featureRequestRepo := repository.NewFeatureRequestRepository(pool)
-	featureRequestSvc := service.NewFeatureRequestService(featureRequestRepo, supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc)
+	featureRequestSvc := service.NewFeatureRequestService(featureRequestRepo, supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, activitySvc)
 
 	sitemapRepo := repository.NewSitemapRepository(pool)
 	sitemapSvc := service.NewSitemapService(sitemapRepo, cfg.SiteURL, cfg.IndexNowKey, cfg.IndexNowKeyLocation, log.Logger)

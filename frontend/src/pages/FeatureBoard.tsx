@@ -59,12 +59,27 @@ export default function FeatureBoard() {
           <article key={item.id} className="rounded-xl border border-subtle bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-semibold">{item.title}</h2>
+                <Link
+                  to="/feature-requests/$id"
+                  params={{ id: item.id }}
+                  className="font-semibold hover:underline"
+                >
+                  {item.title}
+                </Link>
                 <p className="text-xs text-muted mt-1">Status: {item.status} · Scope: {item.scope_type}</p>
               </div>
               <FeatureRequestVoteButton featureRequestID={item.id} initialVoted={item.viewer_has_voted} initialCount={item.vote_count} />
             </div>
             {item.refined_description && <p className="mt-3 text-sm text-secondary whitespace-pre-wrap">{item.refined_description}</p>}
+            <div className="mt-3">
+              <Link
+                to="/feature-requests/$id"
+                params={{ id: item.id }}
+                className="text-xs text-[var(--brass)] hover:underline"
+              >
+                View details & discussion →
+              </Link>
+            </div>
           </article>
         ))}
       </div>
