@@ -71,7 +71,7 @@ export default function SharedView({ type }: SharedViewProps) {
   }
 
   if (!id) {
-    return <PrivateOrMissing type={type} />
+    return <NotFoundOrPrivate type={type} />
   }
 
   return <PublicContent type={type} id={id} />
@@ -90,7 +90,7 @@ function PublicContent({ type, id }: { type: ShareTargetType; id: string }) {
     case 'user':
       return <PublicUser id={id} />
     default:
-      return <PrivateOrMissing type={type} />
+      return <NotFoundOrPrivate type={type} />
   }
 }
 
@@ -149,15 +149,40 @@ function SignInCTA() {
   )
 }
 
-function PrivateOrMissing({ type }: { type: ShareTargetType }) {
+function NotFoundOrPrivate({ type }: { type: ShareTargetType }) {
+  const label = labels[type].toLowerCase()
   return (
     <Shell title={labels[type]}>
       <div className="bg-surface border border-subtle rounded-lg p-6 text-center space-y-2">
         <Lock size={20} className="mx-auto text-muted" />
-        <p className="text-sm text-secondary">This {labels[type].toLowerCase()} is private.</p>
+        <p className="text-sm text-secondary">This {label} isn't available.</p>
         <p className="text-xs text-muted">
-          The owner may have set their profile or this item to private.
+          It may have been removed, set to private, or the owner's profile is private.
         </p>
+      </div>
+    </Shell>
+  )
+}
+
+function TemporarilyUnavailable({
+  type,
+  onRetry,
+}: {
+  type: ShareTargetType
+  onRetry: () => void
+}) {
+  const label = labels[type].toLowerCase()
+  return (
+    <Shell title={labels[type]}>
+      <div className="bg-surface border border-subtle rounded-lg p-6 text-center space-y-3">
+        <p className="text-sm text-secondary">We couldn't load this {label}.</p>
+        <p className="text-xs text-muted">Check your connection and try again in a moment.</p>
+        <button
+          onClick={onRetry}
+          className="px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:bg-surface-hover"
+        >
+          Retry
+        </button>
       </div>
     </Shell>
   )
@@ -180,14 +205,18 @@ function isNotFound(err: unknown): boolean {
 function PublicScoreCard({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(false)
   const prefs = useRegionalPrefs()
-  const { data: card, isLoading, error } = useQuery({
+  const { data: card, isLoading, error, refetch } = useQuery({
     queryKey: ['public-score-card', id],
     queryFn: () => scoreCardApi.get(id),
     retry: false,
   })
 
   if (isLoading) return <LoadingShell type="score_card" />
-  if (error || !card) return <PrivateOrMissing type="score_card" />
+  if (error) {
+    if (isNotFound(error)) return <NotFoundOrPrivate type="score_card" />
+    return <TemporarilyUnavailable type="score_card" onRetry={() => refetch()} />
+  }
+  if (!card) return <NotFoundOrPrivate type="score_card" />
 
   return (
     <Shell title="Score card">
@@ -251,17 +280,18 @@ function PublicScoreCard({ id }: { id: string }) {
 function PublicPelletTest({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(false)
   const prefs = useRegionalPrefs()
-  const { data: session, isLoading, error } = useQuery({
+  const { data: session, isLoading, error, refetch } = useQuery({
     queryKey: ['public-pellet-test', id],
     queryFn: () => pelletTestApi.get(id),
     retry: false,
   })
 
   if (isLoading) return <LoadingShell type="pellet_test" />
-  if (error || !session) {
-    if (isNotFound(error)) return <PrivateOrMissing type="pellet_test" />
-    return <PrivateOrMissing type="pellet_test" />
+  if (error) {
+    if (isNotFound(error)) return <NotFoundOrPrivate type="pellet_test" />
+    return <TemporarilyUnavailable type="pellet_test" onRetry={() => refetch()} />
   }
+  if (!session) return <NotFoundOrPrivate type="pellet_test" />
 
   const pelletLabel = session.pellet
     ? `${session.pellet.brand} ${session.pellet.model}`.trim()
@@ -329,14 +359,18 @@ function PublicPelletTest({ id }: { id: string }) {
 
 function PublicLeague({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(false)
-  const { data: league, isLoading, error } = useQuery({
+  const { data: league, isLoading, error, refetch } = useQuery({
     queryKey: ['public-league', id],
     queryFn: () => leagueApi.get(id),
     retry: false,
   })
 
   if (isLoading) return <LoadingShell type="league" />
-  if (error || !league) return <PrivateOrMissing type="league" />
+  if (error) {
+    if (isNotFound(error)) return <NotFoundOrPrivate type="league" />
+    return <TemporarilyUnavailable type="league" onRetry={() => refetch()} />
+  }
+  if (!league) return <NotFoundOrPrivate type="league" />
 
   return (
     <Shell title="League">
@@ -381,14 +415,18 @@ function PublicLeague({ id }: { id: string }) {
 
 function PublicClub({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(false)
-  const { data: club, isLoading, error } = useQuery({
+  const { data: club, isLoading, error, refetch } = useQuery({
     queryKey: ['public-club', id],
     queryFn: () => clubsApi.get(id),
     retry: false,
   })
 
   if (isLoading) return <LoadingShell type="club" />
-  if (error || !club) return <PrivateOrMissing type="club" />
+  if (error) {
+    if (isNotFound(error)) return <NotFoundOrPrivate type="club" />
+    return <TemporarilyUnavailable type="club" onRetry={() => refetch()} />
+  }
+  if (!club) return <NotFoundOrPrivate type="club" />
 
   return (
     <Shell title="Club">
@@ -433,16 +471,20 @@ function PublicClub({ id }: { id: string }) {
 
 function PublicUser({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(false)
-  const { data: profile, isLoading, error } = useQuery({
+  const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['public-user', id],
     queryFn: () => usersApi.getProfile(id),
     retry: false,
   })
 
   if (isLoading) return <LoadingShell type="user" />
-  if (error || !profile) return <PrivateOrMissing type="user" />
+  if (error) {
+    if (isNotFound(error)) return <NotFoundOrPrivate type="user" />
+    return <TemporarilyUnavailable type="user" onRetry={() => refetch()} />
+  }
+  if (!profile) return <NotFoundOrPrivate type="user" />
   if (profile.is_private || profile.profile_visibility === 'private') {
-    return <PrivateOrMissing type="user" />
+    return <NotFoundOrPrivate type="user" />
   }
 
   return (
