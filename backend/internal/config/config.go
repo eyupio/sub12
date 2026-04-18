@@ -32,6 +32,9 @@ type Config struct {
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 
+	// Public site URL used for sitemap generation and SEO pings.
+	SiteURL string `envconfig:"SITE_URL" default:"http://localhost:5173"`
+
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`
