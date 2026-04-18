@@ -287,6 +287,7 @@ export default function ClubDetail() {
   useEffect(() => {
     if (inviteCodeFromUrl) setJoinCodeInput(inviteCodeFromUrl)
   }, [inviteCodeFromUrl])
+
   const joinMutation = useMutation({
     mutationFn: () => clubsApi.join(id, joinCodeInput || undefined),
     onSuccess: (data) => {
@@ -324,7 +325,7 @@ export default function ClubDetail() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to leave club', 'error'),
   })
 
-  function copyInviteLink() {
+  function copyJoinCode() {
     if (!club || !club.join_code) return
     const url = `${window.location.origin}/clubs/${club.id}?code=${encodeURIComponent(club.join_code)}`
     navigator.clipboard.writeText(url)
@@ -487,7 +488,7 @@ export default function ClubDetail() {
           </div>
           {club.is_member && club.join_code && (
             <button
-              onClick={copyInviteLink}
+              onClick={copyJoinCode}
               className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
               title="Copy invite link"
               aria-label="Copy invite link"

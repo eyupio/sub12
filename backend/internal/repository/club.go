@@ -92,6 +92,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		`, clubID).Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount,
 		)
@@ -118,6 +119,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 	`, clubID, viewerID).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 		&club.MemberCount, &club.IsAdmin, &club.IsMember,
 	)
@@ -157,6 +159,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 			if err := rows.Scan(
 				&club.ID, &club.Name, &club.Description, &club.ImageURL,
 				&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+				&club.DateFormat, &club.TimeFormat, &club.Timezone,
 				&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 				&club.MemberCount,
 			); err != nil {
@@ -195,6 +198,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		if err := rows.Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount, &club.IsAdmin, &club.IsMember,
 		); err != nil {
@@ -229,6 +233,7 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 		if err := rows.Scan(
 			&club.ID, &club.Name, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 			&club.MemberCount, &club.IsAdmin,
 		); err != nil {
@@ -397,25 +402,23 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 	var club model.Club
 	err := r.db.QueryRow(ctx, `
 		UPDATE clubs
-		SET name                 = COALESCE($2, name),
-		    description          = COALESCE($3, description),
-		    type                 = COALESCE($4::club_type, type),
-		    join_policy          = COALESCE($5::club_join_policy, join_policy),
-		    post_visibility      = COALESCE($6, post_visibility),
+		SET name                = COALESCE($2, name),
+		    description         = COALESCE($3, description),
+		    type                = COALESCE($4::club_type, type),
+		    join_policy         = COALESCE($5::club_join_policy, join_policy),
+		    post_visibility     = COALESCE($6, post_visibility),
 		    allow_member_invites = COALESCE($7, allow_member_invites),
-		    date_format          = COALESCE($8, date_format),
-		    time_format          = COALESCE($9, time_format),
-		    timezone             = COALESCE($10, timezone),
-		    updated_at           = NOW()
+		    date_format         = COALESCE($8, date_format),
+		    time_format         = COALESCE($9, time_format),
+		    timezone            = COALESCE($10, timezone),
+		    updated_at          = NOW()
 		WHERE id = $1
 		RETURNING id, name, description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility, allow_member_invites,
 		          date_format, time_format, timezone,
 		          created_by, created_at::text, updated_at::text,
 		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
-	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.AllowMemberInvites,
-		in.DateFormat, in.TimeFormat, in.Timezone,
-	).Scan(
+	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.AllowMemberInvites, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
