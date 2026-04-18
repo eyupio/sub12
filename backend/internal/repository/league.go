@@ -1096,3 +1096,57 @@ func (r *LeagueRepository) GetLeagueIDByRoundID(ctx context.Context, roundID str
 	}
 	return leagueID, nil
 }
+
+// ListAdminIDs returns the user IDs of all admins for a league.
+func (r *LeagueRepository) ListAdminIDs(ctx context.Context, leagueID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id FROM league_members WHERE league_id = $1 AND is_admin = TRUE
+	`, leagueID)
+	if err != nil {
+		return nil, fmt.Errorf("list league admin ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan league admin id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetClubIDByLeagueID returns the club_id the league is hosted under, or nil.
+func (r *LeagueRepository) GetClubIDByLeagueID(ctx context.Context, leagueID string) (*string, error) {
+	var clubID *string
+	err := r.db.QueryRow(ctx, `SELECT club_id FROM leagues WHERE id = $1`, leagueID).Scan(&clubID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get club id by league: %w", err)
+	}
+	return clubID, nil
+}
+
+// GetScopeByScoreCardID returns the (league_id, club_id) scope for a score
+// card. Either or both may be nil. A score card posted outside a league round
+// and without an explicit club_id resolves to (nil, nil) — platform scope.
+func (r *LeagueRepository) GetScopeByScoreCardID(ctx context.Context, scoreCardID string) (leagueID, clubID *string, err error) {
+	err = r.db.QueryRow(ctx, `
+		SELECT l.id, COALESCE(l.club_id, sc.club_id)
+		FROM score_cards sc
+		LEFT JOIN rounds rd  ON rd.id = sc.league_round_id
+		LEFT JOIN seasons s  ON s.id  = rd.season_id
+		LEFT JOIN leagues l  ON l.id  = s.league_id
+		WHERE sc.id = $1
+	`, scoreCardID).Scan(&leagueID, &clubID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, ErrNotFound
+		}
+		return nil, nil, fmt.Errorf("get scope by score card: %w", err)
+	}
+	return leagueID, clubID, nil
+}

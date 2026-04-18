@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2 } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2, Flag } from 'lucide-react'
 import { leagueApi, LeagueConfig, League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -518,6 +518,18 @@ export default function LeagueSettings() {
       <RulesSection leagueId={id} config={config} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
+
+      <Link
+        to="/leagues/$id/reports"
+        params={{ id }}
+        className="flex items-center justify-between gap-2 border border-subtle rounded bg-surface p-4 hover:border-[var(--brass)]/30 transition-colors"
+      >
+        <span className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-secondary">
+          <Flag size={14} className="text-[var(--brass)]" />
+          Member reports
+        </span>
+        <span className="text-[10px] tracking-widest uppercase text-muted">Review &rarr;</span>
+      </Link>
     </div>
   )
 }

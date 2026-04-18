@@ -142,14 +142,14 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		SELECT user_id, follow_request, follow_accepted, comment_on_my_card,
 		       reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 		       score_amended, league_join_approved, club_join_approved, mention,
-		       digest_email, updated_at
+		       report_filed, digest_email, updated_at
 		FROM notification_preferences
 		WHERE user_id = $1
 	`, userID).Scan(
 		&p.UserID, &p.FollowRequest, &p.FollowAccepted, &p.CommentOnMyCard,
 		&p.ReplyToMyComment, &p.LikeOnMyContent, &p.ScoreVerified, &p.ScoreRejected,
 		&p.ScoreAmended, &p.LeagueJoinApproved, &p.ClubJoinApproved, &p.Mention,
-		&p.DigestEmail, &p.UpdatedAt,
+		&p.ReportFiled, &p.DigestEmail, &p.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -199,6 +199,9 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.Mention != nil {
 		current.Mention = *in.Mention
 	}
+	if in.ReportFiled != nil {
+		current.ReportFiled = *in.ReportFiled
+	}
 	if in.DigestEmail != nil {
 		current.DigestEmail = *in.DigestEmail
 	}
@@ -208,9 +211,9 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			user_id, follow_request, follow_accepted, comment_on_my_card,
 			reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 			score_amended, league_join_approved, club_join_approved, mention,
-			digest_email, updated_at
+			report_filed, digest_email, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
 			follow_request       = EXCLUDED.follow_request,
@@ -224,12 +227,13 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			league_join_approved = EXCLUDED.league_join_approved,
 			club_join_approved   = EXCLUDED.club_join_approved,
 			mention              = EXCLUDED.mention,
+			report_filed         = EXCLUDED.report_filed,
 			digest_email         = EXCLUDED.digest_email,
 			updated_at           = NOW()
 	`, current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
 		current.ReplyToMyComment, current.LikeOnMyContent, current.ScoreVerified, current.ScoreRejected,
 		current.ScoreAmended, current.LeagueJoinApproved, current.ClubJoinApproved, current.Mention,
-		current.DigestEmail)
+		current.ReportFiled, current.DigestEmail)
 	if err != nil {
 		return nil, fmt.Errorf("upsert prefs: %w", err)
 	}

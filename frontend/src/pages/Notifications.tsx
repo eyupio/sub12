@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign } from 'lucide-react'
+import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag } from 'lucide-react'
 import { notificationsApi, Notification, NotificationType } from '../api/notifications'
 
 const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
@@ -15,6 +15,7 @@ const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   league_join_approved: Trophy,
   club_join_approved: UsersIcon,
   mention: AtSign,
+  report_filed: Flag,
 }
 
 function notificationSentence(n: Notification): string {
@@ -42,10 +43,22 @@ function notificationSentence(n: Notification): string {
       return `Your club join request was approved`
     case 'mention':
       return `${actor} mentioned you`
+    case 'report_filed': {
+      const community = n.metadata?.community_name as string | undefined
+      const target = (n.metadata?.target_label as string | undefined) ?? 'content'
+      return community
+        ? `${actor} flagged ${target} in ${community}`
+        : `${actor} flagged ${target}`
+    }
   }
 }
 
 function notificationLink(n: Notification): string | null {
+  if (n.type === 'report_filed') {
+    if (n.league_id) return `/leagues/${n.league_id}/reports`
+    if (n.club_id) return `/clubs/${n.club_id}/reports`
+    return '/admin/reports'
+  }
   if (n.target_type === 'score_card' && n.target_id) return `/scores/${n.target_id}`
   if (n.target_type === 'post' && n.target_id) return `/scores/${n.target_id}` // posts open in-context; placeholder
   if (n.target_type === 'user' && n.target_id) return `/users/${n.target_id}`

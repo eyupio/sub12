@@ -42,6 +42,7 @@ import ComboAnalytics from './pages/ComboAnalytics'
 import Notifications from './pages/Notifications'
 import PrivacyCenter from './pages/PrivacyCenter'
 import NotificationSettings from './pages/NotificationSettings'
+import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
 
 // Guard: redirect to /login if not authenticated
@@ -118,6 +119,12 @@ const leagueSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues/$id/settings',
   component: LeagueSettings,
+})
+
+const leagueReportsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/leagues/$id/reports',
+  component: LeagueReportsPage,
 })
 
 const pelletTestingRoute = createRoute({
@@ -202,6 +209,12 @@ const clubSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/clubs/$id/settings',
   component: ClubSettings,
+})
+
+const clubReportsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/clubs/$id/reports',
+  component: ClubReportsPage,
 })
 
 const scoreTrendsRoute = createRoute({
@@ -346,9 +359,11 @@ export const routeTree = rootRoute.addChildren([
     leaguesRoute,
     leagueDetailRoute,
     leagueSettingsRoute,
+    leagueReportsRoute,
     clubsRoute,
     clubDetailRoute,
     clubSettingsRoute,
+    clubReportsRoute,
     profileRoute,
     userProfileRoute,
     usersRoute,
