@@ -14,6 +14,8 @@ import { useAuthStore } from '../store/auth'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { StarBadge } from '../components/StarBadge'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 import { LikeButton } from '../components/LikeButton'
 
 const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
@@ -495,7 +497,10 @@ export default function Feed() {
 
   return (
     <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-2xl mx-auto">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feed</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feed</h1>
+        <HelpIcon content={pageHelp.feed} />
+      </div>
 
       {/* Filter tabs */}
       <div role="tablist" aria-label="Feed filter" className="flex gap-1.5 overflow-x-auto pb-1">

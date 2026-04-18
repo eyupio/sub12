@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
@@ -8,21 +8,28 @@ import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
 import { ToastContainer } from './Toast'
 import { NotificationBell } from './NotificationBell'
+import { NavTracker } from './NavTracker'
+import { Tooltip } from './Tooltip'
+import { tips } from './tooltips'
 
+// Order reflects user flow: home -> daily activity -> competition -> gear
+// -> account -> help. Admin items are appended for admins only.
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
   { to: '/feed', icon: Activity, label: 'Feed', mobileLabel: 'Feed' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
+  { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
   { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
-  { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
-  { to: '/support', icon: LifeBuoy, label: 'Support', mobileLabel: 'Help' },
-  { to: '/feature-requests', icon: Lightbulb, label: 'Features', mobileLabel: 'Ideas' },
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
+  { to: '/help', icon: HelpCircle, label: 'Help', mobileLabel: 'Help' },
+  { to: '/support', icon: LifeBuoy, label: 'Support', mobileLabel: 'Tickets' },
+  { to: '/feature-requests', icon: Lightbulb, label: 'Features', mobileLabel: 'Ideas' },
 ] as const
 
 const adminNavItems = [
+  { to: '/admin/faqs',           icon: BookOpen, label: 'Admin FAQs',    mobileLabel: 'FAQs'   },
   { to: '/admin/email/settings', icon: Mail,    label: 'Email Admin',   mobileLabel: 'Email'  },
   { to: '/admin/users',          icon: UserCog, label: 'Admin Users',   mobileLabel: 'Users'  },
   { to: '/admin/leagues',        icon: Trophy,  label: 'Admin Leagues', mobileLabel: 'Lgues'  },
@@ -31,6 +38,7 @@ const adminNavItems = [
   { to: '/admin/support',         icon: Inbox,   label: 'Support Inbox', mobileLabel: 'Inbox' },
 ]
 
+// Mobile bottom nav is 5 items max. Core daily-use actions.
 const mobileNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
   { to: '/scores', icon: Target, label: 'Scores' },
@@ -38,13 +46,15 @@ const mobileNavItems = [
   { to: '/leagues', icon: Trophy, label: 'Leagues' },
 ] as const
 
+// Everything not in mobileNavItems appears in the "More" overlay.
 const moreMenuItems = [
   { to: '/feed', icon: Activity, label: 'Feed' },
-  { to: '/clubs', icon: Users, label: 'Clubs' },
   { to: '/gear', icon: Package, label: 'Gear' },
+  { to: '/clubs', icon: Users, label: 'Clubs' },
+  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/help', icon: HelpCircle, label: 'Help' },
   { to: '/support', icon: LifeBuoy, label: 'Support' },
   { to: '/feature-requests', icon: Lightbulb, label: 'Features' },
-  { to: '/profile', icon: User, label: 'Profile' },
 ]
 
 export default function Layout({ children }: PropsWithChildren) {
@@ -107,6 +117,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
+      <NavTracker />
       <ToastContainer />
       {/* Corner crosshair decorations */}
       <CornerMark className="top-5 left-5 text-muted" />
@@ -117,11 +128,15 @@ export default function Layout({ children }: PropsWithChildren) {
       {/* \u2500\u2500 Desktop sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-r border-subtle bg-nav backdrop-blur z-40">
         <div className="px-5 py-4 border-b border-subtle">
-          <img
-            src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
-            alt="SUB12"
-            className="h-8 w-auto"
-          />
+          <Tooltip content={tips.homeLogo} placement="right">
+            <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
+              <img
+                src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+                alt="SUB12"
+                className="h-8 w-auto"
+              />
+            </Link>
+          </Tooltip>
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1" aria-label="Primary">
@@ -140,17 +155,18 @@ export default function Layout({ children }: PropsWithChildren) {
 
         <div className="px-4 py-4 border-t border-subtle space-y-3">
           <div className="flex items-center justify-between">
-            <ThemeToggle />
+            <Tooltip content={tips.themeToggle}><span><ThemeToggle /></span></Tooltip>
             <div className="flex items-center gap-3">
-              <NotificationBell />
-              <button
-                onClick={handleLogout}
-                className="text-muted hover:text-secondary transition-colors"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut size={17} />
-              </button>
+              <Tooltip content={tips.notificationBell}><span><NotificationBell /></span></Tooltip>
+              <Tooltip content={tips.logout}>
+                <button
+                  onClick={handleLogout}
+                  className="text-muted hover:text-secondary transition-colors"
+                  aria-label="Sign out"
+                >
+                  <LogOut size={17} />
+                </button>
+              </Tooltip>
             </div>
           </div>
           {user && (
@@ -163,11 +179,13 @@ export default function Layout({ children }: PropsWithChildren) {
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
         <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
-          <img
-            src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
-            alt="SUB12"
-            className="h-8 w-auto"
-          />
+          <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
+            <img
+              src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+              alt="SUB12"
+              className="h-8 w-auto"
+            />
+          </Link>
           <div className="flex items-center gap-3">
             {user && (
               <span className="text-sm text-muted hidden sm:block tracking-wide">{user.display_name}</span>

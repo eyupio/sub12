@@ -6,6 +6,8 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi } from '../api/users'
 import { privacyApi } from '../api/privacy'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 type VisibilityOption = 'public' | 'followers' | 'private'
 
@@ -118,6 +120,7 @@ export default function PrivacyCenter() {
           <ChevronLeft size={18} />
         </Link>
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Privacy</h1>
+        <HelpIcon content={pageHelp.privacy} />
       </div>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">

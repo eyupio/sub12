@@ -9,6 +9,8 @@ import { CatalogSearch } from '../components/CatalogSearch'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, PelletCatalogEntry } from '../catalog/pelletCatalog'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
@@ -570,7 +572,10 @@ export default function Gear() {
 
   return (
     <div className="p-4 lg:p-8 space-y-5 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Gear</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Gear</h1>
+        <HelpIcon content={pageHelp.gear} />
+      </div>
 
       <div className="flex gap-1 border-b border-subtle">
         {(['rifles', 'pellets'] as Tab[]).map(t => (

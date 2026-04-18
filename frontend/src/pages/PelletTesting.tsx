@@ -5,6 +5,8 @@ import { pelletTestApi, PelletTestSessionSummary } from '../api/pelletTesting'
 import { gearApi, Rifle } from '../api/gear'
 import GroupSizeTimeline from '../components/GroupSizeTimeline'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -49,7 +51,10 @@ export default function PelletTesting() {
 
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Pellet Testing</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Pellet Testing</h1>
+          <HelpIcon content={pageHelp.pelletTesting} />
+        </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           <Link
             to="/pellet-testing/batch-report"

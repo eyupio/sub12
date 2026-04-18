@@ -1,7 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { Target } from 'lucide-react'
+import { useSmartBack } from '../hooks/useSmartBack'
 
 export default function NotFound() {
+  const smartBack = useSmartBack('/')
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="text-center max-w-sm">
@@ -20,7 +22,7 @@ export default function NotFound() {
             Go home
           </Link>
           <button
-            onClick={() => window.history.back()}
+            onClick={smartBack}
             className="px-4 py-2 rounded-lg text-secondary text-sm tracking-wide hover:bg-surface-hover transition-colors"
           >
             Go back

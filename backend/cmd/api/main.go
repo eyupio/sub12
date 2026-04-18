@@ -179,6 +179,9 @@ func main() {
 	supportTicketSvc := service.NewSupportTicketService(supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, emailSenderSvc, cfg.CORSOrigin)
 	featureRequestSvc := service.NewFeatureRequestService(featureRequestRepo, supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, activitySvc)
 
+	faqRepo := repository.NewFAQRepository(pool)
+	faqSvc := service.NewFAQService(faqRepo)
+
 	sitemapRepo := repository.NewSitemapRepository(pool)
 	sitemapSvc := service.NewSitemapService(sitemapRepo, cfg.SiteURL, cfg.IndexNowKey, cfg.IndexNowKeyLocation, log.Logger)
 
@@ -206,7 +209,7 @@ func main() {
 	moderationSweeper := service.NewModerationSweeper(pool, log.Logger, cfg.ModerationFlagGrace, cfg.ModerationSweepInterval)
 	go moderationSweeper.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, sitemapSvc, muteRepo, rl, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

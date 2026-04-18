@@ -10,6 +10,9 @@ import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { toast } from '../store/toast'
+import { useSmartBack } from '../hooks/useSmartBack'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -98,6 +101,7 @@ export default function LeagueDetail() {
   const initialJoinCode = normalizeInviteCode(search?.code) || inviteCode
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const smartBack = useSmartBack('/leagues', ['/clubs/', '/feed', '/profile', '/leagues'])
   const currentUser = useAuthStore(s => s.user)
   const [joinError, setJoinError] = useState('')
   const [joinSuccess, setJoinSuccess] = useState(false)
@@ -291,9 +295,14 @@ export default function LeagueDetail() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/leagues" className="text-muted hover:text-secondary transition-colors">
+        <button
+          type="button"
+          onClick={smartBack}
+          aria-label="Back"
+          className="text-muted hover:text-secondary transition-colors"
+        >
           <ChevronLeft size={20} />
-        </Link>
+        </button>
         {league?.image_url && (
           <img
             src={league.image_url}
@@ -306,9 +315,12 @@ export default function LeagueDetail() {
             <div className="h-5 w-40 bg-surface rounded animate-pulse" />
           ) : (
             <>
-              <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary truncate">
-                {league?.name ?? 'League'}
-              </h1>
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary truncate">
+                  {league?.name ?? 'League'}
+                </h1>
+                <HelpIcon content={pageHelp.leagueDetail} />
+              </div>
               {league?.description && (
                 <p className="text-xs text-muted truncate mt-0.5">{league.description}</p>
               )}
