@@ -8,6 +8,7 @@ export default function ResetPassword() {
   const search = useSearch({ strict: false }) as { token?: string }
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-primary-dark.svg' : 'logo-primary-light.svg'}`
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -66,7 +67,7 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <img src={isDark ? '/logo-primary-dark.svg' : '/logo-primary-light.svg'} alt="SUB12" className="h-40 w-auto mx-auto" />
+          <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
           <p className="mt-4 text-sm tracking-widest uppercase text-muted">Set a new password</p>
         </div>
 

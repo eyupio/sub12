@@ -10,6 +10,7 @@ export default function Register() {
   const setAuth = useAuthStore((s) => s.setAuth)
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-primary-dark.svg' : 'logo-primary-light.svg'}`
 
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -40,7 +41,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <img src={isDark ? '/logo-primary-dark.svg' : '/logo-primary-light.svg'} alt="SUB12" className="h-40 w-auto mx-auto" />
+          <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
           <p className="mt-4 text-sm tracking-widest uppercase text-muted">Create your account</p>
         </div>
 

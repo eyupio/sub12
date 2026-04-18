@@ -500,6 +500,7 @@ export default function LandingPage() {
     (theme === 'system' &&
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const headerLogoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-horizontal-dark.svg' : 'logo-horizontal-light.svg'}`
 
   return (
     <div className="min-h-screen bg-page">
@@ -511,7 +512,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-subtle bg-nav backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3">
           <Link to="/" aria-label="SUB12 home" className="inline-flex items-center">
-            <img src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'} alt="SUB12" className="h-8 w-auto" />
+            <img src={headerLogoSrc} alt="SUB12" className="h-8 w-auto" />
           </Link>
           <nav className="hidden items-center gap-6 lg:flex">
             <a href="#how-it-works" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
