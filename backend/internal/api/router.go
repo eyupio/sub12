@@ -40,6 +40,7 @@ func NewRouter(
 	posts *service.PostService,
 	notifications *service.NotificationService,
 	moderation *service.ModerationService,
+	supportTickets *service.SupportTicketService,
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
@@ -188,6 +189,13 @@ func NewRouter(
 			// Moderation: user-submitted reports
 			reportH := handler.NewReport(moderation)
 			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
+			supportH := handler.NewSupportTicket(supportTickets)
+			r.With(rl.Limit("report")).Post("/support/tickets", supportH.Create)
+			r.Get("/support/tickets", supportH.ListMine)
+			r.Get("/support/tickets/{id}", supportH.Get)
+			r.Patch("/support/tickets/{id}", supportH.Update)
+			r.Post("/support/tickets/{id}/messages", supportH.AddMessage)
+			r.Post("/support/tickets/{id}/read", supportH.MarkRead)
 
 			// League/club scoped moderation (admins of that community).
 			r.Get("/leagues/{id}/reports", reportH.ListForLeague)
