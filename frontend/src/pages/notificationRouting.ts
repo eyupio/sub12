@@ -25,6 +25,8 @@ export function notificationSentence(n: Notification): string {
       return `Your club join request was approved`
     case 'mention':
       return `${actor} mentioned you`
+    case 'post_flagged':
+      return `${actor} flagged your post — please reflect and edit to amend`
     case 'report_filed': {
       const community = n.metadata?.community_name as string | undefined
       const target = (n.metadata?.target_label as string | undefined) ?? 'content'

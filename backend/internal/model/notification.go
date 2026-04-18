@@ -15,6 +15,7 @@ const (
 	NotificationTypeLeagueJoinApproved         = "league_join_approved"
 	NotificationTypeClubJoinApproved           = "club_join_approved"
 	NotificationTypeMention                    = "mention"
+	NotificationTypePostFlagged                = "post_flagged"
 	NotificationTypeReportFiled                = "report_filed"
 	NotificationTypeTicketCreated              = "ticket_created"
 	NotificationTypeTicketReplied              = "ticket_replied"
@@ -58,6 +59,7 @@ type NotificationPreferences struct {
 	LeagueJoinApproved              bool      `json:"league_join_approved"`
 	ClubJoinApproved                bool      `json:"club_join_approved"`
 	Mention                         bool      `json:"mention"`
+	PostFlagged                     bool      `json:"post_flagged"`
 	ReportFiled                     bool      `json:"report_filed"`
 	TicketCreated                   bool      `json:"ticket_created"`
 	TicketReplied                   bool      `json:"ticket_replied"`
@@ -76,6 +78,7 @@ type NotificationPreferences struct {
 	LeagueJoinApprovedEmail         bool      `json:"league_join_approved_email"`
 	ClubJoinApprovedEmail           bool      `json:"club_join_approved_email"`
 	MentionEmail                    bool      `json:"mention_email"`
+	PostFlaggedEmail                bool      `json:"post_flagged_email"`
 	TicketCreatedEmail              bool      `json:"ticket_created_email"`
 	TicketRepliedEmail              bool      `json:"ticket_replied_email"`
 	TicketAssignedEmail             bool      `json:"ticket_assigned_email"`
@@ -99,6 +102,7 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		LeagueJoinApproved:              true,
 		ClubJoinApproved:                true,
 		Mention:                         true,
+		PostFlagged:                     true,
 		ReportFiled:                     true,
 		TicketCreated:                   true,
 		TicketReplied:                   true,
@@ -117,6 +121,7 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		LeagueJoinApprovedEmail:         true,
 		ClubJoinApprovedEmail:           true,
 		MentionEmail:                    true,
+		PostFlaggedEmail:                true,
 		TicketCreatedEmail:              true,
 		TicketRepliedEmail:              true,
 		TicketAssignedEmail:             true,
@@ -150,6 +155,8 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 		return p.ClubJoinApproved
 	case NotificationTypeMention:
 		return p.Mention
+	case NotificationTypePostFlagged:
+		return p.PostFlagged
 	case NotificationTypeReportFiled:
 		return p.ReportFiled
 	case NotificationTypeTicketCreated:
@@ -194,6 +201,8 @@ func (p *NotificationPreferences) EmailEnabledForType(t string) bool {
 		return p.ClubJoinApprovedEmail
 	case NotificationTypeMention:
 		return p.MentionEmail
+	case NotificationTypePostFlagged:
+		return p.PostFlaggedEmail
 	case NotificationTypeTicketCreated:
 		return p.TicketCreatedEmail
 	case NotificationTypeTicketReplied:
@@ -221,6 +230,7 @@ type UpdateNotificationPrefsInput struct {
 	LeagueJoinApproved              *bool `json:"league_join_approved,omitempty"`
 	ClubJoinApproved                *bool `json:"club_join_approved,omitempty"`
 	Mention                         *bool `json:"mention,omitempty"`
+	PostFlagged                     *bool `json:"post_flagged,omitempty"`
 	ReportFiled                     *bool `json:"report_filed,omitempty"`
 	TicketCreated                   *bool `json:"ticket_created,omitempty"`
 	TicketReplied                   *bool `json:"ticket_replied,omitempty"`
@@ -239,6 +249,7 @@ type UpdateNotificationPrefsInput struct {
 	LeagueJoinApprovedEmail         *bool `json:"league_join_approved_email,omitempty"`
 	ClubJoinApprovedEmail           *bool `json:"club_join_approved_email,omitempty"`
 	MentionEmail                    *bool `json:"mention_email,omitempty"`
+	PostFlaggedEmail                *bool `json:"post_flagged_email,omitempty"`
 	TicketCreatedEmail              *bool `json:"ticket_created_email,omitempty"`
 	TicketRepliedEmail              *bool `json:"ticket_replied_email,omitempty"`
 	TicketAssignedEmail             *bool `json:"ticket_assigned_email,omitempty"`

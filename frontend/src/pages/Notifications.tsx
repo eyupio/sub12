@@ -17,6 +17,7 @@ const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   league_join_approved: Trophy,
   club_join_approved: UsersIcon,
   mention: AtSign,
+  post_flagged: Flag,
   report_filed: Flag,
   ticket_created: LifeBuoy,
   ticket_replied: MessageSquare,

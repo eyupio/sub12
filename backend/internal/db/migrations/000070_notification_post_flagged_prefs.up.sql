@@ -1,0 +1,3 @@
+ALTER TABLE notification_preferences
+    ADD COLUMN IF NOT EXISTS post_flagged BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS post_flagged_email BOOLEAN NOT NULL DEFAULT TRUE;
