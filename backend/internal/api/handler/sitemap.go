@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/service"
@@ -31,6 +32,21 @@ func (h *SitemapHandler) ServeXML(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// ServeIndexNowKeyFile responds with the currently active IndexNow key file.
+// GET /{key}.txt
+func (h *SitemapHandler) ServeIndexNowKeyFile(w http.ResponseWriter, r *http.Request) {
+	key := chi.URLParam(r, "key")
+	content, ok := h.svc.ResolveIndexNowKeyFile(key)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(content))
+}
+
 // AdminSitemapHandler provides admin endpoints for sitemap management.
 type AdminSitemapHandler struct {
 	svc *service.SitemapService
@@ -49,6 +65,12 @@ func (h *AdminSitemapHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)
+}
+
+// KeyInfo returns the currently active IndexNow key details.
+// GET /api/v1/admin/sitemap/indexnow-key
+func (h *AdminSitemapHandler) KeyInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.svc.IndexNowKeyInfo())
 }
 
 // Ping submits the sitemap URL to the requested search engines.

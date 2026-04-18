@@ -45,6 +45,11 @@ export default function AdminSitemap() {
     queryFn: adminSitemapApi.getStats,
   })
 
+  const indexNowKeyQuery = useQuery({
+    queryKey: ['admin-sitemap-indexnow-key'],
+    queryFn: adminSitemapApi.getIndexNowKey,
+  })
+
   const submissionsQuery = useQuery({
     queryKey: ['admin-sitemap-submissions', offset],
     queryFn: () => adminSitemapApi.listSubmissions(PAGE_SIZE, offset),
@@ -109,9 +114,36 @@ export default function AdminSitemap() {
       {/* Ping controls */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Submit Sitemap to Search Engines</h2>
-        <p className="text-xs text-muted">
-          IndexNow requires a configured key. Set <code>INDEXNOW_KEY</code> (and optionally <code>INDEXNOW_KEY_LOCATION</code>) on the API server before submitting.
-        </p>
+        {indexNowKeyQuery.error && (
+          <p className="text-sm text-red-400">{parseError(indexNowKeyQuery.error)}</p>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] tracking-widest uppercase text-muted">IndexNow Key</span>
+            <input
+              type="text"
+              value={indexNowKeyQuery.data?.key ?? ''}
+              readOnly
+              placeholder={indexNowKeyQuery.isLoading ? 'Loading key…' : 'Unavailable'}
+              className="w-full rounded border border-subtle bg-bg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-[var(--brass)]"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] tracking-widest uppercase text-muted">IndexNow Key Location</span>
+            <input
+              type="text"
+              value={indexNowKeyQuery.data?.key_location ?? ''}
+              readOnly
+              placeholder={indexNowKeyQuery.isLoading ? 'Loading location…' : 'Unavailable'}
+              className="w-full rounded border border-subtle bg-bg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-[var(--brass)]"
+            />
+          </label>
+        </div>
+        {indexNowKeyQuery.data && (
+          <p className="text-xs text-muted">
+            Key source: <span className="uppercase tracking-wide">{indexNowKeyQuery.data.source}</span>. This key is hosted automatically and used for IndexNow submissions.
+          </p>
+        )}
         <div className="flex flex-wrap gap-3">
           {engines.map((e) => (
             <label key={e.id} className="flex items-center gap-2 cursor-pointer select-none">
