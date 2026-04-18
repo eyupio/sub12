@@ -346,6 +346,7 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
   const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
@@ -386,7 +387,19 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
                 )}
               </span>
             </div>
-            <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+              {currentUser && currentUser.id !== r.user_id && (
+                <button
+                  onClick={() => setReportTargetId(r.id)}
+                  className="p-1 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
+                  aria-label="Report reply"
+                  title="Report inappropriate reply"
+                >
+                  <AlertTriangle size={12} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -417,6 +430,13 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
           </button>
         </div>
       )}
+
+      <ReportDialog
+        open={reportTargetId !== null}
+        targetType="comment"
+        targetId={reportTargetId ?? ''}
+        onClose={() => setReportTargetId(null)}
+      />
     </div>
   )
 }
@@ -431,6 +451,7 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [flagTargetId, setFlagTargetId] = useState<string | null>(null)
+  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
 
   const flagMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => commentApi.flag(id, reason),
@@ -612,6 +633,16 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
                             </button>
                           )
                         )}
+                        {currentUser && currentUser.id !== c.user_id && (
+                          <button
+                            onClick={() => setReportTargetId(c.id)}
+                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors"
+                            aria-label="Report comment"
+                            title="Report inappropriate comment"
+                          >
+                            <AlertTriangle size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
                     {/* Comment actions: like + reply toggle */}
@@ -690,6 +721,13 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
         onSubmit={async (reason) => {
           if (flagTargetId) await flagMutation.mutateAsync({ id: flagTargetId, reason })
         }}
+      />
+
+      <ReportDialog
+        open={reportTargetId !== null}
+        targetType="comment"
+        targetId={reportTargetId ?? ''}
+        onClose={() => setReportTargetId(null)}
       />
     </div>
   )
