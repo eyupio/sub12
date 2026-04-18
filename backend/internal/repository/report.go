@@ -18,16 +18,18 @@ func NewReportRepository(db *pgxpool.Pool) *ReportRepository {
 	return &ReportRepository{db: db}
 }
 
-// Create persists a new report in status=open.
-func (r *ReportRepository) Create(ctx context.Context, reporterID string, in *model.CreateReportInput) (*model.Report, error) {
+// Create persists a new report in status=open. leagueID and clubID are
+// optional scope values resolved by the service layer before calling this.
+func (r *ReportRepository) Create(ctx context.Context, reporterID string, in *model.CreateReportInput, leagueID, clubID *string) (*model.Report, error) {
 	report := &model.Report{}
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO reports (reporter_id, target_type, target_id, reason, notes, status)
-		VALUES ($1, $2, $3, $4, $5, 'open')
-		RETURNING id, reporter_id, target_type, target_id, reason, notes, status, decided_by, decided_at, created_at
-	`, reporterID, in.TargetType, in.TargetID, in.Reason, in.Notes).Scan(
+		INSERT INTO reports (reporter_id, target_type, target_id, reason, notes, status, league_id, club_id)
+		VALUES ($1, $2, $3, $4, $5, 'open', $6, $7)
+		RETURNING id, reporter_id, target_type, target_id, reason, notes, status, league_id, club_id, decided_by, decided_at, created_at
+	`, reporterID, in.TargetType, in.TargetID, in.Reason, in.Notes, leagueID, clubID).Scan(
 		&report.ID, &report.ReporterID, &report.TargetType, &report.TargetID,
 		&report.Reason, &report.Notes, &report.Status,
+		&report.LeagueID, &report.ClubID,
 		&report.DecidedBy, &report.DecidedAt, &report.CreatedAt,
 	)
 	if err != nil {
@@ -40,11 +42,12 @@ func (r *ReportRepository) Create(ctx context.Context, reporterID string, in *mo
 func (r *ReportRepository) GetByID(ctx context.Context, id string) (*model.Report, error) {
 	report := &model.Report{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, reporter_id, target_type, target_id, reason, notes, status, decided_by, decided_at, created_at
+		SELECT id, reporter_id, target_type, target_id, reason, notes, status, league_id, club_id, decided_by, decided_at, created_at
 		FROM reports WHERE id = $1
 	`, id).Scan(
 		&report.ID, &report.ReporterID, &report.TargetType, &report.TargetID,
 		&report.Reason, &report.Notes, &report.Status,
+		&report.LeagueID, &report.ClubID,
 		&report.DecidedBy, &report.DecidedAt, &report.CreatedAt,
 	)
 	if err != nil {
@@ -57,21 +60,40 @@ func (r *ReportRepository) GetByID(ctx context.Context, id string) (*model.Repor
 }
 
 // List returns reports filtered by status, newest first.
-func (r *ReportRepository) List(ctx context.Context, status string, limit int) ([]*model.Report, error) {
+// scope selects which slice of reports to return:
+//   - "platform"  → reports with no league_id and no club_id
+//   - "league"    → reports scoped to the given scopeID (league_id)
+//   - "club"      → reports scoped to the given scopeID (club_id)
+//   - ""          → no scope filter (admin-wide view)
+func (r *ReportRepository) List(ctx context.Context, status, scope, scopeID string, limit int) ([]*model.Report, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
 	query := `
-		SELECT id, reporter_id, target_type, target_id, reason, notes, status, decided_by, decided_at, created_at
+		SELECT id, reporter_id, target_type, target_id, reason, notes, status, league_id, club_id, decided_by, decided_at, created_at
 		FROM reports
 	`
 	args := []any{}
+	where := []string{}
 	if status != "" {
-		query += " WHERE status = $1"
 		args = append(args, status)
+		where = append(where, fmt.Sprintf("status = $%d", len(args)))
 	}
-	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", len(args)+1)
+	switch scope {
+	case "platform":
+		where = append(where, "league_id IS NULL AND club_id IS NULL")
+	case "league":
+		args = append(args, scopeID)
+		where = append(where, fmt.Sprintf("league_id = $%d", len(args)))
+	case "club":
+		args = append(args, scopeID)
+		where = append(where, fmt.Sprintf("club_id = $%d", len(args)))
+	}
+	if len(where) > 0 {
+		query += " WHERE " + joinAnd(where)
+	}
 	args = append(args, limit)
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", len(args))
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -85,6 +107,7 @@ func (r *ReportRepository) List(ctx context.Context, status string, limit int) (
 		if err := rows.Scan(
 			&report.ID, &report.ReporterID, &report.TargetType, &report.TargetID,
 			&report.Reason, &report.Notes, &report.Status,
+			&report.LeagueID, &report.ClubID,
 			&report.DecidedBy, &report.DecidedAt, &report.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan report: %w", err)
@@ -95,6 +118,17 @@ func (r *ReportRepository) List(ctx context.Context, status string, limit int) (
 		items = []*model.Report{}
 	}
 	return items, nil
+}
+
+func joinAnd(parts []string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += " AND "
+		}
+		out += p
+	}
+	return out
 }
 
 // SetStatus flips a report's status and records the deciding admin.

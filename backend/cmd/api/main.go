@@ -165,7 +165,10 @@ func main() {
 	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, log.Logger)
 
 	reportRepo := repository.NewReportRepository(pool)
-	moderationSvc := service.NewModerationService(reportRepo, postRepo)
+	moderationSvc := service.NewModerationService(
+		reportRepo, postRepo, commentRepo, leagueRepo, clubRepo, userRepo,
+		notificationSvc, emailSenderSvc, cfg.CORSOrigin, log.Logger,
+	)
 
 	// Wire notifications into services that fan out events. Done after
 	// construction to avoid cycles.

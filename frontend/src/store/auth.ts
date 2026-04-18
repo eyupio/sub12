@@ -16,6 +16,9 @@ interface User {
   show_follower_counts?: boolean
   default_distance_unit?: string
   default_measurement_unit?: string
+  date_format?: string
+  time_format?: string
+  timezone?: string
 }
 
 interface AuthState {

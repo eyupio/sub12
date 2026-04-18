@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users, Camera, Mail, Lock, Globe, UserCheck, UserX, Ruler } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera, Mail, Lock, Globe, UserCheck, UserX, Ruler, CalendarDays } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
@@ -11,6 +11,7 @@ import { gearApi } from '../api/gear'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { AchievementsSection } from '../components/AchievementsSection'
 import { toast } from '../store/toast'
+import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -358,6 +359,118 @@ function UnitPreferences() {
   )
 }
 
+function RegionalPreferences() {
+  const { user, updateUser } = useAuthStore()
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateProfileInput) => usersApi.updateMe(input),
+    onSuccess: (updated) => {
+      updateUser({
+        date_format: updated.date_format,
+        time_format: updated.time_format,
+        timezone: updated.timezone,
+      })
+      toast('Regional preferences saved', 'success')
+    },
+    onError: () => toast('Failed to save regional preferences', 'error'),
+  })
+
+  const currentDateFormat = (user?.date_format as DateFormat | undefined) ?? DEFAULT_PREFS.dateFormat
+  const currentTimeFormat = (user?.time_format as TimeFormat | undefined) ?? DEFAULT_PREFS.timeFormat
+  const currentTimezone = user?.timezone || DEFAULT_PREFS.timezone
+
+  const timezones: string[] = (() => {
+    const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+    if (typeof fn === 'function') return fn('timeZone')
+    return ['Europe/London', 'Europe/Dublin', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
+  })()
+
+  return (
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <CalendarDays size={14} className="text-muted" />
+        <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Preferences</h2>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Date Format
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {DATE_FORMAT_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => mutation.mutate({ date_format: value })}
+                disabled={mutation.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                  currentDateFormat === value
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted mt-1">
+            Preview: {formatDate(new Date(), { dateFormat: currentDateFormat, timeFormat: currentTimeFormat, timezone: currentTimezone })}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Time Format
+          </label>
+          <div className="flex gap-2">
+            {(['24h', '12h'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => mutation.mutate({ time_format: v })}
+                disabled={mutation.isPending}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                  currentTimeFormat === v
+                    ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                {v === '24h' ? '24-hour' : '12-hour'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="timezone-select" className="block text-[10px] tracking-widest uppercase text-muted mb-2">
+            Timezone
+          </label>
+          <select
+            id="timezone-select"
+            value={currentTimezone}
+            onChange={(e) => mutation.mutate({ timezone: e.target.value })}
+            disabled={mutation.isPending}
+            className="w-full max-w-xs px-3 py-1.5 rounded border border-subtle bg-surface text-secondary text-sm disabled:opacity-40"
+          >
+            {!timezones.includes(currentTimezone) && (
+              <option value={currentTimezone}>{currentTimezone}</option>
+            )}
+            {timezones.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-muted mt-1">
+            Dates and times in the app are displayed in this timezone.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Profile() {
   const { user, updateUser } = useAuthStore()
   const queryClient = useQueryClient()
@@ -698,6 +811,9 @@ export default function Profile() {
 
       {/* Unit Preferences */}
       <UnitPreferences />
+
+      {/* Regional Preferences */}
+      <RegionalPreferences />
 
       {/* Stats */}
       <div>

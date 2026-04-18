@@ -47,10 +47,12 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 		VALUES ($1, $2, $3, $4::club_type, $5::club_join_policy)
 		RETURNING id, name, description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility, allow_member_invites,
+		          date_format, time_format, timezone,
 		          created_by, created_at::text, updated_at::text
 	`, input.Name, input.Description, userID, clubType, joinPolicy).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 	)
 	if err != nil {
@@ -82,6 +84,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 			SELECT
 				c.id, c.name, c.description, c.image_url, c.join_code,
 				c.type::text, c.join_policy::text, c.post_visibility, c.allow_member_invites,
+				c.date_format, c.time_format, c.timezone,
 				c.created_by, c.created_at::text, c.updated_at::text,
 				(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count
 			FROM clubs c
@@ -105,6 +108,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		SELECT
 			c.id, c.name, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility, c.allow_member_invites,
+			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
 			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
 			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false) AS is_admin,
@@ -133,6 +137,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 			SELECT
 				c.id, c.name, c.description, c.image_url, c.join_code,
 				c.type::text, c.join_policy::text, c.post_visibility, c.allow_member_invites,
+				c.date_format, c.time_format, c.timezone,
 				c.created_by, c.created_at::text, c.updated_at::text,
 				COUNT(cm.user_id)::int AS member_count
 			FROM clubs c
@@ -167,6 +172,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		SELECT
 			c.id, c.name, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility, c.allow_member_invites,
+			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
 			COUNT(cm.user_id)::int AS member_count,
 			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $1::uuid), false) AS is_admin,
@@ -204,6 +210,7 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 		SELECT
 			c.id, c.name, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility, c.allow_member_invites,
+			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
 			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
 			cm.is_admin
@@ -257,6 +264,26 @@ func (r *ClubRepository) IsMember(ctx context.Context, clubID, userID string) (b
 		SELECT EXISTS(SELECT 1 FROM club_members WHERE club_id = $1 AND user_id = $2)
 	`, clubID, userID).Scan(&isMember)
 	return isMember, err
+}
+
+// ListAdminIDs returns the user IDs of all admins for a club.
+func (r *ClubRepository) ListAdminIDs(ctx context.Context, clubID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id FROM club_members WHERE club_id = $1 AND is_admin = TRUE
+	`, clubID)
+	if err != nil {
+		return nil, fmt.Errorf("list club admin ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan club admin id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // CountMembershipsByUser returns how many clubs the user has joined.
@@ -376,15 +403,22 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 		    join_policy          = COALESCE($5::club_join_policy, join_policy),
 		    post_visibility      = COALESCE($6, post_visibility),
 		    allow_member_invites = COALESCE($7, allow_member_invites),
+		    date_format          = COALESCE($8, date_format),
+		    time_format          = COALESCE($9, time_format),
+		    timezone             = COALESCE($10, timezone),
 		    updated_at           = NOW()
 		WHERE id = $1
 		RETURNING id, name, description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility, allow_member_invites,
+		          date_format, time_format, timezone,
 		          created_by, created_at::text, updated_at::text,
 		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
-	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.AllowMemberInvites).Scan(
+	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.AllowMemberInvites,
+		in.DateFormat, in.TimeFormat, in.Timezone,
+	).Scan(
 		&club.ID, &club.Name, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility, &club.AllowMemberInvites,
+		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 		&club.MemberCount,
 	)

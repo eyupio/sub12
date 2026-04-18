@@ -25,6 +25,9 @@ type Club struct {
 	JoinPolicy         string  `json:"join_policy"`
 	PostVisibility     string  `json:"post_visibility"`
 	AllowMemberInvites bool    `json:"allow_member_invites"`
+	DateFormat         string  `json:"date_format"`
+	TimeFormat         string  `json:"time_format"`
+	Timezone           string  `json:"timezone"`
 	CreatedBy          string  `json:"created_by"`
 	CreatedAt          string  `json:"created_at"`
 	UpdatedAt          string  `json:"updated_at"`

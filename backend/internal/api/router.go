@@ -200,6 +200,12 @@ func NewRouter(
 			reportH := handler.NewReport(moderation)
 			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
 
+			// League/club scoped moderation (admins of that community).
+			r.Get("/leagues/{id}/reports", reportH.ListForLeague)
+			r.Post("/leagues/{id}/reports/{reportId}/decide", reportH.DecideForLeague)
+			r.Get("/clubs/{id}/reports", reportH.ListForClub)
+			r.Post("/clubs/{id}/reports/{reportId}/decide", reportH.DecideForClub)
+
 			// Score card comments (write operations — auth required)
 			r.With(rl.Limit("comment")).Post("/score-cards/{id}/comments", commentH.Create)
 			r.Patch("/score-cards/{id}/comments/{commentId}", commentH.Update)

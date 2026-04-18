@@ -11,6 +11,9 @@ export interface League {
   club_id?: string
   created_by: string
   member_count: number
+  date_format: string
+  time_format: string
+  timezone: string
   created_at: string
 }
 
@@ -196,6 +199,9 @@ export const leagueApi = {
       description?: string
       type?: 'public' | 'private'
       post_visibility?: 'members' | 'public'
+      date_format?: string
+      time_format?: string
+      timezone?: string
     },
   ) => api.patch<League>(`/leagues/${id}`, payload),
 

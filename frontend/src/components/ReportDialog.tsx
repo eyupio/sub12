@@ -9,6 +9,12 @@ interface ReportDialogProps {
   targetType: ReportTargetType
   targetId: string
   onClose: () => void
+  /** League id to scope the report to. Only used for `user` targets; ignored for content targets (scope is derived from the target itself). */
+  contextLeagueId?: string
+  /** Club id to scope the report to. Only used for `user` targets; ignored for content targets. */
+  contextClubId?: string
+  /** Display name of the community (league or club) to mention in the success toast. */
+  communityName?: string
 }
 
 const REASONS = [
@@ -19,7 +25,7 @@ const REASONS = [
   'Other',
 ]
 
-export function ReportDialog({ open, targetType, targetId, onClose }: ReportDialogProps) {
+export function ReportDialog({ open, targetType, targetId, onClose, contextLeagueId, contextClubId, communityName }: ReportDialogProps) {
   const [reason, setReason] = useState(REASONS[0])
   const [notes, setNotes] = useState('')
   const firstRef = useRef<HTMLSelectElement>(null)
@@ -67,9 +73,16 @@ export function ReportDialog({ open, targetType, targetId, onClose }: ReportDial
       target_id: targetId,
       reason,
       notes: notes.trim() || undefined,
+      context_league_id: contextLeagueId,
+      context_club_id: contextClubId,
     }),
     onSuccess: () => {
-      toast('Report submitted — thanks', 'success')
+      toast(
+        communityName
+          ? `Report sent to ${communityName} admins`
+          : 'Report submitted — thanks',
+        'success',
+      )
       setNotes('')
       onClose()
     },

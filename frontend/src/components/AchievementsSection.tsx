@@ -1,6 +1,7 @@
 import { Lock, Share2 } from 'lucide-react'
 import { Achievement, AchievementDef } from '../api/achievements'
 import { iconForAchievement } from '../utils/achievementIcons'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 interface Props {
   earned: Achievement[]
@@ -11,12 +12,8 @@ interface Props {
   onShareEarned?: (def: AchievementDef) => void
 }
 
-function formatEarnedDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
 export function AchievementsSection({ earned, allDefs, onShareEarned }: Props) {
+  const prefs = useRegionalPrefs()
   // Nothing to show when the catalog hasn't loaded yet and the user has no earned items.
   if (allDefs.length === 0 && earned.length === 0) return null
 
@@ -84,7 +81,7 @@ export function AchievementsSection({ earned, allDefs, onShareEarned }: Props) {
               </p>
               {isEarned ? (
                 <p className="text-[9px] text-muted uppercase tracking-widest">
-                  {formatEarnedDate(userAward.earned_at)}
+                  {formatDate(userAward.earned_at, prefs)}
                 </p>
               ) : (
                 <p className="text-[9px] text-muted leading-tight line-clamp-2">

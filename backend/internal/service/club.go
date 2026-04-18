@@ -292,6 +292,15 @@ func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string
 	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
 		return nil, ErrInvalidClub
 	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return nil, ErrInvalidClub
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return nil, ErrInvalidClub
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
+		return nil, ErrInvalidClub
+	}
 	club, err := s.repo.AdminUpdate(ctx, clubID, in)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrClubNotFound, err)
@@ -371,6 +380,18 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 // AdminUpdateClub applies a partial update to any club without ownership checks.
 func (s *ClubService) AdminUpdateClub(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, ErrInvalidClub
+	}
+	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
+		return nil, ErrInvalidClub
+	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return nil, ErrInvalidClub
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return nil, ErrInvalidClub
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
 		return nil, ErrInvalidClub
 	}
 	club, err := s.repo.AdminUpdate(ctx, id, in)

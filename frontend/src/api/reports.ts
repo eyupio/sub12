@@ -12,6 +12,8 @@ export interface Report {
   reason: string
   notes?: string
   status: ReportStatus
+  league_id?: string
+  club_id?: string
   decided_by?: string
   decided_at?: string
   created_at: string
@@ -22,6 +24,8 @@ export interface CreateReportPayload {
   target_id: string
   reason: string
   notes?: string
+  context_league_id?: string
+  context_club_id?: string
 }
 
 export interface DecidePayload {
@@ -29,12 +33,24 @@ export interface DecidePayload {
   notes?: string
 }
 
+function statusQuery(status?: ReportStatus, limit = 50) {
+  const parts = [`limit=${limit}`]
+  if (status) parts.push(`status=${status}`)
+  return parts.join('&')
+}
+
 export const reportsApi = {
   create: (payload: CreateReportPayload) => api.post<Report>('/reports', payload),
   adminList: (status?: ReportStatus, limit = 50) =>
-    api.get<{ items: Report[] }>(
-      `/admin/reports?limit=${limit}${status ? `&status=${status}` : ''}`,
-    ),
+    api.get<{ items: Report[] }>(`/admin/reports?${statusQuery(status, limit)}`),
   adminDecide: (id: string, payload: DecidePayload) =>
     api.post<Report>(`/admin/reports/${id}/decide`, payload),
+  listForLeague: (leagueId: string, status?: ReportStatus, limit = 50) =>
+    api.get<{ items: Report[] }>(`/leagues/${leagueId}/reports?${statusQuery(status, limit)}`),
+  decideForLeague: (leagueId: string, reportId: string, payload: DecidePayload) =>
+    api.post<Report>(`/leagues/${leagueId}/reports/${reportId}/decide`, payload),
+  listForClub: (clubId: string, status?: ReportStatus, limit = 50) =>
+    api.get<{ items: Report[] }>(`/clubs/${clubId}/reports?${statusQuery(status, limit)}`),
+  decideForClub: (clubId: string, reportId: string, payload: DecidePayload) =>
+    api.post<Report>(`/clubs/${clubId}/reports/${reportId}/decide`, payload),
 }

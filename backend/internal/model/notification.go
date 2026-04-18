@@ -15,6 +15,7 @@ const (
 	NotificationTypeLeagueJoinApproved = "league_join_approved"
 	NotificationTypeClubJoinApproved   = "club_join_approved"
 	NotificationTypeMention            = "mention"
+	NotificationTypeReportFiled        = "report_filed"
 )
 
 // Notification is a single delivered in-app notification row.
@@ -49,6 +50,7 @@ type NotificationPreferences struct {
 	LeagueJoinApproved  bool      `json:"league_join_approved"`
 	ClubJoinApproved    bool      `json:"club_join_approved"`
 	Mention             bool      `json:"mention"`
+	ReportFiled         bool      `json:"report_filed"`
 	DigestEmail         bool      `json:"digest_email"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
@@ -68,6 +70,7 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		LeagueJoinApproved: true,
 		ClubJoinApproved:   true,
 		Mention:            true,
+		ReportFiled:        true,
 		DigestEmail:        false,
 	}
 }
@@ -97,6 +100,8 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 		return p.ClubJoinApproved
 	case NotificationTypeMention:
 		return p.Mention
+	case NotificationTypeReportFiled:
+		return p.ReportFiled
 	}
 	return true
 }
@@ -114,5 +119,6 @@ type UpdateNotificationPrefsInput struct {
 	LeagueJoinApproved  *bool `json:"league_join_approved,omitempty"`
 	ClubJoinApproved    *bool `json:"club_join_approved,omitempty"`
 	Mention             *bool `json:"mention,omitempty"`
+	ReportFiled         *bool `json:"report_filed,omitempty"`
 	DigestEmail         *bool `json:"digest_email,omitempty"`
 }
