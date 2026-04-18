@@ -142,14 +142,24 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		SELECT user_id, follow_request, follow_accepted, comment_on_my_card,
 		       reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 		       score_amended, league_join_approved, club_join_approved, mention,
-		       digest_email, updated_at
+		       digest_email,
+		       follow_request_email, follow_accepted_email, comment_on_my_card_email,
+		       reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
+		       score_rejected_email, score_amended_email, league_join_approved_email,
+		       club_join_approved_email, mention_email,
+		       updated_at
 		FROM notification_preferences
 		WHERE user_id = $1
 	`, userID).Scan(
 		&p.UserID, &p.FollowRequest, &p.FollowAccepted, &p.CommentOnMyCard,
 		&p.ReplyToMyComment, &p.LikeOnMyContent, &p.ScoreVerified, &p.ScoreRejected,
 		&p.ScoreAmended, &p.LeagueJoinApproved, &p.ClubJoinApproved, &p.Mention,
-		&p.DigestEmail, &p.UpdatedAt,
+		&p.DigestEmail,
+		&p.FollowRequestEmail, &p.FollowAcceptedEmail, &p.CommentOnMyCardEmail,
+		&p.ReplyToMyCommentEmail, &p.LikeOnMyContentEmail, &p.ScoreVerifiedEmail,
+		&p.ScoreRejectedEmail, &p.ScoreAmendedEmail, &p.LeagueJoinApprovedEmail,
+		&p.ClubJoinApprovedEmail, &p.MentionEmail,
+		&p.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -202,34 +212,91 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.DigestEmail != nil {
 		current.DigestEmail = *in.DigestEmail
 	}
+	if in.FollowRequestEmail != nil {
+		current.FollowRequestEmail = *in.FollowRequestEmail
+	}
+	if in.FollowAcceptedEmail != nil {
+		current.FollowAcceptedEmail = *in.FollowAcceptedEmail
+	}
+	if in.CommentOnMyCardEmail != nil {
+		current.CommentOnMyCardEmail = *in.CommentOnMyCardEmail
+	}
+	if in.ReplyToMyCommentEmail != nil {
+		current.ReplyToMyCommentEmail = *in.ReplyToMyCommentEmail
+	}
+	if in.LikeOnMyContentEmail != nil {
+		current.LikeOnMyContentEmail = *in.LikeOnMyContentEmail
+	}
+	if in.ScoreVerifiedEmail != nil {
+		current.ScoreVerifiedEmail = *in.ScoreVerifiedEmail
+	}
+	if in.ScoreRejectedEmail != nil {
+		current.ScoreRejectedEmail = *in.ScoreRejectedEmail
+	}
+	if in.ScoreAmendedEmail != nil {
+		current.ScoreAmendedEmail = *in.ScoreAmendedEmail
+	}
+	if in.LeagueJoinApprovedEmail != nil {
+		current.LeagueJoinApprovedEmail = *in.LeagueJoinApprovedEmail
+	}
+	if in.ClubJoinApprovedEmail != nil {
+		current.ClubJoinApprovedEmail = *in.ClubJoinApprovedEmail
+	}
+	if in.MentionEmail != nil {
+		current.MentionEmail = *in.MentionEmail
+	}
 
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO notification_preferences (
 			user_id, follow_request, follow_accepted, comment_on_my_card,
 			reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 			score_amended, league_join_approved, club_join_approved, mention,
-			digest_email, updated_at
+			digest_email,
+			follow_request_email, follow_accepted_email, comment_on_my_card_email,
+			reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
+			score_rejected_email, score_amended_email, league_join_approved_email,
+			club_join_approved_email, mention_email,
+			updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+			NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
-			follow_request       = EXCLUDED.follow_request,
-			follow_accepted      = EXCLUDED.follow_accepted,
-			comment_on_my_card   = EXCLUDED.comment_on_my_card,
-			reply_to_my_comment  = EXCLUDED.reply_to_my_comment,
-			like_on_my_content   = EXCLUDED.like_on_my_content,
-			score_verified       = EXCLUDED.score_verified,
-			score_rejected       = EXCLUDED.score_rejected,
-			score_amended        = EXCLUDED.score_amended,
-			league_join_approved = EXCLUDED.league_join_approved,
-			club_join_approved   = EXCLUDED.club_join_approved,
-			mention              = EXCLUDED.mention,
-			digest_email         = EXCLUDED.digest_email,
-			updated_at           = NOW()
-	`, current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
+			follow_request             = EXCLUDED.follow_request,
+			follow_accepted            = EXCLUDED.follow_accepted,
+			comment_on_my_card         = EXCLUDED.comment_on_my_card,
+			reply_to_my_comment        = EXCLUDED.reply_to_my_comment,
+			like_on_my_content         = EXCLUDED.like_on_my_content,
+			score_verified             = EXCLUDED.score_verified,
+			score_rejected             = EXCLUDED.score_rejected,
+			score_amended              = EXCLUDED.score_amended,
+			league_join_approved       = EXCLUDED.league_join_approved,
+			club_join_approved         = EXCLUDED.club_join_approved,
+			mention                    = EXCLUDED.mention,
+			digest_email               = EXCLUDED.digest_email,
+			follow_request_email       = EXCLUDED.follow_request_email,
+			follow_accepted_email      = EXCLUDED.follow_accepted_email,
+			comment_on_my_card_email   = EXCLUDED.comment_on_my_card_email,
+			reply_to_my_comment_email  = EXCLUDED.reply_to_my_comment_email,
+			like_on_my_content_email   = EXCLUDED.like_on_my_content_email,
+			score_verified_email       = EXCLUDED.score_verified_email,
+			score_rejected_email       = EXCLUDED.score_rejected_email,
+			score_amended_email        = EXCLUDED.score_amended_email,
+			league_join_approved_email = EXCLUDED.league_join_approved_email,
+			club_join_approved_email   = EXCLUDED.club_join_approved_email,
+			mention_email              = EXCLUDED.mention_email,
+			updated_at                 = NOW()
+	`,
+		current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
 		current.ReplyToMyComment, current.LikeOnMyContent, current.ScoreVerified, current.ScoreRejected,
 		current.ScoreAmended, current.LeagueJoinApproved, current.ClubJoinApproved, current.Mention,
-		current.DigestEmail)
+		current.DigestEmail,
+		current.FollowRequestEmail, current.FollowAcceptedEmail, current.CommentOnMyCardEmail,
+		current.ReplyToMyCommentEmail, current.LikeOnMyContentEmail, current.ScoreVerifiedEmail,
+		current.ScoreRejectedEmail, current.ScoreAmendedEmail, current.LeagueJoinApprovedEmail,
+		current.ClubJoinApprovedEmail, current.MentionEmail,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("upsert prefs: %w", err)
 	}

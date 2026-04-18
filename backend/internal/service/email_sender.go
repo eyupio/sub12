@@ -109,6 +109,50 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
 }
 
+// SendNotification sends a generic notification email to toEmail using the
+// `notification_generic` template. The provided subject and body are injected
+// as `notification_title` and `notification_body` placeholders respectively.
+func (s *EmailSenderService) SendNotification(ctx context.Context, toEmail, displayName, subject, body string) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, "notification_generic")
+	if err != nil {
+		return fmt.Errorf("load notification_generic template: %w", err)
+	}
+	if !tpl.IsEnabled {
+		s.log.Warn().Msg("notification_generic template disabled; skipping email send")
+		return nil
+	}
+	payload := map[string]any{
+		"display_name":       displayName,
+		"notification_title": subject,
+		"notification_body":  body,
+	}
+	renderedSubject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification subject: %w", err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification text: %w", err)
+	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification html: %w", err)
+	}
+
+	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("load smtp settings: %w", err)
+	}
+
+	fromName := "Sub-12"
+	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
+		fromName = strings.TrimSpace(*settings.FromName)
+	}
+	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, renderedSubject, textBody, htmlBody))
+}
+
 func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
 	boundary := fmt.Sprintf("=_sub12_%x", rand.Int63())
 	msg := strings.Builder{}

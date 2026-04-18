@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -15,11 +16,20 @@ type NotificationService struct {
 	repo    *repository.NotificationRepository
 	blocks  *repository.BlockRepository
 	mutes   *repository.MuteRepository
+	users   *repository.UserRepository
+	emailer *EmailSenderService
 	logger  zerolog.Logger
 }
 
-func NewNotificationService(repo *repository.NotificationRepository, blocks *repository.BlockRepository, mutes *repository.MuteRepository, logger zerolog.Logger) *NotificationService {
-	return &NotificationService{repo: repo, blocks: blocks, mutes: mutes, logger: logger}
+func NewNotificationService(
+	repo *repository.NotificationRepository,
+	blocks *repository.BlockRepository,
+	mutes *repository.MuteRepository,
+	users *repository.UserRepository,
+	emailer *EmailSenderService,
+	logger zerolog.Logger,
+) *NotificationService {
+	return &NotificationService{repo: repo, blocks: blocks, mutes: mutes, users: users, emailer: emailer, logger: logger}
 }
 
 // NotifEvent is the input to Fanout. One Fanout call produces one notification
@@ -39,6 +49,9 @@ type NotifEvent struct {
 // preferences, blocks and mutes. Self-notifications are silently dropped.
 // Errors are logged but never returned to callers — a failed notification must
 // never prevent the user-facing action from succeeding.
+//
+// When the recipient has opted in to email for the event type, an email is
+// also dispatched asynchronously on a background context.
 func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	if s == nil || s.repo == nil {
 		return
@@ -90,6 +103,67 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	if err := s.repo.Insert(ctx, n); err != nil {
 		s.logger.Warn().Err(err).Str("type", ev.Type).Str("recipient_id", ev.RecipientID).Msg("insert notification failed")
 	}
+
+	if !prefs.EmailEnabledForType(ev.Type) {
+		return
+	}
+	if s.users == nil || s.emailer == nil {
+		return
+	}
+	recipient, err := s.users.GetByID(ctx, ev.RecipientID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("recipient_id", ev.RecipientID).Msg("load recipient for notification email failed")
+		return
+	}
+	actorName := ""
+	if ev.ActorID != "" {
+		if a, err := s.users.GetByID(ctx, ev.ActorID); err == nil {
+			actorName = a.DisplayName
+		}
+	}
+	subject, body := notificationEmailContent(ev, actorName)
+	go func(toEmail, displayName, subject, body, evType string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.emailer.SendNotification(bgCtx, toEmail, displayName, subject, body); err != nil {
+			s.logger.Warn().Err(err).Str("type", evType).Msg("send notification email failed")
+		}
+	}(recipient.Email, recipient.DisplayName, subject, body, ev.Type)
+}
+
+// notificationEmailContent maps a NotifEvent to a user-facing email subject
+// and a single-sentence notification body. Unknown types fall back to a
+// generic message.
+func notificationEmailContent(ev NotifEvent, actorName string) (subject, body string) {
+	actor := actorName
+	if actor == "" {
+		actor = "Someone"
+	}
+	switch ev.Type {
+	case model.NotificationTypeFollowRequest:
+		return "New follow request on Sub-12", actor + " wants to follow you on Sub-12."
+	case model.NotificationTypeFollowAccepted:
+		return "New follower on Sub-12", actor + " is now following you on Sub-12."
+	case model.NotificationTypeCommentOnCard:
+		return "New comment on your score card", actor + " commented on your score card."
+	case model.NotificationTypeReplyToMyComment:
+		return "New reply to your comment", actor + " replied to your comment."
+	case model.NotificationTypeLikeOnMyContent:
+		return "Someone liked your content", actor + " liked your content on Sub-12."
+	case model.NotificationTypeScoreVerified:
+		return "Your score was verified", "A league admin verified your score card."
+	case model.NotificationTypeScoreRejected:
+		return "Your score was rejected", "A league admin rejected your score card."
+	case model.NotificationTypeScoreAmended:
+		return "Your score was amended", "A league admin amended your score card."
+	case model.NotificationTypeLeagueJoinApproved:
+		return "League join approved", "Your request to join a league was approved."
+	case model.NotificationTypeClubJoinApproved:
+		return "Club join approved", "Your request to join a club was approved."
+	case model.NotificationTypeMention:
+		return "You were mentioned on Sub-12", actor + " mentioned you on Sub-12."
+	}
+	return "New Sub-12 notification", "You have a new notification on Sub-12."
 }
 
 // List returns a page of notifications for the recipient.

@@ -34,23 +34,36 @@ type Notification struct {
 	CreatedAt         time.Time      `json:"created_at"`
 }
 
-// NotificationPreferences holds per-type opt-in flags.
-// Missing rows in the DB imply all-defaults-true (see DefaultNotificationPreferences).
+// NotificationPreferences holds per-type opt-in flags. The base flags gate
+// in-app delivery; the *_email flags gate email delivery for the same type.
+// Missing rows in the DB imply all in-app defaults true and all email defaults
+// false (see DefaultNotificationPreferences).
 type NotificationPreferences struct {
-	UserID              string    `json:"user_id"`
-	FollowRequest       bool      `json:"follow_request"`
-	FollowAccepted      bool      `json:"follow_accepted"`
-	CommentOnMyCard     bool      `json:"comment_on_my_card"`
-	ReplyToMyComment    bool      `json:"reply_to_my_comment"`
-	LikeOnMyContent     bool      `json:"like_on_my_content"`
-	ScoreVerified       bool      `json:"score_verified"`
-	ScoreRejected       bool      `json:"score_rejected"`
-	ScoreAmended        bool      `json:"score_amended"`
-	LeagueJoinApproved  bool      `json:"league_join_approved"`
-	ClubJoinApproved    bool      `json:"club_join_approved"`
-	Mention             bool      `json:"mention"`
-	DigestEmail         bool      `json:"digest_email"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	UserID                  string    `json:"user_id"`
+	FollowRequest           bool      `json:"follow_request"`
+	FollowAccepted          bool      `json:"follow_accepted"`
+	CommentOnMyCard         bool      `json:"comment_on_my_card"`
+	ReplyToMyComment        bool      `json:"reply_to_my_comment"`
+	LikeOnMyContent         bool      `json:"like_on_my_content"`
+	ScoreVerified           bool      `json:"score_verified"`
+	ScoreRejected           bool      `json:"score_rejected"`
+	ScoreAmended            bool      `json:"score_amended"`
+	LeagueJoinApproved      bool      `json:"league_join_approved"`
+	ClubJoinApproved        bool      `json:"club_join_approved"`
+	Mention                 bool      `json:"mention"`
+	DigestEmail             bool      `json:"digest_email"`
+	FollowRequestEmail      bool      `json:"follow_request_email"`
+	FollowAcceptedEmail     bool      `json:"follow_accepted_email"`
+	CommentOnMyCardEmail    bool      `json:"comment_on_my_card_email"`
+	ReplyToMyCommentEmail   bool      `json:"reply_to_my_comment_email"`
+	LikeOnMyContentEmail    bool      `json:"like_on_my_content_email"`
+	ScoreVerifiedEmail      bool      `json:"score_verified_email"`
+	ScoreRejectedEmail      bool      `json:"score_rejected_email"`
+	ScoreAmendedEmail       bool      `json:"score_amended_email"`
+	LeagueJoinApprovedEmail bool      `json:"league_join_approved_email"`
+	ClubJoinApprovedEmail   bool      `json:"club_join_approved_email"`
+	MentionEmail            bool      `json:"mention_email"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 // DefaultNotificationPreferences returns the defaults used when no row exists.
@@ -101,18 +114,59 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 	return true
 }
 
+// EmailEnabledForType returns whether the user wants email for a given type.
+// Unknown types return false (email is opt-in).
+func (p *NotificationPreferences) EmailEnabledForType(t string) bool {
+	switch t {
+	case NotificationTypeFollowRequest:
+		return p.FollowRequestEmail
+	case NotificationTypeFollowAccepted:
+		return p.FollowAcceptedEmail
+	case NotificationTypeCommentOnCard:
+		return p.CommentOnMyCardEmail
+	case NotificationTypeReplyToMyComment:
+		return p.ReplyToMyCommentEmail
+	case NotificationTypeLikeOnMyContent:
+		return p.LikeOnMyContentEmail
+	case NotificationTypeScoreVerified:
+		return p.ScoreVerifiedEmail
+	case NotificationTypeScoreRejected:
+		return p.ScoreRejectedEmail
+	case NotificationTypeScoreAmended:
+		return p.ScoreAmendedEmail
+	case NotificationTypeLeagueJoinApproved:
+		return p.LeagueJoinApprovedEmail
+	case NotificationTypeClubJoinApproved:
+		return p.ClubJoinApprovedEmail
+	case NotificationTypeMention:
+		return p.MentionEmail
+	}
+	return false
+}
+
 // UpdateNotificationPrefsInput is the PATCH payload for preferences.
 type UpdateNotificationPrefsInput struct {
-	FollowRequest       *bool `json:"follow_request,omitempty"`
-	FollowAccepted      *bool `json:"follow_accepted,omitempty"`
-	CommentOnMyCard     *bool `json:"comment_on_my_card,omitempty"`
-	ReplyToMyComment    *bool `json:"reply_to_my_comment,omitempty"`
-	LikeOnMyContent     *bool `json:"like_on_my_content,omitempty"`
-	ScoreVerified       *bool `json:"score_verified,omitempty"`
-	ScoreRejected       *bool `json:"score_rejected,omitempty"`
-	ScoreAmended        *bool `json:"score_amended,omitempty"`
-	LeagueJoinApproved  *bool `json:"league_join_approved,omitempty"`
-	ClubJoinApproved    *bool `json:"club_join_approved,omitempty"`
-	Mention             *bool `json:"mention,omitempty"`
-	DigestEmail         *bool `json:"digest_email,omitempty"`
+	FollowRequest           *bool `json:"follow_request,omitempty"`
+	FollowAccepted          *bool `json:"follow_accepted,omitempty"`
+	CommentOnMyCard         *bool `json:"comment_on_my_card,omitempty"`
+	ReplyToMyComment        *bool `json:"reply_to_my_comment,omitempty"`
+	LikeOnMyContent         *bool `json:"like_on_my_content,omitempty"`
+	ScoreVerified           *bool `json:"score_verified,omitempty"`
+	ScoreRejected           *bool `json:"score_rejected,omitempty"`
+	ScoreAmended            *bool `json:"score_amended,omitempty"`
+	LeagueJoinApproved      *bool `json:"league_join_approved,omitempty"`
+	ClubJoinApproved        *bool `json:"club_join_approved,omitempty"`
+	Mention                 *bool `json:"mention,omitempty"`
+	DigestEmail             *bool `json:"digest_email,omitempty"`
+	FollowRequestEmail      *bool `json:"follow_request_email,omitempty"`
+	FollowAcceptedEmail     *bool `json:"follow_accepted_email,omitempty"`
+	CommentOnMyCardEmail    *bool `json:"comment_on_my_card_email,omitempty"`
+	ReplyToMyCommentEmail   *bool `json:"reply_to_my_comment_email,omitempty"`
+	LikeOnMyContentEmail    *bool `json:"like_on_my_content_email,omitempty"`
+	ScoreVerifiedEmail      *bool `json:"score_verified_email,omitempty"`
+	ScoreRejectedEmail      *bool `json:"score_rejected_email,omitempty"`
+	ScoreAmendedEmail       *bool `json:"score_amended_email,omitempty"`
+	LeagueJoinApprovedEmail *bool `json:"league_join_approved_email,omitempty"`
+	ClubJoinApprovedEmail   *bool `json:"club_join_approved_email,omitempty"`
+	MentionEmail            *bool `json:"mention_email,omitempty"`
 }
