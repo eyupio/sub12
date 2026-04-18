@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import {
   Target, Trophy, MessageSquare, Star, RefreshCw,
   Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck, Send,
+  Lightbulb, CheckCircle,
 } from 'lucide-react'
 import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
@@ -207,6 +208,41 @@ function ActivityCard({ item }: { item: ActivityItem }) {
             )}
           </p>
         )
+      case 'feature_request_created':
+        return (
+          <p className="text-sm text-secondary">
+            {'New feature request: '}
+            {item.target_id ? (
+              <Link
+                to="/feature-requests/$id"
+                params={{ id: item.target_id }}
+                className="text-[var(--brass)] hover:underline font-medium"
+              >
+                {item.metadata?.title ?? 'View details'}
+              </Link>
+            ) : (
+              <span className="font-medium text-primary">{item.metadata?.title ?? 'a feature request'}</span>
+            )}
+            {item.metadata?.scope_type && <span className="text-muted"> · {item.metadata.scope_type}</span>}
+          </p>
+        )
+      case 'feature_request_implemented':
+        return (
+          <p className="text-sm text-secondary">
+            {'Feature implemented: '}
+            {item.target_id ? (
+              <Link
+                to="/feature-requests/$id"
+                params={{ id: item.target_id }}
+                className="text-[var(--brass)] hover:underline font-medium"
+              >
+                {item.metadata?.title ?? 'View details'}
+              </Link>
+            ) : (
+              <span className="font-medium text-primary">{item.metadata?.title ?? 'a feature'}</span>
+            )}
+          </p>
+        )
       case 'achievement_earned': {
         const AchIcon = iconForAchievement(item.metadata?.achievement_icon)
         const achName = item.metadata?.achievement_name ?? 'an achievement'
@@ -253,6 +289,8 @@ function ActivityCard({ item }: { item: ActivityItem }) {
       case 'league_round_opened': return <PlayCircle size={14} className="text-muted" />
       case 'league_season_started': return <CalendarPlus size={14} className="text-muted" />
       case 'achievement_earned': return <Award size={14} className="text-[var(--brass)]" />
+      case 'feature_request_created': return <Lightbulb size={14} className="text-[var(--brass)]" />
+      case 'feature_request_implemented': return <CheckCircle size={14} className="text-[var(--brass)]" />
       default: return null
     }
   }

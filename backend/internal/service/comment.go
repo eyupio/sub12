@@ -25,14 +25,15 @@ type ModerationScope struct {
 }
 
 type CommentService struct {
-	comments     *repository.CommentRepository
-	scoreCards   *repository.ScoreCardRepository
-	posts        *repository.PostRepository
-	postSvc      *PostService
-	blocks       *repository.BlockRepository
-	leagues      *repository.LeagueRepository
-	clubs        *repository.ClubRepository
-	achievements *AchievementService // optional; nil disables achievement evaluation
+	comments        *repository.CommentRepository
+	scoreCards      *repository.ScoreCardRepository
+	posts           *repository.PostRepository
+	postSvc         *PostService
+	blocks          *repository.BlockRepository
+	leagues         *repository.LeagueRepository
+	clubs           *repository.ClubRepository
+	featureRequests *repository.FeatureRequestRepository
+	achievements    *AchievementService // optional; nil disables achievement evaluation
 }
 
 func NewCommentService(
@@ -43,17 +44,19 @@ func NewCommentService(
 	blocks *repository.BlockRepository,
 	leagues *repository.LeagueRepository,
 	clubs *repository.ClubRepository,
+	featureRequests *repository.FeatureRequestRepository,
 	achievements *AchievementService,
 ) *CommentService {
 	return &CommentService{
-		comments:     comments,
-		scoreCards:   scoreCards,
-		posts:        posts,
-		postSvc:      postSvc,
-		blocks:       blocks,
-		leagues:      leagues,
-		clubs:        clubs,
-		achievements: achievements,
+		comments:        comments,
+		scoreCards:      scoreCards,
+		posts:           posts,
+		postSvc:         postSvc,
+		blocks:          blocks,
+		leagues:         leagues,
+		clubs:           clubs,
+		featureRequests: featureRequests,
+		achievements:    achievements,
 	}
 }
 
@@ -111,6 +114,16 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 			if blocked {
 				return nil, ErrCommentDenied
 			}
+		}
+	case "feature_request":
+		if s.featureRequests == nil {
+			return nil, ErrCommentDenied
+		}
+		if _, err := s.featureRequests.GetByID(ctx, targetID, userID); err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrCommentDenied
+			}
+			return nil, err
 		}
 	default:
 		return nil, errors.New("unsupported comment target type")
@@ -179,6 +192,13 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 			if blocked {
 				return nil, repository.ErrNotFound
 			}
+		}
+	case "feature_request":
+		if s.featureRequests == nil {
+			return nil, repository.ErrNotFound
+		}
+		if _, err := s.featureRequests.GetByID(ctx, targetID, viewerID); err != nil {
+			return nil, err
 		}
 	}
 	return s.comments.ListByTargetWithViewer(ctx, targetID, targetType, viewerID)

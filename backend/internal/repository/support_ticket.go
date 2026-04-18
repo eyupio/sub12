@@ -369,6 +369,20 @@ func (r *SupportTicketRepository) MarkRead(ctx context.Context, ticketID, userID
 	return nil
 }
 
+// RecordConversionEvent inserts a ticket_event noting that this ticket was
+// converted into a feature request. Metadata carries the new feature_request_id
+// so the timeline can link back to the refined feature request.
+func (r *SupportTicketRepository) RecordConversionEvent(ctx context.Context, ticketID, actorID, featureRequestID string) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO support_ticket_events (ticket_id, actor_id, event_type, to_value, metadata)
+		VALUES ($1, $2, 'converted_to_feature_request', $3, jsonb_build_object('feature_request_id', $3::text))
+	`, ticketID, actorID, featureRequestID)
+	if err != nil {
+		return fmt.Errorf("insert conversion event: %w", err)
+	}
+	return nil
+}
+
 func (r *SupportTicketRepository) recordChangeEvent(ctx context.Context, ticketID, actorID, eventType string, fromValue, toValue *string) {
 	if toValue == nil {
 		return

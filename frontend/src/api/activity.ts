@@ -10,6 +10,8 @@ export type ActivityType =
   | 'league_round_opened'
   | 'league_season_started'
   | 'achievement_earned'
+  | 'feature_request_created'
+  | 'feature_request_implemented'
 
 export type FeedFilter = 'public' | 'for_you' | 'league' | 'club'
 
@@ -38,6 +40,9 @@ export interface ActivityItem {
     achievement_name?: string
     achievement_icon?: string
     achievement_description?: string
+    title?: string
+    status?: string
+    scope_type?: string
   }
   league_id?: string
   club_id?: string

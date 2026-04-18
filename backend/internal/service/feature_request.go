@@ -21,6 +21,7 @@ type FeatureRequestService struct {
 	clubs         *repository.ClubRepository
 	users         *repository.UserRepository
 	notifications *NotificationService
+	activity      *ActivityService
 }
 
 func NewFeatureRequestService(
@@ -30,6 +31,7 @@ func NewFeatureRequestService(
 	clubs *repository.ClubRepository,
 	users *repository.UserRepository,
 	notifications *NotificationService,
+	activity *ActivityService,
 ) *FeatureRequestService {
 	return &FeatureRequestService{
 		repo:          repo,
@@ -38,6 +40,7 @@ func NewFeatureRequestService(
 		clubs:         clubs,
 		users:         users,
 		notifications: notifications,
+		activity:      activity,
 	}
 }
 
@@ -69,7 +72,30 @@ func (s *FeatureRequestService) CreateFromTicket(ctx context.Context, ticketID, 
 	if err != nil {
 		return nil, err
 	}
-	_, _ = s.tickets.Update(ctx, ticketID, actorID, &model.UpdateSupportTicketInput{Status: ptrString(model.SupportStatusInProgress)})
+
+	// Close the originating ticket, ensure it's categorized as a feature, and
+	// record a conversion event so the ticket timeline reflects the transition.
+	// The SupportTicketService.Update call fans out feature_request_state_changed
+	// notifications + emails to the requester and other participants because the
+	// updated category is feature, so no extra fanout is required here.
+	category := model.SupportCategoryFeature
+	status := model.SupportStatusClosed
+	updated, _ := s.tickets.Update(ctx, ticketID, actorID, &model.UpdateSupportTicketInput{
+		Status:   &status,
+		Category: &category,
+	})
+	_ = s.tickets.RecordConversionEvent(ctx, ticketID, actorID, item.ID)
+
+	// Publish a public activity entry so the feed surfaces the new feature.
+	if s.activity != nil && updated != nil {
+		targetID := item.ID
+		targetType := "feature_request"
+		s.activity.Ingest(context.Background(), actorID, model.ActivityFeatureRequestCreated, &targetID, &targetType, model.FeatureRequestMeta{
+			Title:     item.Title,
+			Status:    item.Status,
+			ScopeType: item.ScopeType,
+		}, nil, nil, "public")
+	}
 	return item, nil
 }
 
@@ -105,8 +131,33 @@ func (s *FeatureRequestService) Update(ctx context.Context, id, actorID string, 
 	}
 	if in.Status != nil {
 		s.notifyParticipants(ctx, updated, actorID)
+		if s.activity != nil && current.Status != updated.Status &&
+			(updated.Status == model.FeatureRequestStatusImplemented || updated.Status == model.FeatureRequestStatusDone) {
+			targetID := updated.ID
+			targetType := "feature_request"
+			s.activity.Ingest(context.Background(), actorID, model.ActivityFeatureRequestImplemented, &targetID, &targetType, model.FeatureRequestMeta{
+				Title:     updated.Title,
+				Status:    updated.Status,
+				ScopeType: updated.ScopeType,
+			}, nil, nil, "public")
+		}
 	}
 	return updated, nil
+}
+
+func (s *FeatureRequestService) Get(ctx context.Context, id, viewerID string) (*model.FeatureRequest, error) {
+	item, err := s.repo.GetByID(ctx, id, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := s.canVoteInScope(ctx, item.ScopeType, item.ScopeID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrNotAdmin
+	}
+	return item, nil
 }
 
 func (s *FeatureRequestService) List(ctx context.Context, viewerID string, in *model.ListFeatureRequestsInput) ([]*model.FeatureRequest, error) {
