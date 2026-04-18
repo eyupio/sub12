@@ -429,27 +429,21 @@ export default function LeagueDetail() {
         <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
       )}
 
-      {/* Invite link — shown to members when the server returns a join code
-          (admins always; rank-and-file members only when the league config
-          allows member invites). The raw URL is intentionally hidden; only a
-          copy button is exposed. */}
+      {/* Invite link — shown to members when league has an invite code */}
       {isMember && league?.join_code && (
-        <div className="border border-subtle rounded p-3 bg-surface flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
-            <p className="text-[11px] text-muted mt-0.5">Copy a private link anyone can use to join this league.</p>
-          </div>
+        <div className="border border-subtle rounded p-3 bg-surface">
           <button
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             }}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors text-[11px] tracking-widest uppercase"
+            className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            title="Copy invite link"
             aria-label="Copy invite link"
           >
-            {copied ? <Check size={14} className="text-[var(--brass)]" /> : <Copy size={14} />}
-            {copied ? 'Copied' : 'Copy link'}
+            {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
+            {copied ? 'Copied!' : 'Copy invite link'}
           </button>
         </div>
       )}

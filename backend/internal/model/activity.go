@@ -42,18 +42,22 @@ type FeedRequest struct {
 
 // Activity is a single event in the social feed.
 type Activity struct {
-	ID          string          `json:"id"`
-	UserID      string          `json:"user_id"`
-	DisplayName string          `json:"display_name"`
-	AvatarURL   *string         `json:"avatar_url,omitempty"`
-	Type        ActivityType    `json:"type"`
-	TargetID    *string         `json:"target_id,omitempty"`
-	TargetType  *string         `json:"target_type,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	LeagueID    *string         `json:"league_id,omitempty"`
-	ClubID      *string         `json:"club_id,omitempty"`
-	Visibility  string          `json:"visibility"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID           string          `json:"id"`
+	UserID       string          `json:"user_id"`
+	DisplayName  string          `json:"display_name"`
+	AvatarURL    *string         `json:"avatar_url,omitempty"`
+	StarLevel    int             `json:"star_level"`
+	Type         ActivityType    `json:"type"`
+	TargetID     *string         `json:"target_id,omitempty"`
+	TargetType   *string         `json:"target_type,omitempty"`
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	LeagueID     *string         `json:"league_id,omitempty"`
+	ClubID       *string         `json:"club_id,omitempty"`
+	Visibility   string          `json:"visibility"`
+	LikeCount    int             `json:"like_count"`
+	IsLiked      bool            `json:"is_liked"`
+	CommentCount int             `json:"comment_count"`
+	CreatedAt    time.Time       `json:"created_at"`
 }
 
 // ScorePostedMeta is the JSONB metadata for ActivityScorePosted / ActivityPersonalBest events.

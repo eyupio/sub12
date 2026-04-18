@@ -17,6 +17,7 @@ type AchievementRepo interface {
 
 type CardCountRepo interface {
 	GetCardCount(ctx context.Context, userID string) (int, error)
+	GetLeagueCardCount(ctx context.Context, userID string) (int, error)
 }
 
 // FollowCountRepo exposes the follower/following counts used by social achievements.
@@ -40,6 +41,17 @@ type PelletTestCountRepo interface {
 	CountByUser(ctx context.Context, userID string) (int, error)
 }
 
+// LikeCountRepo exposes like counts for achievement evaluation.
+type LikeCountRepo interface {
+	CountGivenByUser(ctx context.Context, userID string) (int, error)
+	CountReceivedByOwner(ctx context.Context, userID string) (int, error)
+}
+
+// StarLevelRepo updates a user's computed star_level.
+type StarLevelRepo interface {
+	UpdateStarLevel(ctx context.Context, userID string) error
+}
+
 type AchievementService struct {
 	achievements AchievementRepo
 	cards        CardCountRepo
@@ -47,6 +59,8 @@ type AchievementService struct {
 	comments     CommentCountRepo
 	clubs        ClubMembershipCountRepo
 	pelletTests  PelletTestCountRepo
+	likes        LikeCountRepo
+	starLevel    StarLevelRepo
 	activity     *ActivityService // nil disables feed ingestion
 	social       *SocialService   // nil disables privacy enforcement
 }
@@ -58,6 +72,8 @@ func NewAchievementService(
 	comments CommentCountRepo,
 	clubs ClubMembershipCountRepo,
 	pelletTests PelletTestCountRepo,
+	likes LikeCountRepo,
+	starLevel StarLevelRepo,
 	activity *ActivityService,
 ) *AchievementService {
 	return &AchievementService{
@@ -67,6 +83,8 @@ func NewAchievementService(
 		comments:     comments,
 		clubs:        clubs,
 		pelletTests:  pelletTests,
+		likes:        likes,
+		starLevel:    starLevel,
 		activity:     activity,
 	}
 }
@@ -79,10 +97,17 @@ func (s *AchievementService) SetSocial(social *SocialService) {
 
 // award grants an achievement and, when newly awarded, publishes a feed event
 // populated with the def's name/icon/description so feed consumers can render
-// without a second lookup.
+// without a second lookup. Also refreshes the user's star_level.
 func (s *AchievementService) award(ctx context.Context, userID, achievementID string) {
 	awarded, err := s.achievements.Award(ctx, userID, achievementID)
-	if err != nil || !awarded || s.activity == nil {
+	if err != nil || !awarded {
+		return
+	}
+	// Refresh star_level whenever a new achievement is granted.
+	if s.starLevel != nil {
+		_ = s.starLevel.UpdateStarLevel(ctx, userID)
+	}
+	if s.activity == nil {
 		return
 	}
 	def, err := s.achievements.GetDef(ctx, achievementID)
@@ -130,8 +155,17 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 	if cardCount >= 10 {
 		s.award(ctx, userID, "dedicated")
 	}
+	if cardCount >= 25 {
+		s.award(ctx, userID, "top_shooter")
+	}
 	if card.LeagueRoundID != nil {
 		s.award(ctx, userID, "league_debut")
+		if s.cards != nil {
+			leagueCount, err := s.cards.GetLeagueCardCount(ctx, userID)
+			if err == nil && leagueCount >= 5 {
+				s.award(ctx, userID, "league_veteran")
+			}
+		}
 	}
 }
 
@@ -199,7 +233,8 @@ func (s *AchievementService) EvaluateForClubJoin(ctx context.Context, userID str
 	}
 }
 
-// EvaluateForPelletTest awards pellet_scientist on the user's first pellet-test session.
+// EvaluateForPelletTest awards pellet_scientist on the user's first pellet-test session
+// and pellet_expert at 5 sessions.
 func (s *AchievementService) EvaluateForPelletTest(ctx context.Context, userID string) {
 	if s.pelletTests == nil {
 		return
@@ -213,6 +248,47 @@ func (s *AchievementService) EvaluateForPelletTest(ctx context.Context, userID s
 	}
 	if count >= 1 {
 		s.award(ctx, userID, "pellet_scientist")
+	}
+	if count >= 5 {
+		s.award(ctx, userID, "pellet_expert")
+	}
+}
+
+// EvaluateForLikeGiven awards super_liker when the user has given 25 likes.
+func (s *AchievementService) EvaluateForLikeGiven(ctx context.Context, likerID string) {
+	if s.likes == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	count, err := s.likes.CountGivenByUser(ctx, likerID)
+	if err != nil {
+		return
+	}
+	if count >= 25 {
+		s.award(ctx, likerID, "super_liker")
+	}
+}
+
+// EvaluateForLikeReceived awards fan_favourite (10 likes) and community_champion
+// (25 likes) to the owner of the liked content.
+func (s *AchievementService) EvaluateForLikeReceived(ctx context.Context, ownerID string) {
+	if s.likes == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	count, err := s.likes.CountReceivedByOwner(ctx, ownerID)
+	if err != nil {
+		return
+	}
+	if count >= 10 {
+		s.award(ctx, ownerID, "fan_favourite")
+	}
+	if count >= 25 {
+		s.award(ctx, ownerID, "community_champion")
 	}
 }
 
