@@ -32,9 +32,9 @@ function formatDate(iso: string) {
 }
 
 function StatusBadge({ code }: { code?: number }) {
-  if (code == null) return <span className="text-red-400 text-xs">Network Error</span>
-  if (code >= 200 && code < 300) return <span className="text-green-400 text-xs flex items-center gap-1"><CheckCircle size={12} />{code}</span>
-  return <span className="text-red-400 text-xs flex items-center gap-1"><XCircle size={12} />{code}</span>
+  if (code == null) return <span className="text-red-400 text-xs" role="status"><span className="sr-only">Error: </span>Network Error</span>
+  if (code >= 200 && code < 300) return <span className="text-green-400 text-xs flex items-center gap-1" role="status"><CheckCircle size={12} aria-hidden="true" /><span className="sr-only">Success: </span>{code}</span>
+  return <span className="text-red-400 text-xs flex items-center gap-1" role="status"><XCircle size={12} aria-hidden="true" /><span className="sr-only">Error: </span>{code}</span>
 }
 
 export default function AdminSitemap() {

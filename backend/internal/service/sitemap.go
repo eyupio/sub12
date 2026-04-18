@@ -139,14 +139,6 @@ func (s *SitemapService) Stats(ctx context.Context) (*model.SitemapStats, error)
 	}, nil
 }
 
-// knownEngines maps engine names to their sitemap ping URL templates.
-// %s is replaced with the URL-encoded sitemap URL.
-var knownEngines = map[string]string{
-	"google":   "https://www.google.com/ping?sitemap=%s",
-	"bing":     "https://www.bing.com/ping?sitemap=%s",
-	"indexnow": "https://api.indexnow.org/indexnow?url=%s&urlList=%s",
-}
-
 // PingEngines submits the sitemap URL to the requested search engines and
 // records each attempt in the audit table.
 func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engines []string) ([]*model.SitemapSubmission, error) {
