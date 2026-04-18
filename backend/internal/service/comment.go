@@ -10,10 +10,19 @@ import (
 )
 
 var (
-	ErrCommentEmpty   = errors.New("comment body cannot be empty")
-	ErrCommentTooLong = errors.New("comment body exceeds maximum length of 2000 characters")
-	ErrCommentDenied  = errors.New("you cannot comment on this content")
+	ErrCommentEmpty           = errors.New("comment body cannot be empty")
+	ErrCommentTooLong         = errors.New("comment body exceeds maximum length of 2000 characters")
+	ErrCommentDenied          = errors.New("you cannot comment on this content")
+	ErrCommentForbidden       = errors.New("not authorized to moderate this comment")
+	ErrCommentFlagReasonEmpty = errors.New("flag reason is required")
 )
+
+// ModerationScope describes the level of moderation privilege a user has over
+// a piece of content. Scope == "" means no privilege.
+type ModerationScope struct {
+	Scope   string // "" | "league" | "club" | "global"
+	ScopeID string // league_id or club_id; empty for global or none
+}
 
 type CommentService struct {
 	comments     *repository.CommentRepository
@@ -21,11 +30,31 @@ type CommentService struct {
 	posts        *repository.PostRepository
 	postSvc      *PostService
 	blocks       *repository.BlockRepository
+	leagues      *repository.LeagueRepository
+	clubs        *repository.ClubRepository
 	achievements *AchievementService // optional; nil disables achievement evaluation
 }
 
-func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, postSvc *PostService, blocks *repository.BlockRepository, achievements *AchievementService) *CommentService {
-	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, postSvc: postSvc, blocks: blocks, achievements: achievements}
+func NewCommentService(
+	comments *repository.CommentRepository,
+	scoreCards *repository.ScoreCardRepository,
+	posts *repository.PostRepository,
+	postSvc *PostService,
+	blocks *repository.BlockRepository,
+	leagues *repository.LeagueRepository,
+	clubs *repository.ClubRepository,
+	achievements *AchievementService,
+) *CommentService {
+	return &CommentService{
+		comments:     comments,
+		scoreCards:   scoreCards,
+		posts:        posts,
+		postSvc:      postSvc,
+		blocks:       blocks,
+		leagues:      leagues,
+		clubs:        clubs,
+		achievements: achievements,
+	}
 }
 
 func (s *CommentService) validateBody(body string) (string, error) {
@@ -160,17 +189,25 @@ func (s *CommentService) ListReplies(ctx context.Context, commentID, viewerID st
 	return s.comments.ListRepliesWithViewer(ctx, commentID, viewerID)
 }
 
-// Update edits a comment owned by userID.
+// Update edits a comment owned by userID. A successful edit also clears any
+// moderation flag on the comment — the author's edit is treated as the
+// amendment a moderator was asking for.
 func (s *CommentService) Update(ctx context.Context, commentID, userID, body string) (*model.Comment, error) {
 	body, err := s.validateBody(body)
 	if err != nil {
 		return nil, err
 	}
 	comment, err := s.comments.Update(ctx, commentID, userID, body)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, repository.ErrNotFound
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, err
 	}
-	return comment, err
+	// Author editing a flagged comment satisfies the moderator's amendment
+	// request. Best-effort: a clear failure should not fail the edit itself.
+	_ = s.comments.SetCommentFlag(ctx, commentID, nil, nil, nil, nil)
+	return comment, nil
 }
 
 // GetByID retrieves a single comment by ID.
@@ -185,4 +222,76 @@ func (s *CommentService) Delete(ctx context.Context, commentID, userID string) e
 		return repository.ErrNotFound
 	}
 	return err
+}
+
+// CanModerateComment returns the scope through which userID is allowed to
+// moderate a comment. An empty Scope means no authority.
+func (s *CommentService) CanModerateComment(ctx context.Context, userID, role, commentID string) (ModerationScope, error) {
+	if role == "admin" {
+		return ModerationScope{Scope: "global"}, nil
+	}
+	if userID == "" {
+		return ModerationScope{}, nil
+	}
+	leagueID, clubID, err := s.comments.ResolveCommentScope(ctx, commentID)
+	if err != nil {
+		return ModerationScope{}, err
+	}
+	if leagueID != nil && *leagueID != "" {
+		isAdmin, err := s.leagues.IsAdmin(ctx, *leagueID, userID)
+		if err != nil {
+			return ModerationScope{}, err
+		}
+		if isAdmin {
+			return ModerationScope{Scope: "league", ScopeID: *leagueID}, nil
+		}
+	}
+	if clubID != nil && *clubID != "" {
+		isAdmin, err := s.clubs.IsAdmin(ctx, *clubID, userID)
+		if err != nil {
+			return ModerationScope{}, err
+		}
+		if isAdmin {
+			return ModerationScope{Scope: "club", ScopeID: *clubID}, nil
+		}
+	}
+	return ModerationScope{}, nil
+}
+
+// FlagComment marks a comment as needing amendment and records who flagged it
+// and why. Callable by global admins or by league/club admins whose group
+// owns the target content.
+func (s *CommentService) FlagComment(ctx context.Context, userID, role, commentID, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ErrCommentFlagReasonEmpty
+	}
+	if len([]rune(reason)) > 500 {
+		reason = string([]rune(reason)[:500])
+	}
+	scope, err := s.CanModerateComment(ctx, userID, role, commentID)
+	if err != nil {
+		return err
+	}
+	if scope.Scope == "" {
+		return ErrCommentForbidden
+	}
+	scopeVal := scope.Scope
+	var scopeIDPtr *string
+	if scope.ScopeID != "" {
+		scopeIDPtr = &scope.ScopeID
+	}
+	return s.comments.SetCommentFlag(ctx, commentID, &userID, &reason, &scopeVal, scopeIDPtr)
+}
+
+// UnflagComment clears the moderation flag. Authorized the same as FlagComment.
+func (s *CommentService) UnflagComment(ctx context.Context, userID, role, commentID string) error {
+	scope, err := s.CanModerateComment(ctx, userID, role, commentID)
+	if err != nil {
+		return err
+	}
+	if scope.Scope == "" {
+		return ErrCommentForbidden
+	}
+	return s.comments.SetCommentFlag(ctx, commentID, nil, nil, nil, nil)
 }

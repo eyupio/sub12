@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -29,13 +30,17 @@ func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, us
 		)
 		SELECT ins.id, ins.target_id, ins.target_type, ins.parent_id, ins.user_id,
 		       u.display_name, u.avatar_url,
-		       ins.body, ins.like_count, 0 AS reply_count, FALSE AS is_liked, ins.created_at, ins.updated_at
+		       ins.body, ins.like_count, 0 AS reply_count, FALSE AS is_liked,
+		       FALSE AS is_flagged, NULL::text AS flag_reason,
+		       ins.created_at, ins.updated_at
 		FROM ins
 		JOIN users u ON u.id = ins.user_id
 	`, targetID, targetType, userID, body, parentID).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked,
+		&c.IsFlagged, &c.FlagReason,
+		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create comment: %w", err)
@@ -55,6 +60,8 @@ func (r *CommentRepository) ListByTargetWithViewer(ctx context.Context, targetID
 		            ELSE EXISTS (SELECT 1 FROM likes l
 		                         WHERE l.target_id = c.id AND l.target_type = 'comment' AND l.user_id = $3::uuid)
 		       END AS is_liked,
+		       (c.flagged_at IS NOT NULL) AS is_flagged,
+		       c.flag_reason,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
@@ -72,7 +79,9 @@ func (r *CommentRepository) ListByTargetWithViewer(ctx context.Context, targetID
 		if err := rows.Scan(
 			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 			&c.DisplayName, &c.AvatarURL,
-			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked,
+			&c.IsFlagged, &c.FlagReason,
+			&c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
 		}
@@ -104,6 +113,8 @@ func (r *CommentRepository) ListRepliesWithViewer(ctx context.Context, parentID,
 		            ELSE EXISTS (SELECT 1 FROM likes l
 		                         WHERE l.target_id = c.id AND l.target_type = 'comment' AND l.user_id = $2::uuid)
 		       END AS is_liked,
+		       (c.flagged_at IS NOT NULL) AS is_flagged,
+		       c.flag_reason,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
@@ -121,7 +132,9 @@ func (r *CommentRepository) ListRepliesWithViewer(ctx context.Context, parentID,
 		if err := rows.Scan(
 			&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 			&c.DisplayName, &c.AvatarURL,
-			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
+			&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked,
+			&c.IsFlagged, &c.FlagReason,
+			&c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan reply: %w", err)
 		}
@@ -150,6 +163,8 @@ func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*mod
 		       c.body, c.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = c.id) AS reply_count,
 		       FALSE AS is_liked,
+		       (c.flagged_at IS NOT NULL) AS is_flagged,
+		       c.flag_reason,
 		       c.created_at, c.updated_at
 		FROM comments c
 		JOIN users u ON u.id = c.user_id
@@ -157,7 +172,9 @@ func (r *CommentRepository) GetByID(ctx context.Context, commentID string) (*mod
 	`, commentID).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked,
+		&c.IsFlagged, &c.FlagReason,
+		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -183,13 +200,16 @@ func (r *CommentRepository) Update(ctx context.Context, commentID, userID, body 
 		       upd.body, upd.like_count,
 		       (SELECT COUNT(*) FROM comments r WHERE r.parent_id = upd.id) AS reply_count,
 		       FALSE AS is_liked,
+		       FALSE AS is_flagged, NULL::text AS flag_reason,
 		       upd.created_at, upd.updated_at
 		FROM upd
 		JOIN users u ON u.id = upd.user_id
 	`, commentID, userID, body).Scan(
 		&c.ID, &c.TargetID, &c.TargetType, &c.ParentID, &c.UserID,
 		&c.DisplayName, &c.AvatarURL,
-		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked, &c.CreatedAt, &c.UpdatedAt,
+		&c.Body, &c.LikeCount, &c.ReplyCount, &c.IsLiked,
+		&c.IsFlagged, &c.FlagReason,
+		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -239,4 +259,96 @@ func (r *CommentRepository) CountByUser(ctx context.Context, userID string) (int
 		return 0, fmt.Errorf("count comments by user: %w", err)
 	}
 	return count, nil
+}
+
+// SetCommentFlag sets or clears the moderation-flag columns on a comment.
+// Passing flaggerID == nil clears all flag columns; otherwise the columns are
+// written with flagged_at = NOW(). Idempotent: re-flagging refreshes the
+// reason/scope metadata.
+func (r *CommentRepository) SetCommentFlag(
+	ctx context.Context,
+	commentID string,
+	flaggerID *string,
+	reason *string,
+	scope *string,
+	scopeID *string,
+) error {
+	var (
+		tag pgconn.CommandTag
+		err error
+	)
+	if flaggerID == nil {
+		tag, err = r.db.Exec(ctx, `
+			UPDATE comments
+			SET flagged_at = NULL,
+			    flagged_by = NULL,
+			    flag_reason = NULL,
+			    flag_scope = NULL,
+			    flag_scope_id = NULL
+			WHERE id = $1
+		`, commentID)
+	} else {
+		tag, err = r.db.Exec(ctx, `
+			UPDATE comments
+			SET flagged_at = NOW(),
+			    flagged_by = $2::uuid,
+			    flag_reason = $3,
+			    flag_scope = $4,
+			    flag_scope_id = $5::uuid
+			WHERE id = $1
+		`, commentID, *flaggerID, reason, scope, scopeID)
+	}
+	if err != nil {
+		return fmt.Errorf("set comment flag: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ResolveCommentScope resolves a comment's owning league and club by walking
+// target → score_card / post. Either return pointer may be nil if the content
+// is not scoped to that kind of group. Returns ErrNotFound if the comment or
+// target is missing.
+func (r *CommentRepository) ResolveCommentScope(
+	ctx context.Context, commentID string,
+) (leagueID *string, clubID *string, err error) {
+	var targetType, targetID string
+	err = r.db.QueryRow(ctx,
+		`SELECT target_type, target_id FROM comments WHERE id = $1`,
+		commentID,
+	).Scan(&targetType, &targetID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil, ErrNotFound
+		}
+		return nil, nil, fmt.Errorf("resolve comment scope: %w", err)
+	}
+
+	switch targetType {
+	case "score_card":
+		err = r.db.QueryRow(ctx, `
+			SELECT l.id, sc.club_id
+			FROM score_cards sc
+			LEFT JOIN rounds rd ON rd.id = sc.league_round_id
+			LEFT JOIN seasons s ON s.id = rd.season_id
+			LEFT JOIN leagues l ON l.id = s.league_id
+			WHERE sc.id = $1
+		`, targetID).Scan(&leagueID, &clubID)
+	case "post":
+		err = r.db.QueryRow(ctx,
+			`SELECT league_id, club_id FROM posts WHERE id = $1`,
+			targetID,
+		).Scan(&leagueID, &clubID)
+	default:
+		return nil, nil, nil
+	}
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil, ErrNotFound
+		}
+		return nil, nil, fmt.Errorf("resolve comment scope target: %w", err)
+	}
+	return leagueID, clubID, nil
 }

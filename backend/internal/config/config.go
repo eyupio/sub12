@@ -2,6 +2,7 @@ package config
 
 import (
 	"net/url"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -44,6 +45,13 @@ type Config struct {
 	RateLimitReportPerMin        int  `envconfig:"RATELIMIT_REPORT_PER_MIN" default:"5"`
 	RateLimitLikePerMin          int  `envconfig:"RATELIMIT_LIKE_PER_MIN" default:"60"`
 	RateLimitSocialTogglePerMin  int  `envconfig:"RATELIMIT_SOCIAL_TOGGLE_PER_MIN" default:"30"`
+
+	// Moderation flag grace window. When a comment or post is flagged by an
+	// admin, the author gets this long to amend (edit) before the sweeper
+	// promotes the row to hidden_at.
+	ModerationFlagGrace time.Duration `envconfig:"MODERATION_FLAG_GRACE" default:"48h"`
+	// Interval at which the moderation sweeper runs.
+	ModerationSweepInterval time.Duration `envconfig:"MODERATION_SWEEP_INTERVAL" default:"15m"`
 }
 
 // DSN returns the PostgreSQL key=value connection string (for pgxpool).

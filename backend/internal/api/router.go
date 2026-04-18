@@ -206,6 +206,13 @@ func NewRouter(
 			r.Patch("/comments/{id}", commentH.Update)
 			r.Delete("/comments/{id}", commentH.Delete)
 
+			// League/club-scoped comment moderation — callable by the admins of
+			// the league or club that owns the comment's target, or by global
+			// admins. Flagged comments stay visible with a banner and clear
+			// automatically when the author edits them.
+			r.With(rl.Limit("report")).Post("/comments/{id}/flag", commentH.Flag)
+			r.Post("/comments/{id}/unflag", commentH.Unflag)
+
 			// Likes
 			lkh := handler.NewLike(likes)
 			r.With(rl.Limit("like")).Post("/score-cards/{id}/like", lkh.LikeScoreCard)
@@ -222,6 +229,8 @@ func NewRouter(
 			r.Get("/posts/{id}", postH.Get)
 			r.Patch("/posts/{id}", postH.Update)
 			r.Delete("/posts/{id}", postH.Delete)
+			r.With(rl.Limit("report")).Post("/posts/{id}/flag", postH.Flag)
+			r.Post("/posts/{id}/unflag", postH.Unflag)
 			r.With(rl.Limit("comment")).Post("/posts/{id}/comments", commentH.CreateOnPost)
 			r.Get("/posts/{id}/comments", commentH.ListOnPost)
 
@@ -241,6 +250,7 @@ func NewRouter(
 			// League config & management
 			r.Get("/leagues/{id}/config", lh.GetConfig)
 			r.Patch("/leagues/{id}/config", lh.UpdateConfig)
+			r.Delete("/leagues/{id}/members/me", lh.Leave)
 			r.Delete("/leagues/{id}/members/{userId}", lh.RemoveMember)
 
 			// Seasons & rounds

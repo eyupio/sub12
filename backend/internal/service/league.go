@@ -25,6 +25,7 @@ var (
 	ErrCannotConfirmOwn = errors.New("cannot confirm your own score")
 	ErrReasonRequired   = errors.New("reason is required for rejection")
 	ErrNotClubMember    = errors.New("club membership required")
+	ErrLeagueLastAdmin  = errors.New("cannot leave as the last admin; promote another member first")
 )
 
 type LeagueService struct {
@@ -92,6 +93,32 @@ func (s *LeagueService) RemoveMember(ctx context.Context, leagueID, adminID, mem
 		return err
 	}
 	return s.leagues.RemoveMember(ctx, leagueID, memberID)
+}
+
+// LeaveLeague allows a member to remove themselves. The last admin must
+// promote or demote a co-admin first.
+func (s *LeagueService) LeaveLeague(ctx context.Context, leagueID, userID string) error {
+	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return ErrNotMember
+	}
+	isAdmin, err := s.leagues.IsAdmin(ctx, leagueID, userID)
+	if err != nil {
+		return err
+	}
+	if isAdmin {
+		count, err := s.leagues.CountAdmins(ctx, leagueID)
+		if err != nil {
+			return err
+		}
+		if count <= 1 {
+			return ErrLeagueLastAdmin
+		}
+	}
+	return s.leagues.LeaveLeague(ctx, leagueID, userID)
 }
 
 // ListMyLeagues returns leagues the user is a member of, with their rank in each.
