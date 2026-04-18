@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Plus, CheckCircle, XCircle, AlertCircle, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
 import { leagueApi } from '../api/leagues'
+import { statsApi } from '../api/stats'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function VerificationDot({ status }: { status: string }) {
@@ -59,26 +60,81 @@ export default function ScoreHistory() {
     queryFn: () => scoreCardApi.list(20, 0, tab, leagueFilter || undefined),
   })
 
+  const { data: trendsData } = useQuery({
+    queryKey: ['score-trends', 'week', null],
+    queryFn: () => statsApi.getScoreTrends('week'),
+  })
+
+  const trendPoints = trendsData?.items ?? []
+  const firstAvg = trendPoints[0]?.avg_score
+  const lastAvg = trendPoints[trendPoints.length - 1]?.avg_score
+  const trendDelta = firstAvg != null && lastAvg != null && trendPoints.length >= 2
+    ? lastAvg - firstAvg
+    : null
+  const latestBest = trendPoints.length > 0 ? trendPoints[trendPoints.length - 1].best_score : null
+  const latestAvgX = trendPoints.length > 0 ? trendPoints[trendPoints.length - 1].avg_x_count : null
+  const totalCards = trendPoints.reduce((s, p) => s + (p.card_count ?? 0), 0)
+  const trendColorClass = trendDelta != null && trendDelta > 0
+    ? 'text-[var(--success-text)]'
+    : trendDelta != null && trendDelta < 0
+    ? 'text-[var(--error-text)]'
+    : 'text-muted'
+
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">My Cards</h1>
-        <div className="flex items-center gap-4">
-          <Link
-            to="/scores/trends"
-            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-          >
-            Trends \u2192
-          </Link>
-          <Link
-            to="/scores/new"
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-          >
-            <Plus size={14} />
-            New
-          </Link>
-        </div>
+        <Link
+          to="/scores/new"
+          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+        >
+          <Plus size={14} />
+          New
+        </Link>
       </div>
+
+      {/* Trends summary */}
+      {trendPoints.length > 0 && (
+        <div className="bg-surface border border-subtle rounded p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[11px] tracking-widest uppercase text-muted">Weekly Trends</h2>
+            <Link
+              to="/scores/trends"
+              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+            >
+              View Details
+              <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-0.5">
+              <p className="text-[10px] tracking-widest uppercase text-muted">Trend</p>
+              {trendDelta != null ? (
+                <div className="flex items-center gap-1">
+                  {trendDelta > 0
+                    ? <TrendingUp size={14} className="text-[var(--success-text)]" />
+                    : trendDelta < 0
+                    ? <TrendingDown size={14} className="text-[var(--error-text)]" />
+                    : <Minus size={14} className="text-muted" />
+                  }
+                  <span className={`font-mono text-sm ${trendColorClass}`}>
+                    {trendDelta > 0 ? '+' : ''}{trendDelta.toFixed(1)}
+                  </span>
+                </div>
+              ) : <span className="text-muted font-mono text-sm">{'\u2014'}</span>}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[10px] tracking-widest uppercase text-muted">Best</p>
+              <p className="font-mono text-sm text-secondary">{latestBest ?? '\u2014'}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[10px] tracking-widest uppercase text-muted">Avg X</p>
+              <p className="font-mono text-sm text-[var(--brass)]">{latestAvgX != null ? latestAvgX.toFixed(1) : '\u2014'}</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted">{totalCards} card{totalCards !== 1 ? 's' : ''} logged across {trendPoints.length} week{trendPoints.length !== 1 ? 's' : ''}</p>
+        </div>
+      )}
 
       {/* Segmented control */}
       <div className="flex border border-subtle rounded overflow-hidden">
@@ -138,7 +194,7 @@ export default function ScoreHistory() {
                 to="/scores/new"
                 className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
               >
-                Log your first card \u2192
+                Log your first card {'\u2192'}
               </Link>
             </>
           ) : (
@@ -148,7 +204,7 @@ export default function ScoreHistory() {
                 to="/leagues"
                 className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
               >
-                Submit scores through your leagues \u2192
+                Submit scores through your leagues {'\u2192'}
               </Link>
             </>
           )}
