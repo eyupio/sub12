@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import {
   Target, Trophy, MessageSquare, Star, RefreshCw,
   Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck, Send,
-  Lightbulb, CheckCircle, AlertTriangle,
+  Lightbulb, CheckCircle, PenSquare, Share2, AlertTriangle,
 } from 'lucide-react'
 import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
@@ -247,6 +247,81 @@ function ActivityCard({ item }: { item: ActivityItem }) {
             )}
           </p>
         )
+      case 'post_created': {
+        const body = item.metadata?.body_preview?.trim()
+        const attType = item.metadata?.attachment_type
+        const attId = item.metadata?.attachment_target_id
+        const scopeName = item.metadata?.league_name ?? item.metadata?.club_name
+        const scopeRoute: 'league' | 'club' | null =
+          item.league_id ? 'league' : item.club_id ? 'club' : null
+        const scopeId = item.league_id ?? item.club_id
+        const isShare = attType === 'score_card' || attType === 'pellet_test'
+
+        let action: string
+        if (isShare && attType === 'score_card') action = ' shared a score card'
+        else if (isShare && attType === 'pellet_test') action = ' shared a pellet test'
+        else action = ' posted'
+
+        return (
+          <div className="space-y-1">
+            <p className="text-sm text-secondary">
+              <Link
+                to="/users/$id"
+                params={{ id: item.user_id }}
+                className="font-medium text-primary hover:underline"
+              >
+                {item.display_name}
+              </Link>
+              {action}
+              {scopeName && scopeRoute === 'league' && scopeId && (
+                <>
+                  {' in '}
+                  <Link
+                    to="/leagues/$id"
+                    params={{ id: scopeId }}
+                    className="text-[var(--brass)] hover:underline"
+                  >
+                    {scopeName}
+                  </Link>
+                </>
+              )}
+              {scopeName && scopeRoute === 'club' && scopeId && (
+                <>
+                  {' in '}
+                  <Link
+                    to="/clubs/$id"
+                    params={{ id: scopeId }}
+                    className="text-[var(--brass)] hover:underline"
+                  >
+                    {scopeName}
+                  </Link>
+                </>
+              )}
+            </p>
+            {body && (
+              <p className="text-xs text-muted line-clamp-2">“{body}”</p>
+            )}
+            {isShare && attId && attType === 'score_card' && (
+              <Link
+                to="/scores/$id"
+                params={{ id: attId }}
+                className="text-[11px] text-muted hover:text-secondary transition-colors"
+              >
+                View card →
+              </Link>
+            )}
+            {isShare && attId && attType === 'pellet_test' && (
+              <Link
+                to="/pellet-testing/$id"
+                params={{ id: attId }}
+                className="text-[11px] text-muted hover:text-secondary transition-colors"
+              >
+                View test →
+              </Link>
+            )}
+          </div>
+        )
+      }
       case 'achievement_earned': {
         const AchIcon = iconForAchievement(item.metadata?.achievement_icon)
         const achName = item.metadata?.achievement_name ?? 'an achievement'
@@ -295,6 +370,13 @@ function ActivityCard({ item }: { item: ActivityItem }) {
       case 'achievement_earned': return <Award size={14} className="text-[var(--brass)]" />
       case 'feature_request_created': return <Lightbulb size={14} className="text-[var(--brass)]" />
       case 'feature_request_implemented': return <CheckCircle size={14} className="text-[var(--brass)]" />
+      case 'post_created': {
+        const attType = item.metadata?.attachment_type
+        if (attType === 'score_card' || attType === 'pellet_test') {
+          return <Share2 size={14} className="text-muted" />
+        }
+        return <PenSquare size={14} className="text-muted" />
+      }
       default: return null
     }
   }

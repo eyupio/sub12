@@ -44,6 +44,7 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 	// Resolve visibility: for scoped posts (league/club) the group admin's
 	// post_visibility override wins — the poster does not choose. For
 	// unscoped posts the author's selection is trusted, defaulting to public.
+	var leagueName, clubName string
 	if input.LeagueID != nil {
 		member, err := s.leagues.IsMember(ctx, *input.LeagueID, userID)
 		if err != nil {
@@ -57,6 +58,7 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 			return nil, err
 		}
 		input.Visibility = league.PostVisibility
+		leagueName = league.Name
 	} else if input.ClubID != nil {
 		member, err := s.clubs.IsMember(ctx, *input.ClubID, userID)
 		if err != nil {
@@ -70,6 +72,7 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 			return nil, err
 		}
 		input.Visibility = club.PostVisibility
+		clubName = club.Name
 	} else {
 		if input.Visibility == "" {
 			input.Visibility = model.PostVisibilityPublic
@@ -89,9 +92,20 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 	// excludes members-only posts. The user's own privacy settings
 	// (feed_opt_out, profile_visibility) further gate the public feed.
 	targetType := "post"
-	go s.activity.Ingest(context.Background(), userID, "post_created", &post.ID, &targetType,
-		map[string]any{"body_preview": truncate(post.Body, 100)},
-		post.LeagueID, post.ClubID, post.Visibility)
+	meta := model.PostCreatedMeta{
+		BodyPreview: truncate(post.Body, 100),
+		LeagueName:  leagueName,
+		ClubName:    clubName,
+	}
+	for _, a := range post.Attachments {
+		if a.TargetID != nil && (a.Type == "score_card" || a.Type == "pellet_test") {
+			meta.AttachmentType = a.Type
+			meta.AttachmentTargetID = *a.TargetID
+			break
+		}
+	}
+	go s.activity.Ingest(context.Background(), userID, model.ActivityPostCreated, &post.ID, &targetType,
+		meta, post.LeagueID, post.ClubID, post.Visibility)
 
 	return post, nil
 }
