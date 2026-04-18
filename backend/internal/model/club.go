@@ -5,29 +5,31 @@ import "time"
 // ClubSummary is the minimal public-facing view of a club used to render a
 // "members-only" banner without leaking members, standings or posts.
 type ClubSummary struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	Type        string  `json:"type"`
-	JoinPolicy  string  `json:"join_policy"`
-	MemberCount int     `json:"member_count"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Description    *string `json:"description,omitempty"`
+	ImageURL       *string `json:"image_url,omitempty"`
+	Type           string  `json:"type"`
+	JoinPolicy     string  `json:"join_policy"`
+	PostVisibility string  `json:"post_visibility"`
+	MemberCount    int     `json:"member_count"`
 }
 
 type Club struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	JoinCode    string  `json:"join_code"`
-	Type        string  `json:"type"`
-	JoinPolicy  string  `json:"join_policy"`
-	CreatedBy   string  `json:"created_by"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
-	MemberCount int     `json:"member_count"`
-	IsAdmin     bool    `json:"is_admin,omitempty"`
-	IsMember    bool    `json:"is_member,omitempty"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Description    *string `json:"description,omitempty"`
+	ImageURL       *string `json:"image_url,omitempty"`
+	JoinCode       string  `json:"join_code"`
+	Type           string  `json:"type"`
+	JoinPolicy     string  `json:"join_policy"`
+	PostVisibility string  `json:"post_visibility"`
+	CreatedBy      string  `json:"created_by"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+	MemberCount    int     `json:"member_count"`
+	IsAdmin        bool    `json:"is_admin,omitempty"`
+	IsMember       bool    `json:"is_member,omitempty"`
 }
 
 type ClubMember struct {

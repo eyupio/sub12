@@ -640,7 +640,7 @@ export default function ClubDetail() {
       </div>}
 
       {/* Club Feed */}
-      {club.is_member && <ClubFeed clubId={id} />}
+      {club.is_member && <ClubFeed clubId={id} postVisibility={club.post_visibility} />}
 
       <ConfirmDialog
         open={confirmLeave}
@@ -654,7 +654,13 @@ export default function ClubDetail() {
   )
 }
 
-function ClubFeed({ clubId }: { clubId: string }) {
+function ClubFeed({
+  clubId,
+  postVisibility,
+}: {
+  clubId: string
+  postVisibility: 'members' | 'public'
+}) {
   const { data } = useQuery({
     queryKey: ['club', clubId, 'posts'],
     queryFn: () => postApi.listByClub(clubId),
@@ -667,7 +673,11 @@ function ClubFeed({ clubId }: { clubId: string }) {
       <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
         Feed
       </h2>
-      <PostComposer clubId={clubId} queryKey={['club', clubId, 'posts']} />
+      <PostComposer
+        clubId={clubId}
+        queryKey={['club', clubId, 'posts']}
+        groupPostVisibility={postVisibility}
+      />
       {posts.length === 0 && (
         <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
       )}

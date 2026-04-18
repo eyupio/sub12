@@ -150,8 +150,11 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: (input: { type?: 'public' | 'private'; join_policy?: 'open' | 'invite_code' | 'approval' }) =>
-      clubsApi.update(clubId, input),
+    mutationFn: (input: {
+      type?: 'public' | 'private'
+      join_policy?: 'open' | 'invite_code' | 'approval'
+      post_visibility?: 'members' | 'public'
+    }) => clubsApi.update(clubId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
@@ -244,6 +247,32 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
           <p className="text-[10px] text-muted">Regenerating invalidates the previous code.</p>
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Post Visibility</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['members', 'public'] as const).map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ post_visibility: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                club.post_visibility === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">
+          {club.post_visibility === 'public'
+            ? 'Posts and their activity may appear on the public feed. Members’ own privacy settings still apply.'
+            : 'Posts are only visible to club members.'}
+        </p>
+      </div>
     </div>
   )
 }

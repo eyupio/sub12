@@ -3,29 +3,31 @@ package model
 import "time"
 
 type League struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	Type        string    `json:"type"`
-	JoinCode    *string   `json:"join_code,omitempty"`
-	ImageURL    *string   `json:"image_url,omitempty"`
-	ClubID      *string   `json:"club_id,omitempty"`
-	CreatedBy   string    `json:"created_by"`
-	MemberCount int       `json:"member_count"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Description    *string   `json:"description,omitempty"`
+	Type           string    `json:"type"`
+	PostVisibility string    `json:"post_visibility"`
+	JoinCode       *string   `json:"join_code,omitempty"`
+	ImageURL       *string   `json:"image_url,omitempty"`
+	ClubID         *string   `json:"club_id,omitempty"`
+	CreatedBy      string    `json:"created_by"`
+	MemberCount    int       `json:"member_count"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // LeagueSummary is the minimal public-facing view of a league used to render a
 // "members-only" banner without leaking members, standings or posts.
 type LeagueSummary struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	Type        string  `json:"type"`
-	JoinPolicy  string  `json:"join_policy"`
-	MemberCount int     `json:"member_count"`
-	ClubID      *string `json:"club_id,omitempty"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Description    *string `json:"description,omitempty"`
+	ImageURL       *string `json:"image_url,omitempty"`
+	Type           string  `json:"type"`
+	JoinPolicy     string  `json:"join_policy"`
+	PostVisibility string  `json:"post_visibility"`
+	MemberCount    int     `json:"member_count"`
+	ClubID         *string `json:"club_id,omitempty"`
 }
 
 type CreateLeagueInput struct {
@@ -39,9 +41,10 @@ type CreateLeagueInput struct {
 
 // UpdateLeagueBasicsInput captures owner-editable fields on the league record.
 type UpdateLeagueBasicsInput struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Type        *string `json:"type"`
+	Name           *string `json:"name"`
+	Description    *string `json:"description"`
+	Type           *string `json:"type"`
+	PostVisibility *string `json:"post_visibility"`
 }
 
 type LeagueStanding struct {

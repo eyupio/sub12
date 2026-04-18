@@ -9,6 +9,7 @@ export interface Club {
   join_code: string
   type: string
   join_policy: string
+  post_visibility: 'members' | 'public'
   created_by: string
   created_at: string
   updated_at: string
@@ -60,6 +61,7 @@ export interface UpdateClubInput {
   description?: string
   type?: 'public' | 'private'
   join_policy?: 'open' | 'invite_code' | 'approval'
+  post_visibility?: 'members' | 'public'
 }
 
 export const clubsApi = {
