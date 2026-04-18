@@ -1,15 +1,23 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
 import { supportTicketsApi } from '../api/supportTickets'
+import { useAuthStore } from '../store/auth'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
+
+function labelForMessageAuthor(authorId: string | undefined, currentUserId: string | undefined): string {
+  if (!authorId) return 'System'
+  if (authorId === currentUserId) return 'You'
+  return 'Support'
+}
 
 export default function SupportTicketDetail() {
   const { id } = useParams({ from: '/app/support/tickets/$id' })
   const navigate = useNavigate()
   const prefs = useRegionalPrefs()
   const queryClient = useQueryClient()
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const [replyBody, setReplyBody] = useState('')
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -67,26 +75,6 @@ export default function SupportTicketDetail() {
       setSubmitMessage(msg)
     },
   })
-
-  const timelineEntries = useMemo(() => {
-    const detail = ticketQuery.data
-    if (!detail) return []
-    const messages = detail.messages.map((message) => ({
-      id: `m-${message.id}`,
-      kind: message.internal_note ? 'internal_note' : 'message',
-      created_at: message.created_at,
-      text: message.body,
-      actor: message.author_id,
-    }))
-    const events = detail.events.map((event) => ({
-      id: `e-${event.id}`,
-      kind: event.event_type,
-      created_at: event.created_at,
-      text: [event.event_type, event.from_value && `from ${event.from_value}`, event.to_value && `to ${event.to_value}`].filter(Boolean).join(' · '),
-      actor: event.actor_id,
-    }))
-    return [...messages, ...events].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
-  }, [ticketQuery.data])
 
   function onSubmitReply(e: FormEvent) {
     e.preventDefault()
@@ -212,38 +200,10 @@ export default function SupportTicketDetail() {
               {detail.messages.length === 0 && <p className="text-sm text-muted">No messages yet.</p>}
               {detail.messages.map((message) => (
                 <article key={message.id} className="rounded-lg border border-subtle p-3 space-y-1">
-                  <p className="text-xs text-muted">{message.author_id} · {formatDateTime(message.created_at, prefs)}</p>
+                  <p className="text-xs text-muted">{labelForMessageAuthor(message.author_id, currentUserId)} · {formatDateTime(message.created_at, prefs)}</p>
                   <p className="text-sm whitespace-pre-wrap">{message.body}</p>
                 </article>
               ))}
-            </div>
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-              <h3 className="font-medium">Timeline</h3>
-              <div className="mt-3 space-y-2">
-                {timelineEntries.length === 0 && <p className="text-sm text-muted">No timeline events yet.</p>}
-                {timelineEntries.map((entry) => (
-                  <div key={entry.id} className="rounded-md border border-subtle px-3 py-2">
-                    <p className="text-xs text-muted">{formatDateTime(entry.created_at, prefs)} · {entry.actor ?? 'system'}</p>
-                    <p className="text-sm">{entry.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-              <h3 className="font-medium">Participants</h3>
-              <div className="mt-3 space-y-2">
-                {detail.participants.length === 0 && <p className="text-sm text-muted">No participants available.</p>}
-                {detail.participants.map((participant) => (
-                  <div key={`${participant.user_id}-${participant.role}`} className="rounded-md border border-subtle px-3 py-2 text-sm">
-                    <p>{participant.user_id}</p>
-                    <p className="text-xs text-muted">{participant.role} · unread: {participant.unread_count ?? 0}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           </section>
 
