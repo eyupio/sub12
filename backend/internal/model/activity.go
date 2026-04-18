@@ -92,9 +92,10 @@ type LeagueSeasonStartedMeta struct {
 
 // AchievementEarnedMeta is the JSONB metadata for ActivityAchievementEarned events.
 type AchievementEarnedMeta struct {
-	AchievementID   string `json:"achievement_id"`
-	AchievementName string `json:"achievement_name"`
-	AchievementIcon string `json:"achievement_icon"`
+	AchievementID          string `json:"achievement_id"`
+	AchievementName        string `json:"achievement_name"`
+	AchievementIcon        string `json:"achievement_icon,omitempty"`
+	AchievementDescription string `json:"achievement_description,omitempty"`
 }
 
 // FeedResponse is the paginated response for GET /api/v1/feed.

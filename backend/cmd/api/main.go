@@ -80,15 +80,29 @@ func main() {
 	activitySvc := service.NewActivityService(activityRepo, log.Logger, leagueRepo, clubRepo)
 
 	achievementRepo := repository.NewAchievementRepository(pool)
-	achievementSvc := service.NewAchievementService(achievementRepo, scoreCardRepo, activitySvc)
-
-	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
-
 	blockRepo := repository.NewBlockRepository(pool)
 
 	postRepo := repository.NewPostRepository(pool)
 
 	commentRepo := repository.NewCommentRepository(pool)
+
+	socialRepo := repository.NewSocialRepository(pool)
+	pelletTestRepo := repository.NewPelletTestRepository(pool)
+
+	// AchievementService is constructed up front with all count-repo
+	// dependencies. Services that trigger achievement evaluation (social,
+	// comment, club, pellet testing, score card) receive this instance.
+	achievementSvc := service.NewAchievementService(
+		achievementRepo,
+		scoreCardRepo,
+		socialRepo,
+		commentRepo,
+		clubRepo,
+		pelletTestRepo,
+		activitySvc,
+	)
+
+	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)
@@ -101,8 +115,7 @@ func main() {
 
 	leagueSvc := service.NewLeagueService(leagueRepo, clubRepo, activitySvc)
 
-	pelletTestRepo := repository.NewPelletTestRepository(pool)
-	pelletTestSvc := service.NewPelletTestService(pelletTestRepo, activitySvc)
+	pelletTestSvc := service.NewPelletTestService(pelletTestRepo, activitySvc, achievementSvc)
 
 	smtpRepo := repository.NewSMTPRepository(pool)
 	smtpSvc := service.NewSMTPService(smtpRepo)
@@ -129,18 +142,20 @@ func main() {
 
 	imageRepo := repository.NewImageRepository(pool)
 
-	socialRepo := repository.NewSocialRepository(pool)
 	socialSvc := service.NewSocialService(socialRepo, blockRepo)
 	blockSvc := service.NewBlockService(blockRepo, socialRepo)
 
 	// Wire social into achievement service for profile-visibility enforcement on
 	// GET /users/{id}/achievements. Done post-construction to avoid a cycle.
 	achievementSvc.SetSocial(socialSvc)
+	// Reverse wiring so successful follows can trigger achievement evaluation.
+	// Post-construction to avoid the AchievementService ↔ SocialService cycle.
+	socialSvc.SetAchievements(achievementSvc)
 
-	clubSvc := service.NewClubService(clubRepo, activitySvc)
+	clubSvc := service.NewClubService(clubRepo, activitySvc, achievementSvc)
 	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, socialRepo, activitySvc)
 
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, achievementSvc)
 
 	likeRepo := repository.NewLikeRepository(pool)
 	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)

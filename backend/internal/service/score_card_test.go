@@ -41,6 +41,9 @@ func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, _ *model.Upda
 	m.lastXCount = xCount
 	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "pending"}, nil
 }
+func (m *mockScoreCardRepo) IsPersonalBest(_ context.Context, _, _ string, _ int16) (bool, error) {
+	return false, nil
+}
 
 func newTestService(repo *mockScoreCardRepo) *ScoreCardService {
 	return &ScoreCardService{cards: repo}

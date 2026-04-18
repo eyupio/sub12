@@ -20,6 +20,7 @@ type SocialService struct {
 	social        *repository.SocialRepository
 	blocks        *repository.BlockRepository
 	notifications *NotificationService // optional; may be nil in tests
+	achievements  *AchievementService  // optional; nil disables achievement evaluation on follow
 }
 
 func NewSocialService(social *repository.SocialRepository, blocks *repository.BlockRepository) *SocialService {
@@ -30,6 +31,13 @@ func NewSocialService(social *repository.SocialRepository, blocks *repository.Bl
 // import cycles between social and notification services.
 func (s *SocialService) SetNotifications(n *NotificationService) {
 	s.notifications = n
+}
+
+// SetAchievements wires achievement evaluation post-construction to avoid the
+// SocialService ↔ AchievementService cycle (AchievementService depends on
+// SocialService for profile-visibility checks).
+func (s *SocialService) SetAchievements(a *AchievementService) {
+	s.achievements = a
 }
 
 // Follow creates a follow relationship, or a follow request for private profiles.
@@ -80,6 +88,9 @@ func (s *SocialService) Follow(ctx context.Context, followerID, followingID stri
 			ActorID:     followerID,
 			Type:        model.NotificationTypeFollowAccepted,
 		})
+	}
+	if s.achievements != nil {
+		go s.achievements.EvaluateForFollow(context.Background(), followerID, followingID)
 	}
 	return true, false, nil
 }
@@ -177,6 +188,9 @@ func (s *SocialService) DecideFollowRequest(ctx context.Context, requestID, user
 				ActorID:     fr.TargetID,
 				Type:        model.NotificationTypeFollowAccepted,
 			})
+		}
+		if s.achievements != nil {
+			go s.achievements.EvaluateForFollow(context.Background(), fr.RequesterID, fr.TargetID)
 		}
 	}
 	return fr, nil

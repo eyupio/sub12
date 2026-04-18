@@ -155,6 +155,23 @@ func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (
 	return count, nil
 }
 
+// IsPersonalBest returns true when the given card is the user's highest-scoring card.
+// Ties with earlier cards count as a tie, not a new PB, so only a strictly higher
+// score qualifies.
+func (r *ScoreCardRepository) IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM score_cards
+			WHERE user_id = $1 AND id != $2 AND total_score >= $3
+		)
+	`, userID, cardID, totalScore).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check personal best: %w", err)
+	}
+	return !exists, nil
+}
+
 // ListByUser returns paginated score card summaries for a user, newest first.
 // scope filters results: "personal" (no league), "league" (has league), or "" (all).
 // leagueID optionally filters to cards belonging to a specific league.

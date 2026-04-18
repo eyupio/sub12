@@ -20,6 +20,20 @@ func NewAchievement(svc *service.AchievementService) *AchievementHandler {
 	return &AchievementHandler{svc: svc}
 }
 
+// GET /api/v1/achievements — public catalog of every defined achievement.
+// Used by profile pages to render locked tiles alongside earned ones.
+func (h *AchievementHandler) ListDefs(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListDefs(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load achievements")
+		return
+	}
+	if items == nil {
+		items = make([]*model.AchievementDef, 0)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 // GET /api/v1/users/me/achievements
 func (h *AchievementHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

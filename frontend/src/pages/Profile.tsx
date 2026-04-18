@@ -1,14 +1,15 @@
 import { useState, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, X, Check, MapPin, Users, Camera, Mail, Target, Star, Award, Eye, Crosshair, Calendar, Trophy, Lock, Globe, UserCheck, UserX, Ruler } from 'lucide-react'
+import { Pencil, X, Check, MapPin, Users, Camera, Mail, Lock, Globe, UserCheck, UserX, Ruler } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { statsApi } from '../api/stats'
 import { scoreCardApi } from '../api/scoreCards'
 import { usersApi, UpdateProfileInput } from '../api/users'
-import { achievementApi, Achievement } from '../api/achievements'
+import { achievementApi } from '../api/achievements'
 import { gearApi } from '../api/gear'
 import { RifleProfileCard } from '../components/RifleProfileCard'
+import { AchievementsSection } from '../components/AchievementsSection'
 import { toast } from '../store/toast'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
@@ -87,40 +88,6 @@ function AvatarUpload() {
       {avatarMutation.isError && (
         <p className="text-[10px] text-[var(--error-text)] mt-1 text-center">Failed</p>
       )}
-    </div>
-  )
-}
-
-const achievementIconMap: Record<string, typeof Target> = {
-  target: Target,
-  star: Star,
-  award: Award,
-  eye: Eye,
-  crosshair: Crosshair,
-  calendar: Calendar,
-  trophy: Trophy,
-}
-
-function AchievementsSection({ achievements }: { achievements: Achievement[] }) {
-  if (achievements.length === 0) return null
-  return (
-    <div>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Achievements</h2>
-      <div className="flex flex-wrap gap-2">
-        {achievements.map((a) => {
-          const Icon = achievementIconMap[a.icon]
-          return (
-            <span
-              key={a.id}
-              title={a.description}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--brass)]/40 bg-[var(--brass-pill-bg)] text-[var(--brass)] text-[11px] tracking-widest uppercase font-medium"
-            >
-              {Icon && <Icon size={11} />}
-              {a.name}
-            </span>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -416,6 +383,12 @@ export default function Profile() {
     queryKey: ['achievements', 'me'],
     queryFn: () => achievementApi.listMine(),
     enabled: !!user,
+  })
+
+  const { data: achievementDefsData } = useQuery({
+    queryKey: ['achievement-defs'],
+    queryFn: () => achievementApi.listDefs(),
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: riflesData } = useQuery({
@@ -776,7 +749,10 @@ export default function Profile() {
       </div>
 
       {/* Achievements */}
-      <AchievementsSection achievements={achievementsData?.items ?? []} />
+      <AchievementsSection
+        earned={achievementsData?.items ?? []}
+        allDefs={achievementDefsData?.items ?? []}
+      />
 
       {/* Follow Requests (only for private profiles) */}
       {(user?.profile_visibility === 'private') && <FollowRequestsSection />}

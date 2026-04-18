@@ -36,6 +36,7 @@ export interface ActivityItem {
     achievement_id?: string
     achievement_name?: string
     achievement_icon?: string
+    achievement_description?: string
   }
   league_id?: string
   club_id?: string

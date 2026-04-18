@@ -259,6 +259,19 @@ func (r *ClubRepository) IsMember(ctx context.Context, clubID, userID string) (b
 	return isMember, err
 }
 
+// CountMembershipsByUser returns how many clubs the user has joined.
+func (r *ClubRepository) CountMembershipsByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM club_members WHERE user_id = $1`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count club memberships: %w", err)
+	}
+	return count, nil
+}
+
 func (r *ClubRepository) ListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT u.id, u.display_name, u.avatar_url, cm.is_admin, cm.joined_at::text

@@ -23,6 +23,7 @@ type ScoreCardRepo interface {
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
+	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
 }
 
 // LeagueConfigRepo provides league config lookups needed by ScoreCardService.
@@ -98,10 +99,15 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		return nil, err
 	}
 
+	isPB, err := s.cards.IsPersonalBest(ctx, userID, card.ID, card.TotalScore)
+	if err != nil {
+		isPB = false
+	}
+
 	if s.activity != nil {
 		targetID := card.ID
 		targetType := "score_card"
-		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount}
+		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount, IsPB: isPB}
 
 		// Resolve league_id from round if this is a league submission
 		var leagueID *string
@@ -111,11 +117,16 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			}
 		}
 
-		go s.activity.Ingest(context.Background(), userID, model.ActivityScorePosted, &targetID, &targetType, meta, leagueID, card.ClubID, card.Visibility)
+		activityType := model.ActivityScorePosted
+		if isPB {
+			activityType = model.ActivityPersonalBest
+		}
+		go s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, card.ClubID, card.Visibility)
 	}
 
 	if s.achievement != nil {
 		go s.achievement.EvaluateForScoreCard(context.Background(), userID, card)
+		go s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
 	}
 
 	return card, nil

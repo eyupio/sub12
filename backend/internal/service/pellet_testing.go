@@ -14,12 +14,13 @@ var ErrInvalidPelletTest = errors.New("invalid pellet test")
 var ErrInvalidMeasurement = errors.New("invalid measurement")
 
 type PelletTestService struct {
-	repo     *repository.PelletTestRepository
-	activity *ActivityService // nil disables feed ingestion
+	repo         *repository.PelletTestRepository
+	activity     *ActivityService    // nil disables feed ingestion
+	achievements *AchievementService // nil disables achievement evaluation
 }
 
-func NewPelletTestService(repo *repository.PelletTestRepository, activity *ActivityService) *PelletTestService {
-	return &PelletTestService{repo: repo, activity: activity}
+func NewPelletTestService(repo *repository.PelletTestRepository, activity *ActivityService, achievements *AchievementService) *PelletTestService {
+	return &PelletTestService{repo: repo, activity: activity, achievements: achievements}
 }
 
 // ── Session ─────────────────────────────────────────────────────────────────────
@@ -57,6 +58,9 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 			AvgGroupMM:  session.AverageGroupSizeMM,
 		}
 		go s.activity.Ingest(context.Background(), userID, model.ActivityPelletTestPosted, &tid, &tt, meta, nil, nil, "public")
+	}
+	if s.achievements != nil {
+		go s.achievements.EvaluateForPelletTest(context.Background(), userID)
 	}
 	return session, nil
 }

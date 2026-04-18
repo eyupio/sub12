@@ -8,6 +8,7 @@ import {
 import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
+import { iconForAchievement } from '../utils/achievementIcons'
 
 const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
   { key: 'public', label: 'Public', icon: Globe },
@@ -180,14 +181,32 @@ function ActivityCard({ item }: { item: ActivityItem }) {
             )}
           </p>
         )
-      case 'achievement_earned':
+      case 'achievement_earned': {
+        const AchIcon = iconForAchievement(item.metadata?.achievement_icon)
+        const achName = item.metadata?.achievement_name ?? 'an achievement'
+        const achDesc = item.metadata?.achievement_description
         return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span>
-            {' earned '}
-            <span className="font-medium text-[var(--brass)]">{item.metadata?.achievement_name ?? 'an achievement'}</span>
-          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-secondary">
+              <Link
+                to="/users/$id"
+                params={{ id: item.user_id }}
+                className="font-medium text-primary hover:underline"
+              >
+                {item.display_name}
+              </Link>
+              {' earned '}
+              <span className="inline-flex items-center gap-1 font-medium text-[var(--brass)]">
+                <AchIcon size={13} />
+                {achName}
+              </span>
+            </p>
+            {achDesc && (
+              <p className="text-[11px] text-muted">{achDesc}</p>
+            )}
+          </div>
         )
+      }
       default:
         return (
           <p className="text-sm text-secondary">

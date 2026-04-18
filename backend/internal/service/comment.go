@@ -16,15 +16,16 @@ var (
 )
 
 type CommentService struct {
-	comments   *repository.CommentRepository
-	scoreCards *repository.ScoreCardRepository
-	posts      *repository.PostRepository
-	postSvc    *PostService
-	blocks     *repository.BlockRepository
+	comments     *repository.CommentRepository
+	scoreCards   *repository.ScoreCardRepository
+	posts        *repository.PostRepository
+	postSvc      *PostService
+	blocks       *repository.BlockRepository
+	achievements *AchievementService // optional; nil disables achievement evaluation
 }
 
-func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, postSvc *PostService, blocks *repository.BlockRepository) *CommentService {
-	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, postSvc: postSvc, blocks: blocks}
+func NewCommentService(comments *repository.CommentRepository, scoreCards *repository.ScoreCardRepository, posts *repository.PostRepository, postSvc *PostService, blocks *repository.BlockRepository, achievements *AchievementService) *CommentService {
+	return &CommentService{comments: comments, scoreCards: scoreCards, posts: posts, postSvc: postSvc, blocks: blocks, achievements: achievements}
 }
 
 func (s *CommentService) validateBody(body string) (string, error) {
@@ -97,7 +98,16 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 		}
 	}
 
-	return s.comments.Create(ctx, targetID, targetType, userID, body, parentID)
+	comment, err := s.comments.Create(ctx, targetID, targetType, userID, body, parentID)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.achievements != nil {
+		go s.achievements.EvaluateForComment(context.Background(), userID)
+	}
+
+	return comment, nil
 }
 
 // ListByTarget returns top-level comments for a target.
