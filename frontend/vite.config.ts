@@ -31,6 +31,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Prevent the service worker from serving the SPA shell for
+        // backend-generated SEO endpoints (sitemap, robots, IndexNow key files).
+        navigateFallbackDenylist: [
+          /^\/sitemap\.xml$/,
+          /^\/siteindex\.xml$/,
+          /^\/robots\.txt$/,
+          /^\/[a-fA-F0-9]+\.txt$/,
+        ],
         // Cache API responses for offline score entry
         runtimeCaching: [
           {
@@ -50,6 +58,15 @@ export default defineConfig({
     proxy: {
       // Proxy /api to the Go backend (default PORT=8080 in backend/internal/config).
       '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // SEO endpoints served by the backend.
+      '/sitemap.xml': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/siteindex.xml': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
