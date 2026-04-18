@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
@@ -17,6 +17,7 @@ const baseNavItems = [
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
   { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
+  { to: '/feature-requests', icon: Lightbulb, label: 'Features', mobileLabel: 'Ideas' },
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
 ] as const
 
@@ -26,6 +27,7 @@ const adminNavItems = [
   { to: '/admin/leagues',        icon: Trophy,  label: 'Admin Leagues', mobileLabel: 'Lgues'  },
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
   { to: '/admin/sitemap',        icon: Globe,   label: 'Sitemap & SEO', mobileLabel: 'SEO'    },
+  { to: '/admin/feature-requests', icon: Lightbulb, label: 'Feature Admin', mobileLabel: 'Ideas' },
 ]
 
 const mobileNavItems = [
@@ -39,6 +41,7 @@ const moreMenuItems = [
   { to: '/feed', icon: Activity, label: 'Feed' },
   { to: '/clubs', icon: Users, label: 'Clubs' },
   { to: '/gear', icon: Package, label: 'Gear' },
+  { to: '/feature-requests', icon: Lightbulb, label: 'Features' },
   { to: '/profile', icon: User, label: 'Profile' },
 ]
 

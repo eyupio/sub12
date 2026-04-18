@@ -45,6 +45,8 @@ import PrivacyCenter from './pages/PrivacyCenter'
 import NotificationSettings from './pages/NotificationSettings'
 import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
+import FeatureBoard from './pages/FeatureBoard'
+import AdminFeatureRefinement from './pages/AdminFeatureRefinement'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -303,6 +305,18 @@ const settingsNotificationsRoute = createRoute({
   component: NotificationSettings,
 })
 
+const featureBoardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/feature-requests',
+  component: FeatureBoard,
+})
+
+const adminFeatureRefinementRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/feature-requests',
+  component: AdminFeatureRefinement,
+})
+
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
@@ -385,6 +399,8 @@ export const routeTree = rootRoute.addChildren([
     adminClubDetailRoute,
     adminSitemapRoute,
     notificationsRoute,
+    featureBoardRoute,
+    adminFeatureRefinementRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
     confirmEmailRoute,
