@@ -1,6 +1,6 @@
 import { api } from './client'
 
-export type FeatureRequestStatus = 'submitted' | 'refining' | 'accepted' | 'rejected' | 'planned' | 'in_progress' | 'done'
+export type FeatureRequestStatus = 'submitted' | 'refining' | 'accepted' | 'rejected' | 'planned' | 'in_progress' | 'done' | 'implemented'
 
 export interface FeatureRequest {
   id: string

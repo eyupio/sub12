@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { featureRequestsApi } from '../api/featureRequests'
 import { FeatureRequestVoteButton } from '../components/FeatureRequestVoteButton'
 
-const statuses = ['all', 'submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done'] as const
+const statuses = ['all', 'submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done', 'implemented'] as const
 
 export default function FeatureBoard() {
   const [scopeType, setScopeType] = useState<'platform' | 'league' | 'club'>('platform')

@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Inbox, Lightbulb } from 'lucide-react'
-import { featureRequestsApi } from '../api/featureRequests'
+import { Inbox, Lightbulb, Pencil, X } from 'lucide-react'
+import { featureRequestsApi, type FeatureRequest, type FeatureRequestStatus } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
 import { toast } from '../store/toast'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
+const featureStatuses: FeatureRequestStatus[] = ['submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done', 'implemented']
 
 export default function AdminSupportInbox() {
   const qc = useQueryClient()
   const [ticketStatus, setTicketStatus] = useState<SupportTicketStatus>('open')
   const [ticketCategory, setTicketCategory] = useState<SupportTicketCategory | 'all'>('all')
+  const [editingFeature, setEditingFeature] = useState<FeatureRequest | null>(null)
 
   const ticketsQuery = useQuery({
     queryKey: ['admin', 'tickets', ticketStatus, ticketCategory],
@@ -36,6 +38,15 @@ export default function AdminSupportInbox() {
     onError: () => toast('Failed to update ticket status', 'error'),
   })
 
+  const updateFeatureStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: FeatureRequestStatus }) => featureRequestsApi.adminUpdate(id, { status }),
+    onSuccess: () => {
+      toast('Feature request status updated', 'success')
+      qc.invalidateQueries({ queryKey: ['admin', 'feature-requests'] })
+    },
+    onError: () => toast('Failed to update feature request', 'error'),
+  })
+
   const tickets = ticketsQuery.data?.items ?? []
 
   const sortedFeatureRequests = useMemo(
@@ -46,7 +57,7 @@ export default function AdminSupportInbox() {
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Admin support inbox</h1>
-      <p className="text-sm text-muted">View submitted support tickets and feature requests in one place.</p>
+      <p className="text-sm text-muted">Triage tickets and maintain feature requests in one place.</p>
 
       <section className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-3 justify-between">
@@ -104,7 +115,7 @@ export default function AdminSupportInbox() {
         </ul>
       </section>
 
-      <section className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
+      <section id="feature-requests" className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
         <h2 className="font-medium flex items-center gap-2"><Lightbulb size={16} className="text-[var(--brass)]" /> Feature requests</h2>
 
         {featureRequestsQuery.isLoading && <p className="text-sm text-muted">Loading feature requests…</p>}
@@ -113,19 +124,140 @@ export default function AdminSupportInbox() {
 
         <ul className="space-y-2">
           {sortedFeatureRequests.map(feature => (
-            <li key={feature.id} className="rounded-lg border border-subtle p-3 space-y-1">
+            <li key={feature.id} id={`feature-${feature.id}`} className="rounded-lg border border-subtle p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-medium">{feature.title}</p>
-                <span className="text-xs text-muted">{feature.status}</span>
+                <div className="min-w-0">
+                  <p className="font-medium">{feature.title}</p>
+                  <p className="text-xs text-muted">Ticket: {feature.ticket_id} · Votes: {feature.vote_count}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-xs"
+                    value={feature.status}
+                    disabled={updateFeatureStatusMutation.isPending}
+                    onChange={(e) => updateFeatureStatusMutation.mutate({ id: feature.id, status: e.target.value as FeatureRequestStatus })}
+                  >
+                    {featureStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1.5 text-xs hover:bg-[color:var(--surface-muted)]"
+                    onClick={() => setEditingFeature(feature)}
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-muted">Ticket: {feature.ticket_id} · Votes: {feature.vote_count}</p>
               {feature.refined_description && <p className="text-sm text-secondary whitespace-pre-wrap">{feature.refined_description}</p>}
             </li>
           ))}
         </ul>
-
-        <p className="text-xs text-muted">Need to refine statuses or ownership? Use the Feature Admin page.</p>
       </section>
+
+      {editingFeature && (
+        <FeatureRequestEditDialog
+          feature={editingFeature}
+          onClose={() => setEditingFeature(null)}
+          onSaved={() => {
+            setEditingFeature(null)
+            qc.invalidateQueries({ queryKey: ['admin', 'feature-requests'] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+interface FeatureRequestEditDialogProps {
+  feature: FeatureRequest
+  onClose: () => void
+  onSaved: () => void
+}
+
+function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestEditDialogProps) {
+  const [title, setTitle] = useState(feature.title)
+  const [refinedDescription, setRefinedDescription] = useState(feature.refined_description)
+  const [status, setStatus] = useState<FeatureRequestStatus>(feature.status)
+  const [ownerAdminID, setOwnerAdminID] = useState(feature.owner_admin_id ?? '')
+
+  const updateMutation = useMutation({
+    mutationFn: () => featureRequestsApi.adminUpdate(feature.id, {
+      title,
+      refined_description: refinedDescription,
+      status,
+      owner_admin_id: ownerAdminID.trim() === '' ? undefined : ownerAdminID.trim(),
+    }),
+    onSuccess: () => {
+      toast('Feature request updated', 'success')
+      onSaved()
+    },
+    onError: () => toast('Failed to update feature request', 'error'),
+  })
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    updateMutation.mutate()
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Edit feature request">
+      <div className="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-4 md:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-medium">Edit feature request</h3>
+          <button type="button" className="rounded-md p-1 hover:bg-[color:var(--surface-muted)]" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="mt-3 space-y-3">
+          <label className="block text-sm">
+            Title
+            <input
+              className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block text-sm">
+            Refined description
+            <textarea
+              className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+              rows={5}
+              value={refinedDescription}
+              onChange={(e) => setRefinedDescription(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            Status
+            <select
+              className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as FeatureRequestStatus)}
+            >
+              {featureStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Owner admin ID (optional)
+            <input
+              className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+              value={ownerAdminID}
+              onChange={(e) => setOwnerAdminID(e.target.value)}
+              placeholder="UUID"
+            />
+          </label>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" className="rounded-md border border-subtle px-3 py-2 text-sm" onClick={onClose}>Cancel</button>
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

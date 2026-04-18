@@ -29,7 +29,6 @@ const adminNavItems = [
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
   { to: '/admin/sitemap',        icon: Globe,   label: 'Sitemap & SEO', mobileLabel: 'SEO'    },
   { to: '/admin/support',         icon: Inbox,   label: 'Support Inbox', mobileLabel: 'Inbox' },
-  { to: '/admin/feature-requests', icon: Lightbulb, label: 'Feature Admin', mobileLabel: 'Ideas' },
 ]
 
 const mobileNavItems = [
