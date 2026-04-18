@@ -124,47 +124,47 @@ const comparisonRows = [
 
 const pelletTestingPoints: FeaturePoint[] = [
   {
-    title: 'Test the full setup, not just the pellet name',
+    title: 'Rank pellet setups by repeatable outcomes',
     description:
-      'Tie every result to rifle, pellet, head size, batch, distance, and session conditions so comparisons stay honest.',
+      'Compare rifle and pellet combinations by measured results so your shortlist is driven by repeat performance, not brand preference.',
   },
   {
-    title: 'Measure targets with evidence attached',
+    title: 'Compare batches and head sizes side by side',
     description:
-      'Keep the target photo, group size in mm and MOA, and the annotated review in the same record for later scrutiny.',
+      'Spot tins or batch codes that drift from baseline and keep only combinations that stay tight across real sessions.',
   },
   {
-    title: 'Trust repeat sessions more than one standout target',
+    title: 'Promote confidence over one-off wins',
     description:
-      'Review best group, session average, and confidence level so the winning pellet is the one that keeps performing.',
+      'Confidence scoring rewards useful sample sizes, helping you avoid decisions based on one standout card.',
   },
   {
-    title: 'Compare tins, batches, and combinations cleanly',
+    title: 'Back equipment changes with trend evidence',
     description:
-      'Use head-to-head comparison, combo analytics, and batch reporting to find what actually holds together over time.',
+      'Track whether a pellet decision still holds after more sessions, weather changes, and maintenance cycles.',
   },
 ] as const
 
 const groupAnalysisPoints: FeaturePoint[] = [
   {
-    title: 'Multiple groups in one session',
+    title: 'Use one measurement workflow across every group',
     description:
-      'Record several groups against the same conditions to see whether a setup is genuinely stable or just produced one clean cluster.',
+      'Apply the same image-analysis method to multi-group sessions so repeatability is judged on consistent evidence.',
   },
   {
-    title: 'Manual control when the paper gets messy',
+    title: 'Interpret best, average, and spread together',
     description:
-      'Use assisted detection when the image is clean, then correct measurements manually when tears, shadow, or ragged holes need judgement.',
+      'Read smallest group, session average, and variability in one view to separate genuine gains from normal shot-to-shot noise.',
   },
   {
-    title: 'Review group size in context',
+    title: 'Keep measured-image proof attached',
     description:
-      'Look at best, average, and spread together so you can separate true improvement from noise and target-by-target variance.',
+      'Every reviewed target stays linked to its measurement overlay, making later validation and coaching discussions straightforward.',
   },
   {
-    title: 'Keep every measured image for later review',
+    title: 'Correct edge cases with manual judgement',
     description:
-      'Useful when checking scope changes, pellet swaps, bench setup changes, or club disputes after the shooting is done.',
+      'Use assisted detection when paper quality, tears, or shadow confuse auto-picking, then refine points without losing traceability.',
   },
 ] as const
 
@@ -519,10 +519,10 @@ export default function LandingPage() {
               How it works
             </a>
             <a href="#pellet-testing" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
-              Pellet testing
+              Pellet decisions
             </a>
             <a href="#analytics" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
-              Analytics
+              Trends & analytics
             </a>
             <a href="#clubs-leagues" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Clubs and leagues
@@ -669,8 +669,8 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <SectionHeader
               eyebrow="Pellet Testing — Image Measurement"
-              title="Measure every group from a single photo"
-              description="Photograph your target, mark a known distance for calibration, and SUB12 measures the group in millimetres and MOA. Auto-detect the holes, or place them yourself when the paper gets messy."
+              title="Image analysis that powers pellet ranking decisions"
+              description="Run each target through one measurement workflow, then roll those measured groups into ranking, batch comparison, and confidence-backed pellet choices."
               align="center"
             />
 
@@ -687,8 +687,8 @@ export default function LandingPage() {
                     <span className="relative h-2.5 w-2.5 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
                   </div>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Mark your aim point</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Tap where you were aiming so elevation and windage can be measured from the right reference.</p>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Capture a comparable test target</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Start each candidate pellet on the same target style so later ranking compares like with like.</p>
               </SurfaceCard>
 
               <SurfaceCard className="rounded-[24px] p-5">
@@ -704,8 +704,8 @@ export default function LandingPage() {
                     <span className="relative -top-5 rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">25 mm</span>
                   </div>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Set a known distance</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Pick two points on the target and enter the real-world distance. That's your pixels-per-mm calibration.</p>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Normalise measurements</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Calibrate once so every pellet entry is measured on the same scale before comparisons begin.</p>
               </SurfaceCard>
 
               <SurfaceCard className="rounded-[24px] p-5">
@@ -721,8 +721,8 @@ export default function LandingPage() {
                     <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.25</span>
                   </div>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Distance &amp; caliber</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Enter the range and pellet caliber so SUB12 can convert to MOA and account for pellet diameter.</p>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Measure each candidate consistently</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Apply range and caliber context so each measured group is directly comparable across sessions.</p>
               </SurfaceCard>
 
               <SurfaceCard className="rounded-[24px] p-5">
@@ -748,8 +748,8 @@ export default function LandingPage() {
                     <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">Auto-detected · 5 shots</span>
                   </div>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Auto-detect or place manually</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Let SUB12 find the holes with confidence scoring, or drop points yourself when tears and shadow need judgement.</p>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Validate outliers before ranking</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Review auto-detected groups and fix edge cases so one bad read does not distort pellet comparisons.</p>
               </SurfaceCard>
 
               <SurfaceCard className="rounded-[24px] p-5">
@@ -771,8 +771,8 @@ export default function LandingPage() {
                     <span className="font-mono text-sm font-semibold text-primary">3.12mm</span>
                   </div>
                 </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Group size in mm &amp; MOA</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Read group size, mean radius, elevation and windage straight from the image — saved with the session for later review.</p>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Rank setups with confidence</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Turn measured outcomes into evidence-backed ordering so pellet changes are justified, not guessed.</p>
               </SurfaceCard>
             </div>
 
@@ -944,9 +944,9 @@ export default function LandingPage() {
                       <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Why it matters</p>
                       <div className="mt-4 space-y-3">
                         {[
-                          'A single tiny group is useful, but the session average tells you whether the setup is repeatable.',
-                          'The measured image lets you review exactly what happened if the result looks too good or too poor.',
-                          'Keeping best, average, and variability together exposes setups that only look good in isolated cases.',
+                          'Best/average/spread together tells you whether dispersion is tightening or simply fluctuating.',
+                          'Overlay-retained measured images let you audit surprising targets without relying on memory.',
+                          'Validation at this stage protects downstream pellet rankings from misread holes or torn paper.',
                         ].map((line) => (
                           <div key={line} className="flex gap-3 rounded-2xl border border-subtle bg-surface p-3">
                             <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--brass)]" />
@@ -964,7 +964,7 @@ export default function LandingPage() {
               <SectionHeader
                 eyebrow="Group Analysis"
                 title="Group analysis that separates a lucky card from a repeatable setup"
-                description="You need more than a group number on its own. SUB12 ties the measurement to the target image, the shot count, the session, and the wider trend so you can judge the result properly."
+                description="Use this view to interpret and validate measured groups: read spread behaviour, inspect overlays, and confirm whether the session evidence matches the story."
               />
 
               <div className="mt-8">
