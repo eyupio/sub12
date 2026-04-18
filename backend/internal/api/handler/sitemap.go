@@ -66,7 +66,13 @@ func (h *AdminSitemapHandler) Ping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := h.svc.PingEngines(r.Context(), adminID, input.Engines)
+	results, err := h.svc.PingEngines(
+		r.Context(),
+		adminID,
+		input.Engines,
+		input.IndexNowKey,
+		input.IndexNowKeyLocation,
+	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "sitemap ping failed")
 		return

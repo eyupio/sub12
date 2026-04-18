@@ -26,6 +26,8 @@ export interface SitemapSubmissionsResponse {
 
 export interface SitemapPingRequest {
   engines: string[]
+  indexnow_key?: string
+  indexnow_key_location?: string
 }
 
 export const adminSitemapApi = {

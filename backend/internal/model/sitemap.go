@@ -31,14 +31,16 @@ type SitemapSubmission struct {
 
 // SitemapStats summarises the dynamic content available for the sitemap.
 type SitemapStats struct {
-	StaticPages  int `json:"static_pages"`
-	PublicUsers  int `json:"public_users"`
+	StaticPages   int `json:"static_pages"`
+	PublicUsers   int `json:"public_users"`
 	PublicLeagues int `json:"public_leagues"`
-	PublicClubs  int `json:"public_clubs"`
-	TotalURLs    int `json:"total_urls"`
+	PublicClubs   int `json:"public_clubs"`
+	TotalURLs     int `json:"total_urls"`
 }
 
 // SitemapPingRequest is the admin request body to trigger a ping.
 type SitemapPingRequest struct {
-	Engines []string `json:"engines"` // e.g. ["google","bing","indexnow"]
+	Engines             []string `json:"engines"`                         // e.g. ["google","bing","indexnow"]
+	IndexNowKey         string   `json:"indexnow_key,omitempty"`          // optional request-scoped key override
+	IndexNowKeyLocation string   `json:"indexnow_key_location,omitempty"` // optional request-scoped key location override
 }

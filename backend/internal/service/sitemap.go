@@ -148,8 +148,10 @@ func (s *SitemapService) Stats(ctx context.Context) (*model.SitemapStats, error)
 
 // PingEngines submits the sitemap URL to the requested search engines and
 // records each attempt in the audit table.
-func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engines []string) ([]*model.SitemapSubmission, error) {
+func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engines []string, indexNowKey, indexNowKeyLocation string) ([]*model.SitemapSubmission, error) {
 	sitemapURL := s.siteURL + "/sitemap.xml"
+	requestKey := strings.TrimSpace(indexNowKey)
+	requestKeyLocation := strings.TrimSpace(indexNowKeyLocation)
 
 	var results []*model.SitemapSubmission
 
@@ -182,7 +184,11 @@ func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engine
 			results = append(results, sub)
 			continue
 		case "indexnow":
-			if s.indexNowKey == "" {
+			effectiveKey := s.indexNowKey
+			if requestKey != "" {
+				effectiveKey = requestKey
+			}
+			if effectiveKey == "" {
 				msg := "indexnow key is not configured (set INDEXNOW_KEY)"
 				sub, insertErr := s.repo.InsertSubmission(ctx, engine, "", adminID, nil, nil, &msg)
 				if insertErr != nil {
@@ -193,12 +199,15 @@ func (s *SitemapService) PingEngines(ctx context.Context, adminID string, engine
 				continue
 			}
 			location := s.indexNowKeyLocation
+			if requestKeyLocation != "" {
+				location = requestKeyLocation
+			}
 			if location == "" {
-				location = fmt.Sprintf("%s/%s.txt", s.siteURL, s.indexNowKey)
+				location = fmt.Sprintf("%s/%s.txt", s.siteURL, effectiveKey)
 			}
 			body := map[string]any{
 				"host":        mustHost(s.siteURL),
-				"key":         s.indexNowKey,
+				"key":         effectiveKey,
 				"keyLocation": location,
 				"urlList":     []string{sitemapURL},
 			}
