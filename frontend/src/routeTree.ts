@@ -50,6 +50,8 @@ import NotFound from './pages/NotFound'
 import FeatureBoard from './pages/FeatureBoard'
 import AdminFeatureRefinement from './pages/AdminFeatureRefinement'
 import SupportCenter from './pages/SupportCenter'
+import SupportTicketDetail from './pages/SupportTicketDetail'
+import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -332,6 +334,18 @@ const supportCenterRoute = createRoute({
   component: SupportCenter,
 })
 
+const supportTicketDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/support/tickets/$id',
+  component: SupportTicketDetail,
+})
+
+const adminSupportTicketDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/support/tickets/$id',
+  component: AdminSupportTicketDetail,
+})
+
 const adminFeatureRefinementRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/feature-requests',
@@ -421,8 +435,10 @@ export const routeTree = rootRoute.addChildren([
     adminSitemapRoute,
     adminReportsRoute,
     adminSupportRoute,
+    adminSupportTicketDetailRoute,
     notificationsRoute,
     supportCenterRoute,
+    supportTicketDetailRoute,
     featureBoardRoute,
     adminFeatureRefinementRoute,
     settingsPrivacyRoute,

@@ -565,9 +565,9 @@ func (s *SupportTicketService) lookupActorName(ctx context.Context, actorID stri
 
 func (s *SupportTicketService) ticketDetailLink(ticketID string) string {
 	if strings.TrimSpace(s.frontendURL) == "" {
-		return fmt.Sprintf("/tickets/%s", ticketID)
+		return fmt.Sprintf("/support/tickets/%s", ticketID)
 	}
-	return fmt.Sprintf("%s/tickets/%s", s.frontendURL, ticketID)
+	return fmt.Sprintf("%s/support/tickets/%s", s.frontendURL, ticketID)
 }
 
 func humanizeTicketStatus(status string) string {

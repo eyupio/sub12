@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { Inbox, Lightbulb } from 'lucide-react'
 import { featureRequestsApi } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
@@ -36,11 +37,10 @@ export default function AdminSupportInbox() {
   })
 
   const tickets = ticketsQuery.data?.items ?? []
-  const featureRequests = featureRequestsQuery.data?.items ?? []
 
   const sortedFeatureRequests = useMemo(
-    () => [...featureRequests].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
-    [featureRequests],
+    () => [...(featureRequestsQuery.data?.items ?? [])].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
+    [featureRequestsQuery.data?.items],
   )
 
   return (
@@ -85,6 +85,9 @@ export default function AdminSupportInbox() {
                   <p className="text-xs text-muted">
                     {ticket.category} · {ticket.priority} · {ticket.scope_type} · {ticket.status}
                   </p>
+                  <Link to="/admin/support/tickets/$id" params={{ id: ticket.id }} className="mt-1 inline-block text-xs text-[var(--brass)] hover:underline">
+                    Open ticket
+                  </Link>
                 </div>
                 <select
                   className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-xs"
