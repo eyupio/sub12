@@ -36,20 +36,26 @@ const (
 )
 
 type SupportTicket struct {
-	ID          string     `json:"id"`
-	RequesterID string     `json:"requester_id"`
-	ScopeType   string     `json:"scope_type"`
-	ScopeID     *string    `json:"scope_id,omitempty"`
-	Category    string     `json:"category"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	Priority    string     `json:"priority"`
-	AssigneeID  *string    `json:"assignee_id,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ClosedAt    *time.Time `json:"closed_at,omitempty"`
-	UnreadCount int        `json:"unread_count,omitempty"`
+	ID          string       `json:"id"`
+	RequesterID string       `json:"requester_id"`
+	ScopeType   string       `json:"scope_type"`
+	ScopeID     *string      `json:"scope_id,omitempty"`
+	Category    string       `json:"category"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Status      string       `json:"status"`
+	Priority    string       `json:"priority"`
+	AssigneeID  *string      `json:"assignee_id,omitempty"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	ClosedAt    *time.Time   `json:"closed_at,omitempty"`
+	UnreadCount int          `json:"unread_count,omitempty"`
+	Unread      *UnreadState `json:"unread,omitempty"`
+}
+
+type UnreadState struct {
+	Count     int  `json:"count"`
+	HasUnread bool `json:"has_unread"`
 }
 
 type SupportTicketMessage struct {
@@ -62,11 +68,12 @@ type SupportTicketMessage struct {
 }
 
 type SupportTicketParticipant struct {
-	TicketID   string     `json:"ticket_id"`
-	UserID     string     `json:"user_id"`
-	Role       string     `json:"role"`
-	LastReadAt *time.Time `json:"last_read_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
+	TicketID    string     `json:"ticket_id"`
+	UserID      string     `json:"user_id"`
+	Role        string     `json:"role"`
+	LastReadAt  *time.Time `json:"last_read_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UnreadCount int        `json:"unread_count,omitempty"`
 }
 
 type SupportTicketEvent struct {
@@ -114,6 +121,13 @@ type AddSupportTicketMessageInput struct {
 
 type MarkSupportTicketReadInput struct {
 	LastReadAt *time.Time `json:"last_read_at,omitempty"`
+}
+
+type SupportTicketDetail struct {
+	Ticket       *SupportTicket              `json:"ticket"`
+	Messages     []*SupportTicketMessage     `json:"messages"`
+	Events       []*SupportTicketEvent       `json:"events"`
+	Participants []*SupportTicketParticipant `json:"participants"`
 }
 
 func IsValidSupportScopeType(v string) bool {
