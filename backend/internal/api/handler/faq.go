@@ -130,6 +130,48 @@ func (h *FAQHandler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+// PATCH /api/v1/admin/faqs/reorder-items
+func (h *FAQHandler) AdminReorderItems(w http.ResponseWriter, r *http.Request) {
+	updatedBy, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input model.ReorderFAQItemsInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.ReorderItems(r.Context(), input.Items, updatedBy); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to reorder faq items")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/admin/faqs/reorder-sections
+func (h *FAQHandler) AdminReorderSections(w http.ResponseWriter, r *http.Request) {
+	updatedBy, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input model.ReorderFAQSectionsInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.ReorderSections(r.Context(), input.Sections, updatedBy); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to reorder faq sections")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // DELETE /api/v1/admin/faqs/{id}
 func (h *FAQHandler) AdminDelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

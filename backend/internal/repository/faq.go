@@ -28,6 +28,7 @@ func scanFAQ(row pgx.Row) (*model.FAQ, error) {
 		&item.Question,
 		&item.AnswerMD,
 		&item.SortOrder,
+		&item.CategoryOrder,
 		&item.IsPublished,
 		&item.UpdatedBy,
 		&item.CreatedAt,
@@ -38,14 +39,14 @@ func scanFAQ(row pgx.Row) (*model.FAQ, error) {
 	return &item, nil
 }
 
-const faqColumns = `id::text, slug, category, question, answer_md, sort_order, is_published, updated_by::text, created_at, updated_at`
+const faqColumns = `id::text, slug, category, question, answer_md, sort_order, category_order, is_published, updated_by::text, created_at, updated_at`
 
 func (r *FAQRepository) List(ctx context.Context, onlyPublished bool) ([]*model.FAQ, error) {
 	query := `SELECT ` + faqColumns + ` FROM faqs`
 	if onlyPublished {
 		query += ` WHERE is_published = TRUE`
 	}
-	query += ` ORDER BY category, sort_order, question`
+	query += ` ORDER BY category_order, category, sort_order, question`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -91,8 +92,15 @@ func (r *FAQRepository) GetBySlug(ctx context.Context, slug string) (*model.FAQ,
 
 func (r *FAQRepository) Create(ctx context.Context, item *model.FAQ, updatedBy string) (*model.FAQ, error) {
 	created, err := scanFAQ(r.db.QueryRow(ctx, `
-		INSERT INTO faqs (slug, category, question, answer_md, sort_order, is_published, updated_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::uuid)
+		INSERT INTO faqs (slug, category, question, answer_md, sort_order, category_order, is_published, updated_by)
+		VALUES (
+			$1, $2, $3, $4, $5,
+			COALESCE(
+				(SELECT MIN(category_order) FROM faqs WHERE category = $2),
+				(SELECT COALESCE(MAX(category_order), 0) + 10 FROM faqs)
+			),
+			$6, $7::uuid
+		)
 		RETURNING `+faqColumns,
 		item.Slug, item.Category, item.Question, item.AnswerMD, item.SortOrder, item.IsPublished, updatedBy))
 	if err != nil {
@@ -110,6 +118,10 @@ func (r *FAQRepository) Update(ctx context.Context, id string, item *model.FAQ, 
 			question = $4,
 			answer_md = $5,
 			sort_order = $6,
+			category_order = COALESCE(
+				(SELECT MIN(category_order) FROM faqs WHERE category = $3 AND id <> $1::uuid),
+				faqs.category_order
+			),
 			is_published = $7,
 			updated_by = $8::uuid,
 			updated_at = NOW()
@@ -132,6 +144,56 @@ func (r *FAQRepository) Delete(ctx context.Context, id string) error {
 	}
 	if ct.RowsAffected() == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *FAQRepository) ReorderItems(ctx context.Context, items []model.ReorderFAQItem, updatedBy string) error {
+	if len(items) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin reorder items: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, it := range items {
+		if _, err := tx.Exec(ctx, `
+			UPDATE faqs
+			SET sort_order = $2, updated_by = $3::uuid, updated_at = NOW()
+			WHERE id = $1::uuid`,
+			it.ID, it.SortOrder, updatedBy); err != nil {
+			return fmt.Errorf("update faq sort_order: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit reorder items: %w", err)
+	}
+	return nil
+}
+
+func (r *FAQRepository) ReorderSections(ctx context.Context, sections []model.ReorderFAQSection, updatedBy string) error {
+	if len(sections) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin reorder sections: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, s := range sections {
+		if _, err := tx.Exec(ctx, `
+			UPDATE faqs
+			SET category_order = $2, updated_by = $3::uuid, updated_at = NOW()
+			WHERE category = $1`,
+			s.Category, s.CategoryOrder, updatedBy); err != nil {
+			return fmt.Errorf("update faq category_order: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit reorder sections: %w", err)
 	}
 	return nil
 }
