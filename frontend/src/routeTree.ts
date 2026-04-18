@@ -33,6 +33,7 @@ import AdminClubs from './pages/AdminClubs'
 import AdminClubDetail from './pages/AdminClubDetail'
 import AdminSitemap from './pages/AdminSitemap'
 import AdminReportsQueue from './pages/AdminReportsQueue'
+import AdminSupportInbox from './pages/AdminSupportInbox'
 import ConfirmEmail from './pages/ConfirmEmail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -48,6 +49,7 @@ import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
 import FeatureBoard from './pages/FeatureBoard'
 import AdminFeatureRefinement from './pages/AdminFeatureRefinement'
+import SupportCenter from './pages/SupportCenter'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -294,6 +296,12 @@ const adminReportsRoute = createRoute({
   component: AdminReportsQueue,
 })
 
+const adminSupportRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/support',
+  component: AdminSupportInbox,
+})
+
 const notificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/notifications',
@@ -316,6 +324,12 @@ const featureBoardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feature-requests',
   component: FeatureBoard,
+})
+
+const supportCenterRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/support',
+  component: SupportCenter,
 })
 
 const adminFeatureRefinementRoute = createRoute({
@@ -406,7 +420,9 @@ export const routeTree = rootRoute.addChildren([
     adminClubDetailRoute,
     adminSitemapRoute,
     adminReportsRoute,
+    adminSupportRoute,
     notificationsRoute,
+    supportCenterRoute,
     featureBoardRoute,
     adminFeatureRefinementRoute,
     settingsPrivacyRoute,
