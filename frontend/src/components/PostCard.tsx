@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send } from 'lucide-react'
+import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send, AlertTriangle } from 'lucide-react'
 import { LikeButton } from './LikeButton'
 import { ReportDialog } from './ReportDialog'
 import { FlagDialog } from './FlagDialog'
@@ -78,6 +78,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [flagOpen, setFlagOpen] = useState(false)
+  const [commentReportId, setCommentReportId] = useState<string | null>(null)
   const [showComments, setShowComments] = useState(false)
   const [newComment, setNewComment] = useState('')
 
@@ -215,6 +216,12 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
         )}
       </div>
       <ReportDialog open={reportOpen} targetType="post" targetId={post.id} onClose={() => setReportOpen(false)} />
+      <ReportDialog
+        open={commentReportId !== null}
+        targetType="comment"
+        targetId={commentReportId ?? ''}
+        onClose={() => setCommentReportId(null)}
+      />
       <FlagDialog
         open={flagOpen}
         targetLabel="post"
@@ -290,9 +297,21 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                   : c.display_name.slice(0, 2).toUpperCase()
                 }
               </div>
-              <div className="flex-1 rounded bg-surface-hover px-2 py-1">
-                <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
-                <span className="text-xs text-secondary whitespace-pre-wrap">{c.body}</span>
+              <div className="flex-1 flex items-start justify-between gap-2 rounded bg-surface-hover px-2 py-1">
+                <div className="min-w-0">
+                  <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
+                  <span className="text-xs text-secondary whitespace-pre-wrap">{c.body}</span>
+                </div>
+                {currentUser && currentUser.id !== c.user_id && (
+                  <button
+                    onClick={() => setCommentReportId(c.id)}
+                    className="p-1 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
+                    aria-label="Report comment"
+                    title="Report inappropriate comment"
+                  >
+                    <AlertTriangle size={12} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
