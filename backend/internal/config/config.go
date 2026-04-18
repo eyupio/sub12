@@ -37,6 +37,9 @@ type Config struct {
 	// after crawlers finish parsing share pages.
 	AppURL string `envconfig:"APP_URL" default:"http://localhost:5173"`
 
+	// Public site URL used for sitemap generation and SEO pings.
+	SiteURL string `envconfig:"SITE_URL" default:"http://localhost:5173"`
+
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`

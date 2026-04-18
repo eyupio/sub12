@@ -40,6 +40,9 @@ func NewRouter(
 	posts *service.PostService,
 	notifications *service.NotificationService,
 	moderation *service.ModerationService,
+	supportTickets *service.SupportTicketService,
+	featureRequests *service.FeatureRequestService,
+	sitemap *service.SitemapService,
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
@@ -56,6 +59,10 @@ func NewRouter(
 	h := handler.NewHealth(db)
 	r.Get("/healthz", h.Liveness)
 	r.Get("/readyz", h.Readiness)
+
+	// Public sitemap.xml (no auth)
+	sitemapH := handler.NewSitemap(sitemap)
+	r.Get("/sitemap.xml", sitemapH.ServeXML)
 
 	// Crawler-friendly share pages — return HTML with Open Graph + Twitter
 	// Card meta tags and redirect human visitors to the SPA. Outside /api/v1
@@ -199,6 +206,31 @@ func NewRouter(
 			// Moderation: user-submitted reports
 			reportH := handler.NewReport(moderation)
 			r.With(rl.Limit("report")).Post("/reports", reportH.Create)
+			supportH := handler.NewSupportTicket(supportTickets)
+			featureH := handler.NewFeatureRequest(featureRequests)
+			r.With(rl.Limit("report")).Post("/tickets", supportH.Create)
+			r.Get("/tickets", supportH.ListMine)
+			r.Get("/tickets/{id}", supportH.Get)
+			r.Post("/tickets/{id}/messages", supportH.AddMessage)
+			r.Post("/tickets/{id}/read", supportH.MarkRead)
+			// backwards-compatible legacy routes
+			r.With(rl.Limit("report")).Post("/support/tickets", supportH.Create)
+			r.Get("/support/tickets", supportH.ListMine)
+			r.Get("/support/tickets/{id}", supportH.Get)
+			r.Post("/support/tickets/{id}/messages", supportH.AddMessage)
+			r.Post("/support/tickets/{id}/read", supportH.MarkRead)
+
+			// Support queue for platform and scoped league/club admins.
+			r.Get("/admin/tickets", supportH.AdminList)
+			r.Get("/admin/tickets/{id}", supportH.AdminGet)
+			r.Post("/admin/tickets/{id}/status", supportH.AdminTransitionStatus)
+			r.Post("/admin/tickets/{id}/assign", supportH.AdminAssign)
+			r.Post("/admin/tickets/{id}/feature-request", featureH.AdminCreateFromTicket)
+			r.Patch("/admin/feature-requests/{id}", featureH.AdminUpdate)
+
+			r.Get("/feature-requests", featureH.List)
+			r.Get("/feature-requests/ranking", featureH.Rank)
+			r.Post("/feature-requests/{id}/vote", featureH.Vote)
 
 			// League/club scoped moderation (admins of that community).
 			r.Get("/leagues/{id}/reports", reportH.ListForLeague)
@@ -349,6 +381,12 @@ func NewRouter(
 				r.Delete("/admin/clubs/{id}", ach.Delete)
 				r.Get("/admin/clubs/{id}/members", ach.ListMembers)
 				r.Delete("/admin/clubs/{id}/members/{userId}", ach.RemoveMember)
+
+				// Sitemap & SEO management
+				asmh := handler.NewAdminSitemap(sitemap)
+				r.Get("/admin/sitemap/stats", asmh.Stats)
+				r.Post("/admin/sitemap/ping", asmh.Ping)
+				r.Get("/admin/sitemap/submissions", asmh.ListSubmissions)
 			})
 		})
 

@@ -31,6 +31,8 @@ import AdminLeagues from './pages/AdminLeagues'
 import AdminLeagueDetail from './pages/AdminLeagueDetail'
 import AdminClubs from './pages/AdminClubs'
 import AdminClubDetail from './pages/AdminClubDetail'
+import AdminSitemap from './pages/AdminSitemap'
+import AdminReportsQueue from './pages/AdminReportsQueue'
 import ConfirmEmail from './pages/ConfirmEmail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -44,6 +46,8 @@ import PrivacyCenter from './pages/PrivacyCenter'
 import NotificationSettings from './pages/NotificationSettings'
 import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
+import FeatureBoard from './pages/FeatureBoard'
+import AdminFeatureRefinement from './pages/AdminFeatureRefinement'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -278,6 +282,18 @@ const adminClubDetailRoute = createRoute({
   component: AdminClubDetail,
 })
 
+const adminSitemapRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/sitemap',
+  component: AdminSitemap,
+})
+
+const adminReportsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/reports',
+  component: AdminReportsQueue,
+})
+
 const notificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/notifications',
@@ -294,6 +310,18 @@ const settingsNotificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings/notifications',
   component: NotificationSettings,
+})
+
+const featureBoardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/feature-requests',
+  component: FeatureBoard,
+})
+
+const adminFeatureRefinementRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/feature-requests',
+  component: AdminFeatureRefinement,
 })
 
 const confirmEmailRoute = createRoute({
@@ -376,7 +404,11 @@ export const routeTree = rootRoute.addChildren([
     adminLeagueDetailRoute,
     adminClubsRoute,
     adminClubDetailRoute,
+    adminSitemapRoute,
+    adminReportsRoute,
     notificationsRoute,
+    featureBoardRoute,
+    adminFeatureRefinementRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
     confirmEmailRoute,

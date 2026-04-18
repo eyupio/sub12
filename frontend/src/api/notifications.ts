@@ -13,6 +13,11 @@ export type NotificationType =
   | 'club_join_approved'
   | 'mention'
   | 'report_filed'
+  | 'ticket_created'
+  | 'ticket_replied'
+  | 'ticket_assigned'
+  | 'ticket_status_changed'
+  | 'feature_request_state_changed'
 
 export interface Notification {
   id: string
@@ -49,6 +54,11 @@ export interface NotificationPreferences {
   club_join_approved: boolean
   mention: boolean
   report_filed: boolean
+  ticket_created: boolean
+  ticket_replied: boolean
+  ticket_assigned: boolean
+  ticket_status_changed: boolean
+  feature_request_state_changed: boolean
   digest_email: boolean
   follow_request_email: boolean
   follow_accepted_email: boolean
@@ -61,6 +71,11 @@ export interface NotificationPreferences {
   league_join_approved_email: boolean
   club_join_approved_email: boolean
   mention_email: boolean
+  ticket_created_email: boolean
+  ticket_replied_email: boolean
+  ticket_assigned_email: boolean
+  ticket_status_changed_email: boolean
+  feature_request_state_changed_email: boolean
   updated_at: string
 }
 

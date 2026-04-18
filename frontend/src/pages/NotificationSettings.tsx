@@ -23,6 +23,11 @@ const ROWS: PrefRow[] = [
   { inAppKey: 'league_join_approved', emailKey: 'league_join_approved_email', label: 'League join approved', description: '' },
   { inAppKey: 'club_join_approved', emailKey: 'club_join_approved_email', label: 'Club join approved', description: '' },
   { inAppKey: 'mention', emailKey: 'mention_email', label: 'Mentions', description: '@-mentions in comments or posts.' },
+  { inAppKey: 'ticket_created', emailKey: 'ticket_created_email', label: 'Ticket created', description: 'When a support ticket is opened in your scope.' },
+  { inAppKey: 'ticket_replied', emailKey: 'ticket_replied_email', label: 'Ticket replies', description: 'New replies on tickets you participate in.' },
+  { inAppKey: 'ticket_assigned', emailKey: 'ticket_assigned_email', label: 'Ticket assignments', description: 'When a ticket is assigned to you.' },
+  { inAppKey: 'ticket_status_changed', emailKey: 'ticket_status_changed_email', label: 'Ticket status changes', description: 'Updates to support ticket lifecycle state.' },
+  { inAppKey: 'feature_request_state_changed', emailKey: 'feature_request_state_changed_email', label: 'Feature request state', description: 'Status changes for feature request tickets.' },
 ]
 
 export default function NotificationSettings() {

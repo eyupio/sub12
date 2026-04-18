@@ -10,6 +10,19 @@ const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
+const templateLabels: Record<string, string> = {
+  forgot_password: 'Forgot password',
+  welcome: 'Welcome',
+  email_change_confirm: 'Email change confirmation',
+  notification_generic: 'Generic notification',
+  notification_report_filed: 'Report filed (admin)',
+  ticket_created_confirmation: 'Ticket created confirmation',
+  ticket_new_reply: 'Ticket new reply',
+  ticket_assigned: 'Ticket assigned',
+  ticket_status_changed: 'Ticket status changed',
+  feature_request_accepted_for_refinement: 'Feature request accepted',
+}
+
 function parseError(error: unknown) {
   if (!(error instanceof Error)) return 'Request failed.'
   const match = error.message.match(/\{.*\}$/)
@@ -53,6 +66,16 @@ export default function AdminEmailTemplates() {
     queryFn: () => adminEmailApi.getTemplate(selectedKey),
     enabled: Boolean(selectedKey),
   })
+
+  const templateItems = useMemo(
+    () =>
+      [...(templatesQuery.data?.items ?? [])].sort((a, b) => {
+        const aLabel = templateLabels[a.key] ?? a.key
+        const bLabel = templateLabels[b.key] ?? b.key
+        return aLabel.localeCompare(bLabel)
+      }),
+    [templatesQuery.data?.items],
+  )
 
   useEffect(() => {
     if (!templateQuery.data) return
@@ -149,17 +172,18 @@ export default function AdminEmailTemplates() {
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="bg-surface border border-subtle rounded-lg p-3 space-y-1 h-fit">
           <h2 className="text-xs uppercase tracking-widest text-muted px-2 pb-2">Templates</h2>
-          {templatesQuery.data?.items?.map((item) => (
+          {templateItems.map((item) => (
             <button
               key={item.key}
               className={`w-full text-left rounded px-2.5 py-2 text-sm border transition-colors ${selectedKey === item.key ? 'border-[var(--brass)]/50 text-[var(--brass)] bg-[var(--brass)]/10' : 'border-transparent text-secondary hover:bg-surface-hover'}`}
               onClick={() => trySelectTemplate(item.key)}
             >
-              <div className="font-medium">{item.key}</div>
+              <div className="font-medium">{templateLabels[item.key] ?? item.key}</div>
+              <div className="text-[11px] text-muted">{item.key}</div>
               <div className="text-xs text-muted">{item.is_enabled ? 'Enabled' : 'Disabled'}</div>
             </button>
           ))}
-          {!templatesQuery.data?.items?.length && (
+          {!templateItems.length && (
             <p className="text-xs text-muted px-2 py-3">No templates found.</p>
           )}
         </aside>
