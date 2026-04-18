@@ -12,6 +12,7 @@ export type ActivityType =
   | 'achievement_earned'
   | 'feature_request_created'
   | 'feature_request_implemented'
+  | 'post_created'
 
 export type FeedFilter = 'public' | 'for_you' | 'league' | 'club'
 
@@ -43,6 +44,9 @@ export interface ActivityItem {
     title?: string
     status?: string
     scope_type?: string
+    body_preview?: string
+    attachment_type?: 'score_card' | 'pellet_test' | 'image'
+    attachment_target_id?: string
   }
   league_id?: string
   club_id?: string

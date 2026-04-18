@@ -20,6 +20,7 @@ const (
 	ActivityAchievementEarned        ActivityType = "achievement_earned"
 	ActivityFeatureRequestCreated    ActivityType = "feature_request_created"
 	ActivityFeatureRequestImplemented ActivityType = "feature_request_implemented"
+	ActivityPostCreated              ActivityType = "post_created"
 )
 
 // FeedFilter controls which slice of the activity feed to return.
@@ -110,6 +111,17 @@ type FeatureRequestMeta struct {
 	Title     string `json:"title"`
 	Status    string `json:"status,omitempty"`
 	ScopeType string `json:"scope_type,omitempty"`
+}
+
+// PostCreatedMeta is the JSONB metadata for ActivityPostCreated events. For
+// share posts (attachments pointing to a score card or pellet test) the
+// attachment fields let the feed link directly to the shared target.
+type PostCreatedMeta struct {
+	BodyPreview      string `json:"body_preview,omitempty"`
+	AttachmentType   string `json:"attachment_type,omitempty"` // "score_card", "pellet_test", "image"
+	AttachmentTargetID string `json:"attachment_target_id,omitempty"`
+	LeagueName       string `json:"league_name,omitempty"`
+	ClubName         string `json:"club_name,omitempty"`
 }
 
 // FeedResponse is the paginated response for GET /api/v1/feed.
