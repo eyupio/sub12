@@ -33,14 +33,22 @@ type ShareMeta struct {
 	leagues    *service.LeagueService
 	clubs      *service.ClubService
 	users      *service.UserService
+	rifles     *service.RifleService
+	pellets    *service.PelletService
 	siteURL    string
 	siteName   string
 
 	frontendOrigin string
 	log            zerolog.Logger
 
-	once sync.Once
-	tmpl []byte // cached SPA index.html with OG placeholders
+	// Template cache. Re-fetched lazily once the TTL elapses so a frontend
+	// redeploy (new hashed bundle filenames) is picked up within a minute
+	// without a backend restart. The embedded fallback is never cached so a
+	// cold-start race never persists past the next successful fetch.
+	mu       sync.RWMutex
+	cached   []byte
+	cachedAt time.Time
+	ttl      time.Duration
 }
 
 // NewShareMeta constructs the share-meta handler. siteURL is the public
@@ -55,6 +63,8 @@ func NewShareMeta(
 	leagues *service.LeagueService,
 	clubs *service.ClubService,
 	users *service.UserService,
+	rifles *service.RifleService,
+	pellets *service.PelletService,
 	siteURL, frontendOrigin string,
 	log zerolog.Logger,
 ) *ShareMeta {
@@ -64,10 +74,13 @@ func NewShareMeta(
 		leagues:        leagues,
 		clubs:          clubs,
 		users:          users,
+		rifles:         rifles,
+		pellets:        pellets,
 		siteURL:        strings.TrimRight(siteURL, "/"),
 		siteName:       "SUB12",
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            log,
+		ttl:            60 * time.Second,
 	}
 }
 
@@ -91,14 +104,12 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 		if id != "" {
 			card, err := s.scoreCards.GetForViewer(r.Context(), id, "")
 			if err == nil {
-				og.Title = fmt.Sprintf("%d points on sub-12", card.TotalScore)
-				if card.XCount > 0 {
-					og.Title = fmt.Sprintf("%d points (%dX) on sub-12", card.TotalScore, card.XCount)
-				}
-				og.Description = scoreCardDescription(card)
-				if card.CardImageURL != nil && *card.CardImageURL != "" {
-					og.Image = s.absolute(*card.CardImageURL)
-				}
+				displayName := s.lookupDisplayName(r.Context(), card.UserID)
+				rifle := s.lookupRifle(r.Context(), card.RifleID, card.UserID)
+				pellet := s.lookupPellet(r.Context(), card.PelletID, card.UserID)
+				og.Title = scoreCardTitle(card, displayName)
+				og.Description = scoreCardDescription(card, displayName, rifle, pellet)
+				og.Image = s.absolute("/og/score-cards/" + id + ".png")
 				og.Type = "article"
 			}
 		}
@@ -114,11 +125,10 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 		if id != "" {
 			sess, err := s.pelletTest.GetForViewer(r.Context(), id, "")
 			if err == nil {
+				displayName := s.lookupDisplayName(r.Context(), sess.UserID)
 				og.Title = pelletTestTitle(sess)
-				og.Description = pelletTestDescription(sess)
-				if len(sess.Images) > 0 && sess.Images[0].ImageURL != "" {
-					og.Image = s.absolute(sess.Images[0].ImageURL)
-				}
+				og.Description = pelletTestDescription(sess, displayName)
+				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
 				og.Type = "article"
 			}
 		}
@@ -126,7 +136,7 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 	}
 }
 
-// League returns a handler for /leagues/{id}.
+// League returns a handler for /share/leagues/{id}.
 func (s *ShareMeta) League() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		og := s.defaultOG(r)
@@ -135,14 +145,8 @@ func (s *ShareMeta) League() http.HandlerFunc {
 			league, err := s.leagues.GetByID(r.Context(), id, "")
 			if err == nil && league != nil {
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
-				if league.Description != nil && *league.Description != "" {
-					og.Description = *league.Description
-				} else {
-					og.Description = fmt.Sprintf("Join the %s league on sub-12.", league.Name)
-				}
-				if league.ImageURL != nil && *league.ImageURL != "" {
-					og.Image = s.absolute(*league.ImageURL)
-				}
+				og.Description = leagueDescription(league)
+				og.Image = s.absolute("/og/leagues/" + id + ".png")
 				og.Type = "article"
 			}
 		}
@@ -150,7 +154,7 @@ func (s *ShareMeta) League() http.HandlerFunc {
 	}
 }
 
-// Club returns a handler for /clubs/{id}.
+// Club returns a handler for /share/clubs/{id}.
 func (s *ShareMeta) Club() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		og := s.defaultOG(r)
@@ -159,14 +163,8 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 			club, err := s.clubs.GetByID(r.Context(), id, "")
 			if err == nil && club != nil {
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
-				if club.Description != nil && *club.Description != "" {
-					og.Description = *club.Description
-				} else {
-					og.Description = fmt.Sprintf("Join the %s club on sub-12.", club.Name)
-				}
-				if club.ImageURL != nil && *club.ImageURL != "" {
-					og.Image = s.absolute(*club.ImageURL)
-				}
+				og.Description = clubDescription(club)
+				og.Image = s.absolute("/og/clubs/" + id + ".png")
 				og.Type = "article"
 			}
 		}
@@ -174,7 +172,7 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 	}
 }
 
-// User returns a handler for /users/{id}.
+// User returns a handler for /share/users/{id}.
 func (s *ShareMeta) User() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		og := s.defaultOG(r)
@@ -183,19 +181,48 @@ func (s *ShareMeta) User() http.HandlerFunc {
 			profile, err := s.users.GetPublicProfile(r.Context(), id)
 			if err == nil && profile != nil && profile.ProfileVisibility != "private" {
 				og.Title = fmt.Sprintf("%s on sub-12", profile.DisplayName)
-				if profile.Bio != nil && *profile.Bio != "" {
-					og.Description = *profile.Bio
-				} else {
-					og.Description = fmt.Sprintf("%s's profile on sub-12.", profile.DisplayName)
-				}
-				if profile.AvatarURL != nil && *profile.AvatarURL != "" {
-					og.Image = s.absolute(*profile.AvatarURL)
-				}
+				og.Description = userDescription(profile)
+				og.Image = s.absolute("/og/users/" + id + ".png")
 				og.Type = "profile"
 			}
 		}
 		s.writeHTML(w, r, og)
 	}
+}
+
+// lookupDisplayName returns the owner's display name if the profile is not
+// private. Returns "" on any error so callers can degrade gracefully.
+func (s *ShareMeta) lookupDisplayName(ctx context.Context, userID string) string {
+	if s.users == nil || userID == "" {
+		return ""
+	}
+	profile, err := s.users.GetPublicProfile(ctx, userID)
+	if err != nil || profile == nil || profile.ProfileVisibility == "private" {
+		return ""
+	}
+	return profile.DisplayName
+}
+
+func (s *ShareMeta) lookupRifle(ctx context.Context, rifleID *string, ownerID string) *model.Rifle {
+	if s.rifles == nil || rifleID == nil || *rifleID == "" || ownerID == "" {
+		return nil
+	}
+	rifle, err := s.rifles.GetByID(ctx, *rifleID, ownerID)
+	if err != nil {
+		return nil
+	}
+	return rifle
+}
+
+func (s *ShareMeta) lookupPellet(ctx context.Context, pelletID *string, ownerID string) *model.Pellet {
+	if s.pellets == nil || pelletID == nil || *pelletID == "" || ownerID == "" {
+		return nil
+	}
+	pellet, err := s.pellets.GetByID(ctx, *pelletID, ownerID)
+	if err != nil {
+		return nil
+	}
+	return pellet
 }
 
 // defaultOG returns the stock site-wide tags, used when an entity is
@@ -257,28 +284,42 @@ func (s *ShareMeta) writeHTML(w http.ResponseWriter, r *http.Request, og openGra
 	_, _ = w.Write(body)
 }
 
-// template lazily fetches the SPA index.html from the configured frontend
-// origin and caches it. Falls back to an embedded minimal template when the
-// frontend isn't reachable (dev, first boot, etc.).
+// template returns the SPA index.html with a TTL-based re-fetch. On fetch
+// failure we return the last known good shell if we have one, otherwise the
+// embedded fallback — but we never cache the fallback. This means a cold
+// start where the frontend container isn't up yet self-heals on the next
+// request once the frontend is reachable.
 func (s *ShareMeta) template() []byte {
-	s.once.Do(func() {
-		if s.frontendOrigin == "" {
-			s.tmpl = []byte(fallbackTemplate)
-			return
+	s.mu.RLock()
+	if s.cached != nil && time.Since(s.cachedAt) < s.ttl {
+		fresh := s.cached
+		s.mu.RUnlock()
+		return fresh
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cached != nil && time.Since(s.cachedAt) < s.ttl {
+		return s.cached
+	}
+	if s.frontendOrigin == "" {
+		return []byte(fallbackTemplate)
+	}
+
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	html, err := fetchIndexHTML(fetchCtx, s.frontendOrigin)
+	if err != nil {
+		s.log.Warn().Err(err).Str("origin", s.frontendOrigin).Msg("share_meta: fetch failed, serving fallback")
+		if s.cached != nil {
+			return s.cached
 		}
-		for attempt := 0; attempt < 5; attempt++ {
-			html, err := fetchIndexHTML(context.Background(), s.frontendOrigin)
-			if err == nil {
-				s.tmpl = html
-				return
-			}
-			s.log.Warn().Err(err).Int("attempt", attempt+1).Str("origin", s.frontendOrigin).Msg("share_meta: failed to fetch frontend index.html")
-			time.Sleep(time.Duration(attempt+1) * time.Second)
-		}
-		s.log.Warn().Str("origin", s.frontendOrigin).Msg("share_meta: using embedded fallback after retries exhausted")
-		s.tmpl = []byte(fallbackTemplate)
-	})
-	return s.tmpl
+		return []byte(fallbackTemplate)
+	}
+	s.cached = html
+	s.cachedAt = time.Now()
+	return s.cached
 }
 
 func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
@@ -306,19 +347,19 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 // Regexes scoped to tag attributes; all anchored to the beginning of an
 // opening <meta ...> so we don't replace tags we didn't mean to.
 var (
-	reOGTitle        = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
-	reOGDesc         = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
-	reOGImage        = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
-	reOGType         = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
-	reOGURL          = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
-	reOGSiteName     = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
-	reTwitterTitle   = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
-	reTwitterDesc    = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
-	reTwitterImage   = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
-	reDescription    = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
-	rePageTitle      = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
-	reOGImageWHAlt   = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height|alt)"[^>]*>`)
-	reHeadOpen       = regexp.MustCompile(`(?i)<head[^>]*>`)
+	reOGTitle      = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
+	reOGDesc       = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
+	reOGImage      = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
+	reOGType       = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
+	reOGURL        = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
+	reOGSiteName   = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
+	reTwitterTitle = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
+	reTwitterDesc  = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
+	reTwitterImage = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reDescription  = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
+	rePageTitle    = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
+	reOGImageWHAlt = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height|alt)"[^>]*>`)
+	reHeadOpen     = regexp.MustCompile(`(?i)<head[^>]*>`)
 )
 
 func metaProp(prop, content string) string {
@@ -385,41 +426,133 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 
 // ── entity-specific copy helpers ────────────────────────────────────────────
 
-func scoreCardDescription(card *model.ScoreCard) string {
-	parts := []string{fmt.Sprintf("Total: %d (%dX)", card.TotalScore, card.XCount)}
-	if card.Location != nil && *card.Location != "" {
-		parts = append(parts, "at "+*card.Location)
+func scoreCardTitle(card *model.ScoreCard, displayName string) string {
+	score := fmt.Sprintf("%d points", card.TotalScore)
+	if card.XCount > 0 {
+		score = fmt.Sprintf("%d points (%dX)", card.TotalScore, card.XCount)
 	}
+	if displayName != "" {
+		return fmt.Sprintf("%s shot %s on sub-12", displayName, score)
+	}
+	return score + " on sub-12"
+}
+
+func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *model.Rifle, pellet *model.Pellet) string {
+	parts := []string{}
+	if displayName != "" {
+		parts = append(parts, displayName)
+	}
+	parts = append(parts, fmt.Sprintf("%d (%dX)", card.TotalScore, card.XCount))
 	if card.ShotAt != "" {
-		parts = append(parts, "on "+card.ShotAt)
+		parts = append(parts, card.ShotAt)
 	}
-	return strings.Join(parts, " ") + " — shared via sub-12."
+	if card.Location != nil && *card.Location != "" {
+		parts = append(parts, *card.Location)
+	}
+	gear := []string{}
+	if rifle != nil {
+		r := strings.TrimSpace(rifle.Make + " " + rifle.Model)
+		if r != "" {
+			gear = append(gear, r)
+		}
+	}
+	if pellet != nil {
+		p := strings.TrimSpace(pellet.Brand + " " + pellet.Model)
+		if p != "" {
+			gear = append(gear, p)
+		}
+	}
+	if len(gear) > 0 {
+		parts = append(parts, strings.Join(gear, " + "))
+	}
+	return strings.Join(parts, " • ") + " — shared via sub-12."
 }
 
 func pelletTestTitle(sess *model.PelletTestSession) string {
 	if sess.Pellet != nil {
 		label := strings.TrimSpace(sess.Pellet.Brand + " " + sess.Pellet.Model)
 		if label != "" {
-			return "Pellet test: " + label
+			return "Pellet test: " + label + " on sub-12"
 		}
 	}
 	return "Pellet test on sub-12"
 }
 
-func pelletTestDescription(sess *model.PelletTestSession) string {
+func pelletTestDescription(sess *model.PelletTestSession, displayName string) string {
 	parts := []string{}
+	if displayName != "" {
+		parts = append(parts, displayName)
+	}
 	if sess.Rifle != nil {
-		parts = append(parts, "Rifle: "+strings.TrimSpace(sess.Rifle.Make+" "+sess.Rifle.Model))
+		r := strings.TrimSpace(sess.Rifle.Make + " " + sess.Rifle.Model)
+		if r != "" {
+			parts = append(parts, r)
+		}
 	}
 	if sess.BestGroupSizeMM != nil {
-		parts = append(parts, fmt.Sprintf("Best group: %.2fmm", *sess.BestGroupSizeMM))
+		parts = append(parts, fmt.Sprintf("Best %.2fmm", *sess.BestGroupSizeMM))
+	}
+	if sess.AverageGroupSizeMM != nil {
+		parts = append(parts, fmt.Sprintf("Avg %.2fmm", *sess.AverageGroupSizeMM))
 	}
 	if sess.DistanceM > 0 {
-		parts = append(parts, fmt.Sprintf("Distance: %.1fm", sess.DistanceM))
+		parts = append(parts, fmt.Sprintf("%.1fm", sess.DistanceM))
+	}
+	if sess.TestDate != "" {
+		parts = append(parts, sess.TestDate)
 	}
 	if len(parts) == 0 {
 		return "Pellet testing session shared via sub-12."
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, " · ") + " — shared via sub-12."
 }
 
+func leagueDescription(league *model.League) string {
+	parts := []string{fmt.Sprintf("%d member%s", league.MemberCount, plural(league.MemberCount))}
+	if league.Description != nil && strings.TrimSpace(*league.Description) != "" {
+		parts = append(parts, truncate(*league.Description, 160))
+	}
+	return strings.Join(parts, " · ") + " — sub-12 league."
+}
+
+func clubDescription(club *model.Club) string {
+	parts := []string{fmt.Sprintf("%d member%s", club.MemberCount, plural(club.MemberCount))}
+	if club.Description != nil && strings.TrimSpace(*club.Description) != "" {
+		parts = append(parts, truncate(*club.Description, 160))
+	}
+	return strings.Join(parts, " · ") + " — sub-12 club."
+}
+
+func userDescription(profile *model.PublicProfile) string {
+	parts := []string{}
+	if profile.Location != nil && *profile.Location != "" {
+		parts = append(parts, *profile.Location)
+	}
+	if profile.Club != nil && *profile.Club != "" {
+		parts = append(parts, *profile.Club)
+	}
+	if profile.Bio != nil && strings.TrimSpace(*profile.Bio) != "" {
+		parts = append(parts, truncate(*profile.Bio, 160))
+	}
+	if len(parts) == 0 {
+		return fmt.Sprintf("%s's profile on sub-12.", profile.DisplayName)
+	}
+	return strings.Join(parts, " · ") + " — on sub-12."
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+// truncate returns s clipped to n runes with an ellipsis if it was clipped.
+func truncate(s string, n int) string {
+	s = strings.TrimSpace(s)
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return strings.TrimRight(string(runes[:n-1]), " ") + "…"
+}

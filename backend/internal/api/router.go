@@ -75,7 +75,7 @@ func NewRouter(
 	// URLs for shareable content. Humans get the working SPA (tags are
 	// invisible); crawlers render rich previews. The response is the same
 	// for both — no user-agent sniffing.
-	shareMeta := handler.NewShareMeta(scoreCards, pelletTests, leagues, clubs, users, cfg.SiteURL, cfg.FrontendOrigin, log)
+	shareMeta := handler.NewShareMeta(scoreCards, pelletTests, leagues, clubs, users, rifles, pellets, cfg.SiteURL, cfg.FrontendOrigin, log)
 	r.Get("/score-cards/{id}", shareMeta.ScoreCard())
 	r.Get("/pellet-tests/{id}", shareMeta.PelletTest())
 	// League/club/user canonical URLs stay authed for in-app navigation;
@@ -84,6 +84,19 @@ func NewRouter(
 	r.Get("/share/leagues/{id}", shareMeta.League())
 	r.Get("/share/clubs/{id}", shareMeta.Club())
 	r.Get("/share/users/{id}", shareMeta.User())
+
+	// Branded OG preview images. Rendered per-entity PNGs that social
+	// platforms embed in link previews. Privacy checks mirror share-meta;
+	// private / missing entities fall through to the site default.
+	ogImage, err := handler.NewOGImage(scoreCards, pelletTests, leagues, clubs, users, rifles, pellets, log)
+	if err != nil {
+		log.Fatal().Err(err).Msg("init og image handler")
+	}
+	r.Get("/og/score-cards/{id}.png", ogImage.ScoreCard())
+	r.Get("/og/pellet-tests/{id}.png", ogImage.PelletTest())
+	r.Get("/og/leagues/{id}.png", ogImage.League())
+	r.Get("/og/clubs/{id}.png", ogImage.Club())
+	r.Get("/og/users/{id}.png", ogImage.User())
 
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {

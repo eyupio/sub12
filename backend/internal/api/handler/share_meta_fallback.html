@@ -22,11 +22,38 @@
     <meta name="twitter:image" content="/og-image.png" />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      html, body { margin: 0; padding: 0; background: #0C0C0C; color: #E7E4DE; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+      .card { max-width: 420px; padding: 32px; text-align: center; }
+      .brand { letter-spacing: 0.25em; font-size: 13px; color: #C9A86A; text-transform: uppercase; margin-bottom: 12px; }
+      h1 { font-size: 18px; font-weight: 500; margin: 0 0 8px; color: #E7E4DE; }
+      p { font-size: 14px; color: #9A948A; margin: 0 0 20px; line-height: 1.5; }
+      a { display: inline-block; padding: 10px 18px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #0C0C0C; background: #C9A86A; text-decoration: none; border-radius: 4px; }
+      a:hover { opacity: 0.85; }
+      .dot { display: inline-block; width: 6px; height: 6px; background: #C9A86A; border-radius: 50%; margin: 0 3px; animation: pulse 1.4s infinite ease-in-out; }
+      .dot:nth-child(2) { animation-delay: 0.2s; }
+      .dot:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes pulse { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+    </style>
   </head>
   <body>
     <noscript>
-      <p>This page requires JavaScript. Please enable it in your browser.</p>
+      <p style="padding: 2rem;">This page requires JavaScript. Please enable it in your browser.</p>
     </noscript>
-    <p style="font-family: system-ui, sans-serif; padding: 2rem;">Loading…</p>
+    <div class="wrap">
+      <div class="card">
+        <div class="brand">SUB12</div>
+        <h1>Getting things ready<span class="dot"></span><span class="dot"></span><span class="dot"></span></h1>
+        <p>We're just warming up the app. This page will refresh automatically.</p>
+        <a href="/">Continue to sub-12</a>
+      </div>
+    </div>
+    <script>
+      // Self-heal: when the backend serves this fallback during a brief
+      // cold-start window, retry the same URL in a few seconds. Once the
+      // frontend shell is reachable again the real SPA takes over.
+      setTimeout(function () { location.reload(); }, 2500);
+    </script>
   </body>
 </html>
