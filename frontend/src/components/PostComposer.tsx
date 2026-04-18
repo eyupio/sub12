@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Send, Globe, Users as UsersIcon, UserCheck, Lock } from 'lucide-react'
 import { postApi, CreatePostPayload, PostVisibility } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 
+type GroupPostVisibility = 'members' | 'public'
+
 interface PostComposerProps {
   leagueId?: string
   clubId?: string
   queryKey: unknown[]
+  // When the composer is scoped to a league/club, the group admin sets the
+  // policy; the poster does not choose. Pass the current setting so we can
+  // show a read-only label.
+  groupPostVisibility?: GroupPostVisibility
 }
 
 interface VisibilityOption {
@@ -18,32 +24,24 @@ interface VisibilityOption {
   icon: typeof Globe
 }
 
-function getVisibilityOptions(scoped: boolean): VisibilityOption[] {
-  if (scoped) {
-    return [
-      { value: 'members', label: 'Members', description: 'Only this group', icon: UsersIcon },
-      { value: 'public', label: 'Public', description: 'Anyone with the link', icon: Globe },
-      { value: 'private', label: 'Only me', description: 'Not visible to anyone else', icon: Lock },
-    ]
-  }
-  return [
-    { value: 'public', label: 'Public', description: 'Everyone', icon: Globe },
-    { value: 'followers', label: 'Followers', description: 'Only people who follow you', icon: UserCheck },
-    { value: 'private', label: 'Only me', description: 'Not visible to anyone else', icon: Lock },
-  ]
+const UNSCOPED_OPTIONS: VisibilityOption[] = [
+  { value: 'public', label: 'Public', description: 'Everyone', icon: Globe },
+  { value: 'followers', label: 'Followers', description: 'Only people who follow you', icon: UserCheck },
+  { value: 'private', label: 'Only me', description: 'Not visible to anyone else', icon: Lock },
+]
+
+function scopedVisibilityLabel(v: GroupPostVisibility): { label: string; icon: typeof Globe } {
+  return v === 'public'
+    ? { label: 'Public (set by admin)', icon: Globe }
+    : { label: 'Members only (set by admin)', icon: UsersIcon }
 }
 
-export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) {
+export function PostComposer({ leagueId, clubId, queryKey, groupPostVisibility }: PostComposerProps) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [body, setBody] = useState('')
   const scoped = !!(leagueId || clubId)
-  const options = useMemo(() => getVisibilityOptions(scoped), [scoped])
-  const [visibility, setVisibility] = useState<PostVisibility>(options[0].value)
-
-  useEffect(() => {
-    setVisibility(options[0].value)
-  }, [options])
+  const [visibility, setVisibility] = useState<PostVisibility>('public')
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -51,18 +49,25 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
         body: body.trim(),
         league_id: leagueId,
         club_id: clubId,
-        visibility,
+        // Scoped posts: backend resolves visibility from the group admin's
+        // post_visibility setting. Any value sent here is ignored server-side.
+        visibility: scoped ? undefined : visibility,
       }
       return postApi.create(payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey })
       setBody('')
-      setVisibility(options[0].value)
+      if (!scoped) setVisibility('public')
       toast('Posted', 'success')
     },
     onError: () => toast('Failed to create post', 'error'),
   })
+
+  const scopedLabel = useMemo(
+    () => (scoped ? scopedVisibilityLabel(groupPostVisibility ?? 'members') : null),
+    [scoped, groupPostVisibility],
+  )
 
   if (!currentUser) return null
 
@@ -99,21 +104,32 @@ export function PostComposer({ leagueId, clubId, queryKey }: PostComposerProps) 
         />
       </div>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <label className="flex items-center gap-2 text-[11px] tracking-wide text-muted">
-          <span className="tracking-widest uppercase">Visibility</span>
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as PostVisibility)}
-            aria-label="Post visibility"
-            className="bg-page border border-subtle rounded px-2 py-1 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50"
+        {scopedLabel ? (
+          <div
+            className="flex items-center gap-1.5 text-[11px] tracking-wide text-muted"
+            title="The league or club admin controls this setting."
           >
-            {options.map((opt) => (
-              <option key={opt.value} value={opt.value} title={opt.description}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span className="tracking-widest uppercase">Visibility</span>
+            <scopedLabel.icon size={12} />
+            <span className="text-xs text-secondary">{scopedLabel.label}</span>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 text-[11px] tracking-wide text-muted">
+            <span className="tracking-widest uppercase">Visibility</span>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as PostVisibility)}
+              aria-label="Post visibility"
+              className="bg-page border border-subtle rounded px-2 py-1 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50"
+            >
+              {UNSCOPED_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} title={opt.description}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || !body.trim()}

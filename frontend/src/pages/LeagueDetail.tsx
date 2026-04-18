@@ -528,12 +528,20 @@ export default function LeagueDetail() {
       </div>
 
       {/* League Feed */}
-      {isMember && league && <LeagueFeed leagueId={league.id} />}
+      {isMember && league && (
+        <LeagueFeed leagueId={league.id} postVisibility={league.post_visibility} />
+      )}
     </div>
   )
 }
 
-function LeagueFeed({ leagueId }: { leagueId: string }) {
+function LeagueFeed({
+  leagueId,
+  postVisibility,
+}: {
+  leagueId: string
+  postVisibility: 'members' | 'public'
+}) {
   const { data } = useQuery({
     queryKey: ['league', leagueId, 'posts'],
     queryFn: () => postApi.listByLeague(leagueId),
@@ -546,7 +554,11 @@ function LeagueFeed({ leagueId }: { leagueId: string }) {
       <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
         Feed
       </h2>
-      <PostComposer leagueId={leagueId} queryKey={['league', leagueId, 'posts']} />
+      <PostComposer
+        leagueId={leagueId}
+        queryKey={['league', leagueId, 'posts']}
+        groupPostVisibility={postVisibility}
+      />
       {posts.length === 0 && (
         <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
       )}
