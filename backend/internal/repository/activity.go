@@ -51,7 +51,6 @@ func activityColumnsViewer(viewerParam string) string {
            WHERE target_id = a.target_id
              AND target_type = 'score_card'
              AND user_id = ` + viewerParam + `
-             AND a.target_type = 'score_card'
        )`
 }
 

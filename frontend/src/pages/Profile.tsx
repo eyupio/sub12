@@ -90,7 +90,7 @@ function AvatarUpload() {
       {avatarMutation.isError && (
         <p className="text-[10px] text-[var(--error-text)] mt-1 text-center">Failed</p>
       )}
-      {!!user?.star_level && user.star_level > 0 && (
+      {!!user?.star_level && (
         <div className="flex justify-center mt-1">
           <StarBadge level={user.star_level} size={10} />
         </div>
