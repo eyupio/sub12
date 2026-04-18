@@ -137,6 +137,11 @@ export default function SupportCenter() {
                 )}
               </div>
               {ticket.description && <p className="mt-2 text-sm text-secondary line-clamp-2">{ticket.description}</p>}
+              <div className="mt-3">
+                <Link to="/support/tickets/$id" params={{ id: ticket.id }} className="text-xs text-[var(--brass)] hover:underline">
+                  Open ticket
+                </Link>
+              </div>
             </article>
           ))}
         </div>

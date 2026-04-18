@@ -2,7 +2,8 @@ import type { ComponentProps, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import Notifications, { notificationLink } from '../Notifications'
+import Notifications from '../Notifications'
+import { notificationLink } from '../notificationRouting'
 import { notificationsApi, type Notification } from '../../api/notifications'
 import { routeTree } from '../../routeTree'
 
@@ -89,10 +90,10 @@ describe('Notifications routing', () => {
   it('maps notification types to valid app routes', () => {
     expect(notificationLink(makeNotification({ type: 'report_filed', league_id: 'lg-1' }))).toBe('/leagues/lg-1/reports')
     expect(notificationLink(makeNotification({ type: 'report_filed', club_id: 'cb-1' }))).toBe('/clubs/cb-1/reports')
-    expect(notificationLink(makeNotification({ type: 'ticket_created' }))).toBe('/admin/support')
-    expect(notificationLink(makeNotification({ type: 'ticket_replied' }))).toBe('/admin/support')
-    expect(notificationLink(makeNotification({ type: 'ticket_assigned' }))).toBe('/admin/support')
-    expect(notificationLink(makeNotification({ type: 'ticket_status_changed' }))).toBe('/admin/support')
+    expect(notificationLink(makeNotification({ type: 'ticket_created', target_id: 't-1' }))).toBe('/support/tickets/t-1')
+    expect(notificationLink(makeNotification({ type: 'ticket_replied', target_id: 't-2' }))).toBe('/support/tickets/t-2')
+    expect(notificationLink(makeNotification({ type: 'ticket_assigned', target_id: 't-3' }))).toBe('/support/tickets/t-3')
+    expect(notificationLink(makeNotification({ type: 'ticket_status_changed', target_id: 't-4' }))).toBe('/support/tickets/t-4')
     expect(notificationLink(makeNotification({ type: 'feature_request_state_changed' }))).toBe('/feature-requests')
     expect(notificationLink(makeNotification({ type: 'score_verified', target_type: 'score_card', target_id: 'sc-1' }))).toBe('/scores/sc-1')
     expect(notificationLink(makeNotification({ type: 'mention', target_type: 'post', target_id: 'post-1' }))).toBe('/feed')
