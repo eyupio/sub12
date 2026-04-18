@@ -74,6 +74,7 @@ func (h *ImageHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", img.ContentType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", img.SizeBytes))
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	w.Write(img.Data)
 }

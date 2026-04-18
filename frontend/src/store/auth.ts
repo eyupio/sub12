@@ -46,10 +46,11 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sub12-auth',
-      // Only persist tokens and user — not actions
+      // Persist only the refresh token and user. The access token stays in
+      // memory so an XSS payload that reads localStorage cannot exfiltrate it;
+      // the API client auto-refreshes on 401 after a page reload.
       partialize: (s) => ({
         user: s.user,
-        accessToken: s.accessToken,
         refreshToken: s.refreshToken,
       }),
     },

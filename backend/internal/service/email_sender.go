@@ -254,10 +254,35 @@ func (s *EmailSenderService) sendRenderedTemplate(ctx context.Context, toEmail, 
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
 	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+	msg, err := buildMultipartMsg(from, toEmail, subject, textBody, htmlBody)
+	if err != nil {
+		return err
+	}
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, msg)
 }
 
-func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
+// sanitizeHeader rejects SMTP header values containing CR or LF to prevent
+// header injection (e.g. a malicious From name smuggling Bcc/Reply-To).
+func sanitizeHeader(name, value string) (string, error) {
+	if strings.ContainsAny(value, "\r\n") {
+		return "", fmt.Errorf("invalid %s header: contains line break", name)
+	}
+	return value, nil
+}
+
+func buildMultipartMsg(from, to, subject, textBody, htmlBody string) ([]byte, error) {
+	from, err := sanitizeHeader("From", from)
+	if err != nil {
+		return nil, err
+	}
+	to, err = sanitizeHeader("To", to)
+	if err != nil {
+		return nil, err
+	}
+	subject, err = sanitizeHeader("Subject", subject)
+	if err != nil {
+		return nil, err
+	}
 	boundary := fmt.Sprintf("=_sub12_%x", rand.Int63())
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
@@ -275,7 +300,7 @@ func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
 	msg.WriteString("\r\n")
 	msg.WriteString(htmlBody + "\r\n")
 	msg.WriteString("--" + boundary + "--\r\n")
-	return []byte(msg.String())
+	return []byte(msg.String()), nil
 }
 
 func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
@@ -289,10 +314,18 @@ func (s *EmailSenderService) SendTestEmail(ctx context.Context) error {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
 	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+	from, err = sanitizeHeader("From", from)
+	if err != nil {
+		return err
+	}
+	toHeader, err := sanitizeHeader("To", settings.FromEmail)
+	if err != nil {
+		return err
+	}
 
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
-	msg.WriteString("To: " + settings.FromEmail + "\r\n")
+	msg.WriteString("To: " + toHeader + "\r\n")
 	msg.WriteString("Subject: sub12.io SMTP Test\r\n")
 	msg.WriteString("MIME-Version: 1.0\r\n")
 	msg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")

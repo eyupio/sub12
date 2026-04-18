@@ -8,12 +8,31 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// likeTables is the fixed set of tables likes can target. The table name is
-// interpolated into SQL, so this whitelist prevents injection via targetType.
-var likeTables = map[string]string{
-	"score_card": "score_cards",
-	"post":       "posts",
-	"comment":    "comments",
+// likeCountIncrementSQL returns a pre-baked UPDATE statement keyed by
+// targetType. Each branch is a compile-time constant string, so no user input
+// ever reaches SQL composition.
+func likeCountIncrementSQL(targetType string) (string, bool) {
+	switch targetType {
+	case "score_card":
+		return `UPDATE score_cards SET like_count = like_count + 1 WHERE id = $1`, true
+	case "post":
+		return `UPDATE posts SET like_count = like_count + 1 WHERE id = $1`, true
+	case "comment":
+		return `UPDATE comments SET like_count = like_count + 1 WHERE id = $1`, true
+	}
+	return "", false
+}
+
+func likeCountDecrementSQL(targetType string) (string, bool) {
+	switch targetType {
+	case "score_card":
+		return `UPDATE score_cards SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, true
+	case "post":
+		return `UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, true
+	case "comment":
+		return `UPDATE comments SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, true
+	}
+	return "", false
 }
 
 type LikeRepository struct {
@@ -57,25 +76,11 @@ func (r *LikeRepository) IsLiked(ctx context.Context, userID, targetID, targetTy
 	return exists, err
 }
 
-// IncrementLikeCount increments the like_count on a target table (score_cards, posts, comments).
-func (r *LikeRepository) IncrementLikeCount(ctx context.Context, targetID, table string) error {
-	query := fmt.Sprintf(`UPDATE %s SET like_count = like_count + 1 WHERE id = $1`, table)
-	_, err := r.db.Exec(ctx, query, targetID)
-	return err
-}
-
-// DecrementLikeCount decrements the like_count on a target table.
-func (r *LikeRepository) DecrementLikeCount(ctx context.Context, targetID, table string) error {
-	query := fmt.Sprintf(`UPDATE %s SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, table)
-	_, err := r.db.Exec(ctx, query, targetID)
-	return err
-}
-
 // LikeTx inserts a like and increments the target's like_count in a single
 // transaction, preventing counter drift under concurrent calls. Returns true if
 // a new like row was created.
 func (r *LikeRepository) LikeTx(ctx context.Context, userID, targetID, targetType string) (bool, error) {
-	table, ok := likeTables[targetType]
+	incSQL, ok := likeCountIncrementSQL(targetType)
 	if !ok {
 		return false, fmt.Errorf("invalid like target type: %s", targetType)
 	}
@@ -95,10 +100,7 @@ func (r *LikeRepository) LikeTx(ctx context.Context, userID, targetID, targetTyp
 	}
 	created := tag.RowsAffected() > 0
 	if created {
-		if _, err := tx.Exec(ctx,
-			fmt.Sprintf(`UPDATE %s SET like_count = like_count + 1 WHERE id = $1`, table),
-			targetID,
-		); err != nil {
+		if _, err := tx.Exec(ctx, incSQL, targetID); err != nil {
 			return false, fmt.Errorf("increment like_count: %w", err)
 		}
 	}
@@ -111,7 +113,7 @@ func (r *LikeRepository) LikeTx(ctx context.Context, userID, targetID, targetTyp
 // UnlikeTx removes a like and decrements the target's like_count in a single
 // transaction. Returns true if a like row was removed.
 func (r *LikeRepository) UnlikeTx(ctx context.Context, userID, targetID, targetType string) (bool, error) {
-	table, ok := likeTables[targetType]
+	decSQL, ok := likeCountDecrementSQL(targetType)
 	if !ok {
 		return false, fmt.Errorf("invalid like target type: %s", targetType)
 	}
@@ -129,10 +131,7 @@ func (r *LikeRepository) UnlikeTx(ctx context.Context, userID, targetID, targetT
 	}
 	removed := tag.RowsAffected() > 0
 	if removed {
-		if _, err := tx.Exec(ctx,
-			fmt.Sprintf(`UPDATE %s SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, table),
-			targetID,
-		); err != nil {
+		if _, err := tx.Exec(ctx, decSQL, targetID); err != nil {
 			return false, fmt.Errorf("decrement like_count: %w", err)
 		}
 	}

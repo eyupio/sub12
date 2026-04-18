@@ -57,7 +57,7 @@ describe('useAuthStore', () => {
     expect(s.refreshToken).toBeNull()
   })
 
-  it('persists user and tokens to localStorage under the sub12-auth key', () => {
+  it('persists user and refresh token, but not the access token, to localStorage', () => {
     useAuthStore.getState().setAuth(freshUser, 'access-1', 'refresh-1')
 
     const raw = window.localStorage.getItem('sub12-auth')
@@ -65,8 +65,8 @@ describe('useAuthStore', () => {
 
     const parsed = JSON.parse(raw as string)
     expect(parsed.state.user).toEqual(freshUser)
-    expect(parsed.state.accessToken).toBe('access-1')
     expect(parsed.state.refreshToken).toBe('refresh-1')
+    expect(parsed.state.accessToken).toBeUndefined()
   })
 
   it('does not persist actions (setAuth/clearAuth) in localStorage', () => {

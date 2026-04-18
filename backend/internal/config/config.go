@@ -19,6 +19,9 @@ type Config struct {
 	DBName     string `envconfig:"DB_NAME" default:"sub12"`
 	DBUser     string `envconfig:"DB_USER" default:"sub12"`
 	DBPassword string `envconfig:"DB_PASSWORD" required:"true"`
+	// DBSSLMode controls libpq TLS negotiation. Must be set to `require`,
+	// `verify-ca`, or `verify-full` in production.
+	DBSSLMode string `envconfig:"DB_SSLMODE" default:"disable"`
 
 	// Redis
 	RedisURL string `envconfig:"REDIS_URL" default:"redis://localhost:6379"`
@@ -68,7 +71,7 @@ func (c *Config) DSN() string {
 		" dbname=" + c.DBName +
 		" user=" + c.DBUser +
 		" password=" + c.DBPassword +
-		" sslmode=disable"
+		" sslmode=" + c.sslMode()
 }
 
 // DatabaseURL returns a pgx5:// URL (for golang-migrate).
@@ -78,9 +81,16 @@ func (c *Config) DatabaseURL() string {
 		User:     url.UserPassword(c.DBUser, c.DBPassword),
 		Host:     c.DBHost + ":" + c.DBPort,
 		Path:     c.DBName,
-		RawQuery: "sslmode=disable",
+		RawQuery: "sslmode=" + c.sslMode(),
 	}
 	return u.String()
+}
+
+func (c *Config) sslMode() string {
+	if c.DBSSLMode == "" {
+		return "disable"
+	}
+	return c.DBSSLMode
 }
 
 // Load reads configuration from environment variables.
