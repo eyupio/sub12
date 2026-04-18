@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useParams, useRouter, Link } from '@tanstack/react-router'
+import { useParams, Link } from '@tanstack/react-router'
+import { useSmartBack } from '../hooks/useSmartBack'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
@@ -53,7 +54,7 @@ function FollowListModal({ title, items, onClose }: { title: string; items: Foll
 
 export default function UserProfile() {
   const { id } = useParams({ strict: false })
-  const router = useRouter()
+  const smartBack = useSmartBack('/feed', ['/feed', '/users', '/leagues/', '/clubs/', '/scores'])
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
   const [showMenu, setShowMenu] = useState(false)
@@ -187,7 +188,7 @@ export default function UserProfile() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-2xl mx-auto">
       {/* Back */}
       <button
-        onClick={() => router.history.back()}
+        onClick={smartBack}
         className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
       >
         <ChevronLeft size={14} />

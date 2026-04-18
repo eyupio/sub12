@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, ChevronRight, X, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -185,7 +187,10 @@ export default function Clubs() {
     <>
       <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Clubs</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Clubs</h1>
+            <HelpIcon content={pageHelp.clubs} />
+          </div>
           <button
             onClick={() => setShowCreate(true)}
             className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"

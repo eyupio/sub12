@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { initTheme } from './store/theme'
 import './index.css'
+import 'tippy.js/dist/tippy.css'
 
 // Apply theme before React mounts to prevent FOUC
 initTheme()

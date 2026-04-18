@@ -17,10 +17,14 @@
     "@capacitor/core": "^6.1.0",
     "@tanstack/react-query": "^5.51.1",
     "@tanstack/react-router": "^1.45.3",
+    "@tippyjs/react": "^4.2.6",
     "lucide-react": "^0.408.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1",
+    "tippy.js": "^6.3.7",
     "zustand": "^4.5.4"
   },
   "devDependencies": {

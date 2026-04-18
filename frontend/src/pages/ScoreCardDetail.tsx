@@ -13,6 +13,9 @@ import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FlagDialog } from '../components/FlagDialog'
 import { LikeButton } from '../components/LikeButton'
+import { useSmartBack } from '../hooks/useSmartBack'
+import { Tooltip } from '../components/Tooltip'
+import { tips } from '../components/tooltips'
 import { ShareDialog } from '../components/ShareDialog'
 import { ReportDialog } from '../components/ReportDialog'
 import { Flag } from 'lucide-react'
@@ -211,18 +214,22 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
       {isAdmin && (
         <>
           <div className="flex gap-2">
-            <button
-              onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
-              className="text-[11px] tracking-widest uppercase border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 px-3 py-1.5 rounded transition-colors"
-            >
-              Amend
-            </button>
-            <button
-              onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
-              className="text-[11px] tracking-widest uppercase border border-red-500/30 text-[var(--error-text)] hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
-            >
-              Reject
-            </button>
+            <Tooltip content={tips.scoreAmend}>
+              <button
+                onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
+                className="text-[11px] tracking-widest uppercase border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 px-3 py-1.5 rounded transition-colors"
+              >
+                Amend
+              </button>
+            </Tooltip>
+            <Tooltip content={tips.scoreReject}>
+              <button
+                onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
+                className="text-[11px] tracking-widest uppercase border border-red-500/30 text-[var(--error-text)] hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
+              >
+                Reject
+              </button>
+            </Tooltip>
           </div>
 
           {showAmend && (
@@ -690,6 +697,7 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
 
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
+  const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
   const [showLightbox, setShowLightbox] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -832,9 +840,14 @@ export default function ScoreCardDetail() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-3xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/scores" className="text-muted hover:text-secondary transition-colors">
+        <button
+          type="button"
+          onClick={smartBack}
+          aria-label="Back"
+          className="text-muted hover:text-secondary transition-colors"
+        >
           <ChevronLeft size={20} />
-        </Link>
+        </button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>

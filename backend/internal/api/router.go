@@ -42,6 +42,7 @@ func NewRouter(
 	moderation *service.ModerationService,
 	supportTickets *service.SupportTicketService,
 	featureRequests *service.FeatureRequestService,
+	faqs *service.FAQService,
 	sitemap *service.SitemapService,
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
@@ -84,6 +85,11 @@ func NewRouter(
 		// Public image serving (no auth required)
 		ih := handler.NewImage(images)
 		r.Get("/images/{id}", ih.Serve)
+
+		// Public FAQ routes (no auth required)
+		faqH := handler.NewFAQ(faqs)
+		r.Get("/faqs", faqH.ListPublic)
+		r.Get("/faqs/{slug}", faqH.GetBySlug)
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
@@ -378,6 +384,13 @@ func NewRouter(
 				r.Delete("/admin/clubs/{id}", ach.Delete)
 				r.Get("/admin/clubs/{id}/members", ach.ListMembers)
 				r.Delete("/admin/clubs/{id}/members/{userId}", ach.RemoveMember)
+
+				// FAQs
+				r.Get("/admin/faqs", faqH.AdminList)
+				r.Get("/admin/faqs/{id}", faqH.AdminGet)
+				r.Post("/admin/faqs", faqH.AdminCreate)
+				r.Patch("/admin/faqs/{id}", faqH.AdminUpdate)
+				r.Delete("/admin/faqs/{id}", faqH.AdminDelete)
 
 				// Sitemap & SEO management
 				asmh := handler.NewAdminSitemap(sitemap)

@@ -13,6 +13,8 @@ import { AchievementsSection } from '../components/AchievementsSection'
 import { StarBadge } from '../components/StarBadge'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -598,7 +600,10 @@ export default function Profile() {
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Profile</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Profile</h1>
+          <HelpIcon content={pageHelp.profile} />
+        </div>
         {!editing && (
           <button
             onClick={startEdit}

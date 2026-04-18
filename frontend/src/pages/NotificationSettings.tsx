@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft } from 'lucide-react'
 import { toast } from '../store/toast'
 import { notificationsApi, NotificationPreferences, NotificationPreferencesPatch } from '../api/notifications'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 
 interface PrefRow {
   inAppKey: keyof NotificationPreferences
@@ -54,6 +56,7 @@ export default function NotificationSettings() {
           <ChevronLeft size={18} />
         </Link>
         <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Notifications</h1>
+        <HelpIcon content={pageHelp.notificationSettings} />
       </div>
 
       <p className="text-xs text-muted">

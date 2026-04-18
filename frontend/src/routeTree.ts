@@ -51,6 +51,8 @@ import FeatureBoard from './pages/FeatureBoard'
 import SupportCenter from './pages/SupportCenter'
 import SupportTicketDetail from './pages/SupportTicketDetail'
 import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
+import Help from './pages/Help'
+import AdminFaqs from './pages/AdminFaqs'
 
 // Guard: redirect to /login if not authenticated
 function requireAuth() {
@@ -345,6 +347,18 @@ const adminSupportTicketDetailRoute = createRoute({
   component: AdminSupportTicketDetail,
 })
 
+const helpRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/help',
+  component: Help,
+})
+
+const adminFaqsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/faqs',
+  component: AdminFaqs,
+})
+
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
@@ -435,6 +449,8 @@ export const routeTree = rootRoute.addChildren([
     featureBoardRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
+    helpRoute,
+    adminFaqsRoute,
     confirmEmailRoute,
   ]),
   authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
