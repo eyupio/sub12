@@ -68,6 +68,7 @@ type LeagueConfig struct {
 	RequireScoreVerification bool      `json:"require_score_verification"`
 	RequiredConfirmations    int16     `json:"required_confirmations"`
 	RequireImageUpload       bool      `json:"require_image_upload"`
+	AllowMemberInvites       bool      `json:"allow_member_invites"`
 	UpdatedAt                time.Time `json:"updated_at"`
 }
 
@@ -80,6 +81,7 @@ type UpdateLeagueConfigInput struct {
 	RequireScoreVerification *bool   `json:"require_score_verification"`
 	RequiredConfirmations    *int16  `json:"required_confirmations"`
 	RequireImageUpload       *bool   `json:"require_image_upload"`
+	AllowMemberInvites       *bool   `json:"allow_member_invites"`
 }
 
 type Season struct {

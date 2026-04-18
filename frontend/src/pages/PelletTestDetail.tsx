@@ -760,6 +760,9 @@ export default function PelletTestDetail() {
           targetId={id}
           targetType="pellet_test"
           targetLabel="Pellet Test"
+          shareUrl={`${window.location.origin}/share/pellet-tests/${id}`}
+          shareTitle="Check out my pellet test on sub-12"
+          allowInternal
           onClose={() => setShowShare(false)}
         />
       )}

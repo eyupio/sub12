@@ -53,6 +53,12 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // Crawler-facing share pages are served by the backend as HTML with
+      // per-entity Open Graph meta tags; see backend/internal/api/handler/share.go.
+      '/share': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })

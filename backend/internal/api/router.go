@@ -57,6 +57,17 @@ func NewRouter(
 	r.Get("/healthz", h.Liveness)
 	r.Get("/readyz", h.Readiness)
 
+	// Crawler-friendly share pages — return HTML with Open Graph + Twitter
+	// Card meta tags and redirect human visitors to the SPA. Outside /api/v1
+	// so link previews can hit short, stable URLs (e.g. /share/score-cards/{id}).
+	sh := handler.NewShare(scoreCards, pelletTests, users, leagues, clubs, achievements, cfg.AppURL)
+	r.Get("/share/score-cards/{id}", sh.ScoreCard)
+	r.Get("/share/pellet-tests/{id}", sh.PelletTest)
+	r.Get("/share/users/{id}", sh.User)
+	r.Get("/share/users/{id}/achievements/{key}", sh.Achievement)
+	r.Get("/share/leagues/{id}", sh.League)
+	r.Get("/share/clubs/{id}", sh.Club)
+
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
 		// Pre-instantiate comment handler so it can be used in both protected and public groups

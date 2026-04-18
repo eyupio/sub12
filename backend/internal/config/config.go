@@ -31,6 +31,11 @@ type Config struct {
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 
+	// AppURL is the public base URL of the SPA. Used to build canonical and
+	// Open Graph URLs for /share/* HTML responses and as the redirect target
+	// after crawlers finish parsing share pages.
+	AppURL string `envconfig:"APP_URL" default:"http://localhost:5173"`
+
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`

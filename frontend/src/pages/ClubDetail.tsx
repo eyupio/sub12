@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock, Share2 } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
@@ -12,10 +12,11 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
+import { ShareDialog } from '../components/ShareDialog'
 
-function PrivateClubSummary({ clubId }: { clubId: string }) {
+function PrivateClubSummary({ clubId, inviteCode }: { clubId: string; inviteCode?: string }) {
   const queryClient = useQueryClient()
-  const [joinCode, setJoinCode] = useState('')
+  const [joinCode, setJoinCode] = useState(inviteCode || '')
   const [joinError, setJoinError] = useState('')
   const { data, isLoading } = useQuery({
     queryKey: ['club-summary', clubId],
@@ -227,10 +228,13 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
 
 export default function ClubDetail() {
   const { id } = useParams({ from: '/app/clubs/$id' })
+  const search = useSearch({ strict: false }) as Record<string, unknown>
+  const inviteCodeFromUrl = typeof search?.code === 'string' ? search.code : ''
   const user = useAuthStore(s => s.user)
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [copied, setCopied] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
 
@@ -278,7 +282,11 @@ export default function ClubDetail() {
     },
   })
 
-  const [joinCodeInput, setJoinCodeInput] = useState('')
+  const [joinCodeInput, setJoinCodeInput] = useState(inviteCodeFromUrl)
+
+  useEffect(() => {
+    if (inviteCodeFromUrl) setJoinCodeInput(inviteCodeFromUrl)
+  }, [inviteCodeFromUrl])
   const joinMutation = useMutation({
     mutationFn: () => clubsApi.join(id, joinCodeInput || undefined),
     onSuccess: (data) => {
@@ -316,9 +324,10 @@ export default function ClubDetail() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to leave club', 'error'),
   })
 
-  function copyJoinCode() {
-    if (!club) return
-    navigator.clipboard.writeText(club.join_code)
+  function copyInviteLink() {
+    if (!club || !club.join_code) return
+    const url = `${window.location.origin}/clubs/${club.id}?code=${encodeURIComponent(club.join_code)}`
+    navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -334,7 +343,7 @@ export default function ClubDetail() {
 
   if (!club) {
     if (isPrivateOrNotFound) {
-      return <PrivateClubSummary clubId={id} />
+      return <PrivateClubSummary clubId={id} inviteCode={inviteCodeFromUrl} />
     }
     return (
       <div className="p-4 lg:p-8 text-center text-muted text-sm">
@@ -436,6 +445,14 @@ export default function ClubDetail() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShare(true)}
+              className="text-muted hover:text-[var(--brass)] transition-colors"
+              title="Share club"
+              aria-label="Share club"
+            >
+              <Share2 size={16} />
+            </button>
             {club.is_admin && (
               <Link
                 to="/clubs/$id/settings"
@@ -458,14 +475,15 @@ export default function ClubDetail() {
               </button>
             )}
           </div>
-          {club.is_admin && (
+          {club.is_member && club.join_code && (
             <button
-              onClick={copyJoinCode}
+              onClick={copyInviteLink}
               className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-              title="Copy join code"
+              title="Copy invite link"
+              aria-label="Copy invite link"
             >
               {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
-              {copied ? 'Copied!' : `Code: ${club.join_code}`}
+              {copied ? 'Copied!' : 'Copy invite link'}
             </button>
           )}
         </div>
@@ -650,6 +668,17 @@ export default function ClubDetail() {
         onConfirm={() => { setConfirmLeave(false); leaveMutation.mutate() }}
         onCancel={() => setConfirmLeave(false)}
       />
+
+      {showShare && (
+        <ShareDialog
+          targetId={id}
+          targetType="club"
+          targetLabel={club.name}
+          shareUrl={`${window.location.origin}/share/clubs/${id}`}
+          shareTitle={`${club.name} on sub-12`}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   )
 }

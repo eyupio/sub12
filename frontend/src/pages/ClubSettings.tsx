@@ -154,6 +154,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
       type?: 'public' | 'private'
       join_policy?: 'open' | 'invite_code' | 'approval'
       post_visibility?: 'members' | 'public'
+      allow_member_invites?: boolean
     }) => clubsApi.update(clubId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
@@ -247,6 +248,25 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
           <p className="text-[10px] text-muted">Regenerating invalidates the previous code.</p>
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Member Invites</label>
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={club.allow_member_invites}
+            disabled={mutation.isPending}
+            onChange={(e) => mutation.mutate({ allow_member_invites: e.target.checked })}
+            className="mt-0.5 accent-[var(--brass)]"
+          />
+          <span className="text-sm text-secondary">
+            Allow members to share the invite link
+            <span className="block text-[10px] text-muted mt-0.5">
+              When off, only admins can see and copy the invite link on the club page.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Post Visibility</label>

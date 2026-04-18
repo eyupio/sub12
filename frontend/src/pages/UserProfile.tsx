@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useParams, useRouter, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Lock, MoreHorizontal, ShieldOff, Clock, Share2, X as XIcon } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
-import { achievementApi } from '../api/achievements'
+import { achievementApi, type AchievementDef } from '../api/achievements'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ReportDialog } from '../components/ReportDialog'
 import { AchievementsSection } from '../components/AchievementsSection'
+import { ShareDialog } from '../components/ShareDialog'
 
 function FollowListModal({ title, items, onClose }: { title: string; items: FollowListItem[]; onClose: () => void }) {
   return (
@@ -59,6 +60,8 @@ export default function UserProfile() {
   const [showFollowing, setShowFollowing] = useState(false)
   const [confirmUnfollow, setConfirmUnfollow] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [shareAchievement, setShareAchievement] = useState<AchievementDef | null>(null)
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['user-profile', id],
@@ -236,6 +239,16 @@ export default function UserProfile() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {!profile.is_private && (
+                      <button
+                        onClick={() => setShowShare(true)}
+                        className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors"
+                        title="Share profile"
+                        aria-label="Share profile"
+                      >
+                        <Share2 size={14} />
+                      </button>
+                    )}
                     {getFollowButton()}
                     {!isOwnProfile && (
                       <div className="relative">
@@ -323,6 +336,7 @@ export default function UserProfile() {
           <AchievementsSection
             earned={achievementsData?.items ?? []}
             allDefs={achievementDefsData?.items ?? []}
+            onShareEarned={profile.is_private ? undefined : setShareAchievement}
           />
 
           {/* Follower/Following modals */}
@@ -359,6 +373,28 @@ export default function UserProfile() {
               targetType="user"
               targetId={id}
               onClose={() => setShowReport(false)}
+            />
+          )}
+
+          {showShare && id && (
+            <ShareDialog
+              targetId={id}
+              targetType="user"
+              targetLabel={`${profile.display_name}'s profile`}
+              shareUrl={`${window.location.origin}/share/users/${id}`}
+              shareTitle={`${profile.display_name} on sub-12`}
+              onClose={() => setShowShare(false)}
+            />
+          )}
+
+          {shareAchievement && id && (
+            <ShareDialog
+              targetId={shareAchievement.id}
+              targetType="achievement"
+              targetLabel={`"${shareAchievement.name}" achievement`}
+              shareUrl={`${window.location.origin}/share/users/${id}/achievements/${shareAchievement.id}`}
+              shareTitle={`${profile.display_name} unlocked "${shareAchievement.name}" on sub-12`}
+              onClose={() => setShareAchievement(null)}
             />
           )}
         </>

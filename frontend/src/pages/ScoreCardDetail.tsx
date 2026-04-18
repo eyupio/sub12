@@ -1050,6 +1050,9 @@ export default function ScoreCardDetail() {
           targetId={id}
           targetType="score_card"
           targetLabel="Score Card"
+          shareUrl={`${window.location.origin}/share/score-cards/${id}`}
+          shareTitle={`${card.total_score}/250 with ${card.x_count}x on sub-12`}
+          allowInternal
           onClose={() => setShowShare(false)}
         />
       )}

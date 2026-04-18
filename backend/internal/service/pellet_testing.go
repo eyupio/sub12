@@ -69,6 +69,13 @@ func (s *PelletTestService) GetByID(ctx context.Context, id, userID string) (*mo
 	return s.repo.GetByID(ctx, id, userID)
 }
 
+// GetPublicByID returns a session without an ownership check. Callers are
+// responsible for verifying access (e.g. IsPublic on the returned value).
+// Used by the /share/pellet-tests/{id} OG endpoint.
+func (s *PelletTestService) GetPublicByID(ctx context.Context, id string) (*model.PelletTestSession, error) {
+	return s.repo.GetPublicByID(ctx, id)
+}
+
 func (s *PelletTestService) List(ctx context.Context, userID string, limit, offset int) ([]*model.PelletTestSessionSummary, error) {
 	if limit <= 0 {
 		limit = 20

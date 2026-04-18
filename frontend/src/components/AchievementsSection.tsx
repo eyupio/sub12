@@ -1,10 +1,14 @@
-import { Lock } from 'lucide-react'
+import { Lock, Share2 } from 'lucide-react'
 import { Achievement, AchievementDef } from '../api/achievements'
 import { iconForAchievement } from '../utils/achievementIcons'
 
 interface Props {
   earned: Achievement[]
   allDefs: AchievementDef[]
+  // When set, renders a small share icon on each earned achievement and
+  // invokes the callback with the achievement key. Owners of the profile
+  // (or public visitors) can then share a specific milestone.
+  onShareEarned?: (def: AchievementDef) => void
 }
 
 function formatEarnedDate(iso: string): string {
@@ -12,7 +16,7 @@ function formatEarnedDate(iso: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export function AchievementsSection({ earned, allDefs }: Props) {
+export function AchievementsSection({ earned, allDefs, onShareEarned }: Props) {
   // Nothing to show when the catalog hasn't loaded yet and the user has no earned items.
   if (allDefs.length === 0 && earned.length === 0) return null
 
@@ -52,8 +56,19 @@ export function AchievementsSection({ earned, allDefs }: Props) {
             <div
               key={def.id}
               title={def.description}
-              className={`${baseClass} ${styleClass}`}
+              className={`${baseClass} ${styleClass} relative`}
             >
+              {isEarned && onShareEarned && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onShareEarned(def) }}
+                  className="absolute top-1 right-1 text-muted hover:text-[var(--brass)] transition-colors"
+                  aria-label={`Share ${def.name}`}
+                  title={`Share ${def.name}`}
+                >
+                  <Share2 size={11} />
+                </button>
+              )}
               <div className="relative">
                 <Icon size={20} />
                 {!isEarned && (

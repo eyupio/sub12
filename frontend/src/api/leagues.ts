@@ -43,6 +43,7 @@ export interface LeagueConfig {
   require_score_verification: boolean
   required_confirmations: number
   require_image_upload: boolean
+  allow_member_invites: boolean
   updated_at: string
 }
 
@@ -55,6 +56,7 @@ export interface UpdateLeagueConfigPayload {
   require_score_verification?: boolean
   required_confirmations?: number
   require_image_upload?: boolean
+  allow_member_invites?: boolean
 }
 
 export interface Season {

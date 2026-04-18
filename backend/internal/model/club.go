@@ -16,20 +16,21 @@ type ClubSummary struct {
 }
 
 type Club struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Description    *string `json:"description,omitempty"`
-	ImageURL       *string `json:"image_url,omitempty"`
-	JoinCode       string  `json:"join_code"`
-	Type           string  `json:"type"`
-	JoinPolicy     string  `json:"join_policy"`
-	PostVisibility string  `json:"post_visibility"`
-	CreatedBy      string  `json:"created_by"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
-	MemberCount    int     `json:"member_count"`
-	IsAdmin        bool    `json:"is_admin,omitempty"`
-	IsMember       bool    `json:"is_member,omitempty"`
+	ID                 string  `json:"id"`
+	Name               string  `json:"name"`
+	Description        *string `json:"description,omitempty"`
+	ImageURL           *string `json:"image_url,omitempty"`
+	JoinCode           string  `json:"join_code"`
+	Type               string  `json:"type"`
+	JoinPolicy         string  `json:"join_policy"`
+	PostVisibility     string  `json:"post_visibility"`
+	AllowMemberInvites bool    `json:"allow_member_invites"`
+	CreatedBy          string  `json:"created_by"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
+	MemberCount        int     `json:"member_count"`
+	IsAdmin            bool    `json:"is_admin,omitempty"`
+	IsMember           bool    `json:"is_member,omitempty"`
 }
 
 type ClubMember struct {

@@ -139,6 +139,7 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 		if !isClubMember {
 			return nil, ErrLeagueNotFound
 		}
+		s.redactInviteCodeIfNeeded(ctx, league, viewerID)
 		return league, nil
 	}
 
@@ -155,7 +156,34 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 	if league.Type == "private" && viewerID == "" {
 		return nil, ErrLeagueNotFound
 	}
+	s.redactInviteCodeIfNeeded(ctx, league, viewerID)
 	return league, nil
+}
+
+// redactInviteCodeIfNeeded blanks out league.JoinCode when the league config
+// restricts invite sharing to admins and the viewer is not a league admin.
+// Non-members never see the code either way (it's only shown in the member UI).
+func (s *LeagueService) redactInviteCodeIfNeeded(ctx context.Context, league *model.League, viewerID string) {
+	if league == nil || league.JoinCode == nil {
+		return
+	}
+	if viewerID == "" {
+		league.JoinCode = nil
+		return
+	}
+	cfg, err := s.leagues.GetConfig(ctx, league.ID)
+	if err != nil {
+		// On config fetch failure, err on the side of hiding.
+		league.JoinCode = nil
+		return
+	}
+	if cfg.AllowMemberInvites {
+		return
+	}
+	isAdmin, err := s.leagues.IsAdmin(ctx, league.ID, viewerID)
+	if err != nil || !isAdmin {
+		league.JoinCode = nil
+	}
 }
 
 func (s *LeagueService) ListPublic(ctx context.Context) ([]*model.League, error) {

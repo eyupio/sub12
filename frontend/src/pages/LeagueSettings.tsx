@@ -284,11 +284,15 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; config: LeagueConfig; joinCode?: string }) {
   const queryClient = useQueryClient()
   const [joinPolicy, setJoinPolicy] = useState(config.join_policy)
+  const [allowMemberInvites, setAllowMemberInvites] = useState(config.allow_member_invites)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
   const saveMutation = useMutation({
-    mutationFn: () => leagueApi.updateConfig(leagueId, { join_policy: joinPolicy }),
+    mutationFn: () => leagueApi.updateConfig(leagueId, {
+      join_policy: joinPolicy,
+      allow_member_invites: allowMemberInvites,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'config'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
@@ -343,6 +347,21 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
           </button>
         </div>
       )}
+
+      <label className="flex items-start gap-3 cursor-pointer select-none py-1">
+        <input
+          type="checkbox"
+          checked={allowMemberInvites}
+          onChange={(e) => setAllowMemberInvites(e.target.checked)}
+          className="mt-0.5 accent-[var(--brass)]"
+        />
+        <span className="text-sm text-secondary">
+          Allow members to share the invite link
+          <span className="block text-[11px] text-muted mt-0.5">
+            When off, only admins can see and copy the invite link on the league page.
+          </span>
+        </span>
+      </label>
 
       {error && <p className="text-red-400 text-xs">{error}</p>}
       {saved && <p className="text-green-400 text-xs">Saved</p>}

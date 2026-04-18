@@ -429,12 +429,14 @@ func (r *LeagueRepository) GetConfig(ctx context.Context, leagueID string) (*mod
 	err := r.db.QueryRow(ctx, `
 		SELECT league_id, starts_on::text, ends_on::text,
 		       max_submissions_per_round, scoring_rule::text, join_policy::text,
-		       require_score_verification, required_confirmations, require_image_upload, updated_at
+		       require_score_verification, required_confirmations, require_image_upload,
+		       allow_member_invites, updated_at
 		FROM league_configs WHERE league_id = $1
 	`, leagueID).Scan(
 		&c.LeagueID, &c.StartsOn, &c.EndsOn,
 		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
-		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload, &c.UpdatedAt,
+		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload,
+		&c.AllowMemberInvites, &c.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -457,19 +459,23 @@ func (r *LeagueRepository) UpdateConfig(ctx context.Context, leagueID string, in
 			require_score_verification = COALESCE($7, require_score_verification),
 			required_confirmations     = COALESCE($8, required_confirmations),
 			require_image_upload       = COALESCE($9, require_image_upload),
+			allow_member_invites       = COALESCE($10, allow_member_invites),
 			updated_at                 = NOW()
 		WHERE league_id = $1
 		RETURNING league_id, starts_on::text, ends_on::text,
 		          max_submissions_per_round, scoring_rule::text, join_policy::text,
-		          require_score_verification, required_confirmations, require_image_upload, updated_at
+		          require_score_verification, required_confirmations, require_image_upload,
+		          allow_member_invites, updated_at
 	`, leagueID,
 		input.StartsOn, input.EndsOn, input.MaxSubmissionsPerRound,
 		input.ScoringRule, input.JoinPolicy,
 		input.RequireScoreVerification, input.RequiredConfirmations, input.RequireImageUpload,
+		input.AllowMemberInvites,
 	).Scan(
 		&c.LeagueID, &c.StartsOn, &c.EndsOn,
 		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
-		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload, &c.UpdatedAt,
+		&c.RequireScoreVerification, &c.RequiredConfirmations, &c.RequireImageUpload,
+		&c.AllowMemberInvites, &c.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -1046,7 +1052,7 @@ func (r *LeagueRepository) GetConfigByRoundID(ctx context.Context, roundID strin
 		SELECT lc.league_id, lc.starts_on::text, lc.ends_on::text,
 		       lc.max_submissions_per_round, lc.scoring_rule::text, lc.join_policy::text,
 		       lc.require_score_verification, lc.required_confirmations,
-		       lc.require_image_upload, lc.updated_at
+		       lc.require_image_upload, lc.allow_member_invites, lc.updated_at
 		FROM league_configs lc
 		JOIN seasons s ON s.league_id = lc.league_id
 		JOIN rounds rd ON rd.season_id = s.id
@@ -1055,7 +1061,7 @@ func (r *LeagueRepository) GetConfigByRoundID(ctx context.Context, roundID strin
 		&c.LeagueID, &c.StartsOn, &c.EndsOn,
 		&c.MaxSubmissionsPerRound, &c.ScoringRule, &c.JoinPolicy,
 		&c.RequireScoreVerification, &c.RequiredConfirmations,
-		&c.RequireImageUpload, &c.UpdatedAt,
+		&c.RequireImageUpload, &c.AllowMemberInvites, &c.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

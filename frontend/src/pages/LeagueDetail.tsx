@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock, Share2 } from 'lucide-react'
 import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
+import { ShareDialog } from '../components/ShareDialog'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -101,6 +102,7 @@ export default function LeagueDetail() {
   const [joinPending, setJoinPending] = useState(false)
   const [joinCode, setJoinCode] = useState(initialJoinCode)
   const [copied, setCopied] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [scoreFilter, setScoreFilter] = useState<string>('')
 
   useEffect(() => {
@@ -285,6 +287,14 @@ export default function LeagueDetail() {
             </>
           )}
         </div>
+        <button
+          onClick={() => setShowShare(true)}
+          className="text-muted hover:text-[var(--brass)] transition-colors"
+          title="Share league"
+          aria-label="Share league"
+        >
+          <Share2 size={18} />
+        </button>
         {isAdmin && (
             <Link
               to="/leagues/$id/settings"
@@ -366,26 +376,28 @@ export default function LeagueDetail() {
         <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
       )}
 
-      {/* Invite link — shown to members when league has an invite code */}
+      {/* Invite link — shown to members when the server returns a join code
+          (admins always; rank-and-file members only when the league config
+          allows member invites). The raw URL is intentionally hidden; only a
+          copy button is exposed. */}
       {isMember && league?.join_code && (
-        <div className="border border-subtle rounded p-3 bg-surface space-y-1.5">
-          <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs text-secondary bg-page rounded px-2 py-1.5 truncate font-mono">
-              {`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`}
-            </code>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
-              className="flex-shrink-0 p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors"
-              aria-label="Copy invite link"
-            >
-              {copied ? <Check size={14} className="text-[var(--brass)]" /> : <Copy size={14} />}
-            </button>
+        <div className="border border-subtle rounded p-3 bg-surface flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
+            <p className="text-[11px] text-muted mt-0.5">Copy a private link anyone can use to join this league.</p>
           </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors text-[11px] tracking-widest uppercase"
+            aria-label="Copy invite link"
+          >
+            {copied ? <Check size={14} className="text-[var(--brass)]" /> : <Copy size={14} />}
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
         </div>
       )}
 
@@ -530,6 +542,17 @@ export default function LeagueDetail() {
       {/* League Feed */}
       {isMember && league && (
         <LeagueFeed leagueId={league.id} postVisibility={league.post_visibility} />
+      )}
+
+      {showShare && leagueId && (
+        <ShareDialog
+          targetId={leagueId}
+          targetType="league"
+          targetLabel={league?.name ?? 'League'}
+          shareUrl={`${window.location.origin}/share/leagues/${leagueId}`}
+          shareTitle={`Join ${league?.name ?? 'this league'} on sub-12`}
+          onClose={() => setShowShare(false)}
+        />
       )}
     </div>
   )

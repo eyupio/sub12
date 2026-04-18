@@ -60,6 +60,11 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*mo
 	if club.Type == "private" && !club.IsMember {
 		return nil, ErrClubNotFound
 	}
+	// Hide join_code from non-admins when the club restricts invite sharing.
+	// Non-members never see it either way since the invite UI is members-only.
+	if !club.IsAdmin && !club.AllowMemberInvites {
+		club.JoinCode = ""
+	}
 	return club, nil
 }
 

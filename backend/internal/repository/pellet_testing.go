@@ -66,6 +66,23 @@ func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *mo
 	return session, nil
 }
 
+// GetPublicByID returns the session by ID without an ownership check. Caller
+// must verify the caller is permitted to view it (e.g. is_public == true or
+// ownership). Used by the /share/* HTML OG endpoints.
+func (r *PelletTestRepository) GetPublicByID(ctx context.Context, id string) (*model.PelletTestSession, error) {
+	session, err := scanSession(r.db.QueryRow(ctx, `
+		SELECT `+sessionCols+`
+		FROM pellet_test_sessions WHERE id = $1
+	`, id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get pellet test session: %w", err)
+	}
+	return session, nil
+}
+
 func (r *PelletTestRepository) GetByID(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {
 	session, err := scanSession(r.db.QueryRow(ctx, `
 		SELECT `+sessionCols+`
