@@ -33,6 +33,7 @@ import AdminClubs from './pages/AdminClubs'
 import AdminClubDetail from './pages/AdminClubDetail'
 import AdminSitemap from './pages/AdminSitemap'
 import AdminReportsQueue from './pages/AdminReportsQueue'
+import AdminSupportInbox from './pages/AdminSupportInbox'
 import ConfirmEmail from './pages/ConfirmEmail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -295,6 +296,12 @@ const adminReportsRoute = createRoute({
   component: AdminReportsQueue,
 })
 
+const adminSupportRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/support',
+  component: AdminSupportInbox,
+})
+
 const notificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/notifications',
@@ -413,6 +420,7 @@ export const routeTree = rootRoute.addChildren([
     adminClubDetailRoute,
     adminSitemapRoute,
     adminReportsRoute,
+    adminSupportRoute,
     notificationsRoute,
     supportCenterRoute,
     featureBoardRoute,

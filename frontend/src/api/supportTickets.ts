@@ -39,4 +39,14 @@ export interface CreateSupportTicketInput {
 export const supportTicketsApi = {
   create: (payload: CreateSupportTicketInput) => api.post<SupportTicket>('/tickets', payload),
   listMine: (limit = 200) => api.get<SupportTicketListResponse>(`/tickets?limit=${limit}`),
+  adminList: (params?: { status?: SupportTicketStatus; category?: SupportTicketCategory; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.category) q.set('category', params.category)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const query = q.toString()
+    return api.get<SupportTicketListResponse>(`/admin/tickets${query ? `?${query}` : ''}`)
+  },
+  adminTransitionStatus: (id: string, status: SupportTicketStatus) =>
+    api.post<SupportTicket>(`/admin/tickets/${id}/status`, { status }),
 }

@@ -73,7 +73,7 @@ export function notificationLink(n: Notification): string | null {
   if (n.type === 'report_filed') {
     if (n.league_id) return `/leagues/${n.league_id}/reports`
     if (n.club_id) return `/clubs/${n.club_id}/reports`
-    return '/admin/reports'
+    return '/admin/support'
   }
 
   if (
@@ -82,7 +82,7 @@ export function notificationLink(n: Notification): string | null {
     n.type === 'ticket_assigned' ||
     n.type === 'ticket_status_changed'
   ) {
-    return '/admin/reports'
+    return '/admin/support'
   }
 
   if (n.type === 'feature_request_state_changed') {
