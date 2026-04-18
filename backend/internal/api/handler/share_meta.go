@@ -274,12 +274,21 @@ func (s *ShareMeta) writeHTML(w http.ResponseWriter, r *http.Request, og openGra
 	if og.Type == "" {
 		og.Type = "website"
 	}
-	tmpl := s.template()
+	tmpl, isFallback := s.template()
 	body := injectOG(tmpl, og, s.siteName)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Short CDN/proxy cache so social platforms see fresh metadata after edits
-	// without hammering the backend for every navigation.
-	w.Header().Set("Cache-Control", "public, max-age=60")
+	if isFallback {
+		// The fallback holding page embeds a JS reload so the real SPA takes
+		// over once the frontend container is reachable. If we let browsers
+		// or CDNs cache it, the reload serves the cached fallback back to
+		// itself and the user is stuck. no-store ensures the next request
+		// actually hits the backend and picks up the real shell.
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		// Short CDN/proxy cache so social platforms see fresh metadata after
+		// edits without hammering the backend for every navigation.
+		w.Header().Set("Cache-Control", "public, max-age=60")
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
@@ -288,23 +297,25 @@ func (s *ShareMeta) writeHTML(w http.ResponseWriter, r *http.Request, og openGra
 // failure we return the last known good shell if we have one, otherwise the
 // embedded fallback — but we never cache the fallback. This means a cold
 // start where the frontend container isn't up yet self-heals on the next
-// request once the frontend is reachable.
-func (s *ShareMeta) template() []byte {
+// request once the frontend is reachable. The isFallback return lets callers
+// emit no-store on the HTTP response so the in-browser auto-reload isn't
+// served a stale cached fallback.
+func (s *ShareMeta) template() (body []byte, isFallback bool) {
 	s.mu.RLock()
 	if s.cached != nil && time.Since(s.cachedAt) < s.ttl {
 		fresh := s.cached
 		s.mu.RUnlock()
-		return fresh
+		return fresh, false
 	}
 	s.mu.RUnlock()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.cached != nil && time.Since(s.cachedAt) < s.ttl {
-		return s.cached
+		return s.cached, false
 	}
 	if s.frontendOrigin == "" {
-		return []byte(fallbackTemplate)
+		return []byte(fallbackTemplate), true
 	}
 
 	fetchCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -313,13 +324,13 @@ func (s *ShareMeta) template() []byte {
 	if err != nil {
 		s.log.Warn().Err(err).Str("origin", s.frontendOrigin).Msg("share_meta: fetch failed, serving fallback")
 		if s.cached != nil {
-			return s.cached
+			return s.cached, false
 		}
-		return []byte(fallbackTemplate)
+		return []byte(fallbackTemplate), true
 	}
 	s.cached = html
 	s.cachedAt = time.Now()
-	return s.cached
+	return s.cached, false
 }
 
 func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {

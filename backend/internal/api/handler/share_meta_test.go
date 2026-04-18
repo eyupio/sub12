@@ -23,10 +23,12 @@ func TestTemplate_CachesSuccessfulFetch(t *testing.T) {
 	defer ts.Close()
 
 	s := newShareMetaForTest(ts.URL, 500*time.Millisecond)
-	first := s.template()
-	second := s.template()
+	first, firstFallback := s.template()
+	second, secondFallback := s.template()
 
 	assert.Equal(t, first, second, "template should be re-used while cache is fresh")
+	assert.False(t, firstFallback, "successful fetch should not be flagged as fallback")
+	assert.False(t, secondFallback, "cached successful fetch should not be flagged as fallback")
 	assert.EqualValues(t, 1, atomic.LoadInt32(&calls), "only one upstream fetch while cache is fresh")
 }
 
@@ -62,15 +64,45 @@ func TestTemplate_FetchFailureDoesNotPoisonCache(t *testing.T) {
 
 	s := newShareMetaForTest(ts.URL, 10*time.Millisecond)
 
-	got := string(s.template())
-	assert.Contains(t, got, "Getting things ready", "fallback HTML should be served on fetch failure")
+	body, isFallback := s.template()
+	assert.Contains(t, string(body), "Getting things ready", "fallback HTML should be served on fetch failure")
+	assert.True(t, isFallback, "template() should flag the embedded fallback so callers can emit no-store")
 
 	// Flip the server healthy and wait out the TTL.
 	atomic.StoreInt32(&failing, 0)
 	time.Sleep(25 * time.Millisecond)
 
-	got = string(s.template())
-	assert.Contains(t, got, "<title>real</title>", "next request after recovery should pick up the real template")
+	body, isFallback = s.template()
+	assert.Contains(t, string(body), "<title>real</title>", "next request after recovery should pick up the real template")
+	assert.False(t, isFallback, "recovered shell should not be flagged as fallback")
+}
+
+func TestWriteHTML_CacheControlMatchesTemplateSource(t *testing.T) {
+	// Real shell: browsers and CDNs may cache briefly so social platforms
+	// don't re-parse on every navigation.
+	ok := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<!doctype html><html><head><title>x</title></head></html>`))
+	}))
+	defer ok.Close()
+
+	s := newShareMetaForTest(ok.URL, time.Minute)
+	rec := httptest.NewRecorder()
+	s.writeHTML(rec, httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil), s.defaultOG(httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil)))
+	assert.Equal(t, "public, max-age=60", rec.Header().Get("Cache-Control"), "successful shell must remain cacheable")
+
+	// Fallback: the embedded holding page must never be cached, otherwise the
+	// in-page JS reload serves itself back from cache and the user is stuck on
+	// "Continue to sub-12" until a manual navigation clears the entry.
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer down.Close()
+
+	s2 := newShareMetaForTest(down.URL, time.Minute)
+	rec2 := httptest.NewRecorder()
+	s2.writeHTML(rec2, httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil), s2.defaultOG(httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil)))
+	assert.Equal(t, "no-store", rec2.Header().Get("Cache-Control"), "fallback holding page must not be cached")
+	assert.Contains(t, rec2.Body.String(), "Getting things ready", "fallback body should be the embedded holding page")
 }
 
 func TestScoreCardDescription_RichesWithGear(t *testing.T) {
