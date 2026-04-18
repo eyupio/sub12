@@ -41,6 +41,7 @@ func NewRouter(
 	notifications *service.NotificationService,
 	moderation *service.ModerationService,
 	supportTickets *service.SupportTicketService,
+	sitemap *service.SitemapService,
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
@@ -57,6 +58,10 @@ func NewRouter(
 	h := handler.NewHealth(db)
 	r.Get("/healthz", h.Liveness)
 	r.Get("/readyz", h.Readiness)
+
+	// Public sitemap.xml (no auth)
+	sitemapH := handler.NewSitemap(sitemap)
+	r.Get("/sitemap.xml", sitemapH.ServeXML)
 
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
@@ -346,6 +351,12 @@ func NewRouter(
 				r.Delete("/admin/clubs/{id}", ach.Delete)
 				r.Get("/admin/clubs/{id}/members", ach.ListMembers)
 				r.Delete("/admin/clubs/{id}/members/{userId}", ach.RemoveMember)
+
+				// Sitemap & SEO management
+				asmh := handler.NewAdminSitemap(sitemap)
+				r.Get("/admin/sitemap/stats", asmh.Stats)
+				r.Post("/admin/sitemap/ping", asmh.Ping)
+				r.Get("/admin/sitemap/submissions", asmh.ListSubmissions)
 			})
 		})
 
