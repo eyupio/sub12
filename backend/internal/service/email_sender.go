@@ -68,6 +68,51 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
 }
 
+// SendReportFiledNotification renders and sends the "content flagged" email
+// to a single admin. The template is admin-editable; disabled by default.
+// Errors are returned so callers can decide whether to log-and-continue.
+func (s *EmailSenderService) SendReportFiledNotification(ctx context.Context, toEmail, displayName, communityName, targetLabel, reason, reportLink string) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, "notification_report_filed")
+	if err != nil {
+		return fmt.Errorf("load notification_report_filed template: %w", err)
+	}
+	if !tpl.IsEnabled {
+		return nil
+	}
+	payload := map[string]any{
+		"display_name":   displayName,
+		"community_name": communityName,
+		"target_label":   targetLabel,
+		"reason":         reason,
+		"report_link":    reportLink,
+	}
+	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification_report_filed subject: %w", err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification_report_filed text: %w", err)
+	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render notification_report_filed html: %w", err)
+	}
+
+	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("load smtp settings: %w", err)
+	}
+
+	fromName := "Sub-12"
+	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
+		fromName = strings.TrimSpace(*settings.FromName)
+	}
+	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
+
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+}
+
 func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, toEmail, displayName, confirmLink string, expiresAt time.Time) error {
 	tpl, err := s.templateRepo.GetByKey(ctx, "email_change_confirm")
 	if err != nil {

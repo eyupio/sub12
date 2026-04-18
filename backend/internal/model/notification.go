@@ -15,29 +15,31 @@ const (
 	NotificationTypeLeagueJoinApproved = "league_join_approved"
 	NotificationTypeClubJoinApproved   = "club_join_approved"
 	NotificationTypeMention            = "mention"
+	NotificationTypeReportFiled        = "report_filed"
 )
 
 // Notification is a single delivered in-app notification row.
 type Notification struct {
-	ID                string         `json:"id"`
-	RecipientID       string         `json:"recipient_id"`
-	ActorID           *string        `json:"actor_id,omitempty"`
-	ActorDisplayName  *string        `json:"actor_display_name,omitempty"`
-	ActorAvatarURL    *string        `json:"actor_avatar_url,omitempty"`
-	Type              string         `json:"type"`
-	TargetID          *string        `json:"target_id,omitempty"`
-	TargetType        *string        `json:"target_type,omitempty"`
-	LeagueID          *string        `json:"league_id,omitempty"`
-	ClubID            *string        `json:"club_id,omitempty"`
-	Metadata          map[string]any `json:"metadata,omitempty"`
-	ReadAt            *time.Time     `json:"read_at,omitempty"`
-	CreatedAt         time.Time      `json:"created_at"`
+	ID               string         `json:"id"`
+	RecipientID      string         `json:"recipient_id"`
+	ActorID          *string        `json:"actor_id,omitempty"`
+	ActorDisplayName *string        `json:"actor_display_name,omitempty"`
+	ActorAvatarURL   *string        `json:"actor_avatar_url,omitempty"`
+	Type             string         `json:"type"`
+	TargetID         *string        `json:"target_id,omitempty"`
+	TargetType       *string        `json:"target_type,omitempty"`
+	LeagueID         *string        `json:"league_id,omitempty"`
+	ClubID           *string        `json:"club_id,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	ReadAt           *time.Time     `json:"read_at,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
 }
 
 // NotificationPreferences holds per-type opt-in flags. The base flags gate
 // in-app delivery; the *_email flags gate email delivery for the same type.
 // Missing rows in the DB imply all in-app defaults true and all email defaults
-// false (see DefaultNotificationPreferences).
+// false (see DefaultNotificationPreferences). report_filed email delivery is
+// gated by DigestEmail and handled by ModerationService directly.
 type NotificationPreferences struct {
 	UserID                  string    `json:"user_id"`
 	FollowRequest           bool      `json:"follow_request"`
@@ -51,6 +53,7 @@ type NotificationPreferences struct {
 	LeagueJoinApproved      bool      `json:"league_join_approved"`
 	ClubJoinApproved        bool      `json:"club_join_approved"`
 	Mention                 bool      `json:"mention"`
+	ReportFiled             bool      `json:"report_filed"`
 	DigestEmail             bool      `json:"digest_email"`
 	FollowRequestEmail      bool      `json:"follow_request_email"`
 	FollowAcceptedEmail     bool      `json:"follow_accepted_email"`
@@ -81,6 +84,7 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		LeagueJoinApproved: true,
 		ClubJoinApproved:   true,
 		Mention:            true,
+		ReportFiled:        true,
 		DigestEmail:        false,
 	}
 }
@@ -110,12 +114,16 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 		return p.ClubJoinApproved
 	case NotificationTypeMention:
 		return p.Mention
+	case NotificationTypeReportFiled:
+		return p.ReportFiled
 	}
 	return true
 }
 
 // EmailEnabledForType returns whether the user wants email for a given type.
-// Unknown types return false (email is opt-in).
+// Unknown types return false (email is opt-in). report_filed has its own
+// dedicated email path in ModerationService gated by DigestEmail, so it is
+// intentionally absent from this switch.
 func (p *NotificationPreferences) EmailEnabledForType(t string) bool {
 	switch t {
 	case NotificationTypeFollowRequest:
@@ -157,6 +165,7 @@ type UpdateNotificationPrefsInput struct {
 	LeagueJoinApproved      *bool `json:"league_join_approved,omitempty"`
 	ClubJoinApproved        *bool `json:"club_join_approved,omitempty"`
 	Mention                 *bool `json:"mention,omitempty"`
+	ReportFiled             *bool `json:"report_filed,omitempty"`
 	DigestEmail             *bool `json:"digest_email,omitempty"`
 	FollowRequestEmail      *bool `json:"follow_request_email,omitempty"`
 	FollowAcceptedEmail     *bool `json:"follow_accepted_email,omitempty"`

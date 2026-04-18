@@ -18,6 +18,9 @@ type User struct {
 	ShowFollowerCounts     bool      `json:"show_follower_counts"`
 	DefaultDistanceUnit    string    `json:"default_distance_unit"`
 	DefaultMeasurementUnit string    `json:"default_measurement_unit"`
+	DateFormat             string    `json:"date_format"`
+	TimeFormat             string    `json:"time_format"`
+	Timezone               string    `json:"timezone"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 }
@@ -47,4 +50,7 @@ type UpdateProfileInput struct {
 	ShowFollowerCounts     *bool   `json:"show_follower_counts"`
 	DefaultDistanceUnit    *string `json:"default_distance_unit"`
 	DefaultMeasurementUnit *string `json:"default_measurement_unit"`
+	DateFormat             *string `json:"date_format"`
+	TimeFormat             *string `json:"time_format"`
+	Timezone               *string `json:"timezone"`
 }

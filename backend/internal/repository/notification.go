@@ -142,7 +142,7 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		SELECT user_id, follow_request, follow_accepted, comment_on_my_card,
 		       reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 		       score_amended, league_join_approved, club_join_approved, mention,
-		       digest_email,
+		       report_filed, digest_email,
 		       follow_request_email, follow_accepted_email, comment_on_my_card_email,
 		       reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
 		       score_rejected_email, score_amended_email, league_join_approved_email,
@@ -154,7 +154,7 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		&p.UserID, &p.FollowRequest, &p.FollowAccepted, &p.CommentOnMyCard,
 		&p.ReplyToMyComment, &p.LikeOnMyContent, &p.ScoreVerified, &p.ScoreRejected,
 		&p.ScoreAmended, &p.LeagueJoinApproved, &p.ClubJoinApproved, &p.Mention,
-		&p.DigestEmail,
+		&p.ReportFiled, &p.DigestEmail,
 		&p.FollowRequestEmail, &p.FollowAcceptedEmail, &p.CommentOnMyCardEmail,
 		&p.ReplyToMyCommentEmail, &p.LikeOnMyContentEmail, &p.ScoreVerifiedEmail,
 		&p.ScoreRejectedEmail, &p.ScoreAmendedEmail, &p.LeagueJoinApprovedEmail,
@@ -209,6 +209,9 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.Mention != nil {
 		current.Mention = *in.Mention
 	}
+	if in.ReportFiled != nil {
+		current.ReportFiled = *in.ReportFiled
+	}
 	if in.DigestEmail != nil {
 		current.DigestEmail = *in.DigestEmail
 	}
@@ -251,15 +254,15 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			user_id, follow_request, follow_accepted, comment_on_my_card,
 			reply_to_my_comment, like_on_my_content, score_verified, score_rejected,
 			score_amended, league_join_approved, club_join_approved, mention,
-			digest_email,
+			report_filed, digest_email,
 			follow_request_email, follow_accepted_email, comment_on_my_card_email,
 			reply_to_my_comment_email, like_on_my_content_email, score_verified_email,
 			score_rejected_email, score_amended_email, league_join_approved_email,
 			club_join_approved_email, mention_email,
 			updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-			$14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
 			NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
@@ -274,6 +277,7 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			league_join_approved       = EXCLUDED.league_join_approved,
 			club_join_approved         = EXCLUDED.club_join_approved,
 			mention                    = EXCLUDED.mention,
+			report_filed               = EXCLUDED.report_filed,
 			digest_email               = EXCLUDED.digest_email,
 			follow_request_email       = EXCLUDED.follow_request_email,
 			follow_accepted_email      = EXCLUDED.follow_accepted_email,
@@ -291,7 +295,7 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 		current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
 		current.ReplyToMyComment, current.LikeOnMyContent, current.ScoreVerified, current.ScoreRejected,
 		current.ScoreAmended, current.LeagueJoinApproved, current.ClubJoinApproved, current.Mention,
-		current.DigestEmail,
+		current.ReportFiled, current.DigestEmail,
 		current.FollowRequestEmail, current.FollowAcceptedEmail, current.CommentOnMyCardEmail,
 		current.ReplyToMyCommentEmail, current.LikeOnMyContentEmail, current.ScoreVerifiedEmail,
 		current.ScoreRejectedEmail, current.ScoreAmendedEmail, current.LeagueJoinApprovedEmail,

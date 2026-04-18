@@ -12,6 +12,7 @@ export type NotificationType =
   | 'league_join_approved'
   | 'club_join_approved'
   | 'mention'
+  | 'report_filed'
 
 export interface Notification {
   id: string
@@ -47,6 +48,7 @@ export interface NotificationPreferences {
   league_join_approved: boolean
   club_join_approved: boolean
   mention: boolean
+  report_filed: boolean
   digest_email: boolean
   follow_request_email: boolean
   follow_accepted_email: boolean

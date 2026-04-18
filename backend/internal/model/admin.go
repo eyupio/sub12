@@ -31,4 +31,7 @@ type UpdateClubInput struct {
 	Type           *string `json:"type"`
 	JoinPolicy     *string `json:"join_policy"`
 	PostVisibility *string `json:"post_visibility"`
+	DateFormat     *string `json:"date_format"`
+	TimeFormat     *string `json:"time_format"`
+	Timezone       *string `json:"timezone"`
 }

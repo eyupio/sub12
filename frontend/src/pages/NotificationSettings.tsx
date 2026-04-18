@@ -107,12 +107,33 @@ export default function NotificationSettings() {
           </ul>
 
           <div className="pt-2">
+            <h2 className="text-xs uppercase tracking-wider text-muted mb-2">Moderation</h2>
+            <ul className="space-y-2">
+              <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-secondary font-medium">Reports filed</p>
+                  <p className="text-xs text-muted">League/club admin only. Email delivery is controlled by the digest email setting below.</p>
+                </div>
+                <label className="shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={data.report_filed}
+                    onChange={(e) => mutation.mutate({ report_filed: e.target.checked })}
+                    aria-label="Reports filed"
+                    className="scale-125"
+                  />
+                </label>
+              </li>
+            </ul>
+          </div>
+
+          <div className="pt-2">
             <h2 className="text-xs uppercase tracking-wider text-muted mb-2">Email digests</h2>
             <ul className="space-y-2">
               <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-secondary font-medium">Digest email</p>
-                  <p className="text-xs text-muted">Weekly summary by email.</p>
+                  <p className="text-xs text-muted">Weekly summary by email; also gates report-filed emails for admins.</p>
                 </div>
                 <label className="shrink-0 cursor-pointer">
                   <input
