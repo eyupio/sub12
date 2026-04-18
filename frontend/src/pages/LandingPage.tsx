@@ -80,7 +80,7 @@ const trustPoints = [
   'Purpose-built for sub-12 air rifle tracking',
   'Works on phone, tablet, and desktop',
   'No ad clutter around your data',
-  'Built around serious range and club workflows',
+  'Free to use — no ads, no paywalls',
 ] as const
 
 const comparisonRows = [
@@ -198,20 +198,29 @@ const analyticsCards = [
 const clubLeagueCards = [
   {
     icon: Users2,
-    title: 'For shooters',
+    title: 'Clubs for every community',
     points: [
-      'Submit scores to leagues without duplicating the session elsewhere.',
-      'Track club standing, personal bests, and current form in the same account.',
-      'Keep your personal testing record while still taking part in shared competition.',
+      'Create or join a club, invite your shooters, and share a club identity with members.',
+      'Club leaderboards, member standings, and activity sit alongside your personal record.',
+      'Host leagues under a club so standings, rounds, and membership all live together.',
     ],
   },
   {
     icon: CalendarRange,
-    title: 'For organisers',
+    title: 'Private or open leagues',
     points: [
+      'Open leagues anyone can join, or private leagues gated by invite code or admin approval.',
       'Run seasons, rounds, standings, and membership from one clean workflow.',
-      'Use join codes, member management, and score verification to reduce admin chase-up.',
-      'Move away from message threads and spreadsheet tabs as the league grows.',
+      'Configure required image uploads, max submissions per round, and scoring rules per league.',
+    ],
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Peer-verified score submissions',
+    points: [
+      'Require one or more peer confirmations before a score counts toward the standings.',
+      'Amend or reject suspect cards with a reason — the change is logged to a full audit trail.',
+      'Organisers spend less time chasing proof; shooters trust the final table.',
     ],
   },
 ] as const
@@ -501,7 +510,9 @@ export default function LandingPage() {
 
       <header className="sticky top-0 z-50 border-b border-subtle bg-nav backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3">
-          <img src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'} alt="SUB12" className="h-8 w-auto" />
+          <Link to="/" aria-label="SUB12 home" className="inline-flex items-center">
+            <img src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'} alt="SUB12" className="h-8 w-auto" />
+          </Link>
           <nav className="hidden items-center gap-6 lg:flex">
             <a href="#how-it-works" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               How it works
@@ -535,7 +546,7 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brass)]/20 bg-[var(--brass)]/10 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">
                 <Crosshair size={13} />
-                For serious sub-12 air rifle shooters
+                For sub-12 air rifle shooters &mdash; beginners to professionals
               </div>
               <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight text-primary sm:text-6xl lg:text-7xl">
                 Know which setup really improves your shooting.
@@ -555,7 +566,7 @@ export default function LandingPage() {
                 </a>
               </div>
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted">
-                Free to start. No ads. Built for range work, club nights, and proper league tracking.
+                Free to use. No ads. Built for range work, club nights, and proper league tracking.
               </p>
             </div>
 
@@ -654,20 +665,121 @@ export default function LandingPage() {
         </section>
 
         <section id="pellet-testing" className="px-4 py-20 lg:py-24">
-          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
-            <div>
-              <SectionHeader
-                eyebrow="Pellet Testing"
-                title="Pellet testing with enough depth to trust the result"
-                description="When a shooter says one pellet works better, the question is always: under what rifle, which batch, how many groups, and over how many sessions? SUB12 keeps the answer attached to the result."
-              />
+          <div className="mx-auto max-w-7xl">
+            <SectionHeader
+              eyebrow="Pellet Testing — Image Measurement"
+              title="Measure every group from a single photo"
+              description="Photograph your target, mark a known distance for calibration, and SUB12 measures the group in millimetres and MOA. Auto-detect the holes, or place them yourself when the paper gets messy."
+              align="center"
+            />
 
-              <div className="mt-8">
-                <FeatureList items={pelletTestingPoints} />
-              </div>
+            <div className="mt-12 grid gap-5 lg:grid-cols-5 md:grid-cols-2">
+              <SurfaceCard className="rounded-[24px] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 01</span>
+                  <Crosshair size={16} className="text-[var(--brass)]" />
+                </div>
+                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                  <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/25">
+                    <div className="absolute h-16 w-16 rounded-full border border-subtle" />
+                    <div className="absolute h-8 w-8 rounded-full border border-[var(--brass)]/35" />
+                    <span className="relative h-2.5 w-2.5 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                  </div>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Mark your aim point</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Tap where you were aiming so elevation and windage can be measured from the right reference.</p>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 02</span>
+                  <SlidersHorizontal size={16} className="text-[var(--brass)]" />
+                </div>
+                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                  <div className="relative flex h-20 w-full max-w-[160px] items-center justify-center">
+                    <span className="absolute left-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                    <span className="absolute right-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                    <span className="absolute left-4 right-4 h-px border-t border-dashed border-[var(--brass)]/55" />
+                    <span className="relative -top-5 rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">25 mm</span>
+                  </div>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Set a known distance</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Pick two points on the target and enter the real-world distance. That's your pixels-per-mm calibration.</p>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 03</span>
+                  <Gauge size={16} className="text-[var(--brass)]" />
+                </div>
+                <div className="mt-4 flex h-32 flex-col items-center justify-center gap-2 rounded-[18px] border border-subtle bg-page">
+                  <div className="rounded-full border border-[var(--brass)]/25 bg-surface px-4 py-1.5 font-mono text-sm font-semibold text-[var(--brass)]">45 m</div>
+                  <div className="flex gap-2">
+                    <span className="rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--brass)]">.177</span>
+                    <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.22</span>
+                    <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.25</span>
+                  </div>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Distance &amp; caliber</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Enter the range and pellet caliber so SUB12 can convert to MOA and account for pellet diameter.</p>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 04</span>
+                  <ScanLine size={16} className="text-[var(--brass)]" />
+                </div>
+                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                  <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/20">
+                    <div className="absolute h-16 w-16 rounded-full border border-subtle" />
+                    {[
+                      'left-[28px] top-[30px]',
+                      'left-[40px] top-[34px]',
+                      'left-[34px] top-[44px]',
+                      'left-[46px] top-[48px]',
+                      'left-[30px] top-[54px]',
+                    ].map((position) => (
+                      <span
+                        key={position}
+                        className={`absolute h-2 w-2 rounded-full bg-[var(--brass)] shadow-[0_0_0_3px_rgba(184,136,44,0.18)] ${position}`}
+                      />
+                    ))}
+                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">Auto-detected · 5 shots</span>
+                  </div>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Auto-detect or place manually</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Let SUB12 find the holes with confidence scoring, or drop points yourself when tears and shadow need judgement.</p>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 05</span>
+                  <BarChart3 size={16} className="text-[var(--brass)]" />
+                </div>
+                <div className="mt-4 flex h-32 flex-col justify-center gap-2 rounded-[18px] border border-subtle bg-page p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Group</span>
+                    <span className="font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">MOA</span>
+                    <span className="font-mono text-sm font-semibold text-primary">0.63</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Mean R.</span>
+                    <span className="font-mono text-sm font-semibold text-primary">3.12mm</span>
+                  </div>
+                </div>
+                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Group size in mm &amp; MOA</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">Read group size, mean radius, elevation and windage straight from the image — saved with the session for later review.</p>
+              </SurfaceCard>
             </div>
 
-            <div className="grid gap-5">
+            <div className="mt-16 grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
+              <div>
+                <FeatureList items={pelletTestingPoints} />
+              </div>
+
               <SurfaceCard className="rounded-[28px] p-0">
                 <div className="border-b border-subtle px-6 py-5">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Pellet Test Detail</p>
@@ -900,18 +1012,18 @@ export default function LandingPage() {
             <SectionHeader
               eyebrow="Clubs And Leagues"
               title="Strong for personal analysis. Strong enough for organised shooting."
-              description="SUB12 is not only a private shooting log. It also gives clubs and leagues a cleaner way to run rounds, standings, score submissions, and member management without losing the shooter-focused detail."
+              description="Create a club, run private or open leagues, and keep score submissions honest with peer confirmations and a full audit trail — all alongside your personal shooting record."
               align="center"
             />
 
-            <div className="mt-12 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="mt-12 grid gap-5 lg:grid-cols-[1.45fr_0.75fr]">
               <SurfaceCard className="rounded-[28px] p-0">
                 <div className="border-b border-subtle px-6 py-5">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted">League Workflow</p>
                   <h3 className="mt-2 text-2xl font-semibold text-primary">Less admin drag. Better visibility for everyone.</h3>
                 </div>
 
-                <div className="grid gap-5 p-6 md:grid-cols-2">
+                <div className="grid gap-5 p-6 sm:grid-cols-2 lg:grid-cols-3">
                   {clubLeagueCards.map(({ icon: Icon, title, points }) => (
                     <div key={title} className="rounded-[24px] border border-subtle bg-page p-5">
                       <div className="flex items-center gap-3">
