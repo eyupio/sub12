@@ -271,6 +271,26 @@ func (r *ClubRepository) IsMember(ctx context.Context, clubID, userID string) (b
 	return isMember, err
 }
 
+// ListAdminIDs returns the user IDs of all admins for a club.
+func (r *ClubRepository) ListAdminIDs(ctx context.Context, clubID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id FROM club_members WHERE club_id = $1 AND is_admin = TRUE
+	`, clubID)
+	if err != nil {
+		return nil, fmt.Errorf("list club admin ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan club admin id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // CountMembershipsByUser returns how many clubs the user has joined.
 func (r *ClubRepository) CountMembershipsByUser(ctx context.Context, userID string) (int, error) {
 	var count int

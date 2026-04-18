@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock, Flag } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
@@ -436,6 +436,16 @@ export default function ClubDetail() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            {club.is_admin && (
+              <Link
+                to="/clubs/$id/reports"
+                params={{ id }}
+                className="text-muted hover:text-secondary transition-colors"
+                title="Club reports"
+              >
+                <Flag size={16} />
+              </Link>
+            )}
             {club.is_admin && (
               <Link
                 to="/clubs/$id/settings"
