@@ -17,8 +17,11 @@ describe('LandingPage', () => {
 
     const header = screen.getByRole('banner')
     const signInLink = within(header).getByRole('link', { name: /sign in/i })
+    const classTokens = signInLink.className.split(/\s+/)
 
     expect(signInLink).toHaveAttribute('href', '/login')
-    expect(signInLink.className).not.toContain('hidden')
+    expect(classTokens).toContain('inline-flex')
+    expect(classTokens).not.toContain('hidden')
+    expect(classTokens.some((token) => token.endsWith(':hidden'))).toBe(false)
   })
 })
