@@ -40,7 +40,12 @@ type SitemapStats struct {
 
 // SitemapPingRequest is the admin request body to trigger a ping.
 type SitemapPingRequest struct {
-	Engines             []string `json:"engines"`                         // e.g. ["google","bing","indexnow"]
-	IndexNowKey         string   `json:"indexnow_key,omitempty"`          // optional request-scoped key override
-	IndexNowKeyLocation string   `json:"indexnow_key_location,omitempty"` // optional request-scoped key location override
+	Engines []string `json:"engines"` // e.g. ["google","bing","indexnow"]
+}
+
+// IndexNowKeyInfo reports the key details currently used by sitemap pings.
+type IndexNowKeyInfo struct {
+	Key         string `json:"key"`
+	KeyLocation string `json:"key_location"`
+	Source      string `json:"source"` // "configured" or "generated"
 }

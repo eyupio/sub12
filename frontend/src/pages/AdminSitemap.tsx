@@ -38,13 +38,16 @@ function StatusBadge({ code }: { code?: number }) {
 export default function AdminSitemap() {
   const queryClient = useQueryClient()
   const [selected, setSelected] = useState<string[]>(['indexnow'])
-  const [indexNowKey, setIndexNowKey] = useState('')
-  const [indexNowKeyLocation, setIndexNowKeyLocation] = useState('')
   const [offset, setOffset] = useState(0)
 
   const statsQuery = useQuery({
     queryKey: ['admin-sitemap-stats'],
     queryFn: adminSitemapApi.getStats,
+  })
+
+  const indexNowKeyQuery = useQuery({
+    queryKey: ['admin-sitemap-indexnow-key'],
+    queryFn: adminSitemapApi.getIndexNowKey,
   })
 
   const submissionsQuery = useQuery({
@@ -53,11 +56,7 @@ export default function AdminSitemap() {
   })
 
   const pingMutation = useMutation({
-    mutationFn: () => adminSitemapApi.ping({
-      engines: selected,
-      indexnow_key: indexNowKey.trim() || undefined,
-      indexnow_key_location: indexNowKeyLocation.trim() || undefined,
-    }),
+    mutationFn: () => adminSitemapApi.ping({ engines: selected }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-sitemap-submissions'] })
     },
@@ -115,14 +114,17 @@ export default function AdminSitemap() {
       {/* Ping controls */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Submit Sitemap to Search Engines</h2>
+        {indexNowKeyQuery.error && (
+          <p className="text-sm text-red-400">{parseError(indexNowKeyQuery.error)}</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span className="text-[10px] tracking-widest uppercase text-muted">IndexNow Key</span>
             <input
               type="text"
-              value={indexNowKey}
-              onChange={(e) => setIndexNowKey(e.target.value)}
-              placeholder="Optional override; falls back to INDEXNOW_KEY on API server"
+              value={indexNowKeyQuery.data?.key ?? ''}
+              readOnly
+              placeholder={indexNowKeyQuery.isLoading ? 'Loading key…' : 'Unavailable'}
               className="w-full rounded border border-subtle bg-bg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-[var(--brass)]"
             />
           </label>
@@ -130,13 +132,18 @@ export default function AdminSitemap() {
             <span className="text-[10px] tracking-widest uppercase text-muted">IndexNow Key Location</span>
             <input
               type="text"
-              value={indexNowKeyLocation}
-              onChange={(e) => setIndexNowKeyLocation(e.target.value)}
-              placeholder="Optional override; falls back to INDEXNOW_KEY_LOCATION"
+              value={indexNowKeyQuery.data?.key_location ?? ''}
+              readOnly
+              placeholder={indexNowKeyQuery.isLoading ? 'Loading location…' : 'Unavailable'}
               className="w-full rounded border border-subtle bg-bg px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-[var(--brass)]"
             />
           </label>
         </div>
+        {indexNowKeyQuery.data && (
+          <p className="text-xs text-muted">
+            Key source: <span className="uppercase tracking-wide">{indexNowKeyQuery.data.source}</span>. This key is hosted automatically and used for IndexNow submissions.
+          </p>
+        )}
         <div className="flex flex-wrap gap-3">
           {engines.map((e) => (
             <label key={e.id} className="flex items-center gap-2 cursor-pointer select-none">

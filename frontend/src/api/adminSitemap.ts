@@ -26,13 +26,20 @@ export interface SitemapSubmissionsResponse {
 
 export interface SitemapPingRequest {
   engines: string[]
-  indexnow_key?: string
-  indexnow_key_location?: string
+}
+
+export interface IndexNowKeyInfo {
+  key: string
+  key_location: string
+  source: 'configured' | 'generated'
 }
 
 export const adminSitemapApi = {
   getStats: () =>
     api.get<SitemapStats>('/admin/sitemap/stats'),
+
+  getIndexNowKey: () =>
+    api.get<IndexNowKeyInfo>('/admin/sitemap/indexnow-key'),
 
   ping: (payload: SitemapPingRequest) =>
     api.post<SitemapSubmission[]>('/admin/sitemap/ping', payload),

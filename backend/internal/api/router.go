@@ -65,6 +65,8 @@ func NewRouter(
 	r.Get("/sitemap.xml", sitemapH.ServeXML)
 	// Legacy typo compatibility for old links/tools.
 	r.Get("/siteindex.xml", sitemapH.ServeXML)
+	// IndexNow key-file verification endpoint.
+	r.Get("/{key}.txt", sitemapH.ServeIndexNowKeyFile)
 
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
@@ -376,6 +378,7 @@ func NewRouter(
 				// Sitemap & SEO management
 				asmh := handler.NewAdminSitemap(sitemap)
 				r.Get("/admin/sitemap/stats", asmh.Stats)
+				r.Get("/admin/sitemap/indexnow-key", asmh.KeyInfo)
 				r.Post("/admin/sitemap/ping", asmh.Ping)
 				r.Get("/admin/sitemap/submissions", asmh.ListSubmissions)
 			})
