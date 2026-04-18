@@ -4,15 +4,27 @@ import { Link, useParams } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
 import { featureRequestsApi } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketStatus } from '../api/supportTickets'
+import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
 
+function labelForUser(
+  userId: string | undefined,
+  ctx: { currentUserId?: string; requesterId?: string },
+): string {
+  if (!userId) return 'System'
+  if (userId === ctx.currentUserId) return 'You'
+  if (userId === ctx.requesterId) return 'Requester'
+  return 'Support'
+}
+
 export default function AdminSupportTicketDetail() {
   const { id } = useParams({ from: '/app/admin/support/tickets/$id' })
   const prefs = useRegionalPrefs()
   const queryClient = useQueryClient()
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const [replyBody, setReplyBody] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
@@ -95,22 +107,23 @@ export default function AdminSupportTicketDetail() {
   const timelineEntries = useMemo(() => {
     const detail = ticketQuery.data
     if (!detail) return []
+    const requesterId = detail.ticket.requester_id
     const messages = detail.messages.map((message) => ({
       id: `m-${message.id}`,
       created_at: message.created_at,
       label: message.internal_note ? 'Internal note' : 'Message',
       body: message.body,
-      actor: message.author_id,
+      actor: labelForUser(message.author_id, { currentUserId, requesterId }),
     }))
     const events = detail.events.map((event) => ({
       id: `e-${event.id}`,
       created_at: event.created_at,
       label: event.event_type,
       body: [event.from_value && `from ${event.from_value}`, event.to_value && `to ${event.to_value}`].filter(Boolean).join(' · '),
-      actor: event.actor_id ?? 'system',
+      actor: labelForUser(event.actor_id, { currentUserId, requesterId }),
     }))
     return [...messages, ...events].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
-  }, [ticketQuery.data])
+  }, [ticketQuery.data, currentUserId])
 
   function onSubmitReply(e: FormEvent) {
     e.preventDefault()
@@ -141,7 +154,13 @@ export default function AdminSupportTicketDetail() {
             <p className="text-xs text-muted">
               {detail.ticket.category ?? 'issue'} · {detail.ticket.priority ?? 'normal'} · {detail.ticket.scope_type ?? 'platform'}
             </p>
-            <p className="text-xs text-muted">Requester: {detail.ticket.requester_id ?? 'unknown'} · Assignee: {detail.ticket.assignee_id ?? 'unassigned'}</p>
+            <p className="text-xs text-muted">
+              {detail.ticket.assignee_id
+                ? detail.ticket.assignee_id === currentUserId
+                  ? 'Assigned to you'
+                  : 'Assigned'
+                : 'Unassigned'}
+            </p>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted">Status</span>
               <select
@@ -218,7 +237,7 @@ export default function AdminSupportTicketDetail() {
                 {detail.messages.length === 0 && <p className="text-sm text-muted">No messages yet.</p>}
                 {detail.messages.map((message) => (
                   <article key={message.id} className="rounded-lg border border-subtle p-3 space-y-1">
-                    <p className="text-xs text-muted">{message.author_id} · {formatDateTime(message.created_at, prefs)}</p>
+                    <p className="text-xs text-muted">{labelForUser(message.author_id, { currentUserId, requesterId: detail.ticket.requester_id })} · {formatDateTime(message.created_at, prefs)}</p>
                     {message.internal_note && <p className="text-[10px] uppercase tracking-widest text-muted">Internal note</p>}
                     <p className="text-sm whitespace-pre-wrap">{message.body}</p>
                   </article>
@@ -240,7 +259,7 @@ export default function AdminSupportTicketDetail() {
               <div className="mt-4 space-y-2">
                 {detail.participants.map((participant) => (
                   <div key={`${participant.user_id}-${participant.role}`} className="rounded-md border border-subtle px-3 py-2 text-sm">
-                    <p>{participant.user_id}</p>
+                    <p>{labelForUser(participant.user_id, { currentUserId, requesterId: detail.ticket.requester_id })}</p>
                     <p className="text-xs text-muted">{participant.role} · unread: {participant.unread_count ?? 0}</p>
                   </div>
                 ))}
