@@ -30,4 +30,7 @@ type UpdateClubInput struct {
 	Description *string `json:"description"`
 	Type        *string `json:"type"`
 	JoinPolicy  *string `json:"join_policy"`
+	DateFormat  *string `json:"date_format"`
+	TimeFormat  *string `json:"time_format"`
+	Timezone    *string `json:"timezone"`
 }

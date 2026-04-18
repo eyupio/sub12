@@ -9,6 +9,7 @@ import { achievementApi } from '../api/achievements'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ReportDialog } from '../components/ReportDialog'
 import { AchievementsSection } from '../components/AchievementsSection'
+import { useRegionalPrefs } from '../utils/date'
 
 function FollowListModal({ title, items, onClose }: { title: string; items: FollowListItem[]; onClose: () => void }) {
   return (
@@ -59,6 +60,9 @@ export default function UserProfile() {
   const [showFollowing, setShowFollowing] = useState(false)
   const [confirmUnfollow, setConfirmUnfollow] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const prefs = useRegionalPrefs()
+  const memberSinceLocale =
+    prefs.dateFormat === 'mdy_slash' ? 'en-US' : prefs.dateFormat === 'ymd_dash' ? 'sv-SE' : 'en-GB'
 
   const { data: profile, isLoading, isError } = useQuery({
     queryKey: ['user-profile', id],
@@ -314,7 +318,7 @@ export default function UserProfile() {
 
           {/* Joined date */}
           <p className="text-[11px] text-muted tracking-wide">
-            Member since {new Date(profile.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })}
+            Member since {new Intl.DateTimeFormat(memberSinceLocale, { year: 'numeric', month: 'long', timeZone: prefs.timezone }).format(new Date(profile.created_at))}
           </p>
 
           {/* Achievements: earned list is hidden for private profiles, but the

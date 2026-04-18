@@ -455,6 +455,15 @@ func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID strin
 	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
 	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return nil, fmt.Errorf("%w: date_format must be one of %s", ErrInvalidLeague, validDateFormatsList())
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return nil, fmt.Errorf("%w: time_format must be '24h' or '12h'", ErrInvalidLeague)
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
+		return nil, fmt.Errorf("%w: timezone must be a valid IANA name", ErrInvalidLeague)
+	}
 	l, err := s.leagues.UpdateBasics(ctx, leagueID, in)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound

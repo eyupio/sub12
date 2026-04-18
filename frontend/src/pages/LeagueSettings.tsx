@@ -5,6 +5,13 @@ import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2 } from 'lucide
 import { leagueApi, LeagueConfig, League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
+
+const TIMEZONES: string[] = (() => {
+  const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+  if (typeof fn === 'function') return fn('timeZone')
+  return ['Europe/London', 'Europe/Dublin', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
+})()
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -121,6 +128,96 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
             ? 'Private leagues are hidden from the directory. Only members see standings and scores.'
             : 'Public leagues appear in the leagues directory.'}
         </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Regional Defaults Section
+// ---------------------------------------------------------------------------
+
+function RegionalSection({ leagueId, league }: { leagueId: string; league: League }) {
+  const queryClient = useQueryClient()
+  const currentDateFormat = (league.date_format as DateFormat | undefined) ?? DEFAULT_PREFS.dateFormat
+  const currentTimeFormat = (league.time_format as TimeFormat | undefined) ?? DEFAULT_PREFS.timeFormat
+  const currentTimezone = league.timezone || DEFAULT_PREFS.timezone
+
+  const mutation = useMutation({
+    mutationFn: (input: { date_format?: string; time_format?: string; timezone?: string }) =>
+      leagueApi.update(leagueId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      toast('Regional defaults saved', 'success')
+    },
+    onError: () => toast('Failed to save regional defaults', 'error'),
+  })
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Defaults</h2>
+      <p className="text-[10px] text-muted -mt-2">
+        Applied on public pages for this league. Logged-in users see their own preference.
+      </p>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Date Format</label>
+        <div className="flex flex-wrap gap-2">
+          {DATE_FORMAT_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ date_format: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                currentDateFormat === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Time Format</label>
+        <div className="flex gap-2">
+          {(['24h', '12h'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ time_format: v })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                currentTimeFormat === v
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {v === '24h' ? '24-hour' : '12-hour'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="league-timezone" className={labelCls}>Timezone</label>
+        <select
+          id="league-timezone"
+          value={currentTimezone}
+          onChange={(e) => mutation.mutate({ timezone: e.target.value })}
+          disabled={mutation.isPending}
+          className={inputCls}
+        >
+          {!TIMEZONES.includes(currentTimezone) && (
+            <option value={currentTimezone}>{currentTimezone}</option>
+          )}
+          {TIMEZONES.map((tz) => (
+            <option key={tz} value={tz}>{tz}</option>
+          ))}
+        </select>
       </div>
     </div>
   )
@@ -388,6 +485,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
 
 function MembersSection({ leagueId, currentUserId }: { leagueId: string; currentUserId: string }) {
   const queryClient = useQueryClient()
+  const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
@@ -424,7 +522,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-muted font-mono">
-              {new Date(member.joined_at).toLocaleDateString()}
+              {formatDate(member.joined_at, prefs)}
             </span>
             {!member.is_admin && member.user_id !== currentUserId && (
               <button
@@ -516,6 +614,7 @@ export default function LeagueSettings() {
       <LeagueImageSection leagueId={id} league={league} />
       <PrivacySection leagueId={id} league={league} />
       <RulesSection leagueId={id} config={config} />
+      <RegionalSection leagueId={id} league={league} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
     </div>

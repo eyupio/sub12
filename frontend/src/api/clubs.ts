@@ -9,6 +9,9 @@ export interface Club {
   join_code: string
   type: string
   join_policy: string
+  date_format: string
+  time_format: string
+  timezone: string
   created_by: string
   created_at: string
   updated_at: string
@@ -60,6 +63,9 @@ export interface UpdateClubInput {
   description?: string
   type?: 'public' | 'private'
   join_policy?: 'open' | 'invite_code' | 'approval'
+  date_format?: string
+  time_format?: string
+  timezone?: string
 }
 
 export const clubsApi = {

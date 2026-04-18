@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign } from 'lucide-react'
 import { notificationsApi, Notification, NotificationType } from '../api/notifications'
+import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   follow_request: UserPlus,
@@ -56,6 +57,7 @@ function notificationLink(n: Notification): string | null {
 
 export default function Notifications() {
   const queryClient = useQueryClient()
+  const prefs = useRegionalPrefs()
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } = useInfiniteQuery({
     queryKey: ['notifications', 'list'],
@@ -140,7 +142,7 @@ export default function Notifications() {
               <div className="flex-1 min-w-0">
                 <p className={`text-sm ${unread ? 'text-secondary font-medium' : 'text-muted'}`}>{sentence}</p>
                 <p className="text-[10px] tracking-widest uppercase text-muted mt-0.5">
-                  {new Date(n.created_at).toLocaleString()}
+                  {formatDateTime(n.created_at, prefs)}
                 </p>
               </div>
               {unread && (

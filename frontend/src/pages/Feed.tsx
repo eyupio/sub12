@@ -9,6 +9,7 @@ import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
 import { iconForAchievement } from '../utils/achievementIcons'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
   { key: 'public', label: 'Public', icon: Globe },
@@ -18,9 +19,8 @@ const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
 ]
 
 function ActivityCard({ item }: { item: ActivityItem }) {
-  const date = new Date(item.created_at).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
+  const prefs = useRegionalPrefs()
+  const date = formatDate(item.created_at, prefs)
 
   const initials = item.display_name
     .split(' ')

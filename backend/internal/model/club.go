@@ -22,6 +22,9 @@ type Club struct {
 	JoinCode    string  `json:"join_code"`
 	Type        string  `json:"type"`
 	JoinPolicy  string  `json:"join_policy"`
+	DateFormat  string  `json:"date_format"`
+	TimeFormat  string  `json:"time_format"`
+	Timezone    string  `json:"timezone"`
 	CreatedBy   string  `json:"created_by"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`

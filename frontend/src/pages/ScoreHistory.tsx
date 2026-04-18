@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
 import { leagueApi } from '../api/leagues'
-import { formatDate } from '../utils/date'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function VerificationDot({ status }: { status: string }) {
   if (status === 'verified') {
@@ -17,6 +17,7 @@ function VerificationDot({ status }: { status: string }) {
 }
 
 function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerification?: boolean }) {
+  const prefs = useRegionalPrefs()
   return (
     <Link
       to="/scores/$id"
@@ -24,7 +25,7 @@ function CardRow({ card, showVerification }: { card: ScoreCardSummary; showVerif
       className="flex items-center justify-between p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
     >
       <div className="space-y-0.5">
-        <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at)}</p>
+        <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at, prefs)}</p>
         {card.league_name && (
           <p className="text-[11px] text-[var(--brass)] tracking-wide">{card.league_name}</p>
         )}

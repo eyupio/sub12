@@ -12,6 +12,9 @@ type League struct {
 	ClubID      *string   `json:"club_id,omitempty"`
 	CreatedBy   string    `json:"created_by"`
 	MemberCount int       `json:"member_count"`
+	DateFormat  string    `json:"date_format"`
+	TimeFormat  string    `json:"time_format"`
+	Timezone    string    `json:"timezone"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -42,6 +45,9 @@ type UpdateLeagueBasicsInput struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 	Type        *string `json:"type"`
+	DateFormat  *string `json:"date_format"`
+	TimeFormat  *string `json:"time_format"`
+	Timezone    *string `json:"timezone"`
 }
 
 type LeagueStanding struct {

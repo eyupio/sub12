@@ -4,6 +4,7 @@ import { Plus, Trophy, ChevronRight, Crosshair, ArrowLeftRight } from 'lucide-re
 import { pelletTestApi, PelletTestSessionSummary } from '../api/pelletTesting'
 import { gearApi, Rifle } from '../api/gear'
 import GroupSizeTimeline from '../components/GroupSizeTimeline'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
   return (
@@ -24,6 +25,7 @@ function formatDistance(m: number, unit: string): string {
 }
 
 export default function PelletTesting() {
+  const prefs = useRegionalPrefs()
   const { data: stats } = useQuery({
     queryKey: ['pellet-test-stats'],
     queryFn: () => pelletTestApi.stats(),
@@ -135,7 +137,7 @@ export default function PelletTesting() {
                       {test.pellet_brand} {test.pellet_model}
                     </p>
                     <p className="text-[11px] text-muted tracking-wide">
-                      {test.rifle_make} {test.rifle_model} · {formatDistance(test.distance_m, test.distance_unit)} · {test.test_date}
+                      {test.rifle_make} {test.rifle_model} · {formatDistance(test.distance_m, test.distance_unit)} · {formatDate(test.test_date, prefs)}
                     </p>
                   </div>
                   <div className="text-right shrink-0 font-mono ml-3">

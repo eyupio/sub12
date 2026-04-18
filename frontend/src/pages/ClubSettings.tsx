@@ -6,6 +6,13 @@ import { clubsApi, type Club, type ClubMember } from '../api/clubs'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
+
+const TIMEZONES: string[] = (() => {
+  const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+  if (typeof fn === 'function') return fn('timeZone')
+  return ['Europe/London', 'Europe/Dublin', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC']
+})()
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -249,11 +256,102 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
 }
 
 // ---------------------------------------------------------------------------
+// Regional Defaults Section
+// ---------------------------------------------------------------------------
+
+function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
+  const queryClient = useQueryClient()
+  const currentDateFormat = (club.date_format as DateFormat | undefined) ?? DEFAULT_PREFS.dateFormat
+  const currentTimeFormat = (club.time_format as TimeFormat | undefined) ?? DEFAULT_PREFS.timeFormat
+  const currentTimezone = club.timezone || DEFAULT_PREFS.timezone
+
+  const mutation = useMutation({
+    mutationFn: (input: { date_format?: string; time_format?: string; timezone?: string }) =>
+      clubsApi.update(clubId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      toast('Regional defaults saved', 'success')
+    },
+    onError: () => toast('Failed to save regional defaults', 'error'),
+  })
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Defaults</h2>
+      <p className="text-[10px] text-muted -mt-2">
+        Applied on public pages for this club. Logged-in users see their own preference.
+      </p>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Date Format</label>
+        <div className="flex flex-wrap gap-2">
+          {DATE_FORMAT_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ date_format: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                currentDateFormat === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Time Format</label>
+        <div className="flex gap-2">
+          {(['24h', '12h'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ time_format: v })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                currentTimeFormat === v
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {v === '24h' ? '24-hour' : '12-hour'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="club-timezone" className={labelCls}>Timezone</label>
+        <select
+          id="club-timezone"
+          value={currentTimezone}
+          onChange={(e) => mutation.mutate({ timezone: e.target.value })}
+          disabled={mutation.isPending}
+          className={inputCls}
+        >
+          {!TIMEZONES.includes(currentTimezone) && (
+            <option value={currentTimezone}>{currentTimezone}</option>
+          )}
+          {TIMEZONES.map((tz) => (
+            <option key={tz} value={tz}>{tz}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Join Requests Section
 // ---------------------------------------------------------------------------
 
 function JoinRequestsSection({ clubId }: { clubId: string }) {
   const queryClient = useQueryClient()
+  const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
     queryKey: ['club', clubId, 'join-requests', 'pending'],
@@ -300,7 +398,7 @@ function JoinRequestsSection({ clubId }: { clubId: string }) {
             <div className="min-w-0">
               <p className="text-sm text-secondary truncate">{req.display_name ?? 'Member'}</p>
               <p className="text-[10px] text-muted font-mono">
-                {new Date(req.created_at).toLocaleDateString()}
+                {formatDate(req.created_at, prefs)}
               </p>
             </div>
           </div>
@@ -582,6 +680,7 @@ export default function ClubSettings() {
       <ClubImageSection clubId={id} club={club} />
       <GeneralInfoSection clubId={id} club={club} />
       <PrivacySection clubId={id} club={club} />
+      <RegionalSection clubId={id} club={club} />
       {club.join_policy === 'approval' && <JoinRequestsSection clubId={id} />}
       <MembersSection clubId={id} currentUserId={currentUser!.id} />
       <LeaveSection clubId={id} members={members} currentUserId={currentUser!.id} />
