@@ -518,7 +518,7 @@ export default function LandingPage() {
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Link to="/login" className="hidden text-sm font-medium uppercase tracking-[0.16em] text-[var(--brass)] transition-opacity hover:opacity-80 sm:inline-flex">
+            <Link to="/login" className="inline-flex text-sm font-medium uppercase tracking-[0.16em] text-[var(--brass)] transition-opacity hover:opacity-80">
               Sign In
             </Link>
             <Link to="/register" className="inline-flex items-center rounded-lg bg-[var(--brass)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-inverse transition-all hover:-translate-y-0.5 hover:opacity-90">
