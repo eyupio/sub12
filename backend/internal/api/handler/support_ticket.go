@@ -54,6 +54,7 @@ func (h *SupportTicketHandler) ListMine(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	in := &model.ListSupportTicketsInput{
+		ViewerID:      userID,
 		ParticipantID: &userID,
 		Status:        r.URL.Query().Get("status"),
 		Category:      r.URL.Query().Get("category"),
@@ -176,6 +177,7 @@ func (h *SupportTicketHandler) AdminList(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	in := &model.ListSupportTicketsInput{
+		ViewerID:  userID,
 		Status:    r.URL.Query().Get("status"),
 		Category:  r.URL.Query().Get("category"),
 		ScopeType: r.URL.Query().Get("scope_type"),

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Bell } from 'lucide-react'
 import { notificationsApi } from '../api/notifications'
+import { supportTicketsApi } from '../api/supportTickets'
 import { useAuthStore } from '../store/auth'
 
 export function NotificationBell() {
@@ -13,8 +14,21 @@ export function NotificationBell() {
     refetchInterval: 30_000,
     staleTime: 15_000,
   })
-  const count = data?.count ?? 0
-  const label = count > 0 ? `${count} unread notifications` : 'Notifications'
+  const { data: tickets } = useQuery({
+    queryKey: ['tickets', 'unread-count'],
+    queryFn: () => supportTicketsApi.listMine(200),
+    enabled: !!token,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+
+  const notifCount = data?.count ?? 0
+  const ticketCount = (tickets?.items ?? []).reduce((sum, t) => sum + (t.unread?.count ?? t.unread_count ?? 0), 0)
+  const totalCount = notifCount + ticketCount
+  const label =
+    totalCount > 0
+      ? `${totalCount} unread items (${notifCount} notifications, ${ticketCount} tickets)`
+      : 'Notifications'
 
   return (
     <Link
@@ -24,12 +38,12 @@ export function NotificationBell() {
       title={label}
     >
       <Bell size={17} />
-      {count > 0 && (
+      {totalCount > 0 && (
         <span
           aria-hidden="true"
           className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--brass)] text-inverse text-[9px] leading-4 tracking-wider font-semibold flex items-center justify-center"
         >
-          {count > 99 ? '99+' : count}
+          {totalCount > 99 ? '99+' : totalCount}
         </span>
       )}
     </Link>
