@@ -103,6 +103,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
   // Resolve effective theme for logo selection
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-horizontal-dark.svg' : 'logo-horizontal-light.svg'}`
 
   async function handleLogout() {
     if (refreshToken) {
@@ -131,7 +132,7 @@ export default function Layout({ children }: PropsWithChildren) {
           <Tooltip content={tips.homeLogo} placement="right">
             <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
               <img
-                src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+                src={logoSrc}
                 alt="SUB12"
                 className="h-8 w-auto"
               />
@@ -181,7 +182,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
           <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
             <img
-              src={isDark ? '/logo-horizontal-dark.svg' : '/logo-horizontal-light.svg'}
+              src={logoSrc}
               alt="SUB12"
               className="h-8 w-auto"
             />

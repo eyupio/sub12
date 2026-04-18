@@ -67,8 +67,8 @@ function requireAuth() {
 
 // Guard: redirect to / if already authenticated
 function requireGuest() {
-  const { accessToken, refreshToken } = useAuthStore.getState()
-  if (accessToken || refreshToken) throw redirect({ to: '/' })
+  const { accessToken } = useAuthStore.getState()
+  if (accessToken) throw redirect({ to: '/' })
 }
 
 const rootRoute = createRootRoute({
