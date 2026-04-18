@@ -18,6 +18,7 @@ export interface ActivityItem {
   user_id: string
   display_name: string
   avatar_url?: string
+  star_level: number
   type: ActivityType
   target_id?: string
   target_type?: string
@@ -41,6 +42,9 @@ export interface ActivityItem {
   league_id?: string
   club_id?: string
   visibility: string
+  like_count: number
+  is_liked: boolean
+  comment_count: number
   created_at: string
 }
 

@@ -28,11 +28,11 @@ func (r *UserRepository) Create(ctx context.Context, email, displayName, passwor
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (email, display_name, password_hash)
 		VALUES ($1, $2, $3)
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 	`, email, displayName, passwordHash).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -46,12 +46,12 @@ func (r *UserRepository) Create(ctx context.Context, email, displayName, passwor
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -65,12 +65,12 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -101,11 +101,11 @@ func (r *UserRepository) UpdateMe(ctx context.Context, id string, in *model.Upda
 			timezone                 = COALESCE($14, timezone),
 			updated_at               = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 	`, id, in.DisplayName, in.Bio, in.Location, in.Club, in.ProfileVisibility, in.DefaultScoreVisibility, in.FeedOptOut, in.ShowFollowerCounts, in.DefaultDistanceUnit, in.DefaultMeasurementUnit, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -122,11 +122,11 @@ func (r *UserRepository) UpdateAvatarURL(ctx context.Context, id, avatarURL stri
 		UPDATE users
 		SET avatar_url = $2, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 	`, id, avatarURL).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -158,11 +158,11 @@ func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) (*mo
 		UPDATE users
 		SET email = $2, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, created_at, updated_at
 	`, id, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -182,7 +182,7 @@ func (r *UserRepository) Search(ctx context.Context, query, viewerID string, lim
 	}
 	rows, err := r.db.Query(ctx, `
 		SELECT id, display_name, bio, location, club, avatar_url,
-		       profile_visibility, show_follower_counts, created_at
+		       profile_visibility, show_follower_counts, star_level, created_at
 		FROM users
 		WHERE LOWER(display_name) LIKE LOWER($1) || '%'
 		  AND (profile_visibility <> 'private' OR LOWER(display_name) = LOWER($1))
@@ -204,12 +204,30 @@ func (r *UserRepository) Search(ctx context.Context, query, viewerID string, lim
 	for rows.Next() {
 		var p model.PublicProfile
 		if err := rows.Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club,
-			&p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.CreatedAt); err != nil {
+			&p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.StarLevel, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		results = append(results, &p)
 	}
 	return results, rows.Err()
+}
+
+// UpdateStarLevel recalculates and stores the star_level for a user based on their
+// earned achievement count. Called after any achievement is awarded.
+func (r *UserRepository) UpdateStarLevel(ctx context.Context, userID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE users
+		SET star_level = LEAST(5, (
+			SELECT COUNT(*)::int / 3
+			FROM user_achievements
+			WHERE user_id = $1
+		))
+		WHERE id = $1
+	`, userID)
+	if err != nil {
+		return fmt.Errorf("update star level: %w", err)
+	}
+	return nil
 }
 
 // ListAll returns a paginated list of all users for admin use, plus the total count.

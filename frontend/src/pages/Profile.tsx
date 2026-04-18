@@ -10,6 +10,7 @@ import { achievementApi } from '../api/achievements'
 import { gearApi } from '../api/gear'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { AchievementsSection } from '../components/AchievementsSection'
+import { StarBadge } from '../components/StarBadge'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
 
@@ -88,6 +89,11 @@ function AvatarUpload() {
       )}
       {avatarMutation.isError && (
         <p className="text-[10px] text-[var(--error-text)] mt-1 text-center">Failed</p>
+      )}
+      {!!user?.star_level && user.star_level > 0 && (
+        <div className="flex justify-center mt-1">
+          <StarBadge level={user.star_level} size={10} />
+        </div>
       )}
     </div>
   )
