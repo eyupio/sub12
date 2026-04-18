@@ -298,6 +298,7 @@ func NewRouter(
 			r.Post("/leagues/{id}/join", lh.Join)
 			r.Post("/leagues/{id}/ensure-round", lh.EnsureDefaultRound)
 			r.Post("/leagues/{id}/image", lh.UploadImage)
+			r.Get("/leagues/{id}/posts", postH.ListByLeague)
 
 			// League config & management
 			r.Get("/leagues/{id}/config", lh.GetConfig)
