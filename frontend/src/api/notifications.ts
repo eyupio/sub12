@@ -50,6 +50,17 @@ export interface NotificationPreferences {
   mention: boolean
   report_filed: boolean
   digest_email: boolean
+  follow_request_email: boolean
+  follow_accepted_email: boolean
+  comment_on_my_card_email: boolean
+  reply_to_my_comment_email: boolean
+  like_on_my_content_email: boolean
+  score_verified_email: boolean
+  score_rejected_email: boolean
+  score_amended_email: boolean
+  league_join_approved_email: boolean
+  club_join_approved_email: boolean
+  mention_email: boolean
   updated_at: string
 }
 

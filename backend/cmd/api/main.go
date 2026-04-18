@@ -162,7 +162,7 @@ func main() {
 
 	muteRepo := repository.NewMuteRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
-	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, log.Logger)
+	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, userRepo, emailSenderSvc, log.Logger)
 
 	reportRepo := repository.NewReportRepository(pool)
 	moderationSvc := service.NewModerationService(

@@ -126,7 +126,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
 }
 
 export function LeagueReportsPage() {
-  const { id } = useParams({ from: '/leagues/$id/reports' })
+  const { id } = useParams({ from: '/app/leagues/$id/reports' })
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
       <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted">
@@ -144,7 +144,7 @@ export function LeagueReportsPage() {
 }
 
 export function ClubReportsPage() {
-  const { id } = useParams({ from: '/clubs/$id/reports' })
+  const { id } = useParams({ from: '/app/clubs/$id/reports' })
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
       <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted">
