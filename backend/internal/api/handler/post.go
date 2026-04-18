@@ -55,12 +55,13 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	role, _ := middleware.UserRoleFromContext(r.Context())
 	var vp *string
 	if viewerID != "" {
 		vp = &viewerID
 	}
 
-	post, err := h.svc.GetByID(r.Context(), id, vp)
+	post, err := h.svc.GetByID(r.Context(), id, vp, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "post not found")

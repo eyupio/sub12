@@ -55,6 +55,7 @@ import SupportTicketDetail from './pages/SupportTicketDetail'
 import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
 import Help from './pages/Help'
 import AdminFaqs from './pages/AdminFaqs'
+import PostDetail from './pages/PostDetail'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -212,6 +213,12 @@ const feedRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feed',
   component: Feed,
+})
+
+const postDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/posts/$id',
+  component: PostDetail,
 })
 
 const clubsRoute = createRoute({
@@ -450,6 +457,7 @@ export const routeTree = rootRoute.addChildren([
     userProfileRoute,
     usersRoute,
     feedRoute,
+    postDetailRoute,
     adminEmailSettingsRoute,
     adminEmailTemplatesRoute,
     adminUsersRoute,
