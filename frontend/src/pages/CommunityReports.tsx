@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Flag, Shield, ChevronLeft } from 'lucide-react'
+import { Flag, Shield, ChevronLeft, ExternalLink } from 'lucide-react'
 import { reportsApi, ModerationAction, Report, ReportStatus } from '../api/reports'
 import { toast } from '../store/toast'
 
@@ -76,6 +76,40 @@ function ReportsPanel({ scope, communityId }: { scope: Scope; communityId: strin
   )
 }
 
+function ReportTargetLink({ report }: { report: Report }) {
+  const className =
+    'inline-flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:underline'
+
+  switch (report.target_type) {
+    case 'post':
+      return (
+        <Link to="/posts/$id" params={{ id: report.target_id }} className={className}>
+          <ExternalLink size={12} /> View post
+        </Link>
+      )
+    case 'score_card':
+      return (
+        <Link to="/scores/$id" params={{ id: report.target_id }} className={className}>
+          <ExternalLink size={12} /> View score card
+        </Link>
+      )
+    case 'user':
+      return (
+        <Link to="/users/$id" params={{ id: report.target_id }} className={className}>
+          <ExternalLink size={12} /> View user
+        </Link>
+      )
+    case 'comment':
+      return (
+        <span className="text-[11px] tracking-widest uppercase text-muted" title={`Comment ID: ${report.target_id}`}>
+          Comment · {report.target_id.slice(0, 8)}…
+        </span>
+      )
+    default:
+      return null
+  }
+}
+
 function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (a: ModerationAction) => void; disabled: boolean }) {
   const when = useMemo(() => new Date(report.created_at).toLocaleString(), [report.created_at])
   const isOpen = report.status === 'open'
@@ -92,6 +126,9 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
           </p>
           {report.notes && <p className="text-xs text-muted mt-1 whitespace-pre-wrap">{report.notes}</p>}
           <p className="text-[10px] tracking-widest uppercase text-muted mt-1">{when} &middot; {report.status}</p>
+          <div className="mt-2">
+            <ReportTargetLink report={report} />
+          </div>
         </div>
       </div>
       {isOpen && (

@@ -120,11 +120,15 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 // GetByID retrieves a post by ID, enforcing visibility rules. A viewer is the
 // author for owner-only operations. Hidden posts surface as ErrNotFound for
 // non-authors; the author still sees the post so the UI can render a moderation
-// banner.
-func (s *PostService) GetByID(ctx context.Context, id string, viewerID *string) (*model.Post, error) {
+// banner. Platform admins (role == "admin") bypass visibility and hidden
+// checks so they can review reported content from the admin reports queue.
+func (s *PostService) GetByID(ctx context.Context, id string, viewerID *string, role string) (*model.Post, error) {
 	post, err := s.posts.GetByID(ctx, id, viewerID)
 	if err != nil {
 		return nil, err
+	}
+	if role == "admin" {
+		return post, nil
 	}
 	if ok, err := s.canViewPost(ctx, post, viewerID); err != nil {
 		return nil, err
