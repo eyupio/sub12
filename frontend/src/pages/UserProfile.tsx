@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, MapPin, Users, UserPlus, UserMinus, Lock, MoreHorizontal, ShieldOff, Clock, X as XIcon, Share2 } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
 import { achievementApi } from '../api/achievements'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ReportDialog } from '../components/ReportDialog'
+import { ShareDialog } from '../components/ShareDialog'
 import { AchievementsSection } from '../components/AchievementsSection'
 import { StarBadge } from '../components/StarBadge'
 import { useRegionalPrefs } from '../utils/date'
@@ -62,6 +63,7 @@ export default function UserProfile() {
   const [showFollowing, setShowFollowing] = useState(false)
   const [confirmUnfollow, setConfirmUnfollow] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const prefs = useRegionalPrefs()
   const memberSinceLocale =
     prefs.dateFormat === 'mdy_slash' ? 'en-US' : prefs.dateFormat === 'ymd_dash' ? 'sv-SE' : 'en-GB'
@@ -247,6 +249,14 @@ export default function UserProfile() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowShare(true)}
+                      className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] transition-colors"
+                      title="Share profile"
+                      aria-label="Share profile"
+                    >
+                      <Share2 size={14} />
+                    </button>
                     {getFollowButton()}
                     {!isOwnProfile && (
                       <div className="relative">
@@ -370,6 +380,15 @@ export default function UserProfile() {
               targetType="user"
               targetId={id}
               onClose={() => setShowReport(false)}
+            />
+          )}
+
+          {showShare && id && profile && (
+            <ShareDialog
+              targetId={id}
+              targetType="user"
+              targetLabel={profile.display_name}
+              onClose={() => setShowShare(false)}
             />
           )}
         </>

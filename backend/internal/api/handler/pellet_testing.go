@@ -79,13 +79,9 @@ func (h *PelletTestHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/pellet-tests/{id}
 func (h *PelletTestHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	id := chi.URLParam(r, "id")
-	session, err := h.svc.GetByID(r.Context(), id, userID)
+	session, err := h.svc.GetForViewer(r.Context(), id, viewerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "pellet test not found")

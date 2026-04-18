@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock, Flag } from 'lucide-react'
+import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock, Flag, Share2 } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
+import { ShareDialog } from '../components/ShareDialog'
 
 function PrivateClubSummary({ clubId }: { clubId: string }) {
   const queryClient = useQueryClient()
@@ -233,6 +234,7 @@ export default function ClubDetail() {
   const [copied, setCopied] = useState(false)
   const [joinError, setJoinError] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [showShare, setShowShare] = useState(false)
 
   const { data: club, isLoading, error: clubError } = useQuery({
     queryKey: ['club', id],
@@ -436,6 +438,14 @@ export default function ClubDetail() {
             </div>
           )}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShare(true)}
+              className="text-muted hover:text-[var(--brass)] transition-colors"
+              title="Share club"
+              aria-label="Share club"
+            >
+              <Share2 size={16} />
+            </button>
             {club.is_admin && (
               <Link
                 to="/clubs/$id/reports"
@@ -660,6 +670,15 @@ export default function ClubDetail() {
         onConfirm={() => { setConfirmLeave(false); leaveMutation.mutate() }}
         onCancel={() => setConfirmLeave(false)}
       />
+
+      {showShare && (
+        <ShareDialog
+          targetId={id}
+          targetType="club"
+          targetLabel={club.name}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   )
 }

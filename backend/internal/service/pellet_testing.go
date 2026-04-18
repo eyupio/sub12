@@ -15,12 +15,19 @@ var ErrInvalidMeasurement = errors.New("invalid measurement")
 
 type PelletTestService struct {
 	repo         *repository.PelletTestRepository
+	users        UserProfileReader   // nil skips owner-privacy checks
 	activity     *ActivityService    // nil disables feed ingestion
 	achievements *AchievementService // nil disables achievement evaluation
 }
 
 func NewPelletTestService(repo *repository.PelletTestRepository, activity *ActivityService, achievements *AchievementService) *PelletTestService {
 	return &PelletTestService{repo: repo, activity: activity, achievements: achievements}
+}
+
+// SetUserReader wires a user lookup so GetForViewer can enforce the owner's
+// profile_visibility when deciding whether to expose a public session.
+func (s *PelletTestService) SetUserReader(users UserProfileReader) {
+	s.users = users
 }
 
 // ── Session ─────────────────────────────────────────────────────────────────────
@@ -67,6 +74,33 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 
 func (s *PelletTestService) GetByID(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {
 	return s.repo.GetByID(ctx, id, userID)
+}
+
+// GetForViewer returns a session when either the viewer owns it or the
+// session is public and the owner's profile is not private. Anonymous callers
+// pass viewerID="". Returns repository.ErrNotFound when the viewer isn't
+// allowed to see the session.
+func (s *PelletTestService) GetForViewer(ctx context.Context, id, viewerID string) (*model.PelletTestSession, error) {
+	session, err := s.repo.GetPublicByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if viewerID != "" && viewerID == session.UserID {
+		return session, nil
+	}
+	if !session.IsPublic {
+		return nil, repository.ErrNotFound
+	}
+	if s.users != nil {
+		owner, err := s.users.GetByID(ctx, session.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if owner.ProfileVisibility == "private" {
+			return nil, repository.ErrNotFound
+		}
+	}
+	return session, nil
 }
 
 func (s *PelletTestService) List(ctx context.Context, userID string, limit, offset int) ([]*model.PelletTestSessionSummary, error) {

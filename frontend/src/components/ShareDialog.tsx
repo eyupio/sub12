@@ -9,11 +9,31 @@ import { toast } from '../store/toast'
 
 type Destination = 'personal' | 'league' | 'club'
 
+type InternalTargetType = 'score_card' | 'pellet_test'
+export type ShareTargetType = InternalTargetType | 'league' | 'club' | 'user'
+
 interface ShareDialogProps {
   targetId: string
-  targetType: 'score_card' | 'pellet_test'
+  targetType: ShareTargetType
   targetLabel: string
   onClose: () => void
+}
+
+// Share URLs use paths distinct from the in-app authed routes for entities
+// whose canonical in-app URL is already gated behind /app auth (leagues,
+// clubs, user profiles). The /share/… paths let anonymous visitors see a
+// public preview while signed-in users get auto-redirected to the full
+// experience.
+const publicPathByType: Record<ShareTargetType, string> = {
+  score_card: '/score-cards',
+  pellet_test: '/pellet-tests',
+  league: '/share/leagues',
+  club: '/share/clubs',
+  user: '/share/users',
+}
+
+function isInternalShareType(t: ShareTargetType): t is InternalTargetType {
+  return t === 'score_card' || t === 'pellet_test'
 }
 
 export function ShareDialog({ targetId, targetType, targetLabel, onClose }: ShareDialogProps) {
@@ -23,11 +43,9 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
   const [entityId, setEntityId] = useState('')
   const [body, setBody] = useState('')
 
+  const canPostInternal = isInternalShareType(targetType)
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const shareUrl =
-    targetType === 'score_card'
-      ? `${origin}/score-cards/${targetId}`
-      : `${origin}/pellet-tests/${targetId}`
+  const shareUrl = `${origin}${publicPathByType[targetType]}/${targetId}`
   const shareText = `${targetLabel} on sub-12`
   const hasWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
@@ -45,9 +63,12 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
 
   const shareMutation = useMutation({
     mutationFn: () => {
+      if (!canPostInternal) {
+        return Promise.reject(new Error('internal share not supported for this target type'))
+      }
       const payload: SharePayload = {
         target_id: targetId,
-        target_type: targetType,
+        target_type: targetType as InternalTargetType,
         body: body.trim() || undefined,
       }
       if (destination === 'league' && entityId) payload.league_id = entityId
@@ -129,7 +150,8 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
           </button>
         </div>
 
-        {/* Internal: post to sub-12 */}
+        {/* Internal: post to sub-12 — only offered for content types the feed understands */}
+        {canPostInternal && (
         <section className="space-y-3">
           <h3 className="text-[11px] tracking-widest uppercase text-muted">Post to sub-12</h3>
 
@@ -209,9 +231,10 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
             <p className="text-[var(--error-text)] text-xs">Failed to share. Please try again.</p>
           )}
         </section>
+        )}
 
-        {/* External sharing */}
-        <section className="space-y-3 border-t border-subtle pt-4">
+        {/* External sharing — offered for every target type */}
+        <section className={`space-y-3 ${canPostInternal ? 'border-t border-subtle pt-4' : ''}`}>
           <h3 className="text-[11px] tracking-widest uppercase text-muted">Share externally</h3>
           <div className="flex flex-wrap gap-2">
             <ExternalButton onClick={copyLink} label="Copy link" icon={<LinkIcon size={14} />} />

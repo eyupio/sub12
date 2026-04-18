@@ -17,6 +17,13 @@ import PelletTestLeaderboard from './pages/PelletTestLeaderboard'
 import PelletComparison from './pages/PelletComparison'
 import BatchReport from './pages/BatchReport'
 import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
+import {
+  SharedScoreCardView,
+  SharedPelletTestView,
+  SharedLeagueView,
+  SharedClubView,
+  SharedUserView,
+} from './pages/SharedView'
 import Profile from './pages/Profile'
 import FollowManagement from './pages/FollowManagement'
 import UserProfile from './pages/UserProfile'
@@ -182,6 +189,41 @@ const publicPelletLeaderboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/pellet-leaderboard',
   component: PublicPelletLeaderboard,
+})
+
+// Canonical public share URLs. The `ShareDialog` points at these paths when
+// "Share externally" is used, and the backend injects entity-specific Open
+// Graph tags here so social platforms render rich previews. Logged-in users
+// are redirected to the full in-app experience; anonymous visitors get a
+// minimal read-only preview plus a sign-in CTA.
+const sharedScoreCardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/score-cards/$id',
+  component: SharedScoreCardView,
+})
+
+const sharedPelletTestRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pellet-tests/$id',
+  component: SharedPelletTestView,
+})
+
+const sharedLeagueRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/share/leagues/$id',
+  component: SharedLeagueView,
+})
+
+const sharedClubRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/share/clubs/$id',
+  component: SharedClubView,
+})
+
+const sharedUserRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/share/users/$id',
+  component: SharedUserView,
 })
 
 const profileRoute = createRoute({
@@ -424,6 +466,11 @@ const resetPasswordRoute = createRoute({
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   publicPelletLeaderboardRoute,
+  sharedScoreCardRoute,
+  sharedPelletTestRoute,
+  sharedLeagueRoute,
+  sharedClubRoute,
+  sharedUserRoute,
   appRoute.addChildren([
     scoreHistoryRoute,
     scoreEntryRoute,

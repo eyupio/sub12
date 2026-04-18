@@ -42,6 +42,13 @@ type Config struct {
 	// Public URL where the IndexNow key file can be fetched.
 	IndexNowKeyLocation string `envconfig:"INDEXNOW_KEY_LOCATION" default:""`
 
+	// Internal URL where the frontend container serves index.html. Used by
+	// the share-meta handler to fetch the SPA shell so it can inject
+	// per-page Open Graph / Twitter card tags. Empty falls back to a
+	// minimal embedded template (crawlers still get correct tags; humans
+	// get a Loading… placeholder).
+	FrontendOrigin string `envconfig:"FRONTEND_ORIGIN" default:""`
+
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
 	AdminPassword string `envconfig:"ADMIN_PASSWORD"`

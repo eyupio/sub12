@@ -78,6 +78,27 @@ func (r *PelletTestRepository) GetByID(ctx context.Context, id, userID string) (
 		return nil, fmt.Errorf("get pellet test session: %w", err)
 	}
 
+	return r.hydrateSession(ctx, session)
+}
+
+// GetPublicByID retrieves a session by ID without an ownership filter. The
+// caller is responsible for enforcing visibility (is_public) and owner privacy.
+func (r *PelletTestRepository) GetPublicByID(ctx context.Context, id string) (*model.PelletTestSession, error) {
+	session, err := scanSession(r.db.QueryRow(ctx, `
+		SELECT `+sessionCols+`
+		FROM pellet_test_sessions WHERE id = $1
+	`, id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get public pellet test session: %w", err)
+	}
+
+	return r.hydrateSession(ctx, session)
+}
+
+func (r *PelletTestRepository) hydrateSession(ctx context.Context, session *model.PelletTestSession) (*model.PelletTestSession, error) {
 	// Load joined rifle
 	rifle, err := scanRifle(r.db.QueryRow(ctx, `
 		SELECT id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at

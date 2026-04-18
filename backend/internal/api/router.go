@@ -70,6 +70,21 @@ func NewRouter(
 	// IndexNow key-file verification endpoint.
 	r.Get("/{key}.txt", sitemapH.ServeIndexNowKeyFile)
 
+	// Share-meta: serves the SPA shell with entity-specific Open Graph and
+	// Twitter card tags injected into <head>. Backs the canonical public
+	// URLs for shareable content. Humans get the working SPA (tags are
+	// invisible); crawlers render rich previews. The response is the same
+	// for both — no user-agent sniffing.
+	shareMeta := handler.NewShareMeta(scoreCards, pelletTests, leagues, clubs, users, cfg.SiteURL, cfg.FrontendOrigin, log)
+	r.Get("/score-cards/{id}", shareMeta.ScoreCard())
+	r.Get("/pellet-tests/{id}", shareMeta.PelletTest())
+	// League/club/user canonical URLs stay authed for in-app navigation;
+	// the dedicated /share/* paths are what the ShareDialog links to and
+	// what the backend injects OG tags for.
+	r.Get("/share/leagues/{id}", shareMeta.League())
+	r.Get("/share/clubs/{id}", shareMeta.Club())
+	r.Get("/share/users/{id}", shareMeta.User())
+
 	// Versioned API
 	r.Route("/api/v1", func(r chi.Router) {
 		// Pre-instantiate comment handler so it can be used in both protected and public groups
@@ -107,11 +122,10 @@ func NewRouter(
 			r.Get("/users/me/rifle-stats", sh.GetRifleStats)
 			r.Get("/users/me/score-trends", sh.GetScoreTrends)
 
-			// Score cards
+			// Score cards (mutations — reads are public via OptionalAuthenticate below)
 			sc := handler.NewScoreCard(scoreCards, images)
 			r.Post("/score-cards", sc.Create)
 			r.Get("/score-cards", sc.List)
-			r.Get("/score-cards/{id}", sc.Get)
 			r.Patch("/score-cards/{id}", sc.Update)
 			r.Delete("/score-cards/{id}", sc.Delete)
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
@@ -132,7 +146,7 @@ func NewRouter(
 			r.Delete("/pellets/{id}", ph.Delete)
 			r.Post("/pellets/{id}/image", ph.UploadImage)
 
-			// Pellet tests
+			// Pellet tests (mutations — reads are public via OptionalAuthenticate below)
 			pth := handler.NewPelletTest(pelletTests, images)
 			r.Get("/pellet-tests/leaderboard", pth.Leaderboard)
 			r.Get("/pellet-tests/stats", pth.Stats)
@@ -143,7 +157,6 @@ func NewRouter(
 			r.Get("/pellet-tests/combo-analytics", pth.ComboAnalytics)
 			r.Post("/pellet-tests", pth.Create)
 			r.Get("/pellet-tests", pth.List)
-			r.Get("/pellet-tests/{id}", pth.Get)
 			r.Patch("/pellet-tests/{id}", pth.Update)
 			r.Delete("/pellet-tests/{id}", pth.Delete)
 			r.Get("/pellet-tests/{id}/export", pth.Export)
@@ -428,6 +441,16 @@ func NewRouter(
 			r.Use(middleware.OptionalAuthenticate(auth))
 			// Comment read: honors score card visibility and block state.
 			r.Get("/score-cards/{id}/comments", commentH.List)
+
+			// Score card and pellet test public reads. The service layer
+			// returns 404 unless the card/session is public and the owner's
+			// profile_visibility is not private; authed owners always see
+			// their own row.
+			publicSC := handler.NewScoreCard(scoreCards, images)
+			r.Get("/score-cards/{id}", publicSC.Get)
+			publicPT := handler.NewPelletTest(pelletTests, images)
+			r.Get("/pellet-tests/{id}", publicPT.Get)
+
 			clh := handler.NewClub(clubs, leagues, images)
 			r.Get("/clubs", clh.List)
 			r.Get("/clubs/{id}", clh.GetByID)
