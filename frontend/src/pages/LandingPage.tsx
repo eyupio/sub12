@@ -354,10 +354,10 @@ function HeroMockup() {
                         <stop offset="100%" stopColor="rgba(184,136,44,1)" />
                       </linearGradient>
                     </defs>
-                    <path d="M18 110 L62 106 L106 94 L150 88 L194 72 L238 78 L282 52" fill="none" stroke="url(#sub12-chart-line)" strokeWidth="4" strokeLinecap="round" />
-                    <path d="M18 110 L62 106 L106 94 L150 88 L194 72 L238 78 L282 52 L282 140 L18 140 Z" fill="rgba(184,136,44,0.10)" />
+                    <path d="M18 50 L62 54 L106 66 L150 72 L194 88 L238 82 L282 108" fill="none" stroke="url(#sub12-chart-line)" strokeWidth="4" strokeLinecap="round" />
+                    <path d="M18 50 L62 54 L106 66 L150 72 L194 88 L238 82 L282 108 L282 140 L18 140 Z" fill="rgba(184,136,44,0.10)" />
                     {[18, 62, 106, 150, 194, 238, 282].map((x, index) => {
-                      const y = [110, 106, 94, 88, 72, 78, 52][index]
+                      const y = [50, 54, 66, 72, 88, 82, 108][index]
                       return (
                         <circle key={x} cx={x} cy={y} r="5" fill="var(--surface)" stroke="rgba(184,136,44,0.9)" strokeWidth="3" />
                       )
