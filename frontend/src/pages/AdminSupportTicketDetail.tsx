@@ -1,8 +1,10 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
+import { featureRequestsApi } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketStatus } from '../api/supportTickets'
+import { toast } from '../store/toast'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
@@ -42,6 +44,53 @@ export default function AdminSupportTicketDetail() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] })
     },
   })
+
+  const featureRequestsQuery = useQuery({
+    queryKey: ['admin', 'feature-requests', 'all'],
+    queryFn: () => featureRequestsApi.list({ limit: 100 }),
+  })
+  const linkedFeature = useMemo(
+    () => featureRequestsQuery.data?.items.find((item) => item.ticket_id === id),
+    [featureRequestsQuery.data?.items, id],
+  )
+
+  const [convertOpen, setConvertOpen] = useState(false)
+  const [convertTitle, setConvertTitle] = useState('')
+  const [convertDescription, setConvertDescription] = useState('')
+
+  useEffect(() => {
+    if (convertOpen && ticketQuery.data?.ticket) {
+      setConvertTitle((prev) => prev || ticketQuery.data.ticket.title || '')
+      setConvertDescription((prev) => prev || ticketQuery.data.ticket.description || '')
+    }
+  }, [convertOpen, ticketQuery.data?.ticket])
+
+  const convertMutation = useMutation({
+    mutationFn: () => featureRequestsApi.adminCreateFromTicket(id, {
+      title: convertTitle.trim(),
+      refined_description: convertDescription.trim(),
+    }),
+    onSuccess: () => {
+      toast('Ticket converted to feature request', 'success')
+      setConvertOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'feature-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['support-ticket', 'admin', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] })
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : 'Failed to convert ticket.'
+      toast(msg, 'error')
+    },
+  })
+
+  function onSubmitConvert(e: FormEvent) {
+    e.preventDefault()
+    if (!convertTitle.trim()) {
+      toast('Title is required', 'error')
+      return
+    }
+    convertMutation.mutate()
+  }
 
   const timelineEntries = useMemo(() => {
     const detail = ticketQuery.data
@@ -105,6 +154,61 @@ export default function AdminSupportTicketDetail() {
               </select>
             </div>
             {detail.ticket.description && <p className="text-sm text-secondary whitespace-pre-wrap">{detail.ticket.description}</p>}
+
+            <div className="pt-2 border-t border-subtle">
+              {linkedFeature ? (
+                <p className="text-sm">
+                  <span className="text-muted">Linked feature:</span>{' '}
+                  <Link
+                    to="/admin/support"
+                    hash={`feature-${linkedFeature.id}`}
+                    className="text-[var(--brass)] hover:underline"
+                  >
+                    {linkedFeature.title}
+                  </Link>{' '}
+                  <span className="text-xs text-muted">· status: {linkedFeature.status}</span>
+                </p>
+              ) : convertOpen ? (
+                <form onSubmit={onSubmitConvert} className="mt-2 space-y-2">
+                  <p className="text-sm font-medium">Convert to feature request</p>
+                  <input
+                    className="w-full rounded-md border border-subtle bg-transparent p-2 text-sm"
+                    value={convertTitle}
+                    onChange={(e) => setConvertTitle(e.target.value)}
+                    placeholder="Feature title"
+                    required
+                  />
+                  <textarea
+                    className="w-full rounded-md border border-subtle bg-transparent p-2 text-sm"
+                    rows={4}
+                    value={convertDescription}
+                    onChange={(e) => setConvertDescription(e.target.value)}
+                    placeholder="Refined description"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+                      disabled={convertMutation.isPending}
+                    >
+                      {convertMutation.isPending ? 'Converting…' : 'Create feature request'}
+                    </button>
+                    <button type="button" className="rounded-md border border-subtle px-3 py-2 text-sm" onClick={() => setConvertOpen(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="rounded-md border border-subtle px-3 py-2 text-sm hover:bg-[color:var(--surface-muted)]"
+                  onClick={() => setConvertOpen(true)}
+                  disabled={featureRequestsQuery.isLoading}
+                >
+                  Convert to feature request
+                </button>
+              )}
+            </div>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">

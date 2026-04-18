@@ -3,13 +3,14 @@ package model
 import "time"
 
 const (
-	FeatureRequestStatusSubmitted  = "submitted"
-	FeatureRequestStatusRefining   = "refining"
-	FeatureRequestStatusAccepted   = "accepted"
-	FeatureRequestStatusRejected   = "rejected"
-	FeatureRequestStatusPlanned    = "planned"
-	FeatureRequestStatusInProgress = "in_progress"
-	FeatureRequestStatusDone       = "done"
+	FeatureRequestStatusSubmitted   = "submitted"
+	FeatureRequestStatusRefining    = "refining"
+	FeatureRequestStatusAccepted    = "accepted"
+	FeatureRequestStatusRejected    = "rejected"
+	FeatureRequestStatusPlanned     = "planned"
+	FeatureRequestStatusInProgress  = "in_progress"
+	FeatureRequestStatusDone        = "done"
+	FeatureRequestStatusImplemented = "implemented"
 )
 
 type FeatureRequest struct {
@@ -55,7 +56,8 @@ func IsValidFeatureRequestStatus(v string) bool {
 		FeatureRequestStatusRejected,
 		FeatureRequestStatusPlanned,
 		FeatureRequestStatusInProgress,
-		FeatureRequestStatusDone:
+		FeatureRequestStatusDone,
+		FeatureRequestStatusImplemented:
 		return true
 	default:
 		return false

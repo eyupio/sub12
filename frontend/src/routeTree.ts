@@ -48,7 +48,6 @@ import NotificationSettings from './pages/NotificationSettings'
 import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
 import FeatureBoard from './pages/FeatureBoard'
-import AdminFeatureRefinement from './pages/AdminFeatureRefinement'
 import SupportCenter from './pages/SupportCenter'
 import SupportTicketDetail from './pages/SupportTicketDetail'
 import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
@@ -346,12 +345,6 @@ const adminSupportTicketDetailRoute = createRoute({
   component: AdminSupportTicketDetail,
 })
 
-const adminFeatureRefinementRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/admin/feature-requests',
-  component: AdminFeatureRefinement,
-})
-
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
@@ -440,7 +433,6 @@ export const routeTree = rootRoute.addChildren([
     supportCenterRoute,
     supportTicketDetailRoute,
     featureBoardRoute,
-    adminFeatureRefinementRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
     confirmEmailRoute,
