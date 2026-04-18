@@ -347,6 +347,9 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
   const [reportTargetId, setReportTargetId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editBody, setEditBody] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
@@ -363,13 +366,34 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
     },
   })
 
+  const updateReplyMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) => commentApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', commentId, 'replies'] })
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+      setEditingId(null)
+    },
+    onError: () => toast('Failed to save reply', 'error'),
+  })
+
+  const deleteReplyMutation = useMutation({
+    mutationFn: (id: string) => commentApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', commentId, 'replies'] })
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+    },
+    onError: () => toast('Failed to delete reply', 'error'),
+  })
+
   const replies: Comment[] = data?.items ?? []
   const initials = (name: string) =>
     name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   return (
     <div className="ml-8 mt-2 space-y-2 border-l-2 border-subtle pl-3">
-      {replies.map((r) => (
+      {replies.map((r) => {
+        const isOwnReply = currentUser?.id === r.user_id
+        return (
         <div key={r.id} className="flex gap-2">
           <div className="w-6 h-6 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[9px] font-medium text-muted">
             {r.avatar_url
@@ -387,22 +411,73 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
                 )}
               </span>
             </div>
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
-              {currentUser && currentUser.id !== r.user_id && (
-                <button
-                  onClick={() => setReportTargetId(r.id)}
-                  className="p-1 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
-                  aria-label="Report reply"
-                  title="Report inappropriate reply"
-                >
-                  <AlertTriangle size={12} />
-                </button>
-              )}
-            </div>
+            {editingId === r.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  rows={2}
+                  className="w-full bg-surface border border-subtle rounded px-2 py-1.5 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
+                  aria-label="Edit reply body"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateReplyMutation.mutate({ id: r.id, body: editBody.trim() })}
+                    disabled={updateReplyMutation.isPending || !editBody.trim()}
+                    className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                  >
+                    {updateReplyMutation.isPending ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="px-2 py-0.5 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm text-secondary leading-relaxed">{r.body}</p>
+                <div className="flex gap-1 flex-shrink-0">
+                  {isOwnReply && (
+                    <>
+                      <button
+                        onClick={() => { setEditingId(r.id); setEditBody(r.body) }}
+                        className="p-1 text-muted hover:text-secondary transition-colors"
+                        aria-label="Edit reply"
+                        title="Edit reply"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(r.id)}
+                        disabled={deleteReplyMutation.isPending}
+                        className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                        aria-label="Delete reply"
+                        title="Delete reply"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </>
+                  )}
+                  {!isOwnReply && currentUser && (
+                    <button
+                      onClick={() => setReportTargetId(r.id)}
+                      className="p-1 text-muted hover:text-[var(--error-text)] transition-colors"
+                      aria-label="Report reply"
+                      title="Report inappropriate reply"
+                    >
+                      <AlertTriangle size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      ))}
+        )
+      })}
 
       {currentUser && (
         <div className="flex gap-2 pt-1">
@@ -437,6 +512,17 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
         targetId={reportTargetId ?? ''}
         onClose={() => setReportTargetId(null)}
         communityName={communityName}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete reply?"
+        message="This reply will be permanently removed."
+        onConfirm={() => {
+          if (confirmDeleteId) deleteReplyMutation.mutate(confirmDeleteId)
+          setConfirmDeleteId(null)
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
       />
     </div>
   )
