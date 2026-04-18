@@ -194,6 +194,59 @@ export default function PelletTestDetail() {
     },
   })
 
+  async function syncGroupFromAnalysis(args: {
+    imageId: string
+    measurementId: string
+    existingGroupId?: string
+    analyzedSizeMM?: number | null
+    analyzedShotCount?: number
+  }) {
+    const { imageId, measurementId, existingGroupId, analyzedSizeMM, analyzedShotCount } = args
+    if (!analyzedSizeMM || analyzedSizeMM <= 0) return
+
+    // When the user explicitly picked "add a new group from image", always create a
+    // fresh group — even if the image was already linked to one from a prior score.
+    const forceCreate = pendingGroupSync?.mode === 'create'
+    const targetGroupId =
+      pendingGroupSync?.mode === 'update'
+        ? pendingGroupSync.groupId
+        : forceCreate
+          ? undefined
+          : existingGroupId
+
+    const resolvedShotCount = (() => {
+      if (analyzedShotCount && analyzedShotCount > 0) return analyzedShotCount
+      if (pendingGroupSync?.mode === 'create') return pendingGroupSync.shotCount
+      if (targetGroupId) {
+        const existing = session?.groups?.find(g => g.id === targetGroupId)
+        if (existing?.shot_count) return existing.shot_count
+      }
+      return newShotCount
+    })()
+
+    if (targetGroupId) {
+      await syncMeasuredGroupMutation.mutateAsync({
+        groupId: targetGroupId,
+        sizeMM: analyzedSizeMM,
+        shotCount: resolvedShotCount,
+      })
+      return
+    }
+
+    const notes = pendingGroupSync?.mode === 'create' ? pendingGroupSync.notes : undefined
+    const created = await pelletTestApi.createGroup(id!, {
+      shot_count: resolvedShotCount,
+      group_size_mm: analyzedSizeMM,
+      notes: withSourceTag(notes, 'image'),
+    })
+    try {
+      await pelletTestApi.updateMeasurement(id!, imageId, measurementId, { group_id: created.id })
+    } catch {
+      // Link-back is best-effort: the group is persisted either way. On re-score without
+      // the link the next save would create a second group, but that's recoverable.
+    }
+  }
+
   const uploadMutation = useMutation({
     mutationFn: (file: File) => pelletTestApi.uploadImage(id!, file),
     onSuccess: () => {
@@ -209,7 +262,7 @@ export default function PelletTestDetail() {
   })
 
   const saveMeasurementMutation = useMutation({
-    mutationFn: async ({ imageId, payload, measurementId, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; measurementId?: string; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
+    mutationFn: async ({ imageId, payload, measurementId, existingGroupId, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; measurementId?: string; existingGroupId?: string; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
       const measurement = measurementId
         ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
         : await pelletTestApi.createMeasurement(id!, imageId, payload)
@@ -219,24 +272,13 @@ export default function PelletTestDetail() {
           distance_unit: analyzedDistanceUnit ?? 'meters',
         })
       }
-      if (pendingGroupSync && analyzedSizeMM && analyzedSizeMM > 0) {
-        const resolvedShotCount = analyzedShotCount && analyzedShotCount > 0
-          ? analyzedShotCount
-          : (pendingGroupSync.mode === 'create' ? pendingGroupSync.shotCount : newShotCount)
-        if (pendingGroupSync.mode === 'update') {
-          await syncMeasuredGroupMutation.mutateAsync({
-            groupId: pendingGroupSync.groupId,
-            sizeMM: analyzedSizeMM,
-            shotCount: resolvedShotCount,
-          })
-        } else {
-          await pelletTestApi.createGroup(id!, {
-            shot_count: resolvedShotCount,
-            group_size_mm: analyzedSizeMM,
-            notes: withSourceTag(pendingGroupSync.notes, 'image'),
-          })
-        }
-      }
+      await syncGroupFromAnalysis({
+        imageId,
+        measurementId: measurement.id,
+        existingGroupId,
+        analyzedSizeMM,
+        analyzedShotCount,
+      })
       return measurement
     },
     onSuccess: () => {
@@ -257,6 +299,7 @@ export default function PelletTestDetail() {
       imageId,
       payload,
       measurementId,
+      existingGroupId,
       detections,
       annotatedBlob,
       analyzedSizeMM,
@@ -267,6 +310,7 @@ export default function PelletTestDetail() {
       imageId: string
       payload: CreateMeasurementPayload
       measurementId?: string
+      existingGroupId?: string
       detections: DetectedHole[]
       annotatedBlob: Blob | null
       analyzedSizeMM?: number | null
@@ -304,24 +348,13 @@ export default function PelletTestDetail() {
         })
       }
 
-      if (pendingGroupSync && analyzedSizeMM && analyzedSizeMM > 0) {
-        const resolvedShotCount = analyzedShotCount && analyzedShotCount > 0
-          ? analyzedShotCount
-          : (pendingGroupSync.mode === 'create' ? pendingGroupSync.shotCount : newShotCount)
-        if (pendingGroupSync.mode === 'update') {
-          await syncMeasuredGroupMutation.mutateAsync({
-            groupId: pendingGroupSync.groupId,
-            sizeMM: analyzedSizeMM,
-            shotCount: resolvedShotCount,
-          })
-        } else {
-          await pelletTestApi.createGroup(id!, {
-            shot_count: resolvedShotCount,
-            group_size_mm: analyzedSizeMM,
-            notes: withSourceTag(pendingGroupSync.notes, 'image'),
-          })
-        }
-      }
+      await syncGroupFromAnalysis({
+        imageId,
+        measurementId: measurement.id,
+        existingGroupId,
+        analyzedSizeMM,
+        analyzedShotCount,
+      })
 
       return measurement
     },
@@ -699,12 +732,13 @@ export default function PelletTestDetail() {
           imageId={measureImage.id}
           existingMeasurement={existingMeasurement}
           existingDetections={existingDetections}
-          onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, measurementId: existingMeasurement?.id, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount, analyzedDistanceValue: analysisMeta.distanceValue, analyzedDistanceUnit: analysisMeta.distanceUnit })}
+          onSave={(payload, analysisMeta) => saveMeasurementMutation.mutate({ imageId: measureImage.id, payload, measurementId: existingMeasurement?.id, existingGroupId: existingMeasurement?.group_id, analyzedSizeMM: analysisMeta.groupSizeMM, analyzedShotCount: analysisMeta.shotCount, analyzedDistanceValue: analysisMeta.distanceValue, analyzedDistanceUnit: analysisMeta.distanceUnit })}
           onSaveDetections={(payload, detections, annotatedBlob, analysisMeta) =>
             saveDetectionsMutation.mutate({
               imageId: measureImage.id,
               payload,
               measurementId: existingMeasurement?.id,
+              existingGroupId: existingMeasurement?.group_id,
               detections,
               annotatedBlob,
               analyzedSizeMM: analysisMeta.groupSizeMM,
