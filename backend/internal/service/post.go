@@ -19,15 +19,22 @@ var (
 )
 
 type PostService struct {
-	posts    *repository.PostRepository
-	leagues  *repository.LeagueRepository
-	clubs    *repository.ClubRepository
-	social   *repository.SocialRepository
-	activity *ActivityService
+	posts         *repository.PostRepository
+	leagues       *repository.LeagueRepository
+	clubs         *repository.ClubRepository
+	social        *repository.SocialRepository
+	activity      *ActivityService
+	notifications *NotificationService // optional; wired post-construction to avoid cycles
 }
 
 func NewPostService(posts *repository.PostRepository, leagues *repository.LeagueRepository, clubs *repository.ClubRepository, social *repository.SocialRepository, activity *ActivityService) *PostService {
 	return &PostService{posts: posts, leagues: leagues, clubs: clubs, social: social, activity: activity}
+}
+
+// SetNotifications wires a notification service post-construction to avoid
+// import cycles.
+func (s *PostService) SetNotifications(n *NotificationService) {
+	s.notifications = n
 }
 
 // Create validates and persists a new post.
@@ -327,12 +334,34 @@ func (s *PostService) FlagPost(ctx context.Context, userID, role, postID, reason
 	if scope.Scope == "" {
 		return ErrPostForbidden
 	}
+	// Load the post first so we know the author for the notification and
+	// have the league/club scope for downstream filtering.
+	post, err := s.posts.GetByID(ctx, postID, nil)
+	if err != nil {
+		return err
+	}
 	scopeVal := scope.Scope
 	var scopeIDPtr *string
 	if scope.ScopeID != "" {
 		scopeIDPtr = &scope.ScopeID
 	}
-	return s.posts.SetPostFlag(ctx, postID, &userID, &reason, &scopeVal, scopeIDPtr)
+	if err := s.posts.SetPostFlag(ctx, postID, &userID, &reason, &scopeVal, scopeIDPtr); err != nil {
+		return err
+	}
+	if s.notifications != nil {
+		targetType := "post"
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: post.UserID,
+			ActorID:     userID,
+			Type:        model.NotificationTypePostFlagged,
+			TargetID:    &post.ID,
+			TargetType:  &targetType,
+			LeagueID:    post.LeagueID,
+			ClubID:      post.ClubID,
+			Metadata:    map[string]any{"reason": reason},
+		})
+	}
+	return nil
 }
 
 // UnflagPost clears the moderation flag on a post.

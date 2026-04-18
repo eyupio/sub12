@@ -180,6 +180,8 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 		return "Club join approved", "Your request to join a club was approved."
 	case model.NotificationTypeMention:
 		return "You were mentioned on sub12.io", actor + " mentioned you on sub12.io."
+	case model.NotificationTypePostFlagged:
+		return "A moderator flagged your post", "A moderator flagged your post and asked you to reflect and edit to amend. Editing your post clears the flag."
 	case model.NotificationTypeTicketCreated:
 		return "New support ticket", actor + " created a support ticket."
 	case model.NotificationTypeTicketReplied:

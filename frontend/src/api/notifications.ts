@@ -12,6 +12,7 @@ export type NotificationType =
   | 'league_join_approved'
   | 'club_join_approved'
   | 'mention'
+  | 'post_flagged'
   | 'report_filed'
   | 'ticket_created'
   | 'ticket_replied'
@@ -53,6 +54,7 @@ export interface NotificationPreferences {
   league_join_approved: boolean
   club_join_approved: boolean
   mention: boolean
+  post_flagged: boolean
   report_filed: boolean
   ticket_created: boolean
   ticket_replied: boolean
@@ -71,6 +73,7 @@ export interface NotificationPreferences {
   league_join_approved_email: boolean
   club_join_approved_email: boolean
   mention_email: boolean
+  post_flagged_email: boolean
   ticket_created_email: boolean
   ticket_replied_email: boolean
   ticket_assigned_email: boolean

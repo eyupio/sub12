@@ -188,6 +188,7 @@ func main() {
 	// Wire notifications into services that fan out events. Done after
 	// construction to avoid cycles.
 	socialSvc.SetNotifications(notificationSvc)
+	postSvc.SetNotifications(notificationSvc)
 
 	// Wire the export aggregators into UserService so GDPR data-export
 	// can include score cards, posts, clubs and leagues without forcing
