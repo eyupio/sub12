@@ -45,6 +45,32 @@ func (r *SocialRepository) Unfollow(ctx context.Context, followerID, followingID
 	return nil
 }
 
+// CountFollowing returns how many users the given user follows.
+func (r *SocialRepository) CountFollowing(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM user_follows WHERE follower_id = $1`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count following: %w", err)
+	}
+	return count, nil
+}
+
+// CountFollowers returns how many users follow the given user.
+func (r *SocialRepository) CountFollowers(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM user_follows WHERE following_id = $1`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count followers: %w", err)
+	}
+	return count, nil
+}
+
 // IsFollowing returns true if followerID follows followingID.
 func (r *SocialRepository) IsFollowing(ctx context.Context, followerID, followingID string) (bool, error) {
 	var exists bool

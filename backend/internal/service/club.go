@@ -25,12 +25,13 @@ var (
 )
 
 type ClubService struct {
-	repo     *repository.ClubRepository
-	activity *ActivityService // nil disables feed ingestion
+	repo         *repository.ClubRepository
+	activity     *ActivityService    // nil disables feed ingestion
+	achievements *AchievementService // nil disables achievement evaluation
 }
 
-func NewClubService(repo *repository.ClubRepository, activity *ActivityService) *ClubService {
-	return &ClubService{repo: repo, activity: activity}
+func NewClubService(repo *repository.ClubRepository, activity *ActivityService, achievements *AchievementService) *ClubService {
+	return &ClubService{repo: repo, activity: activity, achievements: achievements}
 }
 
 func (s *ClubService) Create(ctx context.Context, userID string, input *model.CreateClubInput) (*model.Club, error) {
@@ -139,6 +140,9 @@ func (s *ClubService) Join(ctx context.Context, clubID, userID, joinCode string)
 		meta := model.JoinedClubMeta{ClubName: club.Name}
 		go s.activity.Ingest(context.Background(), userID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 	}
+	if s.achievements != nil {
+		go s.achievements.EvaluateForClubJoin(context.Background(), userID)
+	}
 	return true, false, nil
 }
 
@@ -237,6 +241,9 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 			cid, tt := clubID, "club"
 			meta := model.JoinedClubMeta{ClubName: clubName}
 			go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
+		}
+		if s.achievements != nil {
+			go s.achievements.EvaluateForClubJoin(context.Background(), req.UserID)
 		}
 	}
 	return nil

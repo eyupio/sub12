@@ -227,3 +227,16 @@ func (r *CommentRepository) CountByTarget(ctx context.Context, targetID, targetT
 	}
 	return count, nil
 }
+
+// CountByUser returns the total number of comments authored by the user.
+func (r *CommentRepository) CountByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM comments WHERE user_id = $1`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count comments by user: %w", err)
+	}
+	return count, nil
+}

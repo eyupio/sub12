@@ -333,6 +333,11 @@ func NewRouter(
 		pth := handler.NewPelletTest(pelletTests, images)
 		r.Get("/pellet-tests/public-leaderboard", pth.PublicLeaderboard)
 
+		// Public achievement catalog (no auth required). Per-user earned lists
+		// remain behind /users/{id}/achievements with privacy enforcement.
+		achH := handler.NewAchievement(achievements)
+		r.Get("/achievements", achH.ListDefs)
+
 		// Public routes where viewer context is used for privacy enforcement.
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.OptionalAuthenticate(auth))

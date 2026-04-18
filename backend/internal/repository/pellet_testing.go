@@ -197,6 +197,19 @@ func (r *PelletTestRepository) Delete(ctx context.Context, id, userID string) er
 	return nil
 }
 
+// CountByUser returns how many pellet test sessions the user has created.
+func (r *PelletTestRepository) CountByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM pellet_test_sessions WHERE user_id = $1`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count pellet tests: %w", err)
+	}
+	return count, nil
+}
+
 // ── Groups ──────────────────────────────────────────────────────────────────────
 
 func scanGroup(row pgx.Row) (*model.PelletTestGroup, error) {

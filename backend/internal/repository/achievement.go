@@ -30,6 +30,43 @@ func (r *AchievementRepository) Award(ctx context.Context, userID, achievementID
 	return tag.RowsAffected() == 1, nil
 }
 
+// GetDef returns a single achievement definition by id.
+func (r *AchievementRepository) GetDef(ctx context.Context, id string) (*model.AchievementDef, error) {
+	var d model.AchievementDef
+	err := r.db.QueryRow(ctx, `
+		SELECT id, name, description, icon
+		FROM achievement_defs
+		WHERE id = $1
+	`, id).Scan(&d.ID, &d.Name, &d.Description, &d.Icon)
+	if err != nil {
+		return nil, fmt.Errorf("get achievement def: %w", err)
+	}
+	return &d, nil
+}
+
+// ListDefs returns every defined achievement, ordered by id for a stable catalog.
+func (r *AchievementRepository) ListDefs(ctx context.Context) ([]*model.AchievementDef, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, name, description, icon
+		FROM achievement_defs
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list achievement defs: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.AchievementDef
+	for rows.Next() {
+		var d model.AchievementDef
+		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &d.Icon); err != nil {
+			return nil, fmt.Errorf("scan achievement def: %w", err)
+		}
+		items = append(items, &d)
+	}
+	return items, rows.Err()
+}
+
 // ListForUser returns all achievements earned by a user, newest first.
 func (r *AchievementRepository) ListForUser(ctx context.Context, userID string) ([]*model.UserAchievement, error) {
 	rows, err := r.db.Query(ctx, `
