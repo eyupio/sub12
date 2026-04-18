@@ -64,7 +64,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     ...rest,
   })
 
-  if (res.status === 401 && !isRetry && token) {
+  if (res.status === 401 && !isRetry && (token || useAuthStore.getState().refreshToken)) {
     const refreshed = await handleUnauthorized()
     if (refreshed) {
       return request<T>(path, options, true)
@@ -97,7 +97,7 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
     body: formData,
   })
 
-  if (res.status === 401 && !isRetry && token) {
+  if (res.status === 401 && !isRetry && (token || useAuthStore.getState().refreshToken)) {
     const refreshed = await handleUnauthorized()
     if (refreshed) {
       return requestMultipart<T>(path, formData, true)

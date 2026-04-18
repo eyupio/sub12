@@ -9,14 +9,16 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Runtime stage — nginx serving the static PWA
-FROM nginx:1.27-alpine
+# Runtime stage — nginx serving the static PWA.
+# Uses the unprivileged image which runs as UID 101 and binds to port 8080
+# by default (no root, no cap_net_bind_service needed).
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Custom nginx config: SPA routing (all paths → index.html)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

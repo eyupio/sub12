@@ -39,10 +39,16 @@ export default defineConfig({
           /^\/robots\.txt$/,
           /^\/[a-fA-F0-9]+\.txt$/,
         ],
-        // Cache API responses for offline score entry
+        // Cache API responses for offline score entry. Auth endpoints are
+        // served NetworkOnly so login/refresh responses (which carry tokens)
+        // are never written to Cache Storage.
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/.*\/api\/v1\/.*/i,
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/auth/'),
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',

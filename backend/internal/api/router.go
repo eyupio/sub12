@@ -54,6 +54,7 @@ func NewRouter(
 	r.Use(chimiddleware.RealIP)
 	r.Use(middleware.RequestLogger(log))
 	r.Use(chimiddleware.Recoverer)
+	r.Use(securityHeadersMiddleware(cfg.Env))
 	r.Use(corsMiddleware(cfg.CORSOrigin))
 
 	// Health probes (no auth)
@@ -450,6 +451,26 @@ func NewRouter(
 	})
 
 	return r
+}
+
+// securityHeadersMiddleware sets a baseline of HTTP security response headers
+// on every response. HSTS is only emitted in production so local HTTP dev is
+// not pinned to HTTPS.
+func securityHeadersMiddleware(env string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("Referrer-Policy", "no-referrer")
+			h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+			if env == "production" {
+				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func corsMiddleware(origin string) func(http.Handler) http.Handler {

@@ -217,6 +217,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `sub12` | Database name |
 | `DB_USER` | `sub12` | Database user |
+| `DB_SSLMODE` | `disable` | libpq TLS mode; set to `require` (or `verify-full`) in production |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `JWT_EXPIRY_HOURS` | `24` | JWT token expiry in hours |
 | `PASSWORD_RESET_TTL_MINUTES` | `60` | Password reset token TTL |
