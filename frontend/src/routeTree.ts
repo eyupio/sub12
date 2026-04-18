@@ -55,16 +55,20 @@ import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
 import Help from './pages/Help'
 import AdminFaqs from './pages/AdminFaqs'
 
-// Guard: redirect to /login if not authenticated
+// Guard: redirect to /login if not authenticated.
+// A session exists when we have either a live access token (current tab) or
+// a persisted refresh token (returning user after a reload — the access token
+// is no longer persisted to localStorage, so the API client will mint a fresh
+// one on the first 401).
 function requireAuth() {
-  const token = useAuthStore.getState().accessToken
-  if (!token) throw redirect({ to: '/login' })
+  const { accessToken, refreshToken } = useAuthStore.getState()
+  if (!accessToken && !refreshToken) throw redirect({ to: '/login' })
 }
 
 // Guard: redirect to / if already authenticated
 function requireGuest() {
-  const token = useAuthStore.getState().accessToken
-  if (token) throw redirect({ to: '/' })
+  const { accessToken, refreshToken } = useAuthStore.getState()
+  if (accessToken || refreshToken) throw redirect({ to: '/' })
 }
 
 const rootRoute = createRootRoute({
