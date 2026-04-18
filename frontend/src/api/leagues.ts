@@ -249,6 +249,9 @@ export const leagueApi = {
   removeMember: (leagueId: string, userId: string) =>
     api.del<void>(`/leagues/${leagueId}/members/${userId}`),
 
+  leave: (id: string) =>
+    api.del<void>(`/leagues/${id}/members/me`),
+
   // Score verification
   getLeagueForScoreCard: (scoreCardId: string) =>
     api.get<ScoreCardLeague>(`/score-cards/${scoreCardId}/league`),

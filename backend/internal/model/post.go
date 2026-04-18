@@ -24,6 +24,8 @@ type Post struct {
 	LikeCount    int              `json:"like_count"`
 	CommentCount int              `json:"comment_count"`
 	IsLiked      bool             `json:"is_liked"`
+	IsFlagged    bool             `json:"is_flagged,omitempty"`
+	FlagReason   *string          `json:"flag_reason,omitempty"`
 	Attachments  []PostAttachment `json:"attachments"`
 	CreatedAt    time.Time        `json:"created_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`

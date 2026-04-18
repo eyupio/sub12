@@ -195,3 +195,68 @@ func (h *PostHandler) ListByClub(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": posts})
 }
 
+// Flag handles POST /api/v1/posts/{id}/flag. League/club admins (or global
+// admins) mark the post as needing amendment.
+func (h *PostHandler) Flag(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.svc.FlagPost(r.Context(), userID, role, postID, body.Reason); err != nil {
+		if errors.Is(err, service.ErrPostFlagReasonEmpty) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrPostForbidden) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "post not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to flag post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"flagged": true})
+}
+
+// Unflag handles POST /api/v1/posts/{id}/unflag.
+func (h *PostHandler) Unflag(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
+	postID := chi.URLParam(r, "id")
+
+	if err := h.svc.UnflagPost(r.Context(), userID, role, postID); err != nil {
+		if errors.Is(err, service.ErrPostForbidden) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "post not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to unflag post")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"flagged": false})
+}
+

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -90,6 +91,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string, viewerID *strin
 		       p.body, p.league_id, p.club_id, p.visibility, p.hidden_at,
 		       p.like_count, p.comment_count,
 		       %s AS is_liked,
+		       (p.flagged_at IS NOT NULL) AS is_flagged, p.flag_reason,
 		       p.created_at, p.updated_at
 		FROM posts p
 		JOIN users u ON u.id = p.user_id
@@ -98,6 +100,7 @@ func (r *PostRepository) GetByID(ctx context.Context, id string, viewerID *strin
 		&post.ID, &post.UserID, &post.DisplayName, &post.AvatarURL,
 		&post.Body, &post.LeagueID, &post.ClubID, &post.Visibility, &post.HiddenAt,
 		&post.LikeCount, &post.CommentCount, &post.IsLiked,
+		&post.IsFlagged, &post.FlagReason,
 		&post.CreatedAt, &post.UpdatedAt,
 	)
 	if err != nil {
@@ -135,6 +138,7 @@ func (r *PostRepository) list(ctx context.Context, where string, arg any, limit,
 		SELECT p.id, p.user_id, u.display_name, u.avatar_url,
 		       p.body, p.league_id, p.club_id, p.visibility, p.hidden_at,
 		       p.like_count, p.comment_count,
+		       (p.flagged_at IS NOT NULL) AS is_flagged, p.flag_reason,
 		       p.created_at, p.updated_at
 		FROM posts p
 		JOIN users u ON u.id = p.user_id
@@ -156,6 +160,7 @@ func (r *PostRepository) list(ctx context.Context, where string, arg any, limit,
 			&p.ID, &p.UserID, &p.DisplayName, &p.AvatarURL,
 			&p.Body, &p.LeagueID, &p.ClubID, &p.Visibility, &p.HiddenAt,
 			&p.LikeCount, &p.CommentCount,
+			&p.IsFlagged, &p.FlagReason,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan post: %w", err)
@@ -192,6 +197,7 @@ func (r *PostRepository) Update(ctx context.Context, id, userID, body string) (*
 		SELECT upd.id, upd.user_id, u.display_name, u.avatar_url,
 		       upd.body, upd.league_id, upd.club_id, upd.visibility, upd.hidden_at,
 		       upd.like_count, upd.comment_count,
+		       FALSE AS is_flagged, NULL::text AS flag_reason,
 		       upd.created_at, upd.updated_at
 		FROM upd
 		JOIN users u ON u.id = upd.user_id
@@ -199,6 +205,7 @@ func (r *PostRepository) Update(ctx context.Context, id, userID, body string) (*
 		&post.ID, &post.UserID, &post.DisplayName, &post.AvatarURL,
 		&post.Body, &post.LeagueID, &post.ClubID, &post.Visibility, &post.HiddenAt,
 		&post.LikeCount, &post.CommentCount,
+		&post.IsFlagged, &post.FlagReason,
 		&post.CreatedAt, &post.UpdatedAt,
 	)
 	if err != nil {
@@ -215,6 +222,69 @@ func (r *PostRepository) Update(ctx context.Context, id, userID, body string) (*
 	}
 
 	return &post, nil
+}
+
+// SetPostFlag sets or clears the moderation-flag columns on a post. Passing
+// flaggerID == nil clears all flag columns. Idempotent.
+func (r *PostRepository) SetPostFlag(
+	ctx context.Context,
+	postID string,
+	flaggerID *string,
+	reason *string,
+	scope *string,
+	scopeID *string,
+) error {
+	var (
+		tag pgconn.CommandTag
+		err error
+	)
+	if flaggerID == nil {
+		tag, err = r.db.Exec(ctx, `
+			UPDATE posts
+			SET flagged_at = NULL,
+			    flagged_by = NULL,
+			    flag_reason = NULL,
+			    flag_scope = NULL,
+			    flag_scope_id = NULL
+			WHERE id = $1
+		`, postID)
+	} else {
+		tag, err = r.db.Exec(ctx, `
+			UPDATE posts
+			SET flagged_at = NOW(),
+			    flagged_by = $2::uuid,
+			    flag_reason = $3,
+			    flag_scope = $4,
+			    flag_scope_id = $5::uuid
+			WHERE id = $1
+		`, postID, *flaggerID, reason, scope, scopeID)
+	}
+	if err != nil {
+		return fmt.Errorf("set post flag: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ResolvePostScope returns the league and club a post belongs to. Either may
+// be nil (personal posts belong to neither). Returns ErrNotFound when the
+// post is missing.
+func (r *PostRepository) ResolvePostScope(
+	ctx context.Context, postID string,
+) (leagueID *string, clubID *string, err error) {
+	err = r.db.QueryRow(ctx,
+		`SELECT league_id, club_id FROM posts WHERE id = $1`,
+		postID,
+	).Scan(&leagueID, &clubID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil, ErrNotFound
+		}
+		return nil, nil, fmt.Errorf("resolve post scope: %w", err)
+	}
+	return leagueID, clubID, nil
 }
 
 // SetHidden flips the hidden_at flag for a post. Used by the moderation flow.

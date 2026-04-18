@@ -155,14 +155,14 @@ func main() {
 	clubSvc := service.NewClubService(clubRepo, activitySvc, achievementSvc)
 	postSvc := service.NewPostService(postRepo, leagueRepo, clubRepo, socialRepo, activitySvc)
 
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, achievementSvc)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, achievementSvc)
 
 	likeRepo := repository.NewLikeRepository(pool)
 	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)
 
 	muteRepo := repository.NewMuteRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
-	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, log.Logger)
+	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, userRepo, emailSenderSvc, log.Logger)
 
 	reportRepo := repository.NewReportRepository(pool)
 	moderationSvc := service.NewModerationService(
@@ -188,6 +188,11 @@ func main() {
 		LikePerMin:          cfg.RateLimitLikePerMin,
 		SocialTogglePerMin:  cfg.RateLimitSocialTogglePerMin,
 	}, rdb)
+
+	// Moderation flag sweeper — promotes un-amended flagged rows to hidden_at
+	// after the grace window. Runs as a background goroutine.
+	moderationSweeper := service.NewModerationSweeper(pool, log.Logger, cfg.ModerationFlagGrace, cfg.ModerationSweepInterval)
+	go moderationSweeper.Run(ctx)
 
 	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, muteRepo, rl, imageRepo)
 

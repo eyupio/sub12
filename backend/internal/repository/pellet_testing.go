@@ -657,7 +657,7 @@ func (r *PelletTestRepository) UpdateMeasurement(ctx context.Context, measuremen
 
 	m, err := scanMeasurement(r.db.QueryRow(ctx, `
 		UPDATE pellet_test_measurements SET
-			group_id              = COALESCE($3, group_id),
+			group_id              = COALESCE($3::uuid, group_id),
 			bbox_x                = COALESCE($4, bbox_x),
 			bbox_y                = COALESCE($5, bbox_y),
 			bbox_width            = COALESCE($6, bbox_width),

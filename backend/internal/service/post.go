@@ -10,10 +10,12 @@ import (
 )
 
 var (
-	ErrPostBodyEmpty        = errors.New("post body cannot be empty")
-	ErrPostBodyTooLong      = errors.New("post body exceeds maximum length of 5000 characters")
-	ErrPostDenied           = errors.New("you do not have permission to post here")
+	ErrPostBodyEmpty         = errors.New("post body cannot be empty")
+	ErrPostBodyTooLong       = errors.New("post body exceeds maximum length of 5000 characters")
+	ErrPostDenied            = errors.New("you do not have permission to post here")
 	ErrPostInvalidVisibility = errors.New("invalid post visibility")
+	ErrPostForbidden         = errors.New("not authorized to moderate this post")
+	ErrPostFlagReasonEmpty   = errors.New("flag reason is required")
 )
 
 type PostService struct {
@@ -242,7 +244,9 @@ func (s *PostService) ListByClub(ctx context.Context, clubID, viewerID string, l
 	return s.posts.ListByClub(ctx, clubID, limit, offset)
 }
 
-// Update edits a post owned by userID.
+// Update edits a post owned by userID. A successful edit also clears any
+// moderation flag on the post — the author's edit is treated as the
+// amendment a moderator was asking for.
 func (s *PostService) Update(ctx context.Context, id, userID, body string) (*model.Post, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
@@ -251,7 +255,82 @@ func (s *PostService) Update(ctx context.Context, id, userID, body string) (*mod
 	if len([]rune(body)) > 5000 {
 		return nil, ErrPostBodyTooLong
 	}
-	return s.posts.Update(ctx, id, userID, body)
+	post, err := s.posts.Update(ctx, id, userID, body)
+	if err != nil {
+		return nil, err
+	}
+	// Best-effort flag clear.
+	_ = s.posts.SetPostFlag(ctx, id, nil, nil, nil, nil)
+	return post, nil
+}
+
+// CanModeratePost returns the scope through which userID may moderate a post.
+func (s *PostService) CanModeratePost(ctx context.Context, userID, role, postID string) (ModerationScope, error) {
+	if role == "admin" {
+		return ModerationScope{Scope: "global"}, nil
+	}
+	if userID == "" {
+		return ModerationScope{}, nil
+	}
+	leagueID, clubID, err := s.posts.ResolvePostScope(ctx, postID)
+	if err != nil {
+		return ModerationScope{}, err
+	}
+	if leagueID != nil && *leagueID != "" {
+		isAdmin, err := s.leagues.IsAdmin(ctx, *leagueID, userID)
+		if err != nil {
+			return ModerationScope{}, err
+		}
+		if isAdmin {
+			return ModerationScope{Scope: "league", ScopeID: *leagueID}, nil
+		}
+	}
+	if clubID != nil && *clubID != "" {
+		isAdmin, err := s.clubs.IsAdmin(ctx, *clubID, userID)
+		if err != nil {
+			return ModerationScope{}, err
+		}
+		if isAdmin {
+			return ModerationScope{Scope: "club", ScopeID: *clubID}, nil
+		}
+	}
+	return ModerationScope{}, nil
+}
+
+// FlagPost marks a post as needing amendment.
+func (s *PostService) FlagPost(ctx context.Context, userID, role, postID, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ErrPostFlagReasonEmpty
+	}
+	if len([]rune(reason)) > 500 {
+		reason = string([]rune(reason)[:500])
+	}
+	scope, err := s.CanModeratePost(ctx, userID, role, postID)
+	if err != nil {
+		return err
+	}
+	if scope.Scope == "" {
+		return ErrPostForbidden
+	}
+	scopeVal := scope.Scope
+	var scopeIDPtr *string
+	if scope.ScopeID != "" {
+		scopeIDPtr = &scope.ScopeID
+	}
+	return s.posts.SetPostFlag(ctx, postID, &userID, &reason, &scopeVal, scopeIDPtr)
+}
+
+// UnflagPost clears the moderation flag on a post.
+func (s *PostService) UnflagPost(ctx context.Context, userID, role, postID string) error {
+	scope, err := s.CanModeratePost(ctx, userID, role, postID)
+	if err != nil {
+		return err
+	}
+	if scope.Scope == "" {
+		return ErrPostForbidden
+	}
+	return s.posts.SetPostFlag(ctx, postID, nil, nil, nil, nil)
 }
 
 // Delete removes a post owned by userID.
