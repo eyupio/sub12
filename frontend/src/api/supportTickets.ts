@@ -74,10 +74,21 @@ export interface CreateSupportTicketInput {
   priority?: SupportTicketPriority
 }
 
+export interface UpdateSupportTicketInput {
+  title?: string
+  description?: string
+  category?: SupportTicketCategory
+  status?: SupportTicketStatus
+  priority?: SupportTicketPriority
+  assignee_id?: string | null
+}
+
 export const supportTicketsApi = {
   create: (payload: CreateSupportTicketInput) => api.post<SupportTicket>('/tickets', payload),
   listMine: (limit = 200) => api.get<SupportTicketListResponse>(`/tickets?limit=${limit}`),
   getMine: (id: string) => api.get<SupportTicketDetail>(`/tickets/${id}`),
+  updateMine: (id: string, payload: UpdateSupportTicketInput) => api.patch<SupportTicket>(`/tickets/${id}`, payload),
+  deleteMine: (id: string) => api.del<void>(`/tickets/${id}`),
   adminList: (params?: { status?: SupportTicketStatus; category?: SupportTicketCategory; limit?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)

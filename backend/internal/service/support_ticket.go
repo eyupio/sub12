@@ -157,14 +157,26 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 	if !canAccess {
 		return nil, ErrNotAdmin
 	}
-	if in.AssigneeID != nil || in.Priority != nil || in.Category != nil {
-		isAdmin, err := s.isAdminForTicket(ctx, ticket, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if !isAdmin {
+	isAdmin, err := s.isAdminForTicket(ctx, ticket, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !isAdmin && ticket.RequesterID == actorID {
+		if in.AssigneeID != nil || in.Priority != nil || in.Category != nil {
 			return nil, ErrNotAdmin
 		}
+		if in.Status != nil && *in.Status != model.SupportStatusOpen && *in.Status != model.SupportStatusClosed {
+			return nil, ErrNotAdmin
+		}
+	}
+	if !isAdmin && (in.AssigneeID != nil || in.Priority != nil || in.Category != nil) {
+		return nil, ErrNotAdmin
+	}
+	if in.Title != nil && strings.TrimSpace(*in.Title) == "" {
+		return nil, ErrSupportTitleEmpty
+	}
+	if in.Description != nil && strings.TrimSpace(*in.Description) == "" {
+		return nil, ErrSupportBodyEmpty
 	}
 	if in.Status != nil && !model.IsValidSupportStatus(*in.Status) {
 		return nil, ErrSupportInvalidStatus
@@ -204,6 +216,21 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 	}
 	s.normalizeUnread(updated)
 	return updated, nil
+}
+
+func (s *SupportTicketService) Delete(ctx context.Context, id, actorID string) error {
+	ticket, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	isAdmin, err := s.isAdminForTicket(ctx, ticket, actorID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin && ticket.RequesterID != actorID {
+		return ErrNotAdmin
+	}
+	return s.repo.Delete(ctx, id)
 }
 
 func (s *SupportTicketService) AddMessage(ctx context.Context, ticketID, authorID string, in *model.AddSupportTicketMessageInput) (*model.SupportTicketMessage, error) {

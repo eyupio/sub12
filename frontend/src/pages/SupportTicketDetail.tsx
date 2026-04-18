@@ -1,16 +1,20 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ApiError } from '../api/client'
 import { supportTicketsApi } from '../api/supportTickets'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 export default function SupportTicketDetail() {
   const { id } = useParams({ from: '/app/support/tickets/$id' })
+  const navigate = useNavigate()
   const prefs = useRegionalPrefs()
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [editMessage, setEditMessage] = useState<string | null>(null)
 
   const ticketQuery = useQuery({
     queryKey: ['support-ticket', 'mine', id],
@@ -19,6 +23,34 @@ export default function SupportTicketDetail() {
 
   const markReadMutation = useMutation({
     mutationFn: () => supportTicketsApi.markRead(id),
+  })
+
+  const updateTicketMutation = useMutation({
+    mutationFn: (payload: { title?: string; description?: string; status?: 'open' | 'closed' }) =>
+      supportTicketsApi.updateMine(id, payload),
+    onSuccess: () => {
+      setEditMessage('Ticket updated.')
+      queryClient.invalidateQueries({ queryKey: ['support-ticket', 'mine', id] })
+      queryClient.invalidateQueries({ queryKey: ['support-tickets', 'mine'] })
+      queryClient.invalidateQueries({ queryKey: ['tickets', 'unread-count'] })
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : 'Failed to update ticket.'
+      setEditMessage(msg)
+    },
+  })
+
+  const deleteTicketMutation = useMutation({
+    mutationFn: () => supportTicketsApi.deleteMine(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['support-tickets', 'mine'] })
+      queryClient.invalidateQueries({ queryKey: ['tickets', 'unread-count'] })
+      navigate({ to: '/support' })
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : 'Failed to delete ticket.'
+      setEditMessage(msg)
+    },
   })
 
   const addMessageMutation = useMutation({
@@ -68,6 +100,40 @@ export default function SupportTicketDetail() {
 
   const detail = ticketQuery.data
 
+  useEffect(() => {
+    if (!detail?.ticket) return
+    setTitle(detail.ticket.title ?? '')
+    setDescription(detail.ticket.description ?? '')
+  }, [detail?.ticket])
+
+  function onSaveTicketEdits(e: FormEvent) {
+    e.preventDefault()
+    setEditMessage(null)
+    if (!title.trim()) {
+      setEditMessage('Title cannot be empty.')
+      return
+    }
+    if (!description.trim()) {
+      setEditMessage('Description cannot be empty.')
+      return
+    }
+    updateTicketMutation.mutate({ title: title.trim(), description: description.trim() })
+  }
+
+  function onToggleClosed() {
+    if (!detail?.ticket?.status) return
+    setEditMessage(null)
+    const nextStatus = detail.ticket.status === 'closed' ? 'open' : 'closed'
+    updateTicketMutation.mutate({ status: nextStatus })
+  }
+
+  function onDeleteTicket() {
+    setEditMessage(null)
+    const confirmed = window.confirm('Delete this ticket permanently? This action cannot be undone.')
+    if (!confirmed) return
+    deleteTicketMutation.mutate()
+  }
+
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -89,6 +155,55 @@ export default function SupportTicketDetail() {
               Created {formatDateTime(detail.ticket.created_at, prefs)} · Updated {formatDateTime(detail.ticket.updated_at, prefs)}
             </p>
             {detail.ticket.description && <p className="text-sm text-secondary whitespace-pre-wrap">{detail.ticket.description}</p>}
+          </section>
+
+          <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-3">
+            <h3 className="font-medium">Ticket controls</h3>
+            <form className="space-y-3" onSubmit={onSaveTicketEdits}>
+              <label className="block text-sm space-y-1">
+                <span className="text-muted">Title</span>
+                <input
+                  className="w-full rounded-md border border-subtle bg-transparent px-3 py-2"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={200}
+                />
+              </label>
+              <label className="block text-sm space-y-1">
+                <span className="text-muted">Description</span>
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-subtle bg-transparent p-2"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+                  disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
+                >
+                  {updateTicketMutation.isPending ? 'Saving…' : 'Save changes'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-subtle px-3 py-2 text-sm disabled:opacity-50"
+                  disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
+                  onClick={onToggleClosed}
+                >
+                  {detail.ticket.status === 'closed' ? 'Reopen ticket' : 'Close ticket'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-[var(--error-text)] px-3 py-2 text-sm text-[var(--error-text)] disabled:opacity-50"
+                  disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
+                  onClick={onDeleteTicket}
+                >
+                  {deleteTicketMutation.isPending ? 'Deleting…' : 'Delete ticket'}
+                </button>
+                {editMessage && <p className="text-xs text-muted">{editMessage}</p>}
+              </div>
+            </form>
           </section>
 
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
