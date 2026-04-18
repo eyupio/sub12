@@ -79,13 +79,14 @@ func (s *ClubService) SummaryByID(ctx context.Context, clubID string) (*model.Cl
 		return nil, err
 	}
 	return &model.ClubSummary{
-		ID:          club.ID,
-		Name:        club.Name,
-		Description: club.Description,
-		ImageURL:    club.ImageURL,
-		Type:        club.Type,
-		JoinPolicy:  club.JoinPolicy,
-		MemberCount: club.MemberCount,
+		ID:             club.ID,
+		Name:           club.Name,
+		Description:    club.Description,
+		ImageURL:       club.ImageURL,
+		Type:           club.Type,
+		JoinPolicy:     club.JoinPolicy,
+		PostVisibility: club.PostVisibility,
+		MemberCount:    club.MemberCount,
 	}, nil
 }
 
@@ -283,6 +284,9 @@ func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
 		return nil, ErrInvalidClub
 	}
+	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
+		return nil, ErrInvalidClub
+	}
 	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
 		return nil, ErrInvalidClub
 	}
@@ -371,6 +375,9 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 // AdminUpdateClub applies a partial update to any club without ownership checks.
 func (s *ClubService) AdminUpdateClub(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, ErrInvalidClub
+	}
+	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
 		return nil, ErrInvalidClub
 	}
 	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {

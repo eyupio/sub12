@@ -39,18 +39,9 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 	}
 	input.Body = body
 
-	if input.Visibility == "" {
-		if input.LeagueID != nil || input.ClubID != nil {
-			input.Visibility = model.PostVisibilityMembers
-		} else {
-			input.Visibility = model.PostVisibilityPublic
-		}
-	}
-	if !model.IsValidPostVisibility(input.Visibility) {
-		return nil, ErrPostInvalidVisibility
-	}
-
-	// Validate membership for scoped posts
+	// Resolve visibility: for scoped posts (league/club) the group admin's
+	// post_visibility override wins — the poster does not choose. For
+	// unscoped posts the author's selection is trusted, defaulting to public.
 	if input.LeagueID != nil {
 		member, err := s.leagues.IsMember(ctx, *input.LeagueID, userID)
 		if err != nil {
@@ -59,14 +50,30 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 		if !member {
 			return nil, ErrPostDenied
 		}
-	}
-	if input.ClubID != nil {
+		league, err := s.leagues.GetByID(ctx, *input.LeagueID)
+		if err != nil {
+			return nil, err
+		}
+		input.Visibility = league.PostVisibility
+	} else if input.ClubID != nil {
 		member, err := s.clubs.IsMember(ctx, *input.ClubID, userID)
 		if err != nil {
 			return nil, err
 		}
 		if !member {
 			return nil, ErrPostDenied
+		}
+		club, err := s.clubs.GetByID(ctx, *input.ClubID, userID)
+		if err != nil {
+			return nil, err
+		}
+		input.Visibility = club.PostVisibility
+	} else {
+		if input.Visibility == "" {
+			input.Visibility = model.PostVisibilityPublic
+		}
+		if !model.IsValidPostVisibility(input.Visibility) {
+			return nil, ErrPostInvalidVisibility
 		}
 	}
 
@@ -75,11 +82,14 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 		return nil, err
 	}
 
-	// Fire activity event asynchronously
+	// Fire activity event asynchronously. Use the resolved post visibility so
+	// the public feed filter (which requires visibility = 'public') naturally
+	// excludes members-only posts. The user's own privacy settings
+	// (feed_opt_out, profile_visibility) further gate the public feed.
 	targetType := "post"
 	go s.activity.Ingest(context.Background(), userID, "post_created", &post.ID, &targetType,
 		map[string]any{"body_preview": truncate(post.Body, 100)},
-		post.LeagueID, post.ClubID, "public")
+		post.LeagueID, post.ClubID, post.Visibility)
 
 	return post, nil
 }

@@ -5,6 +5,7 @@ export interface League {
   name: string
   description?: string
   type: string
+  post_visibility: 'members' | 'public'
   join_code?: string
   image_url?: string
   club_id?: string
@@ -164,6 +165,7 @@ export interface LeagueSummary {
   image_url?: string
   type: string
   join_policy: string
+  post_visibility: 'members' | 'public'
   member_count: number
   club_id?: string
 }
@@ -188,8 +190,18 @@ export const leagueApi = {
   create: (payload: CreateLeaguePayload) =>
     api.post<League>('/leagues', payload),
 
-  update: (id: string, payload: { name?: string; description?: string; type?: 'public' | 'private'; date_format?: string; time_format?: string; timezone?: string }) =>
-    api.patch<League>(`/leagues/${id}`, payload),
+  update: (
+    id: string,
+    payload: {
+      name?: string
+      description?: string
+      type?: 'public' | 'private'
+      post_visibility?: 'members' | 'public'
+      date_format?: string
+      time_format?: string
+      timezone?: string
+    },
+  ) => api.patch<League>(`/leagues/${id}`, payload),
 
   join: (id: string, joinCode?: string) =>
     api.post<{ joined?: boolean; pending?: boolean }>(`/leagues/${id}/join`, { join_code: joinCode }),

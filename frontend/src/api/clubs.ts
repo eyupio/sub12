@@ -9,6 +9,7 @@ export interface Club {
   join_code: string
   type: string
   join_policy: string
+  post_visibility: 'members' | 'public'
   date_format: string
   time_format: string
   timezone: string
@@ -63,6 +64,7 @@ export interface UpdateClubInput {
   description?: string
   type?: 'public' | 'private'
   join_policy?: 'open' | 'invite_code' | 'approval'
+  post_visibility?: 'members' | 'public'
   date_format?: string
   time_format?: string
   timezone?: string

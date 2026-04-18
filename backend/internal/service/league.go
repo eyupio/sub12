@@ -455,6 +455,9 @@ func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID strin
 	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
 	}
+	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
+		return nil, fmt.Errorf("%w: post_visibility must be 'members' or 'public'", ErrInvalidLeague)
+	}
 	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
 		return nil, fmt.Errorf("%w: date_format must be one of %s", ErrInvalidLeague, validDateFormatsList())
 	}
@@ -649,14 +652,15 @@ func (s *LeagueService) SummaryByID(ctx context.Context, id string) (*model.Leag
 		return nil, err
 	}
 	summary := &model.LeagueSummary{
-		ID:          league.ID,
-		Name:        league.Name,
-		Description: league.Description,
-		ImageURL:    league.ImageURL,
-		Type:        league.Type,
-		JoinPolicy:  "open",
-		MemberCount: league.MemberCount,
-		ClubID:      league.ClubID,
+		ID:             league.ID,
+		Name:           league.Name,
+		Description:    league.Description,
+		ImageURL:       league.ImageURL,
+		Type:           league.Type,
+		JoinPolicy:     "open",
+		PostVisibility: league.PostVisibility,
+		MemberCount:    league.MemberCount,
+		ClubID:         league.ClubID,
 	}
 	if cfg, err := s.leagues.GetConfig(ctx, id); err == nil && cfg != nil {
 		summary.JoinPolicy = cfg.JoinPolicy

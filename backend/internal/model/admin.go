@@ -26,11 +26,12 @@ type UpdateLeagueInput struct {
 // UpdateClubInput holds fields that a platform admin may change on any club,
 // plus fields that club admins may change via the club settings page.
 type UpdateClubInput struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Type        *string `json:"type"`
-	JoinPolicy  *string `json:"join_policy"`
-	DateFormat  *string `json:"date_format"`
-	TimeFormat  *string `json:"time_format"`
-	Timezone    *string `json:"timezone"`
+	Name           *string `json:"name"`
+	Description    *string `json:"description"`
+	Type           *string `json:"type"`
+	JoinPolicy     *string `json:"join_policy"`
+	PostVisibility *string `json:"post_visibility"`
+	DateFormat     *string `json:"date_format"`
+	TimeFormat     *string `json:"time_format"`
+	Timezone       *string `json:"timezone"`
 }

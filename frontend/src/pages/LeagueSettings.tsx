@@ -90,7 +90,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: (input: { type?: 'public' | 'private' }) =>
+    mutationFn: (input: { type?: 'public' | 'private'; post_visibility?: 'members' | 'public' }) =>
       leagueApi.update(leagueId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
@@ -127,6 +127,32 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
           {league.type === 'private'
             ? 'Private leagues are hidden from the directory. Only members see standings and scores.'
             : 'Public leagues appear in the leagues directory.'}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Post Visibility</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['members', 'public'] as const).map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ post_visibility: value })}
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                league.post_visibility === value
+                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">
+          {league.post_visibility === 'public'
+            ? 'Posts and their activity may appear on the public feed. Members’ own privacy settings still apply.'
+            : 'Posts are only visible to league members.'}
         </p>
       </div>
     </div>
