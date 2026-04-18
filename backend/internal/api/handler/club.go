@@ -37,6 +37,24 @@ func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": clubs})
 }
 
+// GET /api/v1/users/me/clubs
+func (h *ClubHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	clubs, err := h.svc.ListByUser(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list my clubs")
+		return
+	}
+	if clubs == nil {
+		clubs = []*model.Club{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": clubs})
+}
+
 // GET /api/v1/clubs/{id}
 func (h *ClubHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	clubID := chi.URLParam(r, "id")

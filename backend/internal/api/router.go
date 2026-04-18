@@ -323,6 +323,7 @@ func NewRouter(
 
 			// Clubs (auth-required operations)
 			clh := handler.NewClub(clubs, leagues, images)
+			r.Get("/users/me/clubs", clh.ListMine)
 			r.Post("/clubs", clh.Create)
 			r.Patch("/clubs/{id}", clh.Update)
 			r.Post("/clubs/{id}/join", clh.Join)
