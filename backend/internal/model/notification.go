@@ -42,8 +42,8 @@ type Notification struct {
 
 // NotificationPreferences holds per-type opt-in flags. The base flags gate
 // in-app delivery; the *_email flags gate email delivery for the same type.
-// Missing rows in the DB imply all in-app defaults true and all email defaults
-// false (see DefaultNotificationPreferences). report_filed email delivery is
+// Missing rows in the DB imply all in-app and email defaults true
+// (see DefaultNotificationPreferences). report_filed email delivery is
 // gated by DigestEmail and handled by ModerationService directly.
 type NotificationPreferences struct {
 	UserID                          string    `json:"user_id"`
@@ -87,25 +87,41 @@ type NotificationPreferences struct {
 // DefaultNotificationPreferences returns the defaults used when no row exists.
 func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 	return &NotificationPreferences{
-		UserID:                     userID,
-		FollowRequest:              true,
-		FollowAccepted:             true,
-		CommentOnMyCard:            true,
-		ReplyToMyComment:           true,
-		LikeOnMyContent:            true,
-		ScoreVerified:              true,
-		ScoreRejected:              true,
-		ScoreAmended:               true,
-		LeagueJoinApproved:         true,
-		ClubJoinApproved:           true,
-		Mention:                    true,
-		ReportFiled:                true,
-		TicketCreated:              true,
-		TicketReplied:              true,
-		TicketAssigned:             true,
-		TicketStatusChanged:        true,
-		FeatureRequestStateChanged: true,
-		DigestEmail:                false,
+		UserID:                          userID,
+		FollowRequest:                   true,
+		FollowAccepted:                  true,
+		CommentOnMyCard:                 true,
+		ReplyToMyComment:                true,
+		LikeOnMyContent:                 true,
+		ScoreVerified:                   true,
+		ScoreRejected:                   true,
+		ScoreAmended:                    true,
+		LeagueJoinApproved:              true,
+		ClubJoinApproved:                true,
+		Mention:                         true,
+		ReportFiled:                     true,
+		TicketCreated:                   true,
+		TicketReplied:                   true,
+		TicketAssigned:                  true,
+		TicketStatusChanged:             true,
+		FeatureRequestStateChanged:      true,
+		DigestEmail:                     false,
+		FollowRequestEmail:              true,
+		FollowAcceptedEmail:             true,
+		CommentOnMyCardEmail:            true,
+		ReplyToMyCommentEmail:           true,
+		LikeOnMyContentEmail:            true,
+		ScoreVerifiedEmail:              true,
+		ScoreRejectedEmail:              true,
+		ScoreAmendedEmail:               true,
+		LeagueJoinApprovedEmail:         true,
+		ClubJoinApprovedEmail:           true,
+		MentionEmail:                    true,
+		TicketCreatedEmail:              true,
+		TicketRepliedEmail:              true,
+		TicketAssignedEmail:             true,
+		TicketStatusChangedEmail:        true,
+		FeatureRequestStateChangedEmail: true,
 	}
 }
 
