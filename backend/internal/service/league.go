@@ -458,6 +458,15 @@ func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID strin
 	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
 		return nil, fmt.Errorf("%w: post_visibility must be 'members' or 'public'", ErrInvalidLeague)
 	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return nil, fmt.Errorf("%w: date_format must be one of %s", ErrInvalidLeague, validDateFormatsList())
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return nil, fmt.Errorf("%w: time_format must be '24h' or '12h'", ErrInvalidLeague)
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
+		return nil, fmt.Errorf("%w: timezone must be a valid IANA name", ErrInvalidLeague)
+	}
 	l, err := s.leagues.UpdateBasics(ctx, leagueID, in)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound

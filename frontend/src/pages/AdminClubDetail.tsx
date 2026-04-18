@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, X } from 'lucide-react'
 import { adminClubsApi } from '../api/adminClubs'
 import type { Club } from '../api/clubs'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -59,6 +60,7 @@ export default function AdminClubDetail() {
   const { id } = useParams({ from: '/app/admin/clubs/$id' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const prefs = useRegionalPrefs()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -236,7 +238,7 @@ export default function AdminClubDetail() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-muted">Joined {new Date(m.joined_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-muted">Joined {formatDate(m.joined_at, prefs)}</span>
                   </div>
                 </div>
                 <button

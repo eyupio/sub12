@@ -1,0 +1,11 @@
+ALTER TABLE users    DROP COLUMN IF EXISTS date_format;
+ALTER TABLE users    DROP COLUMN IF EXISTS time_format;
+ALTER TABLE users    DROP COLUMN IF EXISTS timezone;
+
+ALTER TABLE leagues  DROP COLUMN IF EXISTS date_format;
+ALTER TABLE leagues  DROP COLUMN IF EXISTS time_format;
+ALTER TABLE leagues  DROP COLUMN IF EXISTS timezone;
+
+ALTER TABLE clubs    DROP COLUMN IF EXISTS date_format;
+ALTER TABLE clubs    DROP COLUMN IF EXISTS time_format;
+ALTER TABLE clubs    DROP COLUMN IF EXISTS timezone;

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, X } from 'lucide-react'
 import { adminUsersApi, type AdminUser } from '../api/adminUsers'
 import { useAuthStore } from '../store/auth'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
@@ -60,6 +61,7 @@ export default function AdminUserDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
+  const prefs = useRegionalPrefs()
 
   const [selectedRole, setSelectedRole] = useState<'user' | 'admin'>('user')
   const [roleOk, setRoleOk] = useState<string | null>(null)
@@ -168,7 +170,7 @@ export default function AdminUserDetail() {
           )}
           <div className="space-y-0.5">
             <p className={labelCls}>Joined</p>
-            <p className="text-sm text-secondary">{new Date(user.created_at).toLocaleDateString()}</p>
+            <p className="text-sm text-secondary">{formatDate(user.created_at, prefs)}</p>
           </div>
         </div>
 

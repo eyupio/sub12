@@ -12,6 +12,7 @@ import { leagueApi, MyLeagueSummary } from '../api/leagues'
 import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
 import { useAuthStore } from '../store/auth'
 import { RifleProfileCard } from '../components/RifleProfileCard'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -32,16 +33,6 @@ function leagueTimingBadge(startsOn?: string, endsOn?: string): { label: string;
     return { label: `Ends ${endsOn}`, urgent: false }
   }
   return null
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const opts: Intl.DateTimeFormatOptions =
-    d.getFullYear() === now.getFullYear()
-      ? { day: 'numeric', month: 'short' }
-      : { day: 'numeric', month: 'short', year: 'numeric' }
-  return d.toLocaleDateString('en-GB', opts)
 }
 
 function scoreDelta(score: number, avg: number): { label: string; sign: 'pos' | 'neg' | 'flat' } {
@@ -295,6 +286,7 @@ function ActivityCard({ card, avgScore, scoreMax, rifleName }: {
     delta?.sign === 'pos' ? 'text-[var(--success-text)]' :
     delta?.sign === 'neg' ? 'text-[var(--error-text)]' :
     'text-muted'
+  const prefs = useRegionalPrefs()
 
   return (
     <Link
@@ -304,7 +296,7 @@ function ActivityCard({ card, avgScore, scoreMax, rifleName }: {
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at)}</p>
+          <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at, prefs)}</p>
           {card.location && (
             <p className="text-[11px] text-muted truncate mt-0.5">{card.location}</p>
           )}

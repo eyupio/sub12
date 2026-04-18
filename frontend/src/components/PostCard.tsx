@@ -5,6 +5,7 @@ import { LikeButton } from './LikeButton'
 import { ReportDialog } from './ReportDialog'
 import { useAuthStore } from '../store/auth'
 import type { Post, PostAttachment, PostVisibility } from '../api/posts'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function AttachmentPreview({ attachment }: { attachment: PostAttachment }) {
   switch (attachment.type) {
@@ -78,11 +79,8 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
     .join('')
     .toUpperCase()
 
-  const date = new Date(post.created_at).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  const prefs = useRegionalPrefs()
+  const date = formatDate(post.created_at, prefs)
 
   const isHidden = !!post.hidden_at
   const isOwnPost = currentUser?.id === post.user_id

@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LikeButton } from '../components/LikeButton'
 import { ShareDialog } from '../components/ShareDialog'
 import { ReportDialog } from '../components/ReportDialog'
+import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -39,6 +40,7 @@ function VerificationBadge({ status }: { status: string }) {
 function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; cardOwnerID: string }) {
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
+  const prefs = useRegionalPrefs()
   const [showAmend, setShowAmend] = useState(false)
   const [showReject, setShowReject] = useState(false)
   const [amendScore, setAmendScore] = useState('')
@@ -137,7 +139,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
               <UserCheck size={13} className="text-[var(--success-text)]" />
               <span className="text-secondary">{conf.display_name}</span>
               <span className="text-muted text-[11px] font-mono ml-auto">
-                {new Date(conf.created_at).toLocaleDateString()}
+                {formatDate(conf.created_at, prefs)}
               </span>
             </div>
           ))}
@@ -159,7 +161,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
                   {action.display_name} \u2014 <span className="uppercase text-[11px]">{action.action}</span>
                 </span>
                 <span className="text-muted text-[11px] font-mono ml-auto">
-                  {new Date(action.created_at).toLocaleDateString()}
+                  {formatDate(action.created_at, prefs)}
                 </span>
               </div>
               {action.action === 'amend' && action.old_total_score != null && (
@@ -334,6 +336,7 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
+  const prefs = useRegionalPrefs()
 
   const { data } = useQuery({
     queryKey: ['comments', commentId, 'replies'],
@@ -367,7 +370,7 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
             <div className="flex items-baseline gap-2 mb-0.5">
               <span className="text-[11px] font-medium text-secondary">{r.display_name}</span>
               <span className="text-[10px] text-muted">
-                {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                {formatDate(r.created_at, prefs)}
                 {new Date(r.updated_at).getTime() - new Date(r.created_at).getTime() > 5000 && (
                   <span className="ml-1 italic">(edited)</span>
                 )}
@@ -414,6 +417,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
   const [newBody, setNewBody] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
+  const prefs = useRegionalPrefs()
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -492,7 +496,7 @@ function CommentsSection({ cardId }: { cardId: string }) {
                 <div className="flex items-baseline gap-2 mb-0.5">
                   <span className="text-xs font-medium text-secondary">{c.display_name}</span>
                   <span className="text-[10px] text-muted">
-                    {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDate(c.created_at, prefs)}
                     {new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 5000 && (
                       <span className="ml-1 italic">(edited)</span>
                     )}

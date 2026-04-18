@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { pelletTestApi, type GroupTimelinePoint } from '../api/pelletTesting'
+import { formatDateShort, useRegionalPrefs } from '../utils/date'
 
 const COLORS = ['#c9a84c', '#22c55e', '#3b82f6', '#f97316', '#a855f7', '#ef4444', '#06b6d4', '#eab308']
 
 export default function GroupSizeTimeline() {
   const [unit, setUnit] = useState<'mm' | 'moa'>('mm')
   const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const prefs = useRegionalPrefs()
 
   const { data, isLoading } = useQuery({
     queryKey: ['pellet-timeline'],
@@ -89,7 +91,7 @@ export default function GroupSizeTimeline() {
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10, fill: 'var(--color-text-muted, #888)' }}
-              tickFormatter={(v: string) => v.slice(5)} // show MM-DD
+              tickFormatter={(v: string) => formatDateShort(v, prefs)}
             />
             <YAxis
               tick={{ fontSize: 10, fill: 'var(--color-text-muted, #888)' }}

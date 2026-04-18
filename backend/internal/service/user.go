@@ -188,6 +188,15 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 			return nil, fmt.Errorf("%w: default_measurement_unit must be 'cm' or 'mm'", ErrInvalidProfile)
 		}
 	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return nil, fmt.Errorf("%w: date_format must be one of %s", ErrInvalidProfile, validDateFormatsList())
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return nil, fmt.Errorf("%w: time_format must be '24h' or '12h'", ErrInvalidProfile)
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
+		return nil, fmt.Errorf("%w: timezone must be a valid IANA name", ErrInvalidProfile)
+	}
 	return s.users.UpdateMe(ctx, id, in)
 }
 
