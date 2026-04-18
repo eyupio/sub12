@@ -860,23 +860,57 @@ export default function LandingPage() {
 
                 <div className="grid gap-5 p-6 md:grid-cols-[0.9fr_1.1fr]">
                   <div className="rounded-[24px] border border-subtle bg-page p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Measured Target</p>
-                    <div className="mt-4 flex h-[240px] items-center justify-center rounded-[24px] border border-subtle bg-surface">
-                      <div className="relative flex h-[170px] w-[170px] items-center justify-center rounded-full border border-[var(--brass)]/20">
-                        <div className="absolute h-[110px] w-[110px] rounded-full border border-subtle" />
-                        <div className="absolute h-[56px] w-[56px] rounded-full border border-[var(--brass)]/25" />
-                        {[
-                          'left-[73px] top-[62px]',
-                          'left-[84px] top-[68px]',
-                          'left-[79px] top-[79px]',
-                          'left-[90px] top-[84px]',
-                          'left-[74px] top-[92px]',
-                        ].map((position) => (
-                          <span
-                            key={position}
-                            className={`absolute h-2.5 w-2.5 rounded-full bg-[var(--brass)] shadow-[0_0_0_3px_rgba(184,136,44,0.14)] ${position}`}
-                          />
-                        ))}
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Measured Target</p>
+                      <span className="rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--brass)]">
+                        Analysed &middot; 92%
+                      </span>
+                    </div>
+                    <div className="relative mt-4 aspect-square overflow-hidden rounded-[24px] border border-subtle" style={{ background: '#f5efe2' }}>
+                      <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(60,40,20,0.06) 1px, transparent 1px)', backgroundSize: '6px 6px' }} />
+                      <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+                        <g fill="none" stroke="rgba(60,40,20,0.18)" strokeWidth="1.2">
+                          <circle cx="200" cy="200" r="160" />
+                          <circle cx="200" cy="200" r="120" />
+                          <circle cx="200" cy="200" r="80" />
+                          <circle cx="200" cy="200" r="44" />
+                          <circle cx="200" cy="200" r="18" fill="rgba(60,40,20,0.30)" />
+                        </g>
+                        <line x1="64" y1="356" x2="172" y2="356" stroke="#eab308" strokeWidth="1.4" strokeDasharray="5 4" opacity="0.85" />
+                        <circle cx="64" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
+                        <text x="64" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">A</text>
+                        <circle cx="172" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
+                        <text x="172" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">B</text>
+                        <rect x="98" y="332" width="40" height="16" rx="4" fill="rgba(20,20,20,0.85)" />
+                        <text x="118" y="343" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fill="#eab308">25 mm</text>
+                        <g stroke="#ef4444" strokeWidth="1.4" opacity="0.85">
+                          <line x1="0" y1="195" x2="400" y2="195" />
+                          <line x1="205" y1="0" x2="205" y2="400" />
+                        </g>
+                        <g stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.18)">
+                          <circle cx="194" cy="180" r="11" />
+                          <circle cx="210" cy="186" r="11" />
+                          <circle cx="201" cy="198" r="11" />
+                          <circle cx="217" cy="202" r="11" />
+                          <circle cx="196" cy="210" r="11" />
+                        </g>
+                        <rect x="178" y="164" width="58" height="62" rx="4" fill="none" stroke="rgba(184,136,44,0.85)" strokeWidth="1.3" strokeDasharray="4 3" />
+                        <rect x="186" y="232" width="76" height="18" rx="4" fill="rgba(20,20,20,0.85)" stroke="rgba(184,136,44,0.5)" strokeWidth="1" />
+                        <text x="224" y="244" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="11" fontWeight="500" fill="#d4a44a">Group: 8.31 mm</text>
+                      </svg>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Group</p>
+                        <p className="mt-0.5 font-mono text-xs font-semibold text-[var(--brass)]">8.31 mm</p>
+                      </div>
+                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">MOA</p>
+                        <p className="mt-0.5 font-mono text-xs font-semibold text-primary">0.63</p>
+                      </div>
+                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Distance</p>
+                        <p className="mt-0.5 font-mono text-xs font-semibold text-primary">45 m</p>
                       </div>
                     </div>
                   </div>
