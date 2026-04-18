@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { featureRequestsApi } from '../api/featureRequests'
 import { FeatureRequestVoteButton } from '../components/FeatureRequestVoteButton'
 
@@ -25,7 +26,10 @@ export default function FeatureBoard() {
     <div className="mx-auto max-w-4xl p-4 md:p-6 space-y-4">
       <div className="rounded-2xl border border-subtle bg-surface p-4">
         <h1 className="text-2xl font-semibold">Community feature board</h1>
-        <p className="text-sm text-muted mt-1">Browse, rank, and vote on scoped feature requests.</p>
+        <p className="text-sm text-muted mt-1">
+          Browse, rank, and upvote scoped feature requests. Need to submit a new request? Open a{' '}
+          <Link to="/support" className="text-[var(--brass)] hover:underline">feature ticket in Support</Link>.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <label className="text-sm">
             Scope type
