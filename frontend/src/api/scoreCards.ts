@@ -62,6 +62,8 @@ export interface Comment {
   like_count: number
   reply_count: number
   is_liked: boolean
+  is_flagged?: boolean
+  flag_reason?: string | null
   created_at: string
   updated_at: string
 }
@@ -114,4 +116,10 @@ export const commentApi = {
 
   delete: (commentId: string) =>
     api.del<void>(`/comments/${commentId}`),
+
+  flag: (commentId: string, reason: string) =>
+    api.post<{ flagged: boolean }>(`/comments/${commentId}/flag`, { reason }),
+
+  unflag: (commentId: string) =>
+    api.post<{ flagged: boolean }>(`/comments/${commentId}/unflag`, {}),
 }

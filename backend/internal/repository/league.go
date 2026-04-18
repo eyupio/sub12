@@ -1004,6 +1004,35 @@ func (r *LeagueRepository) RemoveMember(ctx context.Context, leagueID, memberID 
 	return nil
 }
 
+// LeaveLeague removes the caller's own membership row regardless of admin
+// status. The last-admin guard is enforced in the service layer.
+func (r *LeagueRepository) LeaveLeague(ctx context.Context, leagueID, userID string) error {
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM league_members WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("leave league: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountAdmins returns the number of admins in a league.
+func (r *LeagueRepository) CountAdmins(ctx context.Context, leagueID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM league_members WHERE league_id = $1 AND is_admin = true`,
+		leagueID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count league admins: %w", err)
+	}
+	return count, nil
+}
+
 // GetLeagueByScoreCardID resolves the league that a score card belongs to
 // by traversing score_cards → rounds → seasons → leagues.
 func (r *LeagueRepository) GetLeagueByScoreCardID(ctx context.Context, scoreCardID string) (*model.ScoreCardLeague, error) {

@@ -89,14 +89,14 @@ func (s *AchievementService) award(ctx context.Context, userID, achievementID st
 	if err != nil || def == nil {
 		return
 	}
-	aid, tt := achievementID, "achievement"
+	tt := "achievement"
 	meta := model.AchievementEarnedMeta{
 		AchievementID:          achievementID,
 		AchievementName:        def.Name,
 		AchievementIcon:        def.Icon,
 		AchievementDescription: def.Description,
 	}
-	go s.activity.Ingest(context.Background(), userID, model.ActivityAchievementEarned, &aid, &tt, meta, nil, nil, "public")
+	go s.activity.Ingest(context.Background(), userID, model.ActivityAchievementEarned, nil, &tt, meta, nil, nil, "public")
 }
 
 // EvaluateForScoreCard checks all score-card achievement rules against the newly

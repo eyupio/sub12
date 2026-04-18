@@ -24,6 +24,8 @@ export interface Post {
   like_count: number
   comment_count: number
   is_liked: boolean
+  is_flagged?: boolean
+  flag_reason?: string | null
   attachments: PostAttachment[]
   created_at: string
   updated_at: string
@@ -79,4 +81,10 @@ export const postApi = {
 
   createComment: (id: string, body: string) =>
     api.post<Comment>(`/posts/${id}/comments`, { body }),
+
+  flag: (id: string, reason: string) =>
+    api.post<{ flagged: boolean }>(`/posts/${id}/flag`, { reason }),
+
+  unflag: (id: string) =>
+    api.post<{ flagged: boolean }>(`/posts/${id}/unflag`, {}),
 }

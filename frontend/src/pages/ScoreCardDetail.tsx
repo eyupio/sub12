@@ -5,14 +5,19 @@ import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCirc
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
+import { clubsApi } from '../api/clubs'
 import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { FlagDialog } from '../components/FlagDialog'
 import { LikeButton } from '../components/LikeButton'
 import { ShareDialog } from '../components/ShareDialog'
 import { ReportDialog } from '../components/ReportDialog'
+import { FlagDialog } from '../components/FlagDialog'
+import { clubsApi } from '../api/clubs'
+import { Flag } from 'lucide-react'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function VerificationBadge({ status }: { status: string }) {
@@ -411,7 +416,7 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
   )
 }
 
-function CommentsSection({ cardId }: { cardId: string }) {
+function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate: boolean }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [newBody, setNewBody] = useState('')
@@ -420,6 +425,23 @@ function CommentsSection({ cardId }: { cardId: string }) {
   const prefs = useRegionalPrefs()
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [flagTargetId, setFlagTargetId] = useState<string | null>(null)
+
+  const flagMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => commentApi.flag(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+    },
+  })
+
+  const unflagMutation = useMutation({
+    mutationFn: (id: string) => commentApi.unflag(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', cardId, 'comments'] })
+      toast('Flag cleared', 'success')
+    },
+    onError: () => toast('Failed to clear flag', 'error'),
+  })
 
   const { data } = useQuery({
     queryKey: ['score-cards', cardId, 'comments'],
@@ -529,27 +551,63 @@ function CommentsSection({ cardId }: { cardId: string }) {
                   </div>
                 ) : (
                   <>
+                    {c.is_flagged && (
+                      <div className="mb-1 px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px]">
+                        {currentUser?.id === c.user_id ? (
+                          <>A moderator flagged this comment — please reflect and edit to amend. Your edit clears the flag.</>
+                        ) : (
+                          <>Flagged by a moderator — pending amendment.</>
+                        )}
+                        {c.flag_reason && (
+                          <span className="block text-[10px] text-muted mt-0.5">Reason: {c.flag_reason}</span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm text-secondary leading-relaxed">{c.body}</p>
-                      {currentUser?.id === c.user_id && (
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => startEdit(c)}
-                            className="p-1 text-muted hover:text-secondary transition-colors"
-                            aria-label="Edit comment"
-                          >
-                            <Edit3 size={12} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteId(c.id)}
-                            disabled={deleteMutation.isPending}
-                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
-                            aria-label="Delete comment"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-1 flex-shrink-0">
+                        {currentUser?.id === c.user_id && (
+                          <>
+                            <button
+                              onClick={() => startEdit(c)}
+                              className="p-1 text-muted hover:text-secondary transition-colors"
+                              aria-label="Edit comment"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(c.id)}
+                              disabled={deleteMutation.isPending}
+                              className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                              aria-label="Delete comment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </>
+                        )}
+                        {canModerate && currentUser?.id !== c.user_id && (
+                          c.is_flagged ? (
+                            <button
+                              onClick={() => unflagMutation.mutate(c.id)}
+                              disabled={unflagMutation.isPending}
+                              className="p-1 text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity disabled:opacity-40"
+                              aria-label="Clear flag"
+                              title="Clear flag"
+                            >
+                              <Flag size={12} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setFlagTargetId(c.id)}
+                              className="p-1 text-muted hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                              aria-label="Flag for amendment"
+                              title="Flag for amendment"
+                            >
+                              <Flag size={12} />
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                     {/* Comment actions: like + reply toggle */}
                     <div className="flex items-center gap-3 mt-1">
@@ -619,6 +677,15 @@ function CommentsSection({ cardId }: { cardId: string }) {
         }}
         onCancel={() => setConfirmDeleteId(null)}
       />
+
+      <FlagDialog
+        open={flagTargetId !== null}
+        targetLabel="comment"
+        onClose={() => setFlagTargetId(null)}
+        onSubmit={async (reason) => {
+          if (flagTargetId) await flagMutation.mutateAsync({ id: flagTargetId, reason })
+        }}
+      />
     </div>
   )
 }
@@ -656,6 +723,26 @@ export default function ScoreCardDetail() {
     queryFn: () => usersApi.getProfile(card!.user_id),
     enabled: notOwnCard,
   })
+
+  // Moderation: a user can moderate comments on this card if they are a
+  // global admin, an admin of the card's league, or an admin of the card's
+  // club. Fetch league members + club info for the card when present.
+  const { data: cardLeagueMembers } = useQuery({
+    queryKey: ['leagues', cardLeague?.id, 'members'],
+    queryFn: () => leagueApi.listMembers(cardLeague!.id),
+    enabled: !!cardLeague?.id && !!currentUser,
+  })
+  const { data: cardClub } = useQuery({
+    queryKey: ['clubs', card?.club_id],
+    queryFn: () => clubsApi.get(card!.club_id!),
+    enabled: !!card?.club_id && !!currentUser,
+  })
+  const isCardLeagueAdmin = !!cardLeagueMembers?.items?.find(
+    (m) => m.user_id === currentUser?.id && m.is_admin,
+  )
+  const isCardClubAdmin = !!cardClub?.is_admin
+  const isGlobalAdmin = currentUser?.role === 'admin'
+  const canModerateComments = isGlobalAdmin || isCardLeagueAdmin || isCardClubAdmin
 
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles(), enabled: editing })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
@@ -1069,7 +1156,7 @@ export default function ScoreCardDetail() {
       />
 
       {/* Comments */}
-      <CommentsSection cardId={id} />
+      <CommentsSection cardId={id} canModerate={canModerateComments} />
 
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
