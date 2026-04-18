@@ -15,6 +15,22 @@ export interface ScoreCardSummary {
   created_at: string
 }
 
+export interface ScoreCardAuthor {
+  id: string
+  display_name: string
+  avatar_url?: string
+  location?: string
+  bio?: string
+  star_level: number
+}
+
+export interface ScoreCardAchievement {
+  id: string
+  name: string
+  icon: string
+  earned_at: string
+}
+
 export interface ScoreCard extends ScoreCardSummary {
   user_id: string
   rifle_id?: string
@@ -33,6 +49,8 @@ export interface ScoreCard extends ScoreCardSummary {
   comment_count: number
   is_liked: boolean
   updated_at: string
+  author?: ScoreCardAuthor
+  achievements?: ScoreCardAchievement[]
 }
 
 export interface CreateScoreCardPayload {

@@ -198,6 +198,45 @@ func (s *ScoreCardService) GetForViewer(ctx context.Context, id, viewerID string
 	return card, nil
 }
 
+// GetForViewerWithAuthor returns a score card alongside a compact author
+// block and the owner's earned achievements. Privacy rules mirror
+// GetForViewer: anonymous viewers see only public cards owned by public
+// profiles. The author / achievements fields degrade to nil on any lookup
+// error so a transient profile fetch never hides an otherwise-visible card.
+func (s *ScoreCardService) GetForViewerWithAuthor(ctx context.Context, id, viewerID string) (*model.ScoreCardWithAuthor, error) {
+	card, err := s.GetForViewer(ctx, id, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	out := &model.ScoreCardWithAuthor{ScoreCard: card}
+	if s.users != nil {
+		if owner, err := s.users.GetByID(ctx, card.UserID); err == nil && owner != nil {
+			out.Author = &model.ScoreCardAuthor{
+				ID:          owner.ID,
+				DisplayName: owner.DisplayName,
+				AvatarURL:   owner.AvatarURL,
+				Location:    owner.Location,
+				Bio:         owner.Bio,
+				StarLevel:   owner.StarLevel,
+			}
+		}
+	}
+	if s.achievement != nil {
+		if items, err := s.achievement.ListForUser(ctx, card.UserID, viewerID); err == nil {
+			out.Achievements = make([]*model.ScoreCardAchievement, 0, len(items))
+			for _, a := range items {
+				out.Achievements = append(out.Achievements, &model.ScoreCardAchievement{
+					ID:       a.ID,
+					Name:     a.Name,
+					Icon:     a.Icon,
+					EarnedAt: a.EarnedAt,
+				})
+			}
+		}
+	}
+	return out, nil
+}
+
 // ListByUser returns paginated summaries for the requesting user.
 // scope filters results: "personal", "league", or "" (all).
 // leagueID optionally filters to cards belonging to a specific league.

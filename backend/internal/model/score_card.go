@@ -28,6 +28,36 @@ type ScoreCard struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+// ScoreCardAuthor is a compact, public-safe subset of the card owner's
+// profile, embedded into the score-card GET response so shared views can
+// render attribution (avatar, name, location, star level) in one fetch.
+type ScoreCardAuthor struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"display_name"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
+	Location    *string `json:"location,omitempty"`
+	Bio         *string `json:"bio,omitempty"`
+	StarLevel   int     `json:"star_level"`
+}
+
+// ScoreCardAchievement is an earned achievement surfaced alongside a shared
+// score card so viewers can see the owner's accomplishments at a glance.
+type ScoreCardAchievement struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Icon     string    `json:"icon"`
+	EarnedAt time.Time `json:"earned_at"`
+}
+
+// ScoreCardWithAuthor is the enriched response used by the public
+// score-card GET endpoint. It keeps the full `ScoreCard` JSON shape intact
+// and layers optional `author` / `achievements` attribution on top.
+type ScoreCardWithAuthor struct {
+	*ScoreCard
+	Author       *ScoreCardAuthor        `json:"author,omitempty"`
+	Achievements []*ScoreCardAchievement `json:"achievements,omitempty"`
+}
+
 type CreateScoreCardInput struct {
 	RifleID       *string  `json:"rifle_id"`
 	PelletID      *string  `json:"pellet_id"`
