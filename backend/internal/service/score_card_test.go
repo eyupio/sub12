@@ -15,8 +15,11 @@ import (
 type mockScoreCardRepo struct {
 	createCalled bool
 	updateCalled bool
+	deleteCalled bool
 	lastTotal    int16
 	lastXCount   int16
+	// card is returned from GetByID; if nil, a placeholder is returned.
+	card *model.ScoreCard
 }
 
 func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
@@ -26,6 +29,9 @@ func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateS
 	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "verified"}, nil
 }
 func (m *mockScoreCardRepo) GetByID(_ context.Context, _, _ string) (*model.ScoreCard, error) {
+	if m.card != nil {
+		return m.card, nil
+	}
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
 func (m *mockScoreCardRepo) GetPublicByID(_ context.Context, _ string) (*model.ScoreCard, error) {
@@ -41,8 +47,30 @@ func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, _ *model.Upda
 	m.lastXCount = xCount
 	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "pending"}, nil
 }
+func (m *mockScoreCardRepo) Delete(_ context.Context, _, _ string) error {
+	m.deleteCalled = true
+	return nil
+}
 func (m *mockScoreCardRepo) IsPersonalBest(_ context.Context, _, _ string, _ int16) (bool, error) {
 	return false, nil
+}
+
+// mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
+type mockLeagueRepo struct {
+	cfg *model.LeagueConfig
+}
+
+func (m *mockLeagueRepo) GetConfigByRoundID(_ context.Context, _ string) (*model.LeagueConfig, error) {
+	return m.cfg, nil
+}
+func (m *mockLeagueRepo) CountUserSubmissionsForRound(_ context.Context, _, _ string) (int, error) {
+	return 0, nil
+}
+func (m *mockLeagueRepo) GetLeagueIDByRoundID(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+func (m *mockLeagueRepo) GetByID(_ context.Context, _ string) (*model.League, error) {
+	return nil, nil
 }
 
 func newTestService(repo *mockScoreCardRepo) *ScoreCardService {
@@ -159,4 +187,86 @@ func TestUpdate_NegativeScore(t *testing.T) {
 		ShotXs:     make([]bool, 25),
 	})
 	assert.ErrorIs(t, err, ErrInvalidCard)
+}
+
+// --- Delete tests ---
+
+func TestDelete_Personal(t *testing.T) {
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{ID: "card1", Verification: "verified"},
+	}
+	svc := newTestService(repo)
+
+	err := svc.Delete(context.Background(), "card1", "user1")
+	require.NoError(t, err)
+	assert.True(t, repo.deleteCalled)
+}
+
+func TestDelete_LockedLeagueCard(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID:            "card1",
+			Verification:  "verified",
+			LeagueRoundID: &roundID,
+		},
+	}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{cfg: &model.LeagueConfig{
+			LockEditsAfterVerification: true,
+		}},
+	}
+
+	err := svc.Delete(context.Background(), "card1", "user1")
+	assert.ErrorIs(t, err, ErrEditsLocked)
+	assert.False(t, repo.deleteCalled)
+}
+
+func TestDelete_UnverifiedLeagueCardNotLocked(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID:            "card1",
+			Verification:  "pending",
+			LeagueRoundID: &roundID,
+		},
+	}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{cfg: &model.LeagueConfig{
+			LockEditsAfterVerification: true,
+		}},
+	}
+
+	err := svc.Delete(context.Background(), "card1", "user1")
+	require.NoError(t, err)
+	assert.True(t, repo.deleteCalled)
+}
+
+func TestUpdate_LockedLeagueCard(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID:            "card1",
+			Verification:  "verified",
+			LeagueRoundID: &roundID,
+		},
+	}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{cfg: &model.LeagueConfig{
+			LockEditsAfterVerification: true,
+		}},
+	}
+
+	scores := make([]int16, 25)
+	xs := make([]bool, 25)
+	_, err := svc.Update(context.Background(), "card1", "user1", &model.UpdateScoreCardInput{
+		ShotAt:     "2025-01-01",
+		ShotScores: scores,
+		ShotXs:     xs,
+	})
+	assert.ErrorIs(t, err, ErrEditsLocked)
+	assert.False(t, repo.updateCalled)
 }

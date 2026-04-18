@@ -65,27 +65,29 @@ type LeagueStanding struct {
 
 // LeagueConfig holds all configurable settings for a league.
 type LeagueConfig struct {
-	LeagueID                 string    `json:"league_id"`
-	StartsOn                 *string   `json:"starts_on,omitempty"`
-	EndsOn                   *string   `json:"ends_on,omitempty"`
-	MaxSubmissionsPerRound   int16     `json:"max_submissions_per_round"`
-	ScoringRule              string    `json:"scoring_rule"`
-	JoinPolicy               string    `json:"join_policy"`
-	RequireScoreVerification bool      `json:"require_score_verification"`
-	RequiredConfirmations    int16     `json:"required_confirmations"`
-	RequireImageUpload       bool      `json:"require_image_upload"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	LeagueID                   string    `json:"league_id"`
+	StartsOn                   *string   `json:"starts_on,omitempty"`
+	EndsOn                     *string   `json:"ends_on,omitempty"`
+	MaxSubmissionsPerRound     int16     `json:"max_submissions_per_round"`
+	ScoringRule                string    `json:"scoring_rule"`
+	JoinPolicy                 string    `json:"join_policy"`
+	RequireScoreVerification   bool      `json:"require_score_verification"`
+	RequiredConfirmations      int16     `json:"required_confirmations"`
+	RequireImageUpload         bool      `json:"require_image_upload"`
+	LockEditsAfterVerification bool      `json:"lock_edits_after_verification"`
+	UpdatedAt                  time.Time `json:"updated_at"`
 }
 
 type UpdateLeagueConfigInput struct {
-	StartsOn                 *string `json:"starts_on"`
-	EndsOn                   *string `json:"ends_on"`
-	MaxSubmissionsPerRound   *int16  `json:"max_submissions_per_round"`
-	ScoringRule              *string `json:"scoring_rule"`
-	JoinPolicy               *string `json:"join_policy"`
-	RequireScoreVerification *bool   `json:"require_score_verification"`
-	RequiredConfirmations    *int16  `json:"required_confirmations"`
-	RequireImageUpload       *bool   `json:"require_image_upload"`
+	StartsOn                   *string `json:"starts_on"`
+	EndsOn                     *string `json:"ends_on"`
+	MaxSubmissionsPerRound     *int16  `json:"max_submissions_per_round"`
+	ScoringRule                *string `json:"scoring_rule"`
+	JoinPolicy                 *string `json:"join_policy"`
+	RequireScoreVerification   *bool   `json:"require_score_verification"`
+	RequiredConfirmations      *int16  `json:"required_confirmations"`
+	RequireImageUpload         *bool   `json:"require_image_upload"`
+	LockEditsAfterVerification *bool   `json:"lock_edits_after_verification"`
 }
 
 type Season struct {

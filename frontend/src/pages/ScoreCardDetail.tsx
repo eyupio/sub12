@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
@@ -697,10 +697,12 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
 
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
+  const navigate = useNavigate()
   const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
   const [showLightbox, setShowLightbox] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
@@ -775,6 +777,33 @@ export default function ScoreCardDetail() {
       clearImage()
       setEditing(false)
       toast('Score card updated', 'success')
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 403) {
+        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+      }
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => scoreCardApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['activity'] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      if (cardLeague?.id) {
+        queryClient.invalidateQueries({ queryKey: ['leagues', cardLeague.id] })
+        queryClient.invalidateQueries({ queryKey: ['leagues', cardLeague.id, 'standings'] })
+      }
+      toast('Score card deleted', 'success')
+      navigate({ to: '/scores' })
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 403) {
+        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+      } else {
+        toast('Failed to delete score card', 'error')
+      }
     },
   })
 
@@ -868,9 +897,19 @@ export default function ScoreCardDetail() {
           {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
         </div>
         {isOwner && !editing && (
-          <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
-            <Pencil size={13} /> Edit
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
+              <Pencil size={13} /> Edit
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleteMutation.isPending}
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+              aria-label="Delete score card"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+          </div>
         )}
       </div>
 
@@ -1161,6 +1200,20 @@ export default function ScoreCardDetail() {
         targetType="score_card"
         targetId={id}
         onClose={() => setShowReport(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete score card?"
+        message={card.league_round_id
+          ? 'This removes the card, its league submission, comments, and likes. League standings will update accordingly. This cannot be undone.'
+          : 'This removes the card, its comments, and likes. This cannot be undone.'}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setShowDeleteConfirm(false)
+          deleteMutation.mutate()
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
       />
 
       {/* Comments */}

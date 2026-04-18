@@ -171,6 +171,10 @@ func (h *ScoreCardHandler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrEditsLocked) {
+			writeError(w, http.StatusForbidden, "this score card is locked by league policy")
+			return
+		}
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "score card not found")
 			return
@@ -180,4 +184,30 @@ func (h *ScoreCardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, card)
+}
+
+// DELETE /api/v1/score-cards/{id}
+func (h *ScoreCardHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	if err := h.svc.Delete(r.Context(), id, userID); err != nil {
+		if errors.Is(err, service.ErrEditsLocked) {
+			writeError(w, http.StatusForbidden, "this score card is locked by league policy")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete score card")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

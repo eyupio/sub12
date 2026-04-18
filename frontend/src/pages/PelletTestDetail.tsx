@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2, X } from 'lucide-react'
+import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2, X, Pencil } from 'lucide-react'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { ShareDialog } from '../components/ShareDialog'
@@ -75,6 +75,17 @@ export default function PelletTestDetail() {
   const [showShare, setShowShare] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null)
 
+  // Session edit state
+  const [editing, setEditing] = useState(false)
+  const [editMeta, setEditMeta] = useState({
+    test_date: '',
+    distance_value: '',
+    distance_unit: 'meters',
+    location: '',
+    notes: '',
+    is_public: false,
+  })
+
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
     queryFn: () => pelletTestApi.get(id!),
@@ -135,6 +146,46 @@ export default function PelletTestDetail() {
       navigate({ to: '/pellet-testing' })
     },
   })
+
+  const updateSessionMutation = useMutation({
+    mutationFn: () => {
+      const distance = editMeta.distance_value === '' ? undefined : Number(editMeta.distance_value)
+      return pelletTestApi.update(id!, {
+        test_date: editMeta.test_date || undefined,
+        distance_value: distance,
+        distance_unit: editMeta.distance_unit || undefined,
+        location: editMeta.location || undefined,
+        notes: editMeta.notes || undefined,
+        is_public: editMeta.is_public,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
+      qc.invalidateQueries({ queryKey: ['pellet-tests'] })
+      setEditing(false)
+      toast('Pellet test updated', 'success')
+    },
+    onError: () => {
+      toast('Failed to update pellet test', 'error')
+    },
+  })
+
+  const startSessionEdit = () => {
+    if (!session) return
+    const unit = session.distance_unit || 'meters'
+    const distanceValue = unit === 'yards'
+      ? (session.distance_m / 0.9144).toFixed(0)
+      : String(session.distance_m)
+    setEditMeta({
+      test_date: session.test_date,
+      distance_value: distanceValue,
+      distance_unit: unit,
+      location: session.location ?? '',
+      notes: session.notes ?? '',
+      is_public: session.is_public,
+    })
+    setEditing(true)
+  }
 
   const addGroupMutation = useMutation({
     mutationFn: () => pelletTestApi.createGroup(id!, {
@@ -428,6 +479,16 @@ export default function PelletTestDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {!editing && (
+              <button
+                onClick={startSessionEdit}
+                className="text-muted hover:text-[var(--brass)] transition-colors"
+                aria-label="Edit test"
+                title="Edit"
+              >
+                <Pencil size={18} />
+              </button>
+            )}
             <button
               onClick={() => setShowShare(true)}
               className="text-muted hover:text-secondary transition-colors"
@@ -454,6 +515,87 @@ export default function PelletTestDetail() {
             </button>
           </div>
         </div>
+
+        {editing && (
+          <div className="mt-4 space-y-3 border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+            <h2 className="text-[11px] tracking-widest uppercase text-muted">Edit Test Details</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Test Date</label>
+                <input
+                  type="date"
+                  value={editMeta.test_date}
+                  onChange={e => setEditMeta(m => ({ ...m, test_date: e.target.value }))}
+                  className={inputCls + ' font-mono'}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editMeta.location}
+                  onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))}
+                  placeholder="Range / club"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={editMeta.distance_value}
+                  onChange={e => setEditMeta(m => ({ ...m, distance_value: e.target.value }))}
+                  className={inputCls + ' font-mono'}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Unit</label>
+                <select
+                  value={editMeta.distance_unit}
+                  onChange={e => setEditMeta(m => ({ ...m, distance_unit: e.target.value }))}
+                  className={inputCls}
+                >
+                  <option value="meters">meters</option>
+                  <option value="yards">yards</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+              <textarea
+                value={editMeta.notes}
+                onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))}
+                rows={2}
+                className={inputCls + ' resize-none'}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-secondary">
+              <input
+                type="checkbox"
+                checked={editMeta.is_public}
+                onChange={e => setEditMeta(m => ({ ...m, is_public: e.target.checked }))}
+              />
+              Share this test on the public leaderboard
+            </label>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => updateSessionMutation.mutate()}
+                disabled={updateSessionMutation.isPending || !editMeta.test_date}
+                className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40"
+              >
+                {updateSessionMutation.isPending ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={updateSessionMutation.isPending}
+                className="px-4 py-2.5 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Rifle + Pellet */}
