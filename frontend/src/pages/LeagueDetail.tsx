@@ -421,24 +421,20 @@ export default function LeagueDetail() {
 
       {/* Invite link — shown to members when league has an invite code */}
       {isMember && league?.join_code && (
-        <div className="border border-subtle rounded p-3 bg-surface space-y-1.5">
-          <p className="text-[10px] tracking-widest uppercase text-muted">Invite Link</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs text-secondary bg-page rounded px-2 py-1.5 truncate font-mono">
-              {`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`}
-            </code>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
-              className="flex-shrink-0 p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors"
-              aria-label="Copy invite link"
-            >
-              {copied ? <Check size={14} className="text-[var(--brass)]" /> : <Copy size={14} />}
-            </button>
-          </div>
+        <div className="border border-subtle rounded p-3 bg-surface">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/leagues/${leagueId!}?code=${encodeURIComponent(league.join_code!)}`)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            title="Copy invite link"
+            aria-label="Copy invite link"
+          >
+            {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
+            {copied ? 'Copied!' : 'Copy invite link'}
+          </button>
         </div>
       )}
 
