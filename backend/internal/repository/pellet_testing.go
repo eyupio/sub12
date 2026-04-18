@@ -486,18 +486,23 @@ func (r *PelletTestRepository) GetStats(ctx context.Context, userID string) (*mo
 		return nil, fmt.Errorf("get pellet test stats: %w", err)
 	}
 
-	// Most tested pellet
+	// Top-performing pellet (smallest best group).
 	err = r.db.QueryRow(ctx, `
 		SELECT p.brand || ' ' || p.model
 		FROM pellet_test_sessions s
 		JOIN pellets p ON p.id = s.pellet_id
 		WHERE s.user_id = $1
+		  AND s.group_count > 0
+		  AND s.best_group_size_mm IS NOT NULL
 		GROUP BY s.pellet_id, p.brand, p.model
-		ORDER BY COUNT(*) DESC
+		ORDER BY
+			MIN(s.best_group_size_mm) ASC,
+			AVG(s.average_group_size_mm) ASC,
+			COUNT(*) DESC
 		LIMIT 1
 	`, userID).Scan(&stats.MostTestedPellet)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("get most tested pellet: %w", err)
+		return nil, fmt.Errorf("get top pellet: %w", err)
 	}
 
 	return &stats, nil
