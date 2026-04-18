@@ -33,7 +33,7 @@ type Config struct {
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 
 	// Public site URL used for sitemap generation and SEO pings.
-	SiteURL string `envconfig:"SITE_URL" default:"http://localhost:5173"`
+	SiteURL string `envconfig:"SITE_URL" default:"https://sub12.io"`
 	// IndexNow key used to authenticate URL submission requests.
 	IndexNowKey string `envconfig:"INDEXNOW_KEY" default:""`
 	// Public URL where the IndexNow key file can be fetched.
