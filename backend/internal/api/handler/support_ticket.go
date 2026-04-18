@@ -111,10 +111,36 @@ func (h *SupportTicketHandler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "support ticket not found")
 			return
 		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
 		h.writeValidationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (h *SupportTicketHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := h.svc.Delete(r.Context(), id, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete support ticket")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (h *SupportTicketHandler) AddMessage(w http.ResponseWriter, r *http.Request) {

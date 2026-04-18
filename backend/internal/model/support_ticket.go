@@ -109,10 +109,12 @@ type ListSupportTicketsInput struct {
 }
 
 type UpdateSupportTicketInput struct {
-	Category   *string `json:"category,omitempty"`
-	Status     *string `json:"status,omitempty"`
-	Priority   *string `json:"priority,omitempty"`
-	AssigneeID *string `json:"assignee_id,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Category    *string `json:"category,omitempty"`
+	Status      *string `json:"status,omitempty"`
+	Priority    *string `json:"priority,omitempty"`
+	AssigneeID  *string `json:"assignee_id,omitempty"`
 }
 
 type AddSupportTicketMessageInput struct {

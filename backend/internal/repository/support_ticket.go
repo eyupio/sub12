@@ -177,6 +177,14 @@ func (r *SupportTicketRepository) Update(ctx context.Context, id, actorID string
 	if in.Category != nil {
 		category = *in.Category
 	}
+	title := current.Title
+	if in.Title != nil {
+		title = *in.Title
+	}
+	description := current.Description
+	if in.Description != nil {
+		description = *in.Description
+	}
 	status := current.Status
 	if in.Status != nil {
 		status = *in.Status
@@ -199,14 +207,16 @@ func (r *SupportTicketRepository) Update(ctx context.Context, id, actorID string
 	err = r.db.QueryRow(ctx, `
 		UPDATE support_tickets
 		SET category = $2,
-		    status = $3,
-		    priority = $4,
-		    assignee_id = $5,
+		    title = $3,
+		    description = $4,
+		    status = $5,
+		    priority = $6,
+		    assignee_id = $7,
 		    updated_at = NOW(),
-		    closed_at = $6
+		    closed_at = $8
 		WHERE id = $1
 		RETURNING id, requester_id, scope_type, scope_id, category, title, description, status, priority, assignee_id, created_at, updated_at, closed_at
-	`, id, category, status, priority, assigneeID, closedAt).Scan(
+	`, id, category, title, description, status, priority, assigneeID, closedAt).Scan(
 		&updated.ID, &updated.RequesterID, &updated.ScopeType, &updated.ScopeID, &updated.Category, &updated.Title,
 		&updated.Description, &updated.Status, &updated.Priority, &updated.AssigneeID, &updated.CreatedAt, &updated.UpdatedAt, &updated.ClosedAt,
 	)
@@ -231,6 +241,17 @@ func (r *SupportTicketRepository) Update(ctx context.Context, id, actorID string
 		`, id, *assigneeID)
 	}
 	return updated, nil
+}
+
+func (r *SupportTicketRepository) Delete(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM support_tickets WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete support ticket: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *SupportTicketRepository) AddMessage(ctx context.Context, ticketID, authorID string, in *model.AddSupportTicketMessageInput) (*model.SupportTicketMessage, error) {
