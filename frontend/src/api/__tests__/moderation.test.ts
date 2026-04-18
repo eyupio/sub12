@@ -9,6 +9,7 @@ vi.mock('../../store/auth', () => ({
 import { commentApi } from '../scoreCards'
 import { postApi } from '../posts'
 import { leagueApi } from '../leagues'
+import { reportsApi } from '../reports'
 
 function mockFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -71,6 +72,25 @@ describe('moderation endpoints', () => {
       name: 'ApiError',
       status: 409,
       message: 'last admin',
+    })
+  })
+
+  it('reportsApi.create posts comment report to /reports without context ids', async () => {
+    globalThis.fetch = mockFetch(201, { id: 'r1', target_type: 'comment', target_id: 'c1', status: 'open' })
+    await reportsApi.create({
+      target_type: 'comment',
+      target_id: 'c1',
+      reason: 'Harassment or hate',
+      notes: 'mean stuff',
+    })
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(call[0]).toContain('/reports')
+    expect(call[1].method).toBe('POST')
+    expect(JSON.parse(call[1].body)).toEqual({
+      target_type: 'comment',
+      target_id: 'c1',
+      reason: 'Harassment or hate',
+      notes: 'mean stuff',
     })
   })
 })

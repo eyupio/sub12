@@ -342,7 +342,7 @@ function EditScoreGrid({ shots, onUpdate }: { shots: Shot[]; onUpdate: (shots: S
   )
 }
 
-function CommentReplies({ commentId, cardId }: { commentId: string; cardId: string }) {
+function CommentReplies({ commentId, cardId, communityName }: { commentId: string; cardId: string; communityName?: string }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
@@ -436,12 +436,13 @@ function CommentReplies({ commentId, cardId }: { commentId: string; cardId: stri
         targetType="comment"
         targetId={reportTargetId ?? ''}
         onClose={() => setReportTargetId(null)}
+        communityName={communityName}
       />
     </div>
   )
 }
 
-function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate: boolean }) {
+function CommentsSection({ cardId, canModerate, communityName }: { cardId: string; canModerate: boolean; communityName?: string }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [newBody, setNewBody] = useState('')
@@ -663,7 +664,7 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
 
             {/* Threaded replies */}
             {expandedReplies.has(c.id) && (
-              <CommentReplies commentId={c.id} cardId={cardId} />
+              <CommentReplies commentId={c.id} cardId={cardId} communityName={communityName} />
             )}
           </div>
         ))}
@@ -728,6 +729,7 @@ function CommentsSection({ cardId, canModerate }: { cardId: string; canModerate:
         targetType="comment"
         targetId={reportTargetId ?? ''}
         onClose={() => setReportTargetId(null)}
+        communityName={communityName}
       />
     </div>
   )
@@ -1238,6 +1240,7 @@ export default function ScoreCardDetail() {
         targetType="score_card"
         targetId={id}
         onClose={() => setShowReport(false)}
+        communityName={cardLeague?.name ?? cardClub?.name ?? undefined}
       />
 
       <ConfirmDialog
@@ -1255,7 +1258,11 @@ export default function ScoreCardDetail() {
       />
 
       {/* Comments */}
-      <CommentsSection cardId={id} canModerate={canModerateComments} />
+      <CommentsSection
+        cardId={id}
+        canModerate={canModerateComments}
+        communityName={cardLeague?.name ?? cardClub?.name ?? undefined}
+      />
 
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
