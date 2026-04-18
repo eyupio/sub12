@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag } from 'lucide-react'
+import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send } from 'lucide-react'
 import { LikeButton } from './LikeButton'
 import { ReportDialog } from './ReportDialog'
 import { FlagDialog } from './FlagDialog'
@@ -78,6 +78,26 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [flagOpen, setFlagOpen] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [newComment, setNewComment] = useState('')
+
+  const { data: commentsData } = useQuery({
+    queryKey: ['posts', post.id, 'comments'],
+    queryFn: () => postApi.listComments(post.id),
+    enabled: showComments && !onCommentClick,
+  })
+
+  const createCommentMutation = useMutation({
+    mutationFn: () => postApi.createComment(post.id, newComment.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts', post.id, 'comments'] })
+      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
+      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+      setNewComment('')
+    },
+  })
+
+  const comments = commentsData?.items ?? []
 
   // Resolve league-admin status for the post's league (cached by leagueId).
   const { data: leagueMembers } = useQuery({
@@ -247,14 +267,64 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
           size={16}
         />
         <button
-          onClick={onCommentClick}
-          aria-label={`View ${post.comment_count} comments`}
+          onClick={onCommentClick ?? (() => setShowComments((v) => !v))}
+          aria-label={`${showComments ? 'Hide' : 'View'} ${post.comment_count} comments`}
           className="flex items-center gap-1.5 text-sm text-muted hover:text-secondary transition-colors"
         >
           <MessageSquare size={16} />
           {post.comment_count > 0 && <span>{post.comment_count}</span>}
         </button>
       </div>
+
+      {/* Inline comments */}
+      {showComments && !onCommentClick && (
+        <div className="space-y-2 pt-2">
+          {comments.length === 0 && (
+            <p className="text-xs text-muted">No comments yet.</p>
+          )}
+          {comments.map((c) => (
+            <div key={c.id} className="flex gap-2">
+              <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
+                {c.avatar_url
+                  ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
+                  : c.display_name.slice(0, 2).toUpperCase()
+                }
+              </div>
+              <div className="flex-1 rounded bg-surface-hover px-2 py-1">
+                <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
+                <span className="text-xs text-secondary whitespace-pre-wrap">{c.body}</span>
+              </div>
+            </div>
+          ))}
+
+          {currentUser && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (newComment.trim()) createCommentMutation.mutate()
+              }}
+              className="flex gap-2 mt-2"
+            >
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a comment…"
+                className="flex-1 rounded border border-subtle bg-surface px-2 py-1 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+                maxLength={500}
+              />
+              <button
+                type="submit"
+                disabled={!newComment.trim() || createCommentMutation.isPending}
+                aria-label="Post comment"
+                className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-40"
+              >
+                <Send size={12} />
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </article>
   )
 }
