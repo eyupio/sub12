@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send, AlertTriangle } from 'lucide-react'
+import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send, AlertTriangle, Edit3, Trash2 } from 'lucide-react'
 import { LikeButton } from './LikeButton'
 import { ReportDialog } from './ReportDialog'
 import { FlagDialog } from './FlagDialog'
+import { ConfirmDialog } from './ConfirmDialog'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
 import { postApi, type Post, type PostAttachment, type PostVisibility } from '../api/posts'
+import { commentApi } from '../api/scoreCards'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
 function AttachmentPreview({ attachment }: { attachment: PostAttachment }) {
@@ -81,6 +83,12 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
   const [commentReportId, setCommentReportId] = useState<string | null>(null)
   const [showComments, setShowComments] = useState(false)
   const [newComment, setNewComment] = useState('')
+  const [editingPost, setEditingPost] = useState(false)
+  const [editPostBody, setEditPostBody] = useState(post.body)
+  const [confirmDeletePost, setConfirmDeletePost] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editCommentBody, setEditCommentBody] = useState('')
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null)
 
   const { data: commentsData } = useQuery({
     queryKey: ['posts', post.id, 'comments'],
@@ -141,6 +149,48 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
     onError: () => toast('Failed to clear flag', 'error'),
   })
 
+  const updatePostMutation = useMutation({
+    mutationFn: () => postApi.update(post.id, editPostBody.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
+      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+      setEditingPost(false)
+    },
+    onError: () => toast('Failed to save post', 'error'),
+  })
+
+  const deletePostMutation = useMutation({
+    mutationFn: () => postApi.delete(post.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
+      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+      toast('Post deleted', 'success')
+    },
+    onError: () => toast('Failed to delete post', 'error'),
+  })
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) => commentApi.update(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts', post.id, 'comments'] })
+      setEditingCommentId(null)
+    },
+    onError: () => toast('Failed to save comment', 'error'),
+  })
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (id: string) => commentApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts', post.id, 'comments'] })
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
+      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+    },
+    onError: () => toast('Failed to delete comment', 'error'),
+  })
+
   const initials = post.display_name
     .split(' ')
     .map((w) => w[0])
@@ -167,11 +217,16 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-secondary truncate">{post.display_name}</p>
           <div className="flex items-center gap-2">
-            <p className="text-[10px] text-muted tracking-widest uppercase">{date}</p>
+            <p className="text-[10px] text-muted tracking-widest uppercase">
+              {date}
+              {new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 5000 && (
+                <span className="ml-1 italic normal-case tracking-normal">(edited)</span>
+              )}
+            </p>
             <VisibilityBadge visibility={post.visibility} />
           </div>
         </div>
-        {!isOwnPost && currentUser && (
+        {currentUser && (
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
@@ -184,13 +239,33 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
             </button>
             {menuOpen && (
               <div role="menu" className="absolute right-0 top-full mt-1 min-w-[180px] rounded border border-subtle bg-surface shadow-lg z-10">
-                <button
-                  role="menuitem"
-                  onClick={() => { setMenuOpen(false); setReportOpen(true) }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:bg-surface-hover"
-                >
-                  <Flag size={12} /> Report post
-                </button>
+                {isOwnPost && (
+                  <>
+                    <button
+                      role="menuitem"
+                      onClick={() => { setMenuOpen(false); setEditPostBody(post.body); setEditingPost(true) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:bg-surface-hover"
+                    >
+                      <Edit3 size={12} /> Edit post
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { setMenuOpen(false); setConfirmDeletePost(true) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--error-text)] hover:bg-surface-hover"
+                    >
+                      <Trash2 size={12} /> Delete post
+                    </button>
+                  </>
+                )}
+                {!isOwnPost && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { setMenuOpen(false); setReportOpen(true) }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:bg-surface-hover"
+                  >
+                    <Flag size={12} /> Report post
+                  </button>
+                )}
                 {canModerate && !post.is_flagged && (
                   <button
                     role="menuitem"
@@ -253,7 +328,34 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
       )}
 
       {/* Body */}
-      <p className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">{post.body}</p>
+      {editingPost ? (
+        <div className="space-y-2">
+          <textarea
+            value={editPostBody}
+            onChange={(e) => setEditPostBody(e.target.value)}
+            rows={3}
+            className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
+            aria-label="Edit post body"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => updatePostMutation.mutate()}
+              disabled={updatePostMutation.isPending || !editPostBody.trim()}
+              className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+            >
+              {updatePostMutation.isPending ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => { setEditingPost(false); setEditPostBody(post.body) }}
+              className="px-2.5 py-1 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">{post.body}</p>
+      )}
 
       {/* Attachments */}
       {post.attachments.length > 0 && (
@@ -289,34 +391,93 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
           {comments.length === 0 && (
             <p className="text-xs text-muted">No comments yet.</p>
           )}
-          {comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
-                {c.avatar_url
-                  ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
-                  : c.display_name.slice(0, 2).toUpperCase()
-                }
-              </div>
-              <div className="flex-1 flex items-start justify-between gap-2 rounded bg-surface-hover px-2 py-1">
-                <div className="min-w-0">
-                  <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
-                  <span className="text-xs text-secondary whitespace-pre-wrap">{c.body}</span>
+          {comments.map((c) => {
+            const isEdited = new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 5000
+            const isOwnComment = currentUser?.id === c.user_id
+            return (
+              <div key={c.id} className="flex gap-2">
+                <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
+                  {c.avatar_url
+                    ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
+                    : c.display_name.slice(0, 2).toUpperCase()
+                  }
                 </div>
-                {currentUser && currentUser.id !== c.user_id && (
-                  <button
-                    onClick={() => setCommentReportId(c.id)}
-                    className="p-1 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
-                    aria-label="Report comment"
-                    title="Report inappropriate comment"
-                  >
-                    <AlertTriangle size={12} />
-                  </button>
-                )}
+                <div className="flex-1 min-w-0 rounded bg-surface-hover px-2 py-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-medium text-primary">{c.display_name}</span>
+                      {isEdited && (
+                        <span className="ml-1 text-[10px] italic text-muted">(edited)</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      {isOwnComment && editingCommentId !== c.id && (
+                        <>
+                          <button
+                            onClick={() => { setEditingCommentId(c.id); setEditCommentBody(c.body) }}
+                            className="p-1 text-muted hover:text-secondary transition-colors"
+                            aria-label="Edit comment"
+                            title="Edit comment"
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteCommentId(c.id)}
+                            disabled={deleteCommentMutation.isPending}
+                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                            aria-label="Delete comment"
+                            title="Delete comment"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
+                      {!isOwnComment && currentUser && (
+                        <button
+                          onClick={() => setCommentReportId(c.id)}
+                          className="p-1 text-muted hover:text-[var(--error-text)] transition-colors"
+                          aria-label="Report comment"
+                          title="Report inappropriate comment"
+                        >
+                          <AlertTriangle size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {editingCommentId === c.id ? (
+                    <div className="mt-1 space-y-1">
+                      <textarea
+                        value={editCommentBody}
+                        onChange={(e) => setEditCommentBody(e.target.value)}
+                        rows={2}
+                        className="w-full bg-surface border border-subtle rounded px-2 py-1 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50 resize-none"
+                        aria-label="Edit comment body"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateCommentMutation.mutate({ id: c.id, body: editCommentBody.trim() })}
+                          disabled={updateCommentMutation.isPending || !editCommentBody.trim()}
+                          className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                        >
+                          {updateCommentMutation.isPending ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingCommentId(null)}
+                          className="px-2 py-0.5 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-secondary whitespace-pre-wrap">{c.body}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
-          {currentUser && (
+          {currentUser && !editingCommentId && (
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -344,6 +505,25 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeletePost}
+        title="Delete post?"
+        message="This post will be permanently removed."
+        onConfirm={() => { deletePostMutation.mutate(); setConfirmDeletePost(false) }}
+        onCancel={() => setConfirmDeletePost(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteCommentId !== null}
+        title="Delete comment?"
+        message="This comment will be permanently removed."
+        onConfirm={() => {
+          if (confirmDeleteCommentId) deleteCommentMutation.mutate(confirmDeleteCommentId)
+          setConfirmDeleteCommentId(null)
+        }}
+        onCancel={() => setConfirmDeleteCommentId(null)}
+      />
     </article>
   )
 }
