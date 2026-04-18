@@ -104,6 +104,29 @@ func (s *SocialService) Unfollow(ctx context.Context, followerID, followingID st
 	return err
 }
 
+// BulkUnfollow removes multiple follow relationships for the given follower.
+// Skips self-entries and duplicates, and returns how many rows were actually
+// deleted. Non-existent relationships are silently ignored so partial state
+// (e.g. a stale client) still converges cleanly.
+func (s *SocialService) BulkUnfollow(ctx context.Context, followerID string, followingIDs []string) (int, error) {
+	seen := make(map[string]struct{}, len(followingIDs))
+	cleaned := make([]string, 0, len(followingIDs))
+	for _, id := range followingIDs {
+		if id == "" || id == followerID {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		cleaned = append(cleaned, id)
+	}
+	if len(cleaned) == 0 {
+		return 0, nil
+	}
+	return s.social.BulkUnfollow(ctx, followerID, cleaned)
+}
+
 // GetPublicProfile returns a user's public profile enriched with follow stats.
 // If the profile is private and the viewer is not the owner or a follower,
 // sensitive fields are redacted and IsPrivate is set to true.

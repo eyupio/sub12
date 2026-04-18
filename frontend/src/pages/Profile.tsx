@@ -818,6 +818,10 @@ export default function Profile() {
         <Link to="/settings/notifications" className="text-[var(--brass)] hover:opacity-80">
           → Notification preferences
         </Link>
+        <span className="text-muted">·</span>
+        <Link to="/profile/follows" className="text-[var(--brass)] hover:opacity-80">
+          → Manage follows
+        </Link>
       </div>
 
       {/* Unit Preferences */}

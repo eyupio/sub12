@@ -18,6 +18,7 @@ import PelletComparison from './pages/PelletComparison'
 import BatchReport from './pages/BatchReport'
 import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
 import Profile from './pages/Profile'
+import FollowManagement from './pages/FollowManagement'
 import UserProfile from './pages/UserProfile'
 import Users from './pages/Users'
 import Feed from './pages/Feed'
@@ -187,6 +188,12 @@ const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
   component: Profile,
+})
+
+const profileFollowsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/profile/follows',
+  component: FollowManagement,
 })
 
 const userProfileRoute = createRoute({
@@ -439,6 +446,7 @@ export const routeTree = rootRoute.addChildren([
     clubSettingsRoute,
     clubReportsRoute,
     profileRoute,
+    profileFollowsRoute,
     userProfileRoute,
     usersRoute,
     feedRoute,

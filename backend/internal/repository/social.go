@@ -45,6 +45,23 @@ func (r *SocialRepository) Unfollow(ctx context.Context, followerID, followingID
 	return nil
 }
 
+// BulkUnfollow removes multiple follower → following relationships in one statement.
+// Returns the number of rows actually deleted (so callers can report how many were
+// applied vs. how many were already not following).
+func (r *SocialRepository) BulkUnfollow(ctx context.Context, followerID string, followingIDs []string) (int, error) {
+	if len(followingIDs) == 0 {
+		return 0, nil
+	}
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM user_follows WHERE follower_id = $1 AND following_id = ANY($2::uuid[])`,
+		followerID, followingIDs,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("bulk unfollow: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // CountFollowing returns how many users the given user follows.
 func (r *SocialRepository) CountFollowing(ctx context.Context, userID string) (int, error) {
 	var count int
