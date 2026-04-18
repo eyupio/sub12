@@ -59,11 +59,11 @@ describe('Notifications routing', () => {
     vi.restoreAllMocks()
   })
 
-  it('defines an admin reports destination route', () => {
-    expect(collectRoutePaths(routeTree)).toContain('/admin/reports')
+  it('defines an admin support destination route', () => {
+    expect(collectRoutePaths(routeTree)).toContain('/admin/support')
   })
 
-  it('links report notifications without community scope to admin reports queue', async () => {
+  it('links report notifications without community scope to admin support inbox', async () => {
     vi.spyOn(notificationsApi, 'list').mockResolvedValue({
       items: [
         makeNotification({
@@ -83,16 +83,16 @@ describe('Notifications routing', () => {
     )
 
     const itemLink = await screen.findByRole('link', { name: /alex flagged post/i })
-    expect(itemLink).toHaveAttribute('href', '/admin/reports')
+    expect(itemLink).toHaveAttribute('href', '/admin/support')
   })
 
   it('maps notification types to valid app routes', () => {
     expect(notificationLink(makeNotification({ type: 'report_filed', league_id: 'lg-1' }))).toBe('/leagues/lg-1/reports')
     expect(notificationLink(makeNotification({ type: 'report_filed', club_id: 'cb-1' }))).toBe('/clubs/cb-1/reports')
-    expect(notificationLink(makeNotification({ type: 'ticket_created' }))).toBe('/admin/reports')
-    expect(notificationLink(makeNotification({ type: 'ticket_replied' }))).toBe('/admin/reports')
-    expect(notificationLink(makeNotification({ type: 'ticket_assigned' }))).toBe('/admin/reports')
-    expect(notificationLink(makeNotification({ type: 'ticket_status_changed' }))).toBe('/admin/reports')
+    expect(notificationLink(makeNotification({ type: 'ticket_created' }))).toBe('/admin/support')
+    expect(notificationLink(makeNotification({ type: 'ticket_replied' }))).toBe('/admin/support')
+    expect(notificationLink(makeNotification({ type: 'ticket_assigned' }))).toBe('/admin/support')
+    expect(notificationLink(makeNotification({ type: 'ticket_status_changed' }))).toBe('/admin/support')
     expect(notificationLink(makeNotification({ type: 'feature_request_state_changed' }))).toBe('/feature-requests')
     expect(notificationLink(makeNotification({ type: 'score_verified', target_type: 'score_card', target_id: 'sc-1' }))).toBe('/scores/sc-1')
     expect(notificationLink(makeNotification({ type: 'mention', target_type: 'post', target_id: 'post-1' }))).toBe('/feed')
