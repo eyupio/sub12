@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, Lock } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
-import { scoreCardApi } from '../api/scoreCards'
+import { scoreCardApi, type ScoreCardAuthor, type ScoreCardAchievement } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
@@ -218,8 +218,12 @@ function PublicScoreCard({ id }: { id: string }) {
   }
   if (!card) return <NotFoundOrPrivate type="score_card" />
 
+  const author = card.author
+  const achievements = card.achievements ?? []
+
   return (
     <Shell title="Score card">
+      {author && <PublicAuthorHeader author={author} achievements={achievements} />}
       <article className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -274,6 +278,73 @@ function PublicScoreCard({ id }: { id: string }) {
         />
       )}
     </Shell>
+  )
+}
+
+// PublicAuthorHeader renders the score-card owner's attribution above the
+// card itself so anonymous visitors can see who shot it. Clicking through
+// lands on the owner's public share profile.
+function PublicAuthorHeader({
+  author,
+  achievements,
+}: {
+  author: ScoreCardAuthor
+  achievements: ScoreCardAchievement[]
+}) {
+  const initials = author.display_name[0]?.toUpperCase() ?? '?'
+  const top = achievements.slice(0, 6)
+  const remaining = achievements.length - top.length
+  return (
+    <section className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
+      <Link
+        to="/share/users/$id"
+        params={{ id: author.id }}
+        className="flex items-center gap-3 group"
+      >
+        {author.avatar_url ? (
+          <img
+            src={author.avatar_url}
+            alt={author.display_name}
+            className="w-12 h-12 rounded-full object-cover border border-subtle"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-surface-hover border border-subtle flex items-center justify-center text-muted text-lg font-medium">
+            {initials}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-secondary group-hover:text-[var(--brass)] transition-colors truncate">
+            {author.display_name}
+          </p>
+          {(author.location || author.star_level > 0) && (
+            <p className="text-[11px] text-muted truncate">
+              {[author.location, author.star_level > 0 ? `★ ${author.star_level}` : null]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+      </Link>
+      {top.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-t border-subtle pt-3">
+          {top.map((a) => (
+            <span
+              key={a.id}
+              title={a.name}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[10px] tracking-widest uppercase text-[var(--brass)]"
+            >
+              {a.icon && <span aria-hidden className="text-xs leading-none">{a.icon}</span>}
+              <span className="truncate max-w-[10rem]">{a.name}</span>
+            </span>
+          ))}
+          {remaining > 0 && (
+            <span className="inline-flex items-center rounded-full border border-subtle px-2 py-0.5 text-[10px] tracking-widest uppercase text-muted">
+              +{remaining}
+            </span>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 

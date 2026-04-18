@@ -28,15 +28,16 @@ import (
 // humans and crawlers — humans keep the working SPA (OG tags are invisible),
 // crawlers parse the tags and render a preview card.
 type ShareMeta struct {
-	scoreCards *service.ScoreCardService
-	pelletTest *service.PelletTestService
-	leagues    *service.LeagueService
-	clubs      *service.ClubService
-	users      *service.UserService
-	rifles     *service.RifleService
-	pellets    *service.PelletService
-	siteURL    string
-	siteName   string
+	scoreCards   *service.ScoreCardService
+	pelletTest   *service.PelletTestService
+	leagues      *service.LeagueService
+	clubs        *service.ClubService
+	users        *service.UserService
+	rifles       *service.RifleService
+	pellets      *service.PelletService
+	achievements *service.AchievementService
+	siteURL      string
+	siteName     string
 
 	frontendOrigin string
 	log            zerolog.Logger
@@ -65,6 +66,7 @@ func NewShareMeta(
 	users *service.UserService,
 	rifles *service.RifleService,
 	pellets *service.PelletService,
+	achievements *service.AchievementService,
 	siteURL, frontendOrigin string,
 	log zerolog.Logger,
 ) *ShareMeta {
@@ -76,6 +78,7 @@ func NewShareMeta(
 		users:          users,
 		rifles:         rifles,
 		pellets:        pellets,
+		achievements:   achievements,
 		siteURL:        strings.TrimRight(siteURL, "/"),
 		siteName:       "SUB12",
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
@@ -89,8 +92,11 @@ type openGraph struct {
 	Title       string
 	Description string
 	Image       string // absolute URL
+	ImageAlt    string // descriptive alt text for og:image
 	URL         string // absolute URL of the share page
 	Type        string // "article", "profile", "website"
+	AuthorURL   string // absolute URL of the content owner's profile (article:author)
+	AuthorName  string // owner's display name (og:profile:username, article:author name)
 }
 
 //go:embed share_meta_fallback.html
@@ -107,10 +113,16 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 				displayName := s.lookupDisplayName(r.Context(), card.UserID)
 				rifle := s.lookupRifle(r.Context(), card.RifleID, card.UserID)
 				pellet := s.lookupPellet(r.Context(), card.PelletID, card.UserID)
+				achievements := s.lookupUserAchievements(r.Context(), card.UserID)
 				og.Title = scoreCardTitle(card, displayName)
-				og.Description = scoreCardDescription(card, displayName, rifle, pellet)
+				og.Description = scoreCardDescription(card, displayName, rifle, pellet, achievements)
 				og.Image = s.absolute("/og/score-cards/" + id + ".png")
+				og.ImageAlt = scoreCardImageAlt(card, displayName)
 				og.Type = "article"
+				if displayName != "" {
+					og.AuthorName = displayName
+					og.AuthorURL = s.absolute("/share/users/" + card.UserID)
+				}
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -201,6 +213,20 @@ func (s *ShareMeta) lookupDisplayName(ctx context.Context, userID string) string
 		return ""
 	}
 	return profile.DisplayName
+}
+
+// lookupUserAchievements returns the owner's earned achievements as an
+// anonymous viewer would see them. Errors degrade to nil so a transient
+// failure never drops back to the default OG tags.
+func (s *ShareMeta) lookupUserAchievements(ctx context.Context, userID string) []*model.UserAchievement {
+	if s.achievements == nil || userID == "" {
+		return nil
+	}
+	items, err := s.achievements.ListForUser(ctx, userID, "")
+	if err != nil {
+		return nil
+	}
+	return items
 }
 
 func (s *ShareMeta) lookupRifle(ctx context.Context, rifleID *string, ownerID string) *model.Rifle {
@@ -358,19 +384,23 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 // Regexes scoped to tag attributes; all anchored to the beginning of an
 // opening <meta ...> so we don't replace tags we didn't mean to.
 var (
-	reOGTitle      = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
-	reOGDesc       = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
-	reOGImage      = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
-	reOGType       = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
-	reOGURL        = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
-	reOGSiteName   = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
-	reTwitterTitle = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
-	reTwitterDesc  = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
-	reTwitterImage = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
-	reDescription  = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
-	rePageTitle    = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
-	reOGImageWHAlt = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height|alt)"[^>]*>`)
-	reHeadOpen     = regexp.MustCompile(`(?i)<head[^>]*>`)
+	reOGTitle       = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
+	reOGDesc        = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
+	reOGImage       = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
+	reOGType        = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
+	reOGURL         = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
+	reOGSiteName    = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
+	reOGImageAlt    = regexp.MustCompile(`(?i)<meta\s+property="og:image:alt"[^>]*>`)
+	reOGImageWH     = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height)"[^>]*>`)
+	reOGProfileUser = regexp.MustCompile(`(?i)<meta\s+property="og:profile:username"[^>]*>`)
+	reArticleAuthor = regexp.MustCompile(`(?i)<meta\s+property="article:author"[^>]*>`)
+	reTwitterTitle  = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
+	reTwitterDesc   = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
+	reTwitterImage  = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reTwitterCreator = regexp.MustCompile(`(?i)<meta\s+name="twitter:creator"[^>]*>`)
+	reDescription   = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
+	rePageTitle     = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
+	reHeadOpen      = regexp.MustCompile(`(?i)<head[^>]*>`)
 )
 
 func metaProp(prop, content string) string {
@@ -391,9 +421,12 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 	title := html.EscapeString(og.Title)
 	desc := html.EscapeString(og.Description)
 	img := html.EscapeString(og.Image)
+	imgAlt := html.EscapeString(og.ImageAlt)
 	ogURL := html.EscapeString(og.URL)
 	ogType := html.EscapeString(og.Type)
 	site := html.EscapeString(siteName)
+	authorURL := html.EscapeString(og.AuthorURL)
+	authorName := html.EscapeString(og.AuthorName)
 
 	replacements := []struct {
 		re  *regexp.Regexp
@@ -412,9 +445,47 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 		{reTwitterImage, metaName("twitter:image", img)},
 	}
 
-	// Strip og:image:width/height/alt because our dynamic image dimensions
+	// og:image:width/height are stripped because our dynamic image dimensions
 	// are unknown; omitting is better than misleading.
-	out = reOGImageWHAlt.ReplaceAllString(out, "")
+	out = reOGImageWH.ReplaceAllString(out, "")
+
+	// og:image:alt: inject when we have alt text, drop any stale tag
+	// otherwise so we don't surface copy from a previous entity render.
+	if imgAlt != "" {
+		replacements = append(replacements, struct {
+			re  *regexp.Regexp
+			tag string
+		}{reOGImageAlt, metaProp("og:image:alt", imgAlt)})
+	} else {
+		out = reOGImageAlt.ReplaceAllString(out, "")
+	}
+
+	// Author attribution for article-type OG (og:profile:username +
+	// article:author + twitter:creator). Only emitted when we resolved an
+	// owner so anonymous / private shares don't leak a misleading byline.
+	if authorName != "" {
+		replacements = append(replacements,
+			struct {
+				re  *regexp.Regexp
+				tag string
+			}{reOGProfileUser, metaProp("og:profile:username", authorName)},
+			struct {
+				re  *regexp.Regexp
+				tag string
+			}{reTwitterCreator, metaName("twitter:creator", authorName)},
+		)
+	} else {
+		out = reOGProfileUser.ReplaceAllString(out, "")
+		out = reTwitterCreator.ReplaceAllString(out, "")
+	}
+	if authorURL != "" {
+		replacements = append(replacements, struct {
+			re  *regexp.Regexp
+			tag string
+		}{reArticleAuthor, metaProp("article:author", authorURL)})
+	} else {
+		out = reArticleAuthor.ReplaceAllString(out, "")
+	}
 
 	missing := make([]string, 0, len(replacements))
 	for _, rep := range replacements {
@@ -448,7 +519,7 @@ func scoreCardTitle(card *model.ScoreCard, displayName string) string {
 	return score + " on sub-12"
 }
 
-func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *model.Rifle, pellet *model.Pellet) string {
+func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *model.Rifle, pellet *model.Pellet, achievements []*model.UserAchievement) string {
 	parts := []string{}
 	if displayName != "" {
 		parts = append(parts, displayName)
@@ -476,7 +547,42 @@ func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *mode
 	if len(gear) > 0 {
 		parts = append(parts, strings.Join(gear, " + "))
 	}
+	if names := topAchievementNames(achievements, 2); names != "" {
+		parts = append(parts, names)
+	}
 	return strings.Join(parts, " • ") + " — shared via sub-12."
+}
+
+// scoreCardImageAlt builds descriptive alt text used for og:image:alt so
+// screen readers and accessibility tooling convey who achieved what.
+func scoreCardImageAlt(card *model.ScoreCard, displayName string) string {
+	score := fmt.Sprintf("%d points", card.TotalScore)
+	if card.XCount > 0 {
+		score = fmt.Sprintf("%d points (%dX)", card.TotalScore, card.XCount)
+	}
+	if displayName != "" {
+		return fmt.Sprintf("%s — %s on sub-12", displayName, score)
+	}
+	return score + " on sub-12"
+}
+
+// topAchievementNames returns a comma-joined list of the most recently earned
+// achievement names (up to max). Returns "" when there are none.
+func topAchievementNames(achievements []*model.UserAchievement, max int) string {
+	if len(achievements) == 0 || max <= 0 {
+		return ""
+	}
+	if len(achievements) < max {
+		max = len(achievements)
+	}
+	names := make([]string, 0, max)
+	for i := 0; i < max; i++ {
+		n := strings.TrimSpace(achievements[i].Name)
+		if n != "" {
+			names = append(names, n)
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 func pelletTestTitle(sess *model.PelletTestSession) string {

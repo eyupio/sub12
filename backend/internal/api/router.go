@@ -75,7 +75,7 @@ func NewRouter(
 	// URLs for shareable content. Humans get the working SPA (tags are
 	// invisible); crawlers render rich previews. The response is the same
 	// for both — no user-agent sniffing.
-	shareMeta := handler.NewShareMeta(scoreCards, pelletTests, leagues, clubs, users, rifles, pellets, cfg.SiteURL, cfg.FrontendOrigin, log)
+	shareMeta := handler.NewShareMeta(scoreCards, pelletTests, leagues, clubs, users, rifles, pellets, achievements, cfg.SiteURL, cfg.FrontendOrigin, log)
 	r.Get("/score-cards/{id}", shareMeta.ScoreCard())
 	r.Get("/pellet-tests/{id}", shareMeta.PelletTest())
 	// League/club/user canonical URLs stay authed for in-app navigation;

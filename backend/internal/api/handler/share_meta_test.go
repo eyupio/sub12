@@ -116,7 +116,7 @@ func TestScoreCardDescription_RichesWithGear(t *testing.T) {
 	rifle := &model.Rifle{Make: "Air Arms", Model: "S510"}
 	pellet := &model.Pellet{Brand: "JSB", Model: "Exact 4.52mm"}
 
-	got := scoreCardDescription(card, "John Shooter", rifle, pellet)
+	got := scoreCardDescription(card, "John Shooter", rifle, pellet, nil)
 
 	assert.Contains(t, got, "John Shooter")
 	assert.Contains(t, got, "245 (12X)")
@@ -127,9 +127,25 @@ func TestScoreCardDescription_RichesWithGear(t *testing.T) {
 	assert.Contains(t, got, "shared via sub-12")
 }
 
+func TestScoreCardDescription_IncludesTopAchievements(t *testing.T) {
+	card := &model.ScoreCard{TotalScore: 245, XCount: 12}
+	achievements := []*model.UserAchievement{
+		{AchievementDef: model.AchievementDef{ID: "perfect_card", Name: "Perfect Card"}},
+		{AchievementDef: model.AchievementDef{ID: "century_club", Name: "Century Club"}},
+		{AchievementDef: model.AchievementDef{ID: "third", Name: "Third"}},
+	}
+
+	got := scoreCardDescription(card, "John Shooter", nil, nil, achievements)
+
+	assert.Contains(t, got, "Perfect Card")
+	assert.Contains(t, got, "Century Club")
+	// Only the first two are surfaced so the description stays scannable.
+	assert.NotContains(t, got, "Third")
+}
+
 func TestScoreCardDescription_MinimalCardDegrades(t *testing.T) {
 	card := &model.ScoreCard{TotalScore: 200, XCount: 0}
-	got := scoreCardDescription(card, "", nil, nil)
+	got := scoreCardDescription(card, "", nil, nil, nil)
 
 	assert.Contains(t, got, "200 (0X)")
 	assert.Contains(t, got, "shared via sub-12")
@@ -178,6 +194,54 @@ func TestInjectOG_ReplacesTagsInPlace(t *testing.T) {
 	assert.NotContains(t, out, "og:image:width")
 	// No duplicate og:title tags
 	assert.Equal(t, 1, strings.Count(out, `property="og:title"`))
+}
+
+func TestInjectOG_EmitsAuthorAndImageAltWhenSet(t *testing.T) {
+	tmpl := []byte(`<!doctype html>
+<html>
+  <head>
+    <title>Old</title>
+    <meta property="og:title" content="old" />
+  </head>
+</html>`)
+	og := openGraph{
+		Title:       "John Shooter shot 245 points (12X) on sub-12",
+		Description: "John Shooter • 245 (12X)",
+		Image:       "https://example.com/og.png",
+		ImageAlt:    "John Shooter — 245 points (12X) on sub-12",
+		URL:         "https://example.com/score-cards/abc",
+		Type:        "article",
+		AuthorName:  "John Shooter",
+		AuthorURL:   "https://example.com/share/users/abc",
+	}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.Contains(t, out, `property="og:profile:username" content="John Shooter"`)
+	assert.Contains(t, out, `property="article:author" content="https://example.com/share/users/abc"`)
+	assert.Contains(t, out, `property="og:image:alt" content="John Shooter — 245 points (12X) on sub-12"`)
+	assert.Contains(t, out, `name="twitter:creator" content="John Shooter"`)
+}
+
+func TestInjectOG_OmitsAuthorWhenUnknown(t *testing.T) {
+	tmpl := []byte(`<!doctype html>
+<html>
+  <head>
+    <meta property="og:profile:username" content="stale" />
+    <meta property="article:author" content="stale" />
+    <meta property="og:image:alt" content="stale" />
+    <meta name="twitter:creator" content="stale" />
+  </head>
+</html>`)
+	og := openGraph{Title: "SUB12", Description: "…", Image: "/og.png", URL: "/", Type: "website"}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.NotContains(t, out, "stale")
+	assert.NotContains(t, out, "og:profile:username")
+	assert.NotContains(t, out, "article:author")
+	assert.NotContains(t, out, "og:image:alt")
+	assert.NotContains(t, out, "twitter:creator")
 }
 
 func newShareMetaForTest(frontendOrigin string, ttl time.Duration) *ShareMeta {
