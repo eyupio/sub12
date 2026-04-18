@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag } from 'lucide-react'
+import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy } from 'lucide-react'
 import { notificationsApi, Notification, NotificationType } from '../api/notifications'
+import { notificationLink } from '../api/notificationLinks'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 
 const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
@@ -17,6 +18,11 @@ const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   club_join_approved: UsersIcon,
   mention: AtSign,
   report_filed: Flag,
+  ticket_created: LifeBuoy,
+  ticket_replied: MessageSquare,
+  ticket_assigned: UsersIcon,
+  ticket_status_changed: AlertCircle,
+  feature_request_state_changed: Trophy,
 }
 
 function notificationSentence(n: Notification): string {
@@ -51,21 +57,17 @@ function notificationSentence(n: Notification): string {
         ? `${actor} flagged ${target} in ${community}`
         : `${actor} flagged ${target}`
     }
+    case 'ticket_created':
+      return `${actor} created a support ticket`
+    case 'ticket_replied':
+      return `${actor} replied on a support ticket`
+    case 'ticket_assigned':
+      return `${actor} assigned you a support ticket`
+    case 'ticket_status_changed':
+      return `${actor} changed a support ticket status`
+    case 'feature_request_state_changed':
+      return `${actor} updated a feature request status`
   }
-}
-
-function notificationLink(n: Notification): string | null {
-  if (n.type === 'report_filed') {
-    if (n.league_id) return `/leagues/${n.league_id}/reports`
-    if (n.club_id) return `/clubs/${n.club_id}/reports`
-    return '/admin/reports'
-  }
-  if (n.target_type === 'score_card' && n.target_id) return `/scores/${n.target_id}`
-  if (n.target_type === 'post' && n.target_id) return `/scores/${n.target_id}` // posts open in-context; placeholder
-  if (n.target_type === 'user' && n.target_id) return `/users/${n.target_id}`
-  if (n.league_id) return `/leagues/${n.league_id}`
-  if (n.club_id) return `/clubs/${n.club_id}`
-  return null
 }
 
 export default function Notifications() {
@@ -158,9 +160,18 @@ export default function Notifications() {
                   {formatDateTime(n.created_at, prefs)}
                 </p>
               </div>
-              {unread && (
-                <span aria-label="Unread" className="w-2 h-2 rounded-full bg-[var(--brass)] self-center shrink-0" />
-              )}
+              <div className="shrink-0 flex items-center gap-2 self-center">
+                {(n.type === 'ticket_created' ||
+                  n.type === 'ticket_replied' ||
+                  n.type === 'ticket_assigned' ||
+                  n.type === 'ticket_status_changed' ||
+                  n.type === 'feature_request_state_changed') && (
+                  <span className="text-[9px] tracking-widest uppercase px-1.5 py-0.5 rounded border border-subtle text-muted">
+                    Ticket
+                  </span>
+                )}
+                {unread && <span aria-label="Unread" className="w-2 h-2 rounded-full bg-[var(--brass)] shrink-0" />}
+              </div>
             </div>
           )
           const handleClick = () => {

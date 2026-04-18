@@ -173,6 +173,13 @@ func main() {
 		reportRepo, postRepo, commentRepo, leagueRepo, clubRepo, userRepo,
 		notificationSvc, emailSenderSvc, cfg.CORSOrigin, log.Logger,
 	)
+	supportTicketRepo := repository.NewSupportTicketRepository(pool)
+	supportTicketSvc := service.NewSupportTicketService(supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc, emailSenderSvc, cfg.CORSOrigin)
+	featureRequestRepo := repository.NewFeatureRequestRepository(pool)
+	featureRequestSvc := service.NewFeatureRequestService(featureRequestRepo, supportTicketRepo, leagueRepo, clubRepo, userRepo, notificationSvc)
+
+	sitemapRepo := repository.NewSitemapRepository(pool)
+	sitemapSvc := service.NewSitemapService(sitemapRepo, cfg.SiteURL, log.Logger)
 
 	// Wire notifications into services that fan out events. Done after
 	// construction to avoid cycles.
@@ -184,13 +191,13 @@ func main() {
 	userSvc.SetExportRepos(scoreCardRepo, postRepo, clubRepo, leagueRepo)
 
 	rl := middleware.NewRateLimiter(middleware.RateLimitConfig{
-		Enabled:             cfg.RateLimitEnabled,
-		FollowPerMin:        cfg.RateLimitFollowPerMin,
-		CommentPerMin:       cfg.RateLimitCommentPerMin,
-		PostPerMin:          cfg.RateLimitPostPerMin,
-		ReportPerMin:        cfg.RateLimitReportPerMin,
-		LikePerMin:          cfg.RateLimitLikePerMin,
-		SocialTogglePerMin:  cfg.RateLimitSocialTogglePerMin,
+		Enabled:            cfg.RateLimitEnabled,
+		FollowPerMin:       cfg.RateLimitFollowPerMin,
+		CommentPerMin:      cfg.RateLimitCommentPerMin,
+		PostPerMin:         cfg.RateLimitPostPerMin,
+		ReportPerMin:       cfg.RateLimitReportPerMin,
+		LikePerMin:         cfg.RateLimitLikePerMin,
+		SocialTogglePerMin: cfg.RateLimitSocialTogglePerMin,
 	}, rdb)
 
 	// Moderation flag sweeper — promotes un-amended flagged rows to hidden_at
@@ -198,7 +205,7 @@ func main() {
 	moderationSweeper := service.NewModerationSweeper(pool, log.Logger, cfg.ModerationFlagGrace, cfg.ModerationSweepInterval)
 	go moderationSweeper.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, muteRepo, rl, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, sitemapSvc, muteRepo, rl, imageRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

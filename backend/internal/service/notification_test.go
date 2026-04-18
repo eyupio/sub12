@@ -27,6 +27,11 @@ func TestNotificationEmailContent_AllTypes(t *testing.T) {
 		{"league_join", NotifEvent{Type: model.NotificationTypeLeagueJoinApproved}, "", "League join approved", []string{"league", "approved"}},
 		{"club_join", NotifEvent{Type: model.NotificationTypeClubJoinApproved}, "", "Club join approved", []string{"club", "approved"}},
 		{"mention", NotifEvent{Type: model.NotificationTypeMention}, "Frank", "You were mentioned on sub12.io", []string{"Frank", "mentioned", "sub12.io"}},
+		{"ticket_created", NotifEvent{Type: model.NotificationTypeTicketCreated}, "Grace", "New support ticket", []string{"Grace", "created", "support ticket"}},
+		{"ticket_replied", NotifEvent{Type: model.NotificationTypeTicketReplied}, "Hank", "New reply on a support ticket", []string{"Hank", "replied", "support ticket"}},
+		{"ticket_assigned", NotifEvent{Type: model.NotificationTypeTicketAssigned}, "Ivy", "Support ticket assigned to you", []string{"Ivy", "assigned", "support ticket"}},
+		{"ticket_status", NotifEvent{Type: model.NotificationTypeTicketStatusChanged}, "Jake", "Support ticket status updated", []string{"Jake", "updated", "status"}},
+		{"feature_state", NotifEvent{Type: model.NotificationTypeFeatureRequestStateChanged}, "Kim", "Feature request status updated", []string{"Kim", "feature request", "updated"}},
 		{"unknown", NotifEvent{Type: "made_up_type"}, "", "New sub12.io notification", []string{"new notification", "sub12.io"}},
 	}
 	for _, tc := range cases {

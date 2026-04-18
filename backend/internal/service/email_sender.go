@@ -54,18 +54,7 @@ func (s *EmailSenderService) SendForgotPassword(ctx context.Context, toEmail, di
 		return fmt.Errorf("render forgot_password html: %w", err)
 	}
 
-	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
-	if err != nil {
-		return fmt.Errorf("load smtp settings: %w", err)
-	}
-
-	fromName := "sub12.io"
-	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
-		fromName = strings.TrimSpace(*settings.FromName)
-	}
-	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
 }
 
 // SendReportFiledNotification renders and sends the "content flagged" email
@@ -99,18 +88,7 @@ func (s *EmailSenderService) SendReportFiledNotification(ctx context.Context, to
 		return fmt.Errorf("render notification_report_filed html: %w", err)
 	}
 
-	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
-	if err != nil {
-		return fmt.Errorf("load smtp settings: %w", err)
-	}
-
-	fromName := "sub12.io"
-	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
-		fromName = strings.TrimSpace(*settings.FromName)
-	}
-	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
 }
 
 func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, toEmail, displayName, confirmLink string, expiresAt time.Time) error {
@@ -140,18 +118,7 @@ func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, to
 		return fmt.Errorf("render email_change_confirm html: %w", err)
 	}
 
-	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
-	if err != nil {
-		return fmt.Errorf("load smtp settings: %w", err)
-	}
-
-	fromName := "sub12.io"
-	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
-		fromName = strings.TrimSpace(*settings.FromName)
-	}
-	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
+	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
 }
 
 // SendNotification sends a generic notification email to toEmail using the
@@ -184,18 +151,110 @@ func (s *EmailSenderService) SendNotification(ctx context.Context, toEmail, disp
 		return fmt.Errorf("render notification html: %w", err)
 	}
 
+	return s.sendRenderedTemplate(ctx, toEmail, renderedSubject, textBody, htmlBody)
+}
+
+func (s *EmailSenderService) SendTicketCreatedConfirmation(ctx context.Context, toEmail, displayName, ticketID, ticketTitle, ticketLink string) error {
+	return s.sendTicketTemplate(ctx, toEmail, "ticket_created_confirmation", map[string]any{
+		"display_name": displayName,
+		"ticket_id":    ticketID,
+		"ticket_title": ticketTitle,
+		"ticket_link":  ticketLink,
+		"brand_name":   "sub12.io",
+		"product_name": "sub12.io",
+		"cta_label":    "View ticket",
+	})
+}
+
+func (s *EmailSenderService) SendTicketNewReply(ctx context.Context, toEmail, displayName, actorName, ticketID, ticketTitle, ticketLink string) error {
+	return s.sendTicketTemplate(ctx, toEmail, "ticket_new_reply", map[string]any{
+		"display_name": displayName,
+		"actor_name":   actorName,
+		"ticket_id":    ticketID,
+		"ticket_title": ticketTitle,
+		"ticket_link":  ticketLink,
+		"brand_name":   "sub12.io",
+		"product_name": "sub12.io",
+		"cta_label":    "View ticket",
+	})
+}
+
+func (s *EmailSenderService) SendTicketAssigned(ctx context.Context, toEmail, displayName, actorName, ticketID, ticketTitle, ticketLink string) error {
+	return s.sendTicketTemplate(ctx, toEmail, "ticket_assigned", map[string]any{
+		"display_name": displayName,
+		"actor_name":   actorName,
+		"ticket_id":    ticketID,
+		"ticket_title": ticketTitle,
+		"ticket_link":  ticketLink,
+		"brand_name":   "sub12.io",
+		"product_name": "sub12.io",
+		"cta_label":    "View ticket",
+	})
+}
+
+func (s *EmailSenderService) SendTicketStatusChanged(ctx context.Context, toEmail, displayName, actorName, ticketID, ticketTitle, fromStatus, toStatus, ticketLink string) error {
+	return s.sendTicketTemplate(ctx, toEmail, "ticket_status_changed", map[string]any{
+		"display_name":      displayName,
+		"actor_name":        actorName,
+		"ticket_id":         ticketID,
+		"ticket_title":      ticketTitle,
+		"from_status_label": fromStatus,
+		"status_label":      toStatus,
+		"ticket_link":       ticketLink,
+		"brand_name":        "sub12.io",
+		"product_name":      "sub12.io",
+		"cta_label":         "View ticket",
+	})
+}
+
+func (s *EmailSenderService) SendFeatureRequestAcceptedForRefinement(ctx context.Context, toEmail, displayName, actorName, ticketID, ticketTitle, statusLabel, ticketLink string) error {
+	return s.sendTicketTemplate(ctx, toEmail, "feature_request_accepted_for_refinement", map[string]any{
+		"display_name": displayName,
+		"actor_name":   actorName,
+		"ticket_id":    ticketID,
+		"ticket_title": ticketTitle,
+		"status_label": statusLabel,
+		"ticket_link":  ticketLink,
+		"brand_name":   "sub12.io",
+		"product_name": "sub12.io",
+		"cta_label":    "View ticket",
+	})
+}
+
+func (s *EmailSenderService) sendTicketTemplate(ctx context.Context, toEmail, key string, payload map[string]any) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, key)
+	if err != nil {
+		return fmt.Errorf("load %s template: %w", key, err)
+	}
+	if !tpl.IsEnabled {
+		return nil
+	}
+	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render %s subject: %w", key, err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render %s text: %w", key, err)
+	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render %s html: %w", key, err)
+	}
+	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
+}
+
+func (s *EmailSenderService) sendRenderedTemplate(ctx context.Context, toEmail, subject, textBody, htmlBody string) error {
 	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("load smtp settings: %w", err)
 	}
-
 	fromName := "sub12.io"
 	if settings.FromName != nil && strings.TrimSpace(*settings.FromName) != "" {
 		fromName = strings.TrimSpace(*settings.FromName)
 	}
 	from := fmt.Sprintf("%s <%s>", fromName, settings.FromEmail)
-
-	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, renderedSubject, textBody, htmlBody))
+	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, buildMultipartMsg(from, toEmail, subject, textBody, htmlBody))
 }
 
 func buildMultipartMsg(from, to, subject, textBody, htmlBody string) []byte {
