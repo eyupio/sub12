@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -24,6 +25,8 @@ type SupportTicketService struct {
 	clubs         *repository.ClubRepository
 	users         *repository.UserRepository
 	notifications *NotificationService
+	emailSender   *EmailSenderService
+	frontendURL   string
 }
 
 func NewSupportTicketService(
@@ -32,8 +35,18 @@ func NewSupportTicketService(
 	clubs *repository.ClubRepository,
 	users *repository.UserRepository,
 	notifications *NotificationService,
+	emailSender *EmailSenderService,
+	frontendURL string,
 ) *SupportTicketService {
-	return &SupportTicketService{repo: repo, leagues: leagues, clubs: clubs, users: users, notifications: notifications}
+	return &SupportTicketService{
+		repo:          repo,
+		leagues:       leagues,
+		clubs:         clubs,
+		users:         users,
+		notifications: notifications,
+		emailSender:   emailSender,
+		frontendURL:   strings.TrimRight(frontendURL, "/"),
+	}
 }
 
 func (s *SupportTicketService) Create(ctx context.Context, requesterID string, in *model.CreateSupportTicketInput) (*model.SupportTicket, error) {
@@ -60,6 +73,7 @@ func (s *SupportTicketService) Create(ctx context.Context, requesterID string, i
 		return nil, err
 	}
 	s.notifyScopeAdmins(ctx, ticket, requesterID, model.NotificationTypeTicketCreated)
+	s.sendTicketCreatedConfirmationEmail(ctx, ticket)
 	return ticket, nil
 }
 
@@ -178,6 +192,7 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 			TargetID:    &updated.ID,
 			TargetType:  ptrString("support_ticket"),
 		})
+		s.sendTicketAssignedEmail(ctx, updated, actorID)
 	}
 	if in.Status != nil {
 		eventType := model.NotificationTypeTicketStatusChanged
@@ -185,6 +200,7 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 			eventType = model.NotificationTypeFeatureRequestStateChanged
 		}
 		s.notifyParticipants(ctx, updated.ID, actorID, eventType)
+		s.sendTicketStatusChangedEmails(ctx, updated, actorID, ticket.Status, *in.Status)
 	}
 	s.normalizeUnread(updated)
 	return updated, nil
@@ -211,6 +227,7 @@ func (s *SupportTicketService) AddMessage(ctx context.Context, ticketID, authorI
 	}
 	if !in.InternalNote {
 		s.notifyParticipants(ctx, ticketID, authorID, model.NotificationTypeTicketReplied)
+		s.sendTicketReplyEmails(ctx, ticket, authorID)
 	}
 	return msg, nil
 }
@@ -395,6 +412,178 @@ func (s *SupportTicketService) notifyScopeAdmins(ctx context.Context, ticket *mo
 			LeagueID:    leagueID,
 			ClubID:      clubID,
 		})
+	}
+}
+
+func (s *SupportTicketService) sendTicketCreatedConfirmationEmail(ctx context.Context, ticket *model.SupportTicket) {
+	if s == nil || s.emailSender == nil || s.notifications == nil || ticket == nil || ticket.RequesterID == "" {
+		return
+	}
+	if !s.shouldSendTicketEmail(ctx, ticket.RequesterID, model.NotificationTypeTicketCreated) {
+		return
+	}
+	user, err := s.users.GetByID(ctx, ticket.RequesterID)
+	if err != nil || user.Email == "" {
+		return
+	}
+	_ = s.emailSender.SendTicketCreatedConfirmation(
+		ctx,
+		user.Email,
+		user.DisplayName,
+		ticket.ID,
+		ticket.Title,
+		s.ticketDetailLink(ticket.ID),
+	)
+}
+
+func (s *SupportTicketService) sendTicketReplyEmails(ctx context.Context, ticket *model.SupportTicket, actorID string) {
+	if s == nil || s.emailSender == nil || s.notifications == nil || ticket == nil {
+		return
+	}
+	participants, err := s.repo.ListParticipants(ctx, ticket.ID)
+	if err != nil {
+		return
+	}
+	actorName := s.lookupActorName(ctx, actorID)
+	for _, p := range participants {
+		if p.UserID == "" || p.UserID == actorID {
+			continue
+		}
+		if !s.shouldSendTicketEmail(ctx, p.UserID, model.NotificationTypeTicketReplied) {
+			continue
+		}
+		user, err := s.users.GetByID(ctx, p.UserID)
+		if err != nil || user.Email == "" {
+			continue
+		}
+		_ = s.emailSender.SendTicketNewReply(
+			ctx,
+			user.Email,
+			user.DisplayName,
+			actorName,
+			ticket.ID,
+			ticket.Title,
+			s.ticketDetailLink(ticket.ID),
+		)
+	}
+}
+
+func (s *SupportTicketService) sendTicketAssignedEmail(ctx context.Context, ticket *model.SupportTicket, actorID string) {
+	if s == nil || s.emailSender == nil || s.notifications == nil || ticket == nil || ticket.AssigneeID == nil || *ticket.AssigneeID == "" {
+		return
+	}
+	assigneeID := *ticket.AssigneeID
+	if !s.shouldSendTicketEmail(ctx, assigneeID, model.NotificationTypeTicketAssigned) {
+		return
+	}
+	assignee, err := s.users.GetByID(ctx, assigneeID)
+	if err != nil || assignee.Email == "" {
+		return
+	}
+	_ = s.emailSender.SendTicketAssigned(
+		ctx,
+		assignee.Email,
+		assignee.DisplayName,
+		s.lookupActorName(ctx, actorID),
+		ticket.ID,
+		ticket.Title,
+		s.ticketDetailLink(ticket.ID),
+	)
+}
+
+func (s *SupportTicketService) sendTicketStatusChangedEmails(ctx context.Context, ticket *model.SupportTicket, actorID, fromStatus, toStatus string) {
+	if s == nil || s.emailSender == nil || s.notifications == nil || ticket == nil {
+		return
+	}
+	participants, err := s.repo.ListParticipants(ctx, ticket.ID)
+	if err != nil {
+		return
+	}
+	actorName := s.lookupActorName(ctx, actorID)
+	eventType := model.NotificationTypeTicketStatusChanged
+	isFeatureAccepted := ticket.Category == model.SupportCategoryFeature && toStatus == model.SupportStatusInProgress
+	if ticket.Category == model.SupportCategoryFeature {
+		eventType = model.NotificationTypeFeatureRequestStateChanged
+	}
+	for _, p := range participants {
+		if p.UserID == "" || p.UserID == actorID {
+			continue
+		}
+		if !s.shouldSendTicketEmail(ctx, p.UserID, eventType) {
+			continue
+		}
+		user, err := s.users.GetByID(ctx, p.UserID)
+		if err != nil || user.Email == "" {
+			continue
+		}
+		ticketLink := s.ticketDetailLink(ticket.ID)
+		if isFeatureAccepted {
+			_ = s.emailSender.SendFeatureRequestAcceptedForRefinement(
+				ctx,
+				user.Email,
+				user.DisplayName,
+				actorName,
+				ticket.ID,
+				ticket.Title,
+				humanizeTicketStatus(toStatus),
+				ticketLink,
+			)
+			continue
+		}
+		_ = s.emailSender.SendTicketStatusChanged(
+			ctx,
+			user.Email,
+			user.DisplayName,
+			actorName,
+			ticket.ID,
+			ticket.Title,
+			humanizeTicketStatus(fromStatus),
+			humanizeTicketStatus(toStatus),
+			ticketLink,
+		)
+	}
+}
+
+func (s *SupportTicketService) shouldSendTicketEmail(ctx context.Context, userID, notificationType string) bool {
+	prefs, err := s.notifications.GetPreferences(ctx, userID)
+	if err != nil {
+		prefs = model.DefaultNotificationPreferences(userID)
+	}
+	return prefs.EmailEnabledForType(notificationType)
+}
+
+func (s *SupportTicketService) lookupActorName(ctx context.Context, actorID string) string {
+	if actorID == "" {
+		return "Someone"
+	}
+	user, err := s.users.GetByID(ctx, actorID)
+	if err != nil || strings.TrimSpace(user.DisplayName) == "" {
+		return "Someone"
+	}
+	return user.DisplayName
+}
+
+func (s *SupportTicketService) ticketDetailLink(ticketID string) string {
+	if strings.TrimSpace(s.frontendURL) == "" {
+		return fmt.Sprintf("/tickets/%s", ticketID)
+	}
+	return fmt.Sprintf("%s/tickets/%s", s.frontendURL, ticketID)
+}
+
+func humanizeTicketStatus(status string) string {
+	switch status {
+	case model.SupportStatusOpen:
+		return "Open"
+	case model.SupportStatusInProgress:
+		return "In progress"
+	case model.SupportStatusWaitingOnUser:
+		return "Waiting on user"
+	case model.SupportStatusResolved:
+		return "Resolved"
+	case model.SupportStatusClosed:
+		return "Closed"
+	default:
+		return status
 	}
 }
 
