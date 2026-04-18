@@ -35,17 +35,50 @@ func (r *ActivityRepository) Ingest(ctx context.Context, userID string, actType 
 }
 
 // activityColumns is the shared SELECT list for all feed queries.
-const activityColumns = `a.id, a.user_id, u.display_name, u.avatar_url,
+// Includes star_level from the author, and like/comment counts for score_card targets.
+const activityColumns = `a.id, a.user_id, u.display_name, u.avatar_url, u.star_level,
        a.type, a.target_id::text, a.target_type, a.metadata,
-       a.league_id, a.club_id, a.visibility, a.created_at`
+       a.league_id, a.club_id, a.visibility, a.created_at,
+       COALESCE(sc.like_count, 0),
+       COALESCE(sc.comment_count, 0)`
 
-// scanActivity scans a single activity row matching activityColumns order.
+// activityColumnsViewer extends activityColumns with a viewer-specific is_liked flag.
+// $viewerParam is the positional parameter placeholder for the viewer UUID (e.g. "$1").
+func activityColumnsViewer(viewerParam string) string {
+	return activityColumns + `,
+       EXISTS(
+           SELECT 1 FROM likes
+           WHERE target_id = a.target_id
+             AND target_type = 'score_card'
+             AND user_id = ` + viewerParam + `
+       )`
+}
+
+// activityJoinScoreCard is the optional LEFT JOIN added to enrich score_card targets.
+const activityJoinScoreCard = `LEFT JOIN score_cards sc ON sc.id = a.target_id AND a.target_type = 'score_card'`
+
+// scanActivity scans a single activity row matching activityColumns order (no viewer).
 func scanActivity(scan func(dest ...any) error) (*model.Activity, error) {
 	var a model.Activity
 	if err := scan(
-		&a.ID, &a.UserID, &a.DisplayName, &a.AvatarURL,
+		&a.ID, &a.UserID, &a.DisplayName, &a.AvatarURL, &a.StarLevel,
 		&a.Type, &a.TargetID, &a.TargetType, &a.Metadata,
 		&a.LeagueID, &a.ClubID, &a.Visibility, &a.CreatedAt,
+		&a.LikeCount, &a.CommentCount,
+	); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// scanActivityViewer scans a row matching activityColumnsViewer order.
+func scanActivityViewer(scan func(dest ...any) error) (*model.Activity, error) {
+	var a model.Activity
+	if err := scan(
+		&a.ID, &a.UserID, &a.DisplayName, &a.AvatarURL, &a.StarLevel,
+		&a.Type, &a.TargetID, &a.TargetType, &a.Metadata,
+		&a.LeagueID, &a.ClubID, &a.Visibility, &a.CreatedAt,
+		&a.LikeCount, &a.CommentCount, &a.IsLiked,
 	); err != nil {
 		return nil, err
 	}
@@ -59,12 +92,15 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 		err  error
 	)
 
+	cols := activityColumnsViewer("$1")
+
 	switch req.Filter {
 	case model.FeedPublic:
 		rows, err = r.db.Query(ctx, `
-			SELECT `+activityColumns+`
+			SELECT `+cols+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
+			`+activityJoinScoreCard+`
 			WHERE a.visibility = 'public'
 			  AND u.feed_opt_out = FALSE
 			  AND u.profile_visibility <> 'private'
@@ -80,9 +116,10 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 
 	case model.FeedLeague:
 		rows, err = r.db.Query(ctx, `
-			SELECT `+activityColumns+`
+			SELECT `+activityColumnsViewer("$2")+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
+			`+activityJoinScoreCard+`
 			WHERE a.league_id = $1
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $2
@@ -96,9 +133,10 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 
 	case model.FeedClub:
 		rows, err = r.db.Query(ctx, `
-			SELECT `+activityColumns+`
+			SELECT `+activityColumnsViewer("$2")+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
+			`+activityJoinScoreCard+`
 			WHERE a.club_id = $1
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $2
@@ -112,9 +150,10 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 
 	default: // for_you
 		rows, err = r.db.Query(ctx, `
-			SELECT `+activityColumns+`
+			SELECT `+cols+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
+			`+activityJoinScoreCard+`
 			WHERE a.user_id IN (
 				SELECT following_id FROM user_follows WHERE follower_id = $1
 				UNION ALL SELECT $1
@@ -139,7 +178,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 
 	var items []*model.Activity
 	for rows.Next() {
-		a, scanErr := scanActivity(rows.Scan)
+		a, scanErr := scanActivityViewer(rows.Scan)
 		if scanErr != nil {
 			return nil, fmt.Errorf("scan activity: %w", scanErr)
 		}

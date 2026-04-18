@@ -155,6 +155,18 @@ func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (
 	return count, nil
 }
 
+// GetLeagueCardCount returns the number of score cards a user has submitted for league rounds.
+func (r *ScoreCardRepository) GetLeagueCardCount(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM score_cards WHERE user_id = $1 AND league_round_id IS NOT NULL`,
+		userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get league card count: %w", err)
+	}
+	return count, nil
+}
+
 // IsPersonalBest returns true when the given card is the user's highest-scoring card.
 // Ties with earlier cards count as a tie, not a new PB, so only a strictly higher
 // score qualifies.

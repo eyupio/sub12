@@ -14,6 +14,7 @@ interface User {
   default_score_visibility?: string
   feed_opt_out?: boolean
   show_follower_counts?: boolean
+  star_level?: number
   default_distance_unit?: string
   default_measurement_unit?: string
   date_format?: string

@@ -88,6 +88,7 @@ func main() {
 
 	socialRepo := repository.NewSocialRepository(pool)
 	pelletTestRepo := repository.NewPelletTestRepository(pool)
+	likeRepo := repository.NewLikeRepository(pool)
 
 	// AchievementService is constructed up front with all count-repo
 	// dependencies. Services that trigger achievement evaluation (social,
@@ -99,6 +100,8 @@ func main() {
 		commentRepo,
 		clubRepo,
 		pelletTestRepo,
+		likeRepo,
+		userRepo,
 		activitySvc,
 	)
 
@@ -157,8 +160,9 @@ func main() {
 
 	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, achievementSvc)
 
-	likeRepo := repository.NewLikeRepository(pool)
 	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)
+	// Wire achievements into likes so that liking content can trigger award checks.
+	likeSvc.SetAchievements(achievementSvc)
 
 	muteRepo := repository.NewMuteRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)

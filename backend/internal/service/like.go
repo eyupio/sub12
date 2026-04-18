@@ -15,20 +15,28 @@ var (
 )
 
 type LikeService struct {
-	likes      *repository.LikeRepository
-	scoreCards *repository.ScoreCardRepository
-	posts      *PostService
-	blocks     *repository.BlockRepository
+	likes        *repository.LikeRepository
+	scoreCards   *repository.ScoreCardRepository
+	posts        *PostService
+	blocks       *repository.BlockRepository
+	achievements *AchievementService // nil disables achievement evaluation
 }
 
 func NewLikeService(likes *repository.LikeRepository, scoreCards *repository.ScoreCardRepository, posts *PostService, blocks *repository.BlockRepository) *LikeService {
 	return &LikeService{likes: likes, scoreCards: scoreCards, posts: posts, blocks: blocks}
 }
 
+// SetAchievements wires in the achievement service so likes can trigger award checks.
+// Called after construction to break circular dependency.
+func (s *LikeService) SetAchievements(achievements *AchievementService) {
+	s.achievements = achievements
+}
+
 // Like adds a like on a target. Returns true if a new like was created.
 // Enforces visibility rules per target type: private score cards and posts the
 // viewer cannot see return ErrLikeTargetNotFound so existence is not leaked.
 func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType string) (bool, error) {
+	var ownerID string
 	switch targetType {
 	case model.LikeTargetScoreCard:
 		card, err := s.scoreCards.GetPublicByID(ctx, targetID)
@@ -47,6 +55,7 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 				return false, ErrLikeTargetNotFound
 			}
 		}
+		ownerID = card.UserID
 	case model.LikeTargetPost:
 		viewer := userID
 		post, err := s.posts.CanViewPostID(ctx, targetID, &viewer)
@@ -62,6 +71,7 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 				return false, ErrLikeTargetNotFound
 			}
 		}
+		ownerID = post.UserID
 	case model.LikeTargetComment:
 		// Comments inherit visibility from their parent target; enforcement is
 		// delegated to the parent listing. Block still applies.
@@ -69,7 +79,20 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 		return false, fmt.Errorf("%w: %s", ErrInvalidLikeTarget, targetType)
 	}
 
-	return s.likes.LikeTx(ctx, userID, targetID, targetType)
+	created, err := s.likes.LikeTx(ctx, userID, targetID, targetType)
+	if err != nil {
+		return false, err
+	}
+	// Evaluate achievements in a goroutine so they never slow down the response.
+	if created && s.achievements != nil {
+		go func() {
+			s.achievements.EvaluateForLikeGiven(context.Background(), userID)
+			if ownerID != "" && ownerID != userID {
+				s.achievements.EvaluateForLikeReceived(context.Background(), ownerID)
+			}
+		}()
+	}
+	return created, nil
 }
 
 // Unlike removes a like. Returns true if a like was removed.
