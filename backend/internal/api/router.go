@@ -179,6 +179,7 @@ func NewRouter(
 			socialH := handler.NewSocial(social)
 			r.With(rl.Limit("follow")).Post("/users/{id}/follow", socialH.Follow)
 			r.With(rl.Limit("social_toggle")).Delete("/users/{id}/follow", socialH.Unfollow)
+			r.With(rl.Limit("social_toggle")).Post("/users/me/unfollow-batch", socialH.BulkUnfollow)
 			r.Get("/users/{id}/followers", socialH.ListFollowers)
 			r.Get("/users/{id}/following", socialH.ListFollowing)
 			r.Get("/users/me/follow-requests", socialH.ListFollowRequests)

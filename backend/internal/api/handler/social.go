@@ -80,6 +80,39 @@ func (h *SocialHandler) Unfollow(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"following": false})
 }
 
+// POST /api/v1/users/me/unfollow-batch
+func (h *SocialHandler) BulkUnfollow(w http.ResponseWriter, r *http.Request) {
+	followerID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input struct {
+		UserIDs []string `json:"user_ids"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(input.UserIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "user_ids must not be empty")
+		return
+	}
+	if len(input.UserIDs) > 200 {
+		writeError(w, http.StatusUnprocessableEntity, "cannot unfollow more than 200 users at once")
+		return
+	}
+
+	unfollowed, err := h.svc.BulkUnfollow(r.Context(), followerID, input.UserIDs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to unfollow users")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]int{"unfollowed": unfollowed})
+}
+
 // GET /api/v1/users/{id}/followers
 func (h *SocialHandler) ListFollowers(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := middleware.UserIDFromContext(r.Context())
