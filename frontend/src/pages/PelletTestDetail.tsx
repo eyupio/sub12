@@ -788,7 +788,7 @@ export default function PelletTestDetail() {
                   (newGroupMethod === 'manual' && (!newGroupSize || Number(newGroupSize) <= 0)) ||
                   (newGroupMethod === 'image' && !newGroupImageId)
                 }
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 <Check size={13} /> {addGroupMutation.isPending ? 'Saving…' : newGroupMethod === 'image' ? 'Analyze image' : 'Save'}
               </button>
