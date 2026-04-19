@@ -256,14 +256,14 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 			return err
 		}
 		if s.activity != nil {
-			club, _ := s.repo.GetByID(ctx, clubID, "")
-			clubName := ""
-			if club != nil {
-				clubName = club.Name
+			// Skip the activity feed entry entirely if we can't resolve the
+			// club name — better to drop one best-effort entry than to write
+			// a blank-name "joined club" record that nobody can debug later.
+			if club, err := s.repo.GetByID(ctx, clubID, ""); err == nil && club != nil {
+				cid, tt := clubID, "club"
+				meta := model.JoinedClubMeta{ClubName: club.Name}
+				go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 			}
-			cid, tt := clubID, "club"
-			meta := model.JoinedClubMeta{ClubName: clubName}
-			go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 		}
 		if s.achievements != nil {
 			go s.achievements.EvaluateForClubJoin(context.Background(), req.UserID)
