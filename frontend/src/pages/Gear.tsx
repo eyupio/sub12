@@ -154,6 +154,13 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
             onManualEntry={() => setShowFields(true)}
             placeholder="Search rifles — e.g. HW100, Air Arms..."
           />
+          <button
+            type="button"
+            onClick={() => setShowFields(true)}
+            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            or enter manually →
+          </button>
         </>
       )}
       {showFields && (
@@ -399,6 +406,13 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
             onManualEntry={() => setShowFields(true)}
             placeholder="Search pellets — e.g. JSB Exact, H&N..."
           />
+          <button
+            type="button"
+            onClick={() => setShowFields(true)}
+            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          >
+            or enter manually →
+          </button>
         </>
       )}
       {showFields && (
