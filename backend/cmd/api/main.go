@@ -205,6 +205,7 @@ func main() {
 		ReportPerMin:       cfg.RateLimitReportPerMin,
 		LikePerMin:         cfg.RateLimitLikePerMin,
 		SocialTogglePerMin: cfg.RateLimitSocialTogglePerMin,
+		AuthPerMin:         cfg.RateLimitAuthPerMin,
 	}, rdb)
 
 	// Moderation flag sweeper — promotes un-amended flagged rows to hidden_at

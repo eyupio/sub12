@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -19,6 +20,7 @@ type RateLimitConfig struct {
 	ReportPerMin        int
 	LikePerMin          int
 	SocialTogglePerMin  int
+	AuthPerMin          int
 }
 
 // RateLimiter is a simple token-bucket per (bucket, user) that prefers Redis
@@ -55,13 +57,15 @@ func (rl *RateLimiter) Limit(bucket string) func(http.Handler) http.Handler {
 				return
 			}
 			userID, ok := UserIDFromContext(r.Context())
-			if !ok {
-				// Not authenticated — the route will reject anyway, but keep
-				// per-IP? For now pass through.
-				next.ServeHTTP(w, r)
-				return
+			var key string
+			if ok {
+				key = fmt.Sprintf("rl:%s:u:%s", bucket, userID)
+			} else {
+				// Unauthenticated (e.g. /auth/*) — key by client IP. RealIP
+				// middleware populates r.RemoteAddr from X-Forwarded-For when
+				// present, so we inherit the LB's trust configuration.
+				key = fmt.Sprintf("rl:%s:ip:%s", bucket, clientIP(r))
 			}
-			key := fmt.Sprintf("rl:%s:%s", bucket, userID)
 			allowed, retryAfter := rl.check(r, key, limit)
 			if !allowed {
 				w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
@@ -87,8 +91,20 @@ func (rl *RateLimiter) bucketLimit(bucket string) int {
 		return rl.cfg.LikePerMin
 	case "social_toggle":
 		return rl.cfg.SocialTogglePerMin
+	case "auth":
+		return rl.cfg.AuthPerMin
 	}
 	return 0
+}
+
+// clientIP extracts the best-effort client IP from the request. RealIP
+// middleware rewrites r.RemoteAddr from X-Forwarded-For / X-Real-IP when
+// configured, so we inherit the LB's trust configuration here.
+func clientIP(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func (rl *RateLimiter) check(r *http.Request, key string, limit int) (bool, time.Duration) {
