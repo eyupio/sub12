@@ -24,7 +24,7 @@ export function CatalogSearch<T>({
   placeholder,
 }: CatalogSearchProps<T>) {
   const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [activeIndex, setActiveIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
