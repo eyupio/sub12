@@ -22,6 +22,63 @@ func NewScoreCard(svc *service.ScoreCardService, images *repository.ImageReposit
 	return &ScoreCardHandler{svc: svc, images: images}
 }
 
+// POST /api/v1/score-cards/quick
+// QuickCreate saves a field-captured draft with minimal data (rifle, pellet,
+// optional conditions). Shot grid and strict league validation are deferred
+// until the user graduates the draft via POST /score-cards/{id}/graduate.
+func (h *ScoreCardHandler) QuickCreate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input model.QuickCreateScoreCardInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	card, err := h.svc.QuickCreate(r.Context(), userID, &input)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save draft")
+		return
+	}
+	writeJSON(w, http.StatusCreated, card)
+}
+
+// POST /api/v1/score-cards/{id}/graduate
+// Graduate clears the draft flag after the user has filled in the full shot
+// grid via PATCH. Enforces league submission limits at this step (not at
+// quick-capture) so a user can stash a draft without hitting the cap.
+func (h *ScoreCardHandler) Graduate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+
+	card, err := h.svc.Graduate(r.Context(), id, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrMaxSubmissions) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to graduate draft")
+		return
+	}
+	writeJSON(w, http.StatusOK, card)
+}
+
 // POST /api/v1/score-cards
 func (h *ScoreCardHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
@@ -92,6 +149,23 @@ func (h *ScoreCardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, card)
+}
+
+// GET /api/v1/score-cards/drafts/count
+// Lightweight endpoint used by the nav badge. Returns just the draft count
+// so the frontend doesn't need to fetch a full list.
+func (h *ScoreCardHandler) DraftCount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	count, err := h.svc.GetDraftCount(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to count drafts")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
 // POST /api/v1/score-cards/{id}/image

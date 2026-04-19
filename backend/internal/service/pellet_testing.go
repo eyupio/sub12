@@ -88,6 +88,10 @@ func (s *PelletTestService) GetForViewer(ctx context.Context, id, viewerID strin
 	if viewerID != "" && viewerID == session.UserID {
 		return session, nil
 	}
+	// Drafts are owner-only; hide them from any viewer who doesn't own the session.
+	if session.IsDraft {
+		return nil, repository.ErrNotFound
+	}
 	if !session.IsPublic {
 		return nil, repository.ErrNotFound
 	}
@@ -103,14 +107,77 @@ func (s *PelletTestService) GetForViewer(ctx context.Context, id, viewerID strin
 	return session, nil
 }
 
-func (s *PelletTestService) List(ctx context.Context, userID string, limit, offset int) ([]*model.PelletTestSessionSummary, error) {
+func (s *PelletTestService) List(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.PelletTestSessionSummary, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if limit > 100 {
 		limit = 100
 	}
-	return s.repo.ListByUser(ctx, userID, limit, offset)
+	if scope != "drafts" && scope != "all" {
+		scope = ""
+	}
+	return s.repo.ListByUser(ctx, userID, limit, offset, scope)
+}
+
+// GetDraftCount returns how many quick-capture pellet-test drafts the user
+// has yet to refine.
+func (s *PelletTestService) GetDraftCount(ctx context.Context, userID string) (int, error) {
+	return s.repo.GetDraftCount(ctx, userID)
+}
+
+// QuickCreate persists a quick-capture bench-rest draft with minimal data.
+// Distance defaults to 0 so the user can skip it in the field; they'll enter
+// it at refine time. Activity and achievement side-effects fire only on
+// graduation.
+func (s *PelletTestService) QuickCreate(ctx context.Context, userID string, in *model.QuickCreatePelletTestInput) (*model.PelletTestSession, error) {
+	if in.RifleID == "" || in.PelletID == "" {
+		return nil, fmt.Errorf("%w: rifle and pellet are required", ErrInvalidPelletTest)
+	}
+	unit := "meters"
+	if in.DistanceUnit != nil && *in.DistanceUnit != "" {
+		unit = *in.DistanceUnit
+	}
+	if unit != "meters" && unit != "yards" {
+		return nil, fmt.Errorf("%w: distance unit must be meters or yards", ErrInvalidPelletTest)
+	}
+	var distanceM float64
+	if in.DistanceValue != nil && *in.DistanceValue >= 0 {
+		distanceM = *in.DistanceValue
+		if unit == "yards" {
+			distanceM = distanceM * 0.9144
+		}
+	}
+	return s.repo.CreateDraft(ctx, userID, in, distanceM)
+}
+
+// Graduate flips a pellet-test draft to a full session. Fires the activity
+// feed ingest and achievement evaluation that were suppressed during
+// quick-capture. The caller should first PATCH distance / groups / etc.
+func (s *PelletTestService) Graduate(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {
+	existing, err := s.repo.GetByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !existing.IsDraft {
+		return existing, nil
+	}
+	session, err := s.repo.Graduate(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	if s.activity != nil && session.IsPublic {
+		tid, tt := session.ID, "pellet_test"
+		meta := model.PelletTestPostedMeta{
+			BestGroupMM: session.BestGroupSizeMM,
+			AvgGroupMM:  session.AverageGroupSizeMM,
+		}
+		go s.activity.Ingest(context.Background(), userID, model.ActivityPelletTestPosted, &tid, &tt, meta, nil, nil, "public")
+	}
+	if s.achievements != nil {
+		go s.achievements.EvaluateForPelletTest(context.Background(), userID)
+	}
+	return session, nil
 }
 
 func (s *PelletTestService) Update(ctx context.Context, id, userID string, in *model.UpdatePelletTestSessionInput) (*model.PelletTestSession, error) {

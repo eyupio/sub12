@@ -371,7 +371,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 			(
 				SELECT sc2.x_count
 				FROM score_cards sc2
-				WHERE sc2.user_id = u.id AND sc2.verification = 'verified'
+				WHERE sc2.user_id = u.id AND sc2.verification = 'verified' AND sc2.is_draft = FALSE
 				ORDER BY sc2.total_score DESC, sc2.x_count DESC
 				LIMIT 1
 			) AS best_x,
@@ -379,7 +379,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 			lm.joined_at
 		FROM league_members lm
 		JOIN users u ON u.id = lm.user_id
-		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id AND sc.verification = 'verified'
+		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id AND sc.verification = 'verified' AND sc.is_draft = FALSE
 		WHERE lm.league_id = $1
 		GROUP BY u.id, u.display_name, lm.joined_at
 		ORDER BY %s(sc.total_score::double precision) DESC NULLS LAST, lm.joined_at ASC
@@ -663,7 +663,7 @@ func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limi
 		JOIN rounds rd ON rd.id = sc.league_round_id
 		JOIN seasons s  ON s.id  = rd.season_id
 		JOIN users u    ON u.id  = sc.user_id
-		WHERE s.league_id = $1`
+		WHERE s.league_id = $1 AND sc.is_draft = FALSE`
 
 	args := []any{leagueID}
 	if verification != "" {
@@ -1140,7 +1140,7 @@ func (r *LeagueRepository) CountUserSubmissionsForRound(ctx context.Context, use
 	var count int
 	err := r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM score_cards
-		WHERE user_id = $1 AND league_round_id = $2
+		WHERE user_id = $1 AND league_round_id = $2 AND is_draft = FALSE
 	`, userID, roundID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count user submissions for round: %w", err)

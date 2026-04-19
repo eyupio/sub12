@@ -48,7 +48,7 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 			shot_at::text, location, wind_mph, temp_celsius, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, verification::text, visibility, league_round_id, club_id,
-			like_count, comment_count,
+			like_count, comment_count, is_draft,
 			created_at, updated_at
 	`,
 		userID, input.RifleID, input.PelletID,
@@ -62,11 +62,109 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
-		&card.LikeCount, &card.CommentCount,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create score card: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+	return &card, nil
+}
+
+// CreateDraft inserts a quick-capture score card with minimal data. Shots
+// default to empty arrays (they still satisfy the NOT NULL constraint),
+// total_score/x_count default to 0, and is_draft=true keeps the row out of
+// standings/stats until the user refines it.
+func (r *ScoreCardRepository) CreateDraft(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+
+	shotAt := ""
+	if input.ShotAt != nil {
+		shotAt = *input.ShotAt
+	}
+
+	visibility := "public"
+	if input.Visibility != nil && (*input.Visibility == "private" || *input.Visibility == "followers") {
+		visibility = *input.Visibility
+	}
+
+	empty16 := []int16{}
+	emptyBool := []bool{}
+
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO score_cards (
+			user_id, rifle_id, pellet_id,
+			shot_at, location, wind_mph, temp_celsius, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			verification, league_round_id, club_id, visibility, is_draft
+		) VALUES ($1,$2,$3,COALESCE(NULLIF($4,'')::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,0,0,'pending'::verification_status,$11,$12,$13,TRUE)
+		RETURNING
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, wind_mph, temp_celsius, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, verification::text, visibility, league_round_id, club_id,
+			like_count, comment_count, is_draft,
+			created_at, updated_at
+	`,
+		userID, input.RifleID, input.PelletID,
+		shotAt, input.Location, input.WindMPH, input.TempCelsius, input.Notes,
+		pgtype.FlatArray[int16](empty16),
+		pgtype.FlatArray[bool](emptyBool),
+		input.LeagueRoundID, input.ClubID, visibility,
+	).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create score card draft: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+	return &card, nil
+}
+
+// Graduate clears the is_draft flag in the same transaction used by the
+// refine flow's final PATCH. Callers should first run Update to persist the
+// full shot grid; Graduate only flips the flag and re-evaluates verification
+// so league rounds move from pending to the appropriate state.
+func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+	err := r.db.QueryRow(ctx, `
+		UPDATE score_cards SET
+			is_draft     = FALSE,
+			verification = CASE WHEN league_round_id IS NULL THEN 'verified'::verification_status ELSE 'pending'::verification_status END,
+			updated_at   = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, wind_mph, temp_celsius, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, verification::text, visibility, league_round_id, club_id,
+			like_count, comment_count, is_draft,
+			created_at, updated_at
+	`, id, userID).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("graduate score card: %w", err)
 	}
 	card.ShotScores = []int16(shotScores)
 	card.ShotXs = []bool(shotXs)
@@ -85,7 +183,7 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 			shot_at::text, location, wind_mph, temp_celsius, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, verification::text, visibility, league_round_id, club_id,
-			like_count, comment_count,
+			like_count, comment_count, is_draft,
 			EXISTS(SELECT 1 FROM likes WHERE target_id = score_cards.id AND target_type = 'score_card' AND user_id = $2) AS is_liked,
 			created_at, updated_at
 		FROM score_cards
@@ -95,7 +193,7 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
-		&card.LikeCount, &card.CommentCount, &card.IsLiked,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.IsLiked,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -122,7 +220,7 @@ func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*mo
 			shot_at::text, location, wind_mph, temp_celsius, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, verification::text, visibility, league_round_id, club_id,
-			like_count, comment_count,
+			like_count, comment_count, is_draft,
 			created_at, updated_at
 		FROM score_cards
 		WHERE id = $1
@@ -131,7 +229,7 @@ func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*mo
 		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
-		&card.LikeCount, &card.CommentCount,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -146,9 +244,10 @@ func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*mo
 }
 
 // GetCardCount returns the total number of score cards for a user.
+// Drafts are excluded so "cards logged" counters reflect only completed entries.
 func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (int, error) {
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM score_cards WHERE user_id = $1`, userID).Scan(&count)
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM score_cards WHERE user_id = $1 AND is_draft = FALSE`, userID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get card count: %w", err)
 	}
@@ -159,7 +258,7 @@ func (r *ScoreCardRepository) GetCardCount(ctx context.Context, userID string) (
 func (r *ScoreCardRepository) GetLeagueCardCount(ctx context.Context, userID string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM score_cards WHERE user_id = $1 AND league_round_id IS NOT NULL`,
+		`SELECT COUNT(*) FROM score_cards WHERE user_id = $1 AND league_round_id IS NOT NULL AND is_draft = FALSE`,
 		userID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get league card count: %w", err)
@@ -167,15 +266,26 @@ func (r *ScoreCardRepository) GetLeagueCardCount(ctx context.Context, userID str
 	return count, nil
 }
 
+// GetDraftCount returns the number of drafts the user has yet to refine.
+// Used to badge the Drafts nav entry.
+func (r *ScoreCardRepository) GetDraftCount(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM score_cards WHERE user_id = $1 AND is_draft = TRUE`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get draft count: %w", err)
+	}
+	return count, nil
+}
+
 // IsPersonalBest returns true when the given card is the user's highest-scoring card.
 // Ties with earlier cards count as a tie, not a new PB, so only a strictly higher
-// score qualifies.
+// score qualifies. Drafts never qualify and don't block others from qualifying.
 func (r *ScoreCardRepository) IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM score_cards
-			WHERE user_id = $1 AND id != $2 AND total_score >= $3
+			WHERE user_id = $1 AND id != $2 AND total_score >= $3 AND is_draft = FALSE
 		)
 	`, userID, cardID, totalScore).Scan(&exists)
 	if err != nil {
@@ -185,12 +295,15 @@ func (r *ScoreCardRepository) IsPersonalBest(ctx context.Context, userID, cardID
 }
 
 // ListByUser returns paginated score card summaries for a user, newest first.
-// scope filters results: "personal" (no league), "league" (has league), or "" (all).
+// scope filters results: "personal" (no league), "league" (has league), "club",
+// "drafts" (is_draft=true), or "" (all non-draft cards). Drafts are excluded
+// from every other scope so they don't leak into list views.
 // leagueID optionally filters to cards belonging to a specific league.
 func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error) {
 	query := `
 		SELECT sc.id, sc.shot_at::text, sc.total_score, sc.x_count, sc.location,
-		       sc.verification::text, sc.league_round_id, l.id, l.name, sc.club_id, sc.created_at
+		       sc.verification::text, sc.league_round_id, l.id, l.name, sc.club_id,
+		       sc.card_image_url, sc.is_draft, sc.created_at
 		FROM score_cards sc
 		LEFT JOIN rounds rd ON rd.id = sc.league_round_id
 		LEFT JOIN seasons s ON s.id = rd.season_id
@@ -201,12 +314,16 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	argIdx := 2
 
 	switch scope {
+	case "drafts":
+		query += ` AND sc.is_draft = TRUE`
 	case "personal":
-		query += ` AND sc.league_round_id IS NULL AND sc.club_id IS NULL`
+		query += ` AND sc.is_draft = FALSE AND sc.league_round_id IS NULL AND sc.club_id IS NULL`
 	case "league":
-		query += ` AND sc.league_round_id IS NOT NULL`
+		query += ` AND sc.is_draft = FALSE AND sc.league_round_id IS NOT NULL`
 	case "club":
-		query += ` AND sc.club_id IS NOT NULL`
+		query += ` AND sc.is_draft = FALSE AND sc.club_id IS NOT NULL`
+	default:
+		query += ` AND sc.is_draft = FALSE`
 	}
 
 	if leagueID != "" {
@@ -228,7 +345,8 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	for rows.Next() {
 		var c model.ScoreCardSummary
 		if err := rows.Scan(&c.ID, &c.ShotAt, &c.TotalScore, &c.XCount, &c.Location,
-			&c.Verification, &c.LeagueRoundID, &c.LeagueID, &c.LeagueName, &c.ClubID, &c.CreatedAt); err != nil {
+			&c.Verification, &c.LeagueRoundID, &c.LeagueID, &c.LeagueName, &c.ClubID,
+			&c.CardImageURL, &c.IsDraft, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan score card summary: %w", err)
 		}
 		cards = append(cards, &c)
@@ -271,7 +389,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			shot_at::text, location, wind_mph, temp_celsius, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, verification::text, visibility, league_round_id, club_id,
-			like_count, comment_count,
+			like_count, comment_count, is_draft,
 			created_at, updated_at
 	`,
 		id, userID,
@@ -285,7 +403,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 		&card.ShotAt, &card.Location, &card.WindMPH, &card.TempCelsius, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID,
-		&card.LikeCount, &card.CommentCount,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {

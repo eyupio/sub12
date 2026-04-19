@@ -13,11 +13,13 @@ import (
 // mockScoreCardRepo is a minimal stub that lets us test service-level
 // validation without hitting the database.
 type mockScoreCardRepo struct {
-	createCalled bool
-	updateCalled bool
-	deleteCalled bool
-	lastTotal    int16
-	lastXCount   int16
+	createCalled      bool
+	createDraftCalled bool
+	graduateCalled    bool
+	updateCalled      bool
+	deleteCalled      bool
+	lastTotal         int16
+	lastXCount        int16
 	// card is returned from GetByID; if nil, a placeholder is returned.
 	card *model.ScoreCard
 }
@@ -27,6 +29,18 @@ func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateS
 	m.lastTotal = total
 	m.lastXCount = xCount
 	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "verified"}, nil
+}
+func (m *mockScoreCardRepo) CreateDraft(_ context.Context, _ string, _ *model.QuickCreateScoreCardInput) (*model.ScoreCard, error) {
+	m.createDraftCalled = true
+	return &model.ScoreCard{ID: "draft-id", IsDraft: true, Verification: "pending"}, nil
+}
+func (m *mockScoreCardRepo) Graduate(_ context.Context, _, _ string) (*model.ScoreCard, error) {
+	m.graduateCalled = true
+	if m.card != nil {
+		m.card.IsDraft = false
+		return m.card, nil
+	}
+	return &model.ScoreCard{ID: "test-id", IsDraft: false, Verification: "verified"}, nil
 }
 func (m *mockScoreCardRepo) GetByID(_ context.Context, _, _ string) (*model.ScoreCard, error) {
 	if m.card != nil {
@@ -40,7 +54,8 @@ func (m *mockScoreCardRepo) GetPublicByID(_ context.Context, _ string) (*model.S
 func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ string, _ string) ([]*model.ScoreCardSummary, error) {
 	return nil, nil
 }
-func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _ string) error { return nil }
+func (m *mockScoreCardRepo) GetDraftCount(_ context.Context, _ string) (int, error) { return 0, nil }
+func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _ string) error    { return nil }
 func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, _ *model.UpdateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
 	m.updateCalled = true
 	m.lastTotal = total
@@ -242,6 +257,57 @@ func TestDelete_UnverifiedLeagueCardNotLocked(t *testing.T) {
 	err := svc.Delete(context.Background(), "card1", "user1")
 	require.NoError(t, err)
 	assert.True(t, repo.deleteCalled)
+}
+
+// --- Draft / quick-capture tests ---
+
+// Quick-capture skips the 25-shot validation — that rule only applies at
+// graduation, after the user has refined the shot grid.
+func TestQuickCreate_SkipsShotValidation(t *testing.T) {
+	repo := &mockScoreCardRepo{}
+	svc := newTestService(repo)
+
+	card, err := svc.QuickCreate(context.Background(), "user1", &model.QuickCreateScoreCardInput{})
+	require.NoError(t, err)
+	assert.True(t, repo.createDraftCalled)
+	assert.True(t, card.IsDraft)
+	assert.Equal(t, "pending", card.Verification)
+}
+
+// Graduate refuses to clear the draft flag when the shot grid hasn't been
+// filled in — the user must PATCH the 25-shot payload first.
+func TestGraduate_RequiresFullShotGrid(t *testing.T) {
+	// Simulate a draft with empty shot arrays.
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{
+		ID:           "draft-id",
+		IsDraft:      true,
+		ShotScores:   []int16{},
+		ShotXs:       []bool{},
+		Verification: "pending",
+	}}
+	svc := newTestService(repo)
+	_, err := svc.Graduate(context.Background(), "draft-id", "user1")
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.graduateCalled)
+}
+
+// Graduate flips the flag once the shot grid is full; verification stays
+// pending for league submissions (round is set) and flips to verified for
+// personal cards.
+func TestGraduate_ClearsDraftOnCompleteCard(t *testing.T) {
+	shots := make([]int16, 25)
+	xs := make([]bool, 25)
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{
+		ID:         "draft-id",
+		IsDraft:    true,
+		ShotScores: shots,
+		ShotXs:     xs,
+	}}
+	svc := newTestService(repo)
+	out, err := svc.Graduate(context.Background(), "draft-id", "user1")
+	require.NoError(t, err)
+	assert.True(t, repo.graduateCalled)
+	assert.False(t, out.IsDraft)
 }
 
 func TestUpdate_LockedLeagueCard(t *testing.T) {

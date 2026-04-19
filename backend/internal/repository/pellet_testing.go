@@ -33,7 +33,7 @@ func scanSession(row pgx.Row) (*model.PelletTestSession, error) {
 		&s.VelocityFPS, &s.VelocitySD, &s.ExtremeSpreadFPS,
 		&s.BenchSetup, &s.ScopeDetails, &s.BarometricPressureMbar,
 		&s.AverageGroupSizeMM, &s.BestGroupSizeMM,
-		&s.GroupCount, &s.IsPublic, &s.CreatedAt, &s.UpdatedAt,
+		&s.GroupCount, &s.IsPublic, &s.IsDraft, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ const sessionCols = `id, user_id, rifle_id, pellet_id, test_date, distance_m, di
 	location, wind_mph, temp_celsius, humidity_pct, notes,
 	velocity_fps, velocity_sd, extreme_spread_fps,
 	bench_setup, scope_details, barometric_pressure_mbar,
-	average_group_size_mm, best_group_size_mm, group_count, is_public, created_at, updated_at`
+	average_group_size_mm, best_group_size_mm, group_count, is_public, is_draft, created_at, updated_at`
 
 func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput, distanceM float64) (*model.PelletTestSession, error) {
 	session, err := scanSession(r.db.QueryRow(ctx, `
@@ -64,6 +64,69 @@ func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *mo
 		return nil, fmt.Errorf("create pellet test session: %w", err)
 	}
 	return session, nil
+}
+
+// CreateDraft persists a quick-capture session with minimal data. Distance
+// defaults to 0 (user refines it later); test_date defaults to today. The
+// row is_draft=true so it stays out of leaderboards and stats until
+// graduated.
+func (r *PelletTestRepository) CreateDraft(ctx context.Context, userID string, in *model.QuickCreatePelletTestInput, distanceM float64) (*model.PelletTestSession, error) {
+	testDate := ""
+	if in.TestDate != nil {
+		testDate = *in.TestDate
+	}
+	unit := "meters"
+	if in.DistanceUnit != nil && *in.DistanceUnit != "" {
+		unit = *in.DistanceUnit
+	}
+
+	session, err := scanSession(r.db.QueryRow(ctx, `
+		INSERT INTO pellet_test_sessions (user_id, rifle_id, pellet_id,
+			test_date, distance_m, distance_unit,
+			location, wind_mph, temp_celsius, humidity_pct, notes, is_draft)
+		VALUES ($1,$2,$3,
+			COALESCE(NULLIF($4,'')::date, CURRENT_DATE), $5, $6,
+			$7, $8, $9, $10, $11, TRUE)
+		RETURNING `+sessionCols+`
+	`, userID, in.RifleID, in.PelletID,
+		testDate, distanceM, unit,
+		in.Location, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes))
+	if err != nil {
+		return nil, fmt.Errorf("create pellet test draft: %w", err)
+	}
+	return session, nil
+}
+
+// Graduate flips is_draft=false so the session participates in leaderboards,
+// stats, compare, timeline, confidence, and batch-report aggregates.
+func (r *PelletTestRepository) Graduate(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {
+	session, err := scanSession(r.db.QueryRow(ctx, `
+		UPDATE pellet_test_sessions
+		SET is_draft = FALSE, updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING `+sessionCols+`
+	`, id, userID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("graduate pellet test: %w", err)
+	}
+	return session, nil
+}
+
+// GetDraftCount returns how many quick-capture pellet-test drafts the user
+// has yet to refine. Powers the Drafts nav badge.
+func (r *PelletTestRepository) GetDraftCount(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM pellet_test_sessions WHERE user_id = $1 AND is_draft = TRUE`,
+		userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count pellet test drafts: %w", err)
+	}
+	return count, nil
 }
 
 func (r *PelletTestRepository) GetByID(ctx context.Context, id, userID string) (*model.PelletTestSession, error) {
@@ -134,18 +197,35 @@ func (r *PelletTestRepository) hydrateSession(ctx context.Context, session *mode
 	return session, nil
 }
 
-func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.PelletTestSessionSummary, error) {
-	rows, err := r.db.Query(ctx, `
+// ListByUser returns paginated pellet-test summaries for a user, newest first.
+// scope selects between "drafts" (only quick-capture drafts) and "" (only
+// graduated sessions). Other list endpoints that need both can pass "all".
+func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, limit, offset int, scope string) ([]*model.PelletTestSessionSummary, error) {
+	filter := "AND s.is_draft = FALSE"
+	switch scope {
+	case "drafts":
+		filter = "AND s.is_draft = TRUE"
+	case "all":
+		filter = ""
+	}
+	query := `
 		SELECT s.id, s.test_date, s.distance_m, s.distance_unit, s.location,
 			s.average_group_size_mm, s.best_group_size_mm, s.group_count,
-			ri.make, ri.model, p.brand, p.model, s.created_at
+			ri.make, ri.model, p.brand, p.model,
+			(SELECT '/api/v1/images/' || pti.image_id::text
+			   FROM pellet_test_images pti
+			   WHERE pti.session_id = s.id
+			   ORDER BY pti.created_at
+			   LIMIT 1) AS first_image_url,
+			s.is_draft, s.created_at
 		FROM pellet_test_sessions s
 		JOIN rifles ri ON ri.id = s.rifle_id
 		JOIN pellets p ON p.id = s.pellet_id
-		WHERE s.user_id = $1
+		WHERE s.user_id = $1 ` + filter + `
 		ORDER BY s.test_date DESC, s.created_at DESC
 		LIMIT $2 OFFSET $3
-	`, userID, limit, offset)
+	`
+	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list pellet test sessions: %w", err)
 	}
@@ -159,7 +239,8 @@ func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, li
 		if err := rows.Scan(
 			&s.ID, &testDate, &s.DistanceM, &s.DistanceUnit, &s.Location,
 			&s.AverageGroupSizeMM, &s.BestGroupSizeMM, &s.GroupCount,
-			&s.RifleMake, &s.RifleModel, &s.PelletBrand, &s.PelletModel, &createdAt,
+			&s.RifleMake, &s.RifleModel, &s.PelletBrand, &s.PelletModel,
+			&s.FirstImageURL, &s.IsDraft, &createdAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan pellet test session: %w", err)
 		}
@@ -218,11 +299,12 @@ func (r *PelletTestRepository) Delete(ctx context.Context, id, userID string) er
 	return nil
 }
 
-// CountByUser returns how many pellet test sessions the user has created.
+// CountByUser returns how many graduated pellet test sessions the user has
+// created. Drafts don't count toward achievements / stats.
 func (r *PelletTestRepository) CountByUser(ctx context.Context, userID string) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM pellet_test_sessions WHERE user_id = $1`,
+		`SELECT COUNT(*) FROM pellet_test_sessions WHERE user_id = $1 AND is_draft = FALSE`,
 		userID,
 	).Scan(&count)
 	if err != nil {
@@ -461,6 +543,7 @@ func (r *PelletTestRepository) GetLeaderboard(ctx context.Context, userID, rifle
 			WHERE s.user_id = $1
 			  AND s.rifle_id = $2
 			  AND s.group_count > 0
+			  AND s.is_draft = FALSE
 			GROUP BY s.pellet_id, p.brand, p.model, p.head_size_mm, p.weight_grains
 		)
 		SELECT pellet_id, pellet_brand, pellet_model, head_size_mm, weight_grains,
@@ -501,7 +584,7 @@ func (r *PelletTestRepository) GetStats(ctx context.Context, userID string) (*mo
 			MIN(s.best_group_size_mm),
 			AVG(s.average_group_size_mm)
 		FROM pellet_test_sessions s
-		WHERE s.user_id = $1
+		WHERE s.user_id = $1 AND s.is_draft = FALSE
 	`, userID).Scan(&stats.TotalTests, &stats.TotalGroups, &stats.BestGroupMM, &stats.AvgGroupMM)
 	if err != nil {
 		return nil, fmt.Errorf("get pellet test stats: %w", err)
@@ -515,6 +598,7 @@ func (r *PelletTestRepository) GetStats(ctx context.Context, userID string) (*mo
 		WHERE s.user_id = $1
 		  AND s.group_count > 0
 		  AND s.best_group_size_mm IS NOT NULL
+		  AND s.is_draft = FALSE
 		GROUP BY s.pellet_id, p.brand, p.model
 		ORDER BY
 			MIN(s.best_group_size_mm) ASC,
@@ -760,7 +844,7 @@ func (r *PelletTestRepository) GetComparisonSide(ctx context.Context, userID, ri
 			STDDEV_POP(s.average_group_size_mm)
 		FROM pellet_test_sessions s
 		JOIN pellets p ON p.id = s.pellet_id
-		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.group_count > 0
+		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.group_count > 0 AND s.is_draft = FALSE
 		GROUP BY s.pellet_id, p.brand, p.model
 	`, userID, rifleID, pelletID).Scan(
 		&side.PelletID, &side.PelletBrand, &side.PelletModel,
@@ -780,7 +864,7 @@ func (r *PelletTestRepository) GetComparisonSide(ctx context.Context, userID, ri
 		SELECT g.id, g.session_id, g.group_number, g.shot_count, g.group_size_mm, g.group_size_moa, g.notes, g.created_at, g.updated_at
 		FROM pellet_test_groups g
 		JOIN pellet_test_sessions s ON s.id = g.session_id
-		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3
+		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.is_draft = FALSE
 		ORDER BY s.test_date DESC, g.group_number
 	`, userID, rifleID, pelletID)
 	if err != nil {
@@ -820,7 +904,7 @@ func (r *PelletTestRepository) GetGroupTimeline(ctx context.Context, userID, rif
 		JOIN pellet_test_sessions s ON s.id = g.session_id
 		JOIN rifles ri ON ri.id = s.rifle_id
 		JOIN pellets p ON p.id = s.pellet_id
-		WHERE s.user_id = $1`
+		WHERE s.user_id = $1 AND s.is_draft = FALSE`
 	args := []any{userID}
 	if rifleID != "" {
 		query += ` AND s.rifle_id = $2`
@@ -1092,7 +1176,7 @@ func (r *PelletTestRepository) GetPublicLeaderboard(ctx context.Context, limit, 
 				SUM(s.group_count)::int      AS total_groups
 			FROM pellet_test_sessions s
 			JOIN pellets p ON p.id = s.pellet_id
-			WHERE s.is_public = true AND s.group_count > 0
+			WHERE s.is_public = true AND s.group_count > 0 AND s.is_draft = FALSE
 			GROUP BY p.brand, p.model, p.head_size_mm, p.weight_grains
 		)
 		SELECT pellet_brand, pellet_model, head_size_mm, weight_grains,
@@ -1137,7 +1221,7 @@ func (r *PelletTestRepository) GetBatchReport(ctx context.Context, userID string
 			MAX(s.test_date)::text
 		FROM pellet_test_sessions s
 		JOIN pellets p ON p.id = s.pellet_id
-		WHERE s.user_id = $1 AND s.group_count > 0
+		WHERE s.user_id = $1 AND s.group_count > 0 AND s.is_draft = FALSE
 	`
 	args := []any{userID}
 	if pelletID != nil {
@@ -1188,7 +1272,7 @@ func (r *PelletTestRepository) GetComboAnalytics(ctx context.Context, userID str
 		FROM pellet_test_sessions pts
 		JOIN rifles r  ON r.id  = pts.rifle_id
 		JOIN pellets p ON p.id  = pts.pellet_id
-		WHERE pts.user_id = $1
+		WHERE pts.user_id = $1 AND pts.is_draft = FALSE
 	`
 	args := []any{userID}
 	if rifleID != nil {
@@ -1230,7 +1314,7 @@ func (r *PelletTestRepository) GetConfidenceData(ctx context.Context, userID, ri
 			COUNT(DISTINCT s.id)::int,
 			STDDEV_POP(s.average_group_size_mm)
 		FROM pellet_test_sessions s
-		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.group_count > 0
+		WHERE s.user_id = $1 AND s.rifle_id = $2 AND s.pellet_id = $3 AND s.group_count > 0 AND s.is_draft = FALSE
 	`, userID, rifleID, pelletID).Scan(&testCount, &consistency)
 	if err != nil {
 		return 0, nil, fmt.Errorf("get confidence data: %w", err)

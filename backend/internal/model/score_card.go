@@ -24,8 +24,25 @@ type ScoreCard struct {
 	LikeCount     int       `json:"like_count"`
 	CommentCount  int       `json:"comment_count"`
 	IsLiked       bool      `json:"is_liked"`
+	IsDraft       bool      `json:"is_draft"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// QuickCreateScoreCardInput is the minimal payload accepted by the
+// quick-capture endpoint. Shot grid and full metadata are filled in later
+// via the refine flow.
+type QuickCreateScoreCardInput struct {
+	RifleID       *string  `json:"rifle_id"`
+	PelletID      *string  `json:"pellet_id"`
+	ShotAt        *string  `json:"shot_at"` // YYYY-MM-DD, defaults to today
+	Location      *string  `json:"location"`
+	WindMPH       *float64 `json:"wind_mph"`
+	TempCelsius   *float64 `json:"temp_celsius"`
+	Notes         *string  `json:"notes"`
+	LeagueRoundID *string  `json:"league_round_id"`
+	ClubID        *string  `json:"club_id"`
+	Visibility    *string  `json:"visibility"`
 }
 
 // ScoreCardAuthor is a compact, public-safe subset of the card owner's
@@ -127,6 +144,8 @@ type ScoreCardSummary struct {
 	LeagueID      *string   `json:"league_id,omitempty"`
 	LeagueName    *string   `json:"league_name,omitempty"`
 	ClubID        *string   `json:"club_id,omitempty"`
+	CardImageURL  *string   `json:"card_image_url,omitempty"`
+	IsDraft       bool      `json:"is_draft"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 

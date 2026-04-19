@@ -27,6 +27,7 @@ export interface PelletTestSession {
   best_group_size_mm?: number
   group_count: number
   is_public: boolean
+  is_draft: boolean
   created_at: string
   updated_at: string
   groups?: PelletTestGroup[]
@@ -48,7 +49,22 @@ export interface PelletTestSessionSummary {
   rifle_model: string
   pellet_brand: string
   pellet_model: string
+  first_image_url?: string
+  is_draft: boolean
   created_at: string
+}
+
+export interface QuickCreatePelletTestPayload {
+  rifle_id: string
+  pellet_id: string
+  test_date?: string
+  distance_value?: number
+  distance_unit?: string
+  location?: string
+  wind_mph?: number
+  temp_celsius?: number
+  humidity_pct?: number
+  notes?: string
 }
 
 // ── Group ───────────────────────────────────────────────────────────────────────
@@ -496,8 +512,17 @@ export const pelletTestApi = {
   // Sessions
   create: (payload: CreatePelletTestPayload) =>
     api.post<PelletTestSession>('/pellet-tests', payload),
-  list: (limit = 20, offset = 0) =>
-    api.get<{ items: PelletTestSessionSummary[] }>(`/pellet-tests?limit=${limit}&offset=${offset}`),
+  quickCreate: (payload: QuickCreatePelletTestPayload) =>
+    api.post<PelletTestSession>('/pellet-tests/quick', payload),
+  graduate: (id: string) =>
+    api.post<PelletTestSession>(`/pellet-tests/${id}/graduate`, {}),
+  draftCount: () =>
+    api.get<{ count: number }>('/pellet-tests/drafts/count'),
+  list: (limit = 20, offset = 0, scope?: 'drafts' | 'all') => {
+    let url = `/pellet-tests?limit=${limit}&offset=${offset}`
+    if (scope) url += `&scope=${scope}`
+    return api.get<{ items: PelletTestSessionSummary[] }>(url)
+  },
   get: (id: string) =>
     api.get<PelletTestSession>(`/pellet-tests/${id}`),
   update: (id: string, payload: UpdatePelletTestPayload) =>

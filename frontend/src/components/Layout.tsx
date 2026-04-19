@@ -1,9 +1,12 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
+import { scoreCardApi } from '../api/scoreCards'
+import { pelletTestApi } from '../api/pelletTesting'
 import { CornerMark } from './CornerMark'
 import { ThemeToggle } from './ThemeToggle'
 import { ToastContainer } from './Toast'
@@ -11,6 +14,7 @@ import { NotificationBell } from './NotificationBell'
 import { NavTracker } from './NavTracker'
 import { Tooltip } from './Tooltip'
 import { tips } from './tooltips'
+import QuickCaptureFab from './QuickCaptureFab'
 
 // Order reflects user flow: home -> daily activity -> competition -> gear
 // -> account -> help. Admin items are appended for admins only.
@@ -19,6 +23,7 @@ const baseNavItems = [
   { to: '/feed', icon: Activity, label: 'Feed', mobileLabel: 'Feed' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
+  { to: '/drafts', icon: Zap, label: 'Drafts', mobileLabel: 'Drafts' },
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
   { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
@@ -50,6 +55,7 @@ const mobileNavItems = [
 // Everything not in mobileNavItems appears in the "More" overlay.
 const moreMenuItems = [
   { to: '/feed', icon: Activity, label: 'Feed' },
+  { to: '/drafts', icon: Zap, label: 'Drafts' },
   { to: '/gear', icon: Package, label: 'Gear' },
   { to: '/clubs', icon: Users, label: 'Clubs' },
   { to: '/profile', icon: User, label: 'Profile' },
@@ -67,6 +73,23 @@ export default function Layout({ children }: PropsWithChildren) {
   const [moreOpen, setMoreOpen] = useState(false)
   const isAdmin = user?.role === 'admin'
   const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
+
+  // Drafts badge: sum of score-card + pellet-test quick-capture drafts.
+  // Low-frequency refetch keeps it cheap but accurate after users save new
+  // drafts or graduate old ones from elsewhere in the app.
+  const { data: scoreDraftCount } = useQuery({
+    queryKey: ['score-drafts-count'],
+    queryFn: () => scoreCardApi.draftCount(),
+    refetchInterval: 60_000,
+    enabled: Boolean(user),
+  })
+  const { data: pelletDraftCount } = useQuery({
+    queryKey: ['pellet-drafts-count'],
+    queryFn: () => pelletTestApi.draftCount(),
+    refetchInterval: 60_000,
+    enabled: Boolean(user),
+  })
+  const draftCount = (scoreDraftCount?.count ?? 0) + (pelletDraftCount?.count ?? 0)
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true)
@@ -142,17 +165,25 @@ export default function Layout({ children }: PropsWithChildren) {
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1" aria-label="Primary">
-          {navItems.map(({ to, icon: Icon, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className={navLinkBase}
-              activeProps={{ className: navLinkActive, 'aria-current': 'page' }}
-            >
-              <Icon size={20} />
-              <span>{label}</span>
-            </Link>
-          ))}
+          {navItems.map(({ to, icon: Icon, label }) => {
+            const showBadge = to === '/drafts' && draftCount > 0
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={navLinkBase}
+                activeProps={{ className: navLinkActive, 'aria-current': 'page' }}
+              >
+                <Icon size={20} />
+                <span className="flex-1">{label}</span>
+                {showBadge && (
+                  <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                    {draftCount}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
         </nav>
 
         <div className="px-4 py-4 border-t border-subtle space-y-3">
@@ -217,6 +248,10 @@ export default function Layout({ children }: PropsWithChildren) {
           {children ?? <Outlet />}
         </main>
 
+        {/* Quick-capture FAB: hidden on capture/refine pages to avoid
+            duplicating their save button. */}
+        <QuickCaptureFabWhenAppropriate />
+
         {/* Mobile bottom nav \u2014 5 items max */}
         <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
@@ -252,17 +287,25 @@ export default function Layout({ children }: PropsWithChildren) {
                   <X size={18} />
                 </button>
               </div>
-              {moreMenuItems.map(({ to, icon: Icon, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  onClick={() => setMoreOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
-                >
-                  <Icon size={18} className="text-muted" />
-                  <span>{label}</span>
-                </Link>
-              ))}
+              {moreMenuItems.map(({ to, icon: Icon, label }) => {
+                const showBadge = to === '/drafts' && draftCount > 0
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={() => setMoreOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                  >
+                    <Icon size={18} className="text-muted" />
+                    <span className="flex-1">{label}</span>
+                    {showBadge && (
+                      <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                        {draftCount}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
               {isAdmin && (
                 <>
                   <div className="border-t border-subtle my-2" />
@@ -286,4 +329,20 @@ export default function Layout({ children }: PropsWithChildren) {
       </div>
     </div>
   )
+}
+
+// Hidden on capture/refine screens so the FAB doesn't float over their
+// own save button. window.location is fine here because we just want the
+// current path — no reactive state needed; the FAB re-renders on every
+// navigation via Layout's re-mount.
+function QuickCaptureFabWhenAppropriate() {
+  const path = typeof window !== 'undefined' ? window.location.pathname : ''
+  const hide =
+    path.startsWith('/quick-capture') ||
+    path === '/scores/new' ||
+    path === '/pellet-testing/new' ||
+    path === '/login' ||
+    path === '/register'
+  if (hide) return null
+  return <QuickCaptureFab />
 }

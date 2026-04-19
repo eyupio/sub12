@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { pelletTestApi } from '../api/pelletTesting'
@@ -39,6 +39,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function NewPelletTest() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const search = useSearch({ strict: false }) as { draftId?: string }
+  const draftId = search.draftId
 
   const [rifleId, setRifleId] = useState('')
   const [pelletId, setPelletId] = useState('')
@@ -73,6 +75,33 @@ export default function NewPelletTest() {
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
   const rifles = rifleData?.items ?? []
   const pellets = pelletData?.items ?? []
+
+  // Refine flow: hydrate from the quick-capture draft.
+  const { data: draft } = useQuery({
+    queryKey: ['pellet-test', draftId],
+    queryFn: () => pelletTestApi.get(draftId!),
+    enabled: !!draftId,
+  })
+  useEffect(() => {
+    if (!draft) return
+    setRifleId(draft.rifle_id)
+    setPelletId(draft.pellet_id)
+    setTestDate(draft.test_date)
+    if (draft.distance_m > 0) {
+      const unit = draft.distance_unit === 'yards' ? 'yards' : 'meters'
+      setDistanceUnit(unit)
+      const value = unit === 'yards' ? draft.distance_m / 0.9144 : draft.distance_m
+      setDistanceValue(String(Number(value.toFixed(2))))
+    }
+    if (draft.location) setLocation(draft.location)
+    if (draft.wind_mph != null) setWindMph(String(draft.wind_mph))
+    if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
+    if (draft.humidity_pct != null) setHumidityPct(String(draft.humidity_pct))
+    if (draft.notes) setNotes(draft.notes)
+    // Images and groups already live on the server; no preview hydration
+    // needed — the existing attach list for NEW uploads stays empty until
+    // the user adds more photos.
+  }, [draft])
 
   const addPelletMutation = useMutation({
     mutationFn: () => gearApi.createPellet(newPellet),
@@ -124,24 +153,50 @@ export default function NewPelletTest() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const session = await pelletTestApi.create({
-        rifle_id: rifleId,
-        pellet_id: pelletId,
-        test_date: testDate,
-        distance_value: hasDistance ? Number(distanceValue) : undefined,
-        distance_unit: hasDistance ? distanceUnit : undefined,
-        location: location || undefined,
-        wind_mph: windMph ? Number(windMph) : undefined,
-        temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
-        humidity_pct: humidityPct ? Number(humidityPct) : undefined,
-        notes: notes || undefined,
-        velocity_fps: velocityFps ? Number(velocityFps) : undefined,
-        velocity_sd: velocitySd ? Number(velocitySd) : undefined,
-        extreme_spread_fps: extremeSpreadFps ? Number(extremeSpreadFps) : undefined,
-        bench_setup: benchSetup || undefined,
-        scope_details: scopeDetails || undefined,
-        barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
-      })
+      let session
+      if (draftId) {
+        // Refine flow: PATCH the draft session with the full metadata the
+        // user entered here. Groups and images are additive via the
+        // existing per-session endpoints — the draft's original photo
+        // stays linked.
+        session = await pelletTestApi.update(draftId, {
+          rifle_id: rifleId,
+          pellet_id: pelletId,
+          test_date: testDate,
+          distance_value: hasDistance ? Number(distanceValue) : undefined,
+          distance_unit: hasDistance ? distanceUnit : undefined,
+          location: location || undefined,
+          wind_mph: windMph ? Number(windMph) : undefined,
+          temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
+          humidity_pct: humidityPct ? Number(humidityPct) : undefined,
+          notes: notes || undefined,
+          velocity_fps: velocityFps ? Number(velocityFps) : undefined,
+          velocity_sd: velocitySd ? Number(velocitySd) : undefined,
+          extreme_spread_fps: extremeSpreadFps ? Number(extremeSpreadFps) : undefined,
+          bench_setup: benchSetup || undefined,
+          scope_details: scopeDetails || undefined,
+          barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
+        })
+      } else {
+        session = await pelletTestApi.create({
+          rifle_id: rifleId,
+          pellet_id: pelletId,
+          test_date: testDate,
+          distance_value: hasDistance ? Number(distanceValue) : undefined,
+          distance_unit: hasDistance ? distanceUnit : undefined,
+          location: location || undefined,
+          wind_mph: windMph ? Number(windMph) : undefined,
+          temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
+          humidity_pct: humidityPct ? Number(humidityPct) : undefined,
+          notes: notes || undefined,
+          velocity_fps: velocityFps ? Number(velocityFps) : undefined,
+          velocity_sd: velocitySd ? Number(velocitySd) : undefined,
+          extreme_spread_fps: extremeSpreadFps ? Number(extremeSpreadFps) : undefined,
+          bench_setup: benchSetup || undefined,
+          scope_details: scopeDetails || undefined,
+          barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
+        })
+      }
 
       let groupFailures = 0
       for (const g of validGroups) {
@@ -165,16 +220,24 @@ export default function NewPelletTest() {
         }
       }
 
-      return { session, groupFailures, imageFailures }
+      if (draftId) {
+        session = await pelletTestApi.graduate(session.id)
+      }
+
+      return { session, groupFailures, imageFailures, wasDraft: !!draftId }
     },
-    onSuccess: ({ session, groupFailures, imageFailures }) => {
+    onSuccess: ({ session, groupFailures, imageFailures, wasDraft }) => {
       qc.invalidateQueries({ queryKey: ['pellet-tests'] })
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
+      qc.invalidateQueries({ queryKey: ['pellet-drafts'] })
+      qc.invalidateQueries({ queryKey: ['pellet-drafts-count'] })
       if (groupFailures > 0 || imageFailures > 0) {
         const parts = []
         if (groupFailures > 0) parts.push(`${groupFailures} group${groupFailures === 1 ? '' : 's'}`)
         if (imageFailures > 0) parts.push(`${imageFailures} image${imageFailures === 1 ? '' : 's'}`)
         toast(`Test saved, but ${parts.join(' and ')} failed to upload`, 'error')
+      } else if (wasDraft) {
+        toast('Draft refined and submitted', 'success')
       }
       navigate({ to: '/pellet-testing/$id', params: { id: session.id } })
     },
@@ -187,7 +250,7 @@ export default function NewPelletTest() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
       <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-        New Pellet Test
+        {draftId ? 'Refine Draft' : 'New Pellet Test'}
       </h1>
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-8">

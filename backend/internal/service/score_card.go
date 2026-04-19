@@ -19,9 +19,12 @@ var (
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
 type ScoreCardRepo interface {
 	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
+	CreateDraft(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error)
+	Graduate(ctx context.Context, id, userID string) (*model.ScoreCard, error)
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
 	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
+	GetDraftCount(ctx context.Context, userID string) (int, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	Delete(ctx context.Context, id, userID string) error
@@ -183,6 +186,11 @@ func (s *ScoreCardService) GetForViewer(ctx context.Context, id, viewerID string
 	if viewerID != "" && viewerID == card.UserID {
 		return card, nil
 	}
+	// Drafts are private to the owner; they never graduate into a shared view
+	// until the user clears the flag via the refine flow.
+	if card.IsDraft {
+		return nil, repository.ErrNotFound
+	}
 	if card.Visibility != "public" {
 		return nil, repository.ErrNotFound
 	}
@@ -238,7 +246,7 @@ func (s *ScoreCardService) GetForViewerWithAuthor(ctx context.Context, id, viewe
 }
 
 // ListByUser returns paginated summaries for the requesting user.
-// scope filters results: "personal", "league", or "" (all).
+// scope filters results: "personal", "league", "club", "drafts", or "" (all non-draft).
 // leagueID optionally filters to cards belonging to a specific league.
 func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error) {
 	if limit <= 0 || limit > 100 {
@@ -247,10 +255,103 @@ func (s *ScoreCardService) ListByUser(ctx context.Context, userID string, limit,
 	if offset < 0 {
 		offset = 0
 	}
-	if scope != "" && scope != "personal" && scope != "league" && scope != "club" {
+	if scope != "" && scope != "personal" && scope != "league" && scope != "club" && scope != "drafts" {
 		scope = ""
 	}
 	return s.cards.ListByUser(ctx, userID, limit, offset, scope, leagueID)
+}
+
+// GetDraftCount returns how many quick-capture drafts the user has yet to refine.
+func (s *ScoreCardService) GetDraftCount(ctx context.Context, userID string) (int, error) {
+	return s.cards.GetDraftCount(ctx, userID)
+}
+
+// QuickCreate persists a quick-capture draft with minimal data. The normal
+// league enforcement (max submissions, image required) is intentionally
+// skipped — those rules apply when the user graduates the draft. Activity
+// feed ingestion is also skipped; drafts are private-to-owner until refined.
+func (s *ScoreCardService) QuickCreate(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error) {
+	// Auto-populate club_id from the league if a league round was chosen so
+	// refinement lands in the same club context later.
+	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
+		if (input.ClubID == nil || *input.ClubID == "") {
+			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID); err == nil {
+				if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league.ClubID != nil {
+					input.ClubID = league.ClubID
+				}
+			}
+		}
+	}
+	return s.cards.CreateDraft(ctx, userID, input)
+}
+
+// Graduate flips a draft's is_draft flag to false, re-evaluates verification
+// based on league round linkage, and emits the activity + achievement events
+// that were suppressed at draft creation. The caller must first PATCH the
+// full shot grid via Update; Graduate assumes the card is already complete.
+func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*model.ScoreCard, error) {
+	card, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !card.IsDraft {
+		return card, nil
+	}
+	if len(card.ShotScores) != 25 || len(card.ShotXs) != 25 {
+		return nil, fmt.Errorf("%w: refine the card with 25 shots before graduating", ErrInvalidCard)
+	}
+
+	// Enforce league rules at graduation (not at quick-capture).
+	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil {
+		cfg, cfgErr := s.leagueRepo.GetConfigByRoundID(ctx, *card.LeagueRoundID)
+		if cfgErr != nil && !errors.Is(cfgErr, repository.ErrNotFound) {
+			return nil, fmt.Errorf("check league config: %w", cfgErr)
+		}
+		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
+			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *card.LeagueRoundID)
+			if err != nil {
+				return nil, fmt.Errorf("count submissions: %w", err)
+			}
+			// Exclude this card itself; only peer submissions count toward the cap.
+			if count-1 >= int(cfg.MaxSubmissionsPerRound) {
+				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
+			}
+		}
+	}
+
+	updated, err := s.cards.Graduate(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	isPB, pbErr := s.cards.IsPersonalBest(ctx, userID, updated.ID, updated.TotalScore)
+	if pbErr != nil {
+		isPB = false
+	}
+
+	if s.activity != nil {
+		targetID := updated.ID
+		targetType := "score_card"
+		meta := model.ScorePostedMeta{TotalScore: updated.TotalScore, XCount: updated.XCount, IsPB: isPB}
+		var leagueID *string
+		if updated.LeagueRoundID != nil && *updated.LeagueRoundID != "" && s.leagueRepo != nil {
+			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *updated.LeagueRoundID); err == nil {
+				leagueID = &lid
+			}
+		}
+		activityType := model.ActivityScorePosted
+		if isPB {
+			activityType = model.ActivityPersonalBest
+		}
+		go s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, updated.ClubID, updated.Visibility)
+	}
+
+	if s.achievement != nil {
+		go s.achievement.EvaluateForScoreCard(context.Background(), userID, updated)
+		go s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
+	}
+
+	return updated, nil
 }
 
 // Update modifies a score card's shots and metadata, resets verification, and

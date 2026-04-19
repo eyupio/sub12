@@ -26,9 +26,9 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 			MAX(x_count),
 			ROUND(AVG(total_score)::numeric, 2),
 			(SELECT ROUND(AVG(total_score)::numeric, 2)
-			 FROM (SELECT total_score FROM score_cards WHERE user_id = $1 ORDER BY shot_at DESC, created_at DESC LIMIT 10) sub)
+			 FROM (SELECT total_score FROM score_cards WHERE user_id = $1 AND is_draft = FALSE ORDER BY shot_at DESC, created_at DESC LIMIT 10) sub)
 		FROM score_cards
-		WHERE user_id = $1
+		WHERE user_id = $1 AND is_draft = FALSE
 	`, userID).Scan(
 		&stats.CardsLogged,
 		&stats.BestScore,
@@ -47,7 +47,7 @@ func (r *StatsRepository) GetRifleStats(ctx context.Context, userID string) ([]*
 		SELECT rifle_id, MAX(total_score) AS best_score,
 		       MAX(x_count) AS best_x_count, COUNT(*)::int AS card_count
 		FROM score_cards
-		WHERE user_id = $1 AND rifle_id IS NOT NULL
+		WHERE user_id = $1 AND rifle_id IS NOT NULL AND is_draft = FALSE
 		GROUP BY rifle_id
 	`, userID)
 	if err != nil {
@@ -79,6 +79,7 @@ func (r *StatsRepository) GetScoreTrends(ctx context.Context, userID, granularit
 		FROM score_cards
 		WHERE user_id = $1
 		  AND ($3::UUID IS NULL OR rifle_id = $3)
+		  AND is_draft = FALSE
 		GROUP BY DATE_TRUNC($2, shot_at)
 		ORDER BY period
 	`, userID, granularity, rifleID)
