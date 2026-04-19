@@ -686,6 +686,8 @@ export default function ClubDetail() {
           targetId={id}
           targetType="club"
           targetLabel={club.name}
+          shareTitle={club.name}
+          shareText={`${club.name} on sub-12 — ${club.member_count} member${club.member_count === 1 ? '' : 's'}`}
           onClose={() => setShowShare(false)}
         />
       )}

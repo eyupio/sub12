@@ -180,4 +180,43 @@ describe('ShareDialog', () => {
     expect(hrefArg).toContain(encodeURIComponent('https://app.test/score-cards/sc-1'))
     expect(clubsSpy).not.toHaveBeenCalled()
   })
+
+  it('forwards a caller-supplied shareText to the Web Share API', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+
+    renderDialog({
+      shareTitle: 'Jane Doe — 247 (18X)',
+      shareText: 'Jane Doe shot 247 (18X) at Brandywine on sub-12',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^share externally$/i }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    expect(share).toHaveBeenCalledWith({
+      title: 'Jane Doe — 247 (18X)',
+      text: 'Jane Doe shot 247 (18X) at Brandywine on sub-12',
+      url: 'https://app.test/score-cards/sc-1',
+    })
+  })
+
+  it('embeds a caller-supplied shareText in the Twitter/WhatsApp/Email intents', () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+
+    renderDialog({
+      shareText: 'Jane Doe shot 247 (18X) at Brandywine on sub-12',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^x$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^whatsapp$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^email$/i }))
+
+    const encoded = encodeURIComponent('Jane Doe shot 247 (18X) at Brandywine on sub-12')
+    const [twitterHref] = openSpy.mock.calls[0] ?? []
+    const [whatsappHref] = openSpy.mock.calls[1] ?? []
+    const [emailHref] = openSpy.mock.calls[2] ?? []
+    expect(twitterHref).toContain(encoded)
+    expect(whatsappHref).toContain(encoded)
+    expect(emailHref).toContain(encoded)
+  })
 })

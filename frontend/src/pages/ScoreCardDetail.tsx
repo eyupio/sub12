@@ -1314,14 +1314,24 @@ export default function ScoreCardDetail() {
         )}
       </div>
 
-      {showShare && (
-        <ShareDialog
-          targetId={id}
-          targetType="score_card"
-          targetLabel="Score Card"
-          onClose={() => setShowShare(false)}
-        />
-      )}
+      {showShare && (() => {
+        const authorName = cardAuthor?.display_name || currentUser?.display_name || ''
+        const score = card.x_count > 0 ? `${card.total_score} (${card.x_count}X)` : String(card.total_score)
+        const who = authorName ? `${authorName} shot ` : ''
+        const where = card.location ? ` at ${card.location}` : ''
+        const shareText = `${who}${score}${where} on sub-12`
+        const shareTitle = authorName ? `${authorName} — ${score}` : score
+        return (
+          <ShareDialog
+            targetId={id}
+            targetType="score_card"
+            targetLabel="Score Card"
+            shareTitle={shareTitle}
+            shareText={shareText}
+            onClose={() => setShowShare(false)}
+          />
+        )
+      })()}
 
       <ReportDialog
         open={showReport}

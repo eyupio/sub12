@@ -439,15 +439,13 @@ export default function ImageMeasurement({
     const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
     if (Math.hypot(dx, dy) > threshold) {
       didDrag.current = true
-      if (subMode === 'idle') {
-        if (!isPanning) setIsPanning(true)
-        setPan({
-          x: panOffset.current.x + (e.clientX - panStart.current.x),
-          y: panOffset.current.y + (e.clientY - panStart.current.y),
-        })
-      }
+      if (!isPanning) setIsPanning(true)
+      setPan({
+        x: panOffset.current.x + (e.clientX - panStart.current.x),
+        y: panOffset.current.y + (e.clientY - panStart.current.y),
+      })
     }
-  }, [isPanning, subMode])
+  }, [isPanning])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
@@ -691,7 +689,7 @@ export default function ImageMeasurement({
         <canvas
           ref={canvasRef}
           className="block"
-          style={{ width: canvasSize.w, height: canvasSize.h, touchAction: 'none', cursor: subMode === 'idle' ? 'grab' : 'crosshair' }}
+          style={{ width: canvasSize.w, height: canvasSize.h, touchAction: 'none', cursor: isPanning ? 'grabbing' : (subMode === 'idle' ? 'grab' : 'crosshair') }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
