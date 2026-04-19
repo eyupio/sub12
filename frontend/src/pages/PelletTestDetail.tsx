@@ -517,12 +517,13 @@ export default function PelletTestDetail() {
         </div>
 
         {editing && (
-          <div className="mt-4 space-y-3 border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+          <div className="mt-4 space-y-3 border border-amber-500/30 dark:border-amber-400/30 rounded-lg p-4 bg-amber-500/5 dark:bg-amber-500/10">
             <h2 className="text-[11px] tracking-widest uppercase text-muted">Edit Test Details</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Test Date</label>
+                <label htmlFor="pellet-edit-test-date" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Test Date</label>
                 <input
+                  id="pellet-edit-test-date"
                   type="date"
                   value={editMeta.test_date}
                   onChange={e => setEditMeta(m => ({ ...m, test_date: e.target.value }))}
@@ -530,8 +531,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+                <label htmlFor="pellet-edit-location" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
                 <input
+                  id="pellet-edit-location"
                   type="text"
                   value={editMeta.location}
                   onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))}
@@ -540,8 +542,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>
+                <label htmlFor="pellet-edit-distance" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>
                 <input
+                  id="pellet-edit-distance"
                   type="number"
                   inputMode="decimal"
                   value={editMeta.distance_value}
@@ -550,8 +553,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Unit</label>
+                <label htmlFor="pellet-edit-distance-unit" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Unit</label>
                 <select
+                  id="pellet-edit-distance-unit"
                   value={editMeta.distance_unit}
                   onChange={e => setEditMeta(m => ({ ...m, distance_unit: e.target.value }))}
                   className={inputCls}
@@ -562,8 +566,9 @@ export default function PelletTestDetail() {
               </div>
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+              <label htmlFor="pellet-edit-notes" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
               <textarea
+                id="pellet-edit-notes"
                 value={editMeta.notes}
                 onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))}
                 rows={2}
@@ -783,7 +788,7 @@ export default function PelletTestDetail() {
                   (newGroupMethod === 'manual' && (!newGroupSize || Number(newGroupSize) <= 0)) ||
                   (newGroupMethod === 'image' && !newGroupImageId)
                 }
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 <Check size={13} /> {addGroupMutation.isPending ? 'Saving…' : newGroupMethod === 'image' ? 'Analyze image' : 'Save'}
               </button>

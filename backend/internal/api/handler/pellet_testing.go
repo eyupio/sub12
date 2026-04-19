@@ -381,7 +381,7 @@ func (h *PelletTestHandler) CreateMeasurement(w http.ResponseWriter, r *http.Req
 
 // GET /api/v1/pellet-tests/{id}/images/{imageId}/measurements
 func (h *PelletTestHandler) GetMeasurements(w http.ResponseWriter, r *http.Request) {
-	_, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
@@ -389,8 +389,12 @@ func (h *PelletTestHandler) GetMeasurements(w http.ResponseWriter, r *http.Reque
 	sessionID := chi.URLParam(r, "id")
 	imageID := chi.URLParam(r, "imageId")
 
-	measurements, err := h.svc.GetMeasurements(r.Context(), sessionID, imageID)
+	measurements, err := h.svc.GetMeasurements(r.Context(), sessionID, imageID, userID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to get measurements")
 		return
 	}
@@ -589,15 +593,20 @@ func (h *PelletTestHandler) GetSessionScoring(w http.ResponseWriter, r *http.Req
 
 // GET /api/v1/pellet-tests/{id}/images/{imageId}/measurements/{measurementId}/detections
 func (h *PelletTestHandler) ListDetections(w http.ResponseWriter, r *http.Request) {
-	_, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	sessionID := chi.URLParam(r, "id")
 	measurementID := chi.URLParam(r, "measurementId")
 
-	detections, err := h.svc.ListDetections(r.Context(), measurementID)
+	detections, err := h.svc.ListDetections(r.Context(), sessionID, measurementID, userID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "session not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list detections")
 		return
 	}

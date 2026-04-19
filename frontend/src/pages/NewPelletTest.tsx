@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
@@ -28,10 +28,15 @@ const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = useId()
+  const child = isValidElement(children)
+    ? cloneElement(children as React.ReactElement<{ id?: string }>, { id: (children.props as { id?: string }).id ?? id })
+    : children
+  const childId = isValidElement(children) ? ((children.props as { id?: string }).id ?? id) : undefined
   return (
     <div>
-      <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
-      {children}
+      <label htmlFor={childId} className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
+      {child}
     </div>
   )
 }
@@ -64,6 +69,11 @@ export default function NewPelletTest() {
   ])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const imagePreviewsRef = useRef<string[]>([])
+  imagePreviewsRef.current = imagePreviews
+  useEffect(() => () => {
+    imagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url))
+  }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [showAddPellet, setShowAddPellet] = useState(false)
@@ -382,7 +392,7 @@ export default function NewPelletTest() {
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {imagePreviews.map((preview, i) => (
                   <div key={i} className="relative">
-                    <img src={preview} alt="" className="rounded border border-subtle w-full aspect-square object-cover" />
+                    <img src={preview} alt={`Target photo ${i + 1} preview`} className="rounded border border-subtle w-full aspect-square object-cover" />
                     <button
                       onClick={() => removeImage(i)}
                       className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
