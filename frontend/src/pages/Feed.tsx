@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Target, Trophy, MessageSquare, Star, RefreshCw,
@@ -26,14 +26,83 @@ const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
   { key: 'club', label: 'Club', icon: Building2 },
 ]
 
+function getCardNavigator(
+  item: ActivityItem,
+  navigate: ReturnType<typeof useNavigate>,
+): (() => void) | null {
+  switch (item.type) {
+    case 'score_posted':
+    case 'personal_best':
+    case 'commented': {
+      const id = item.target_id
+      return id ? () => navigate({ to: '/scores/$id', params: { id } }) : null
+    }
+    case 'pellet_test_posted': {
+      const id = item.target_id
+      return id ? () => navigate({ to: '/pellet-testing/$id', params: { id } }) : null
+    }
+    case 'joined_league': {
+      const id = item.target_id ?? item.league_id
+      return id ? () => navigate({ to: '/leagues/$id', params: { id } }) : null
+    }
+    case 'league_round_opened':
+    case 'league_season_started': {
+      const id = item.league_id
+      return id ? () => navigate({ to: '/leagues/$id', params: { id } }) : null
+    }
+    case 'joined_club': {
+      const id = item.target_id ?? item.club_id
+      return id ? () => navigate({ to: '/clubs/$id', params: { id } }) : null
+    }
+    case 'feature_request_created':
+    case 'feature_request_implemented': {
+      const id = item.target_id
+      return id ? () => navigate({ to: '/feature-requests/$id', params: { id } }) : null
+    }
+    case 'post_created': {
+      const id = item.target_id
+      return id ? () => navigate({ to: '/posts/$id', params: { id } }) : null
+    }
+    case 'achievement_earned': {
+      const id = item.user_id
+      return id ? () => navigate({ to: '/users/$id', params: { id } }) : null
+    }
+    default:
+      return null
+  }
+}
+
 function ActivityCard({ item }: { item: ActivityItem }) {
   const prefs = useRegionalPrefs()
   const date = formatDate(item.created_at, prefs)
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [showComments, setShowComments] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [reportTargetId, setReportTargetId] = useState<string | null>(null)
+
+  const goToCard = getCardNavigator(item, navigate)
+
+  const shouldIgnoreCardClick = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false
+    return !!target.closest('a, button, input, textarea, form, [data-no-card-nav]')
+  }
+
+  const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!goToCard) return
+    if (e.defaultPrevented) return
+    if (shouldIgnoreCardClick(e.target)) return
+    goToCard()
+  }
+
+  const handleCardKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!goToCard) return
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    if (shouldIgnoreCardClick(e.target)) return
+    e.preventDefault()
+    goToCard()
+  }
 
   const isScoreCard = item.target_type === 'score_card' && !!item.target_id
   const canInteract = !!currentUser && isScoreCard
@@ -383,8 +452,19 @@ function ActivityCard({ item }: { item: ActivityItem }) {
 
   const comments = commentsData?.items ?? []
 
+  const cardClasses = goToCard
+    ? 'flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface cursor-pointer hover:border-[var(--brass)]/30 transition-colors'
+    : 'flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface'
+
   return (
-    <div className="flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
+    <div
+      className={cardClasses}
+      onClick={goToCard ? handleCardClick : undefined}
+      onKeyDown={goToCard ? handleCardKeyDown : undefined}
+      role={goToCard ? 'link' : undefined}
+      tabIndex={goToCard ? 0 : undefined}
+      aria-label={goToCard ? `${item.display_name} — ${item.type.replace(/_/g, ' ')}` : undefined}
+    >
       {/* Avatar with star badge */}
       <div className="flex-shrink-0">
         <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
@@ -430,7 +510,7 @@ function ActivityCard({ item }: { item: ActivityItem }) {
 
         {/* Inline comment section */}
         {showComments && isScoreCard && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2" data-no-card-nav>
             {comments.map((c) => (
               <div key={c.id} className="flex gap-2">
                 <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
