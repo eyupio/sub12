@@ -60,11 +60,23 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*mo
 	if club.Type == "private" && !club.IsMember {
 		return nil, ErrClubNotFound
 	}
+	if !club.IsMember {
+		club.JoinCode = ""
+	}
 	return club, nil
 }
 
 func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
-	return s.repo.List(ctx, viewerID)
+	clubs, err := s.repo.List(ctx, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range clubs {
+		if !c.IsMember {
+			c.JoinCode = ""
+		}
+	}
+	return clubs, nil
 }
 
 // SummaryByID returns a minimal public summary of any club, including private
