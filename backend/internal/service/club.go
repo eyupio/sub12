@@ -343,27 +343,14 @@ func (s *ClubService) RegenerateJoinCode(ctx context.Context, clubID, requesterI
 
 // LeaveClub allows a member to remove themselves from a club.
 func (s *ClubService) LeaveClub(ctx context.Context, clubID, userID string) error {
-	isMember, err := s.repo.IsMember(ctx, clubID, userID)
-	if err != nil {
-		return err
-	}
-	if !isMember {
+	err := s.repo.LeaveClubGuarded(ctx, clubID, userID)
+	if errors.Is(err, repository.ErrClubMemberNotFound) {
 		return ErrClubNotMember
 	}
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, userID)
-	if err != nil {
-		return err
+	if errors.Is(err, repository.ErrClubLastAdmin) {
+		return ErrClubLastAdmin
 	}
-	if isAdmin {
-		count, err := s.repo.CountAdmins(ctx, clubID)
-		if err != nil {
-			return err
-		}
-		if count <= 1 {
-			return ErrClubLastAdmin
-		}
-	}
-	return s.repo.RemoveMember(ctx, clubID, userID)
+	return err
 }
 
 // UpdateMemberRole allows a club admin to promote or demote another member.
@@ -375,21 +362,13 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 	if !reqIsAdmin {
 		return ErrClubNotAdmin
 	}
-	// Prevent demoting the last admin
 	if !isAdmin {
-		count, err := s.repo.CountAdmins(ctx, clubID)
-		if err != nil {
-			return err
+		// Demotion: enforce the last-admin invariant atomically.
+		err := s.repo.DemoteMemberGuarded(ctx, clubID, targetID)
+		if errors.Is(err, repository.ErrClubLastAdmin) {
+			return ErrClubLastAdmin
 		}
-		if count <= 1 {
-			targetIsAdmin, err := s.repo.IsAdmin(ctx, clubID, targetID)
-			if err != nil {
-				return err
-			}
-			if targetIsAdmin {
-				return ErrClubLastAdmin
-			}
-		}
+		return err
 	}
 	return s.repo.UpdateMemberRole(ctx, clubID, targetID, isAdmin)
 }
