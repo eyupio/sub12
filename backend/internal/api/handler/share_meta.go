@@ -70,6 +70,14 @@ func NewShareMeta(
 	siteURL, frontendOrigin string,
 	log zerolog.Logger,
 ) *ShareMeta {
+	trimmedSite := strings.TrimRight(siteURL, "/")
+	if trimmedSite == "" {
+		// absoluteFromRequest falls back to r.Host when siteURL is empty,
+		// which is safe behind a trusted reverse proxy but opens host-header
+		// injection into og:url when no such proxy is in front. Log loudly so
+		// a missing SITE_URL in a non-dev env is hard to miss.
+		log.Warn().Msg("share_meta: SITE_URL not configured; og:url will echo the request Host header — ensure a trusted reverse proxy rewrites Host, or set SITE_URL")
+	}
 	return &ShareMeta{
 		scoreCards:     scoreCards,
 		pelletTest:     pelletTest,
@@ -79,7 +87,7 @@ func NewShareMeta(
 		rifles:         rifles,
 		pellets:        pellets,
 		achievements:   achievements,
-		siteURL:        strings.TrimRight(siteURL, "/"),
+		siteURL:        trimmedSite,
 		siteName:       "SUB12",
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            log,
@@ -293,9 +301,18 @@ func (s *ShareMeta) absoluteFromRequest(r *http.Request) string {
 	if s.siteURL != "" {
 		return s.siteURL + r.URL.Path
 	}
+	// Only two valid forwarded schemes; reject anything else so a crafted
+	// X-Forwarded-Proto can't inject something like "javascript" into og:url.
 	scheme := "https"
-	if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" {
-		scheme = "http"
+	if r.TLS == nil {
+		switch strings.ToLower(r.Header.Get("X-Forwarded-Proto")) {
+		case "https":
+			scheme = "https"
+		case "http":
+			scheme = "http"
+		default:
+			scheme = "http"
+		}
 	}
 	return scheme + "://" + r.Host + r.URL.Path
 }

@@ -158,6 +158,34 @@ func TestTruncate_HandlesRunes(t *testing.T) {
 	assert.Equal(t, "short", truncate("   short   ", 10))
 }
 
+func TestAbsoluteFromRequest_OnlyAcceptsHTTPOrHTTPS(t *testing.T) {
+	// When SITE_URL is empty, absoluteFromRequest falls back to Host + scheme
+	// inference. Only accept canonical schemes so a crafted X-Forwarded-Proto
+	// like "javascript" can't slip into og:url / canonical metadata.
+	s := &ShareMeta{log: zerolog.Nop()} // siteURL intentionally blank
+
+	cases := []struct {
+		name    string
+		header  string
+		expect  string
+	}{
+		{"https forwarded", "https", "https://example.test/x"},
+		{"http forwarded", "http", "http://example.test/x"},
+		{"empty forwarded", "", "http://example.test/x"},
+		{"bogus forwarded", "javascript", "http://example.test/x"},
+		{"mixed case https", "HTTPS", "https://example.test/x"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://example.test/x", nil)
+			if tc.header != "" {
+				req.Header.Set("X-Forwarded-Proto", tc.header)
+			}
+			assert.Equal(t, tc.expect, s.absoluteFromRequest(req))
+		})
+	}
+}
+
 func TestImageAlt_EveryShareTypeProducesNonEmptyAlt(t *testing.T) {
 	// og:image:alt was only populated for score cards; screen readers and
 	// accessibility linters flagged every other share type. Verify each
