@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Trophy, Crosshair } from 'lucide-react'
 import { pelletTestApi, PelletLeaderboardEntry } from '../api/pelletTesting'
@@ -14,7 +14,10 @@ export default function PelletTestLeaderboard() {
     queryKey: ['rifles'],
     queryFn: () => gearApi.listRifles(),
   })
-  const rifles = riflesData?.items?.filter((r: Rifle) => r.is_active) ?? []
+  const rifles = useMemo(
+    () => riflesData?.items?.filter((r: Rifle) => r.is_active) ?? [],
+    [riflesData],
+  )
 
   const { data: leaderboardData, isLoading } = useQuery({
     queryKey: ['pellet-test-leaderboard', selectedRifleId],
