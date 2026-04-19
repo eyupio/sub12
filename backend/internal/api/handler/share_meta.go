@@ -143,6 +143,10 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
 				og.ImageAlt = pelletTestImageAlt(sess, displayName)
 				og.Type = "article"
+				if displayName != "" {
+					og.AuthorName = displayName
+					og.AuthorURL = s.absolute("/share/users/" + sess.UserID)
+				}
 			}
 		}
 		s.writeHTML(w, r, og)
