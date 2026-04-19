@@ -68,7 +68,14 @@ func (rl *RateLimiter) Limit(bucket string) func(http.Handler) http.Handler {
 			}
 			allowed, retryAfter := rl.check(r, key, limit)
 			if !allowed {
-				w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+				// Ceiling-divide to seconds — a sub-second TTL would
+				// otherwise round down to 0 and send the client into an
+				// immediate spin-retry.
+				secs := int((retryAfter + time.Second - 1) / time.Second)
+				if secs < 1 {
+					secs = 1
+				}
+				w.Header().Set("Retry-After", strconv.Itoa(secs))
 				http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
 				return
 			}

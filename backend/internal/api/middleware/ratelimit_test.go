@@ -50,6 +50,32 @@ func TestRateLimiterDisabledPassesThrough(t *testing.T) {
 	}
 }
 
+func TestRateLimiterRetryAfterAlwaysAtLeastOne(t *testing.T) {
+	// Exceeding the limit must emit Retry-After >= 1 so clients don't
+	// immediately spin-retry at the window boundary.
+	rl := NewRateLimiter(RateLimitConfig{
+		Enabled:    true,
+		AuthPerMin: 1,
+	}, nil)
+
+	handler := rl.Limit("auth")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := func() *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
+		r.RemoteAddr = "203.0.113.7:10000"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, r)
+		return rec
+	}
+	req() // first request consumes the quota
+	rec := req()
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.NotEmpty(t, rec.Header().Get("Retry-After"))
+	assert.NotEqual(t, "0", rec.Header().Get("Retry-After"))
+}
+
 func TestRateLimiterUnknownBucketNoop(t *testing.T) {
 	rl := NewRateLimiter(RateLimitConfig{Enabled: true}, nil)
 	handler := rl.Limit("nope")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
