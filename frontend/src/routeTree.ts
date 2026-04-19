@@ -63,6 +63,8 @@ import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
 import Help from './pages/Help'
 import AdminFaqs from './pages/AdminFaqs'
 import PostDetail from './pages/PostDetail'
+import QuickCapture from './pages/QuickCapture'
+import Drafts from './pages/Drafts'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -108,10 +110,28 @@ const scoreEntryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/new',
   component: ScoreEntry,
-  validateSearch: (search: Record<string, unknown>): { leagueId?: string; roundId?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { leagueId?: string; roundId?: string; draftId?: string } => ({
     leagueId: (search.leagueId as string) || undefined,
     roundId: (search.roundId as string) || undefined,
+    draftId: (search.draftId as string) || undefined,
   }),
+})
+
+const quickCaptureRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/quick-capture',
+  component: QuickCapture,
+  validateSearch: (search: Record<string, unknown>): { type?: 'score' | 'pellet'; leagueId?: string; clubId?: string } => ({
+    type: (search.type as 'score' | 'pellet') || undefined,
+    leagueId: (search.leagueId as string) || undefined,
+    clubId: (search.clubId as string) || undefined,
+  }),
+})
+
+const draftsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/drafts',
+  component: Drafts,
 })
 
 const scoreCardDetailRoute = createRoute({
@@ -160,6 +180,9 @@ const newPelletTestRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/new',
   component: NewPelletTest,
+  validateSearch: (search: Record<string, unknown>): { draftId?: string } => ({
+    draftId: (search.draftId as string) || undefined,
+  }),
 })
 
 const pelletTestDetailRoute = createRoute({
@@ -481,6 +504,8 @@ export const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     scoreHistoryRoute,
     scoreEntryRoute,
+    quickCaptureRoute,
+    draftsRoute,
     scoreCardDetailRoute,
     scoreTrendsRoute,
     pelletTestingRoute,

@@ -12,6 +12,8 @@ export interface ScoreCardSummary {
   league_id?: string
   league_name?: string
   club_id?: string
+  card_image_url?: string
+  is_draft: boolean
   created_at: string
 }
 
@@ -48,9 +50,23 @@ export interface ScoreCard extends ScoreCardSummary {
   like_count: number
   comment_count: number
   is_liked: boolean
+  is_draft: boolean
   updated_at: string
   author?: ScoreCardAuthor
   achievements?: ScoreCardAchievement[]
+}
+
+export interface QuickCreateScoreCardPayload {
+  rifle_id?: string
+  pellet_id?: string
+  shot_at?: string
+  location?: string
+  wind_mph?: number
+  temp_celsius?: number
+  notes?: string
+  league_round_id?: string
+  club_id?: string
+  visibility?: string
 }
 
 export interface CreateScoreCardPayload {
@@ -90,7 +106,16 @@ export const scoreCardApi = {
   create: (payload: CreateScoreCardPayload) =>
     api.post<ScoreCard>('/score-cards', payload),
 
-  list: (limit = 20, offset = 0, scope?: 'personal' | 'league' | 'club', leagueId?: string) => {
+  quickCreate: (payload: QuickCreateScoreCardPayload) =>
+    api.post<ScoreCard>('/score-cards/quick', payload),
+
+  graduate: (id: string) =>
+    api.post<ScoreCard>(`/score-cards/${id}/graduate`, {}),
+
+  draftCount: () =>
+    api.get<{ count: number }>('/score-cards/drafts/count'),
+
+  list: (limit = 20, offset = 0, scope?: 'personal' | 'league' | 'club' | 'drafts', leagueId?: string) => {
     let url = `/score-cards?limit=${limit}&offset=${offset}`
     if (scope) url += `&scope=${scope}`
     if (leagueId) url += `&league_id=${leagueId}`

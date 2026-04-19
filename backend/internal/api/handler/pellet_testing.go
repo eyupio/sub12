@@ -46,7 +46,9 @@ func (h *PelletTestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, session)
 }
 
-// GET /api/v1/pellet-tests
+// GET /api/v1/pellet-tests?scope=drafts|all
+// scope defaults to graduated sessions only. "drafts" returns only
+// quick-capture drafts; "all" merges both (used by admin/debug views).
 func (h *PelletTestHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -65,8 +67,9 @@ func (h *PelletTestHandler) List(w http.ResponseWriter, r *http.Request) {
 			offset = n
 		}
 	}
+	scope := r.URL.Query().Get("scope")
 
-	sessions, err := h.svc.List(r.Context(), userID, limit, offset)
+	sessions, err := h.svc.List(r.Context(), userID, limit, offset, scope)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list pellet tests")
 		return
@@ -75,6 +78,65 @@ func (h *PelletTestHandler) List(w http.ResponseWriter, r *http.Request) {
 		sessions = []*model.PelletTestSessionSummary{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": sessions})
+}
+
+// POST /api/v1/pellet-tests/quick
+func (h *PelletTestHandler) QuickCreate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var in model.QuickCreatePelletTestInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	session, err := h.svc.QuickCreate(r.Context(), userID, &in)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidPelletTest) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to save draft")
+		return
+	}
+	writeJSON(w, http.StatusCreated, session)
+}
+
+// POST /api/v1/pellet-tests/{id}/graduate
+func (h *PelletTestHandler) Graduate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	session, err := h.svc.Graduate(r.Context(), id, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "pellet test not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to graduate draft")
+		return
+	}
+	writeJSON(w, http.StatusOK, session)
+}
+
+// GET /api/v1/pellet-tests/drafts/count
+func (h *PelletTestHandler) DraftCount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	count, err := h.svc.GetDraftCount(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to count drafts")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
 // GET /api/v1/pellet-tests/{id}

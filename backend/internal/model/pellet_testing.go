@@ -27,6 +27,7 @@ type PelletTestSession struct {
 	BestGroupSizeMM        *float64  `json:"best_group_size_mm,omitempty"`
 	GroupCount             int       `json:"group_count"`
 	IsPublic               bool      `json:"is_public"`
+	IsDraft                bool      `json:"is_draft"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
 
@@ -35,6 +36,22 @@ type PelletTestSession struct {
 	Images []*PelletTestImage `json:"images,omitempty"`
 	Rifle  *Rifle             `json:"rifle,omitempty"`
 	Pellet *Pellet            `json:"pellet,omitempty"`
+}
+
+// QuickCreatePelletTestInput is the minimal payload accepted by the
+// quick-capture endpoint. Distance, groups, and measurements are filled in
+// later via the refine flow.
+type QuickCreatePelletTestInput struct {
+	RifleID      string   `json:"rifle_id"`
+	PelletID     string   `json:"pellet_id"`
+	TestDate     *string  `json:"test_date"` // YYYY-MM-DD, defaults to today
+	DistanceValue *float64 `json:"distance_value"`
+	DistanceUnit *string  `json:"distance_unit"`
+	Location     *string  `json:"location"`
+	WindMPH      *float64 `json:"wind_mph"`
+	TempCelsius  *float64 `json:"temp_celsius"`
+	HumidityPct  *float64 `json:"humidity_pct"`
+	Notes        *string  `json:"notes"`
 }
 
 type CreatePelletTestSessionInput struct {
@@ -131,6 +148,8 @@ type PelletTestSessionSummary struct {
 	RifleModel         string   `json:"rifle_model"`
 	PelletBrand        string   `json:"pellet_brand"`
 	PelletModel        string   `json:"pellet_model"`
+	FirstImageURL      *string  `json:"first_image_url,omitempty"`
+	IsDraft            bool     `json:"is_draft"`
 	CreatedAt          string   `json:"created_at"`
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearch, Link } from '@tanstack/react-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, Upload, X, Trophy, HelpCircle } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { toast } from '../store/toast'
@@ -14,9 +14,11 @@ type Shot = { score: number; x: boolean }
 
 export default function ScoreEntry() {
   const navigate = useNavigate()
-  const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string }
+  const qc = useQueryClient()
+  const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string; draftId?: string }
   const leagueId = search.leagueId
   const roundIdParam = search.roundId
+  const draftId = search.draftId
 
   const [shots, setShots] = useState<Shot[]>(
     Array.from({ length: 25 }, () => ({ score: 0, x: false }))
@@ -43,6 +45,33 @@ export default function ScoreEntry() {
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
   const rifles = rifleData?.items ?? []
   const pellets = pelletData?.items ?? []
+
+  // Refine flow: hydrate form fields from a quick-capture draft. On submit,
+  // the mutation PATCHes the draft (including the 25-shot grid) and calls
+  // graduate to flip is_draft=false.
+  const { data: draft } = useQuery({
+    queryKey: ['score-card', draftId],
+    queryFn: () => scoreCardApi.get(draftId!),
+    enabled: !!draftId,
+  })
+  useEffect(() => {
+    if (!draft) return
+    setShotAt(draft.shot_at)
+    if (draft.location) setLocation(draft.location)
+    if (draft.wind_mph != null) setWindMph(String(draft.wind_mph))
+    if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
+    if (draft.notes) setNotes(draft.notes)
+    if (draft.rifle_id) setRifleId(draft.rifle_id)
+    if (draft.pellet_id) setPelletId(draft.pellet_id)
+    if (draft.visibility === 'public' || draft.visibility === 'followers' || draft.visibility === 'private') {
+      setVisibility(draft.visibility)
+    }
+    if (draft.card_image_url && !imagePreview) {
+      setImagePreview(draft.card_image_url)
+    }
+    // Shot grid stays empty on a quick-capture draft — the user fills it
+    // here during refinement, which is the whole point.
+  }, [draft, imagePreview])
 
   // League context
   const { data: league } = useQuery({
@@ -194,7 +223,7 @@ export default function ScoreEntry() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const card = await scoreCardApi.create({
+      const payload = {
         shot_at: shotAt,
         shot_scores: shotScores,
         shot_xs: shotXs,
@@ -206,22 +235,43 @@ export default function ScoreEntry() {
         pellet_id: pelletId || undefined,
         league_round_id: leagueId ? leagueRoundId : undefined,
         visibility,
-      })
+      }
+
+      let card
       let imageFailed = false
-      if (imageFile) {
-        try {
-          await scoreCardApi.uploadImage(card.id, imageFile)
-        } catch {
-          imageFailed = true
+
+      if (draftId) {
+        // Refine flow: PATCH the existing draft with the full shot grid,
+        // upload any newly picked photo, then graduate. Graduate re-runs
+        // verification logic and league limit enforcement.
+        await scoreCardApi.update(draftId, payload)
+        if (imageFile) {
+          try {
+            await scoreCardApi.uploadImage(draftId, imageFile)
+          } catch {
+            imageFailed = true
+          }
+        }
+        card = await scoreCardApi.graduate(draftId)
+      } else {
+        card = await scoreCardApi.create(payload)
+        if (imageFile) {
+          try {
+            await scoreCardApi.uploadImage(card.id, imageFile)
+          } catch {
+            imageFailed = true
+          }
         }
       }
-      return { card, imageFailed }
+      return { card, imageFailed, wasDraft: !!draftId }
     },
-    onSuccess: ({ card, imageFailed }) => {
+    onSuccess: ({ card, imageFailed, wasDraft }) => {
+      qc.invalidateQueries({ queryKey: ['score-drafts'] })
+      qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
       if (imageFailed) {
         toast('Score card saved, but image upload failed — try again from the card', 'error')
       } else {
-        toast('Score card saved', 'success')
+        toast(wasDraft ? 'Draft refined and submitted' : 'Score card saved', 'success')
       }
       navigate({ to: '/scores/$id', params: { id: card.id } })
     },
@@ -246,7 +296,7 @@ export default function ScoreEntry() {
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-            New Score Card
+            {draftId ? 'Refine Draft' : 'New Score Card'}
           </h1>
           <button
             onClick={() => setShowHelp(true)}
