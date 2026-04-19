@@ -141,6 +141,7 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 				og.Title = pelletTestTitle(sess)
 				og.Description = pelletTestDescription(sess, displayName)
 				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
+				og.ImageAlt = pelletTestImageAlt(sess, displayName)
 				og.Type = "article"
 			}
 		}
@@ -159,6 +160,7 @@ func (s *ShareMeta) League() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
 				og.Description = leagueDescription(league)
 				og.Image = s.absolute("/og/leagues/" + id + ".png")
+				og.ImageAlt = leagueImageAlt(league)
 				og.Type = "article"
 			}
 		}
@@ -177,6 +179,7 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
 				og.Description = clubDescription(club)
 				og.Image = s.absolute("/og/clubs/" + id + ".png")
+				og.ImageAlt = clubImageAlt(club)
 				og.Type = "article"
 			}
 		}
@@ -195,6 +198,7 @@ func (s *ShareMeta) User() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", profile.DisplayName)
 				og.Description = userDescription(profile)
 				og.Image = s.absolute("/og/users/" + id + ".png")
+				og.ImageAlt = userImageAlt(profile)
 				og.Type = "profile"
 			}
 		}
@@ -564,6 +568,36 @@ func scoreCardImageAlt(card *model.ScoreCard, displayName string) string {
 		return fmt.Sprintf("%s — %s on sub-12", displayName, score)
 	}
 	return score + " on sub-12"
+}
+
+// pelletTestImageAlt describes the pellet-test preview card so screen readers
+// parse it as more than just "image". Mirrors scoreCardImageAlt in tone.
+func pelletTestImageAlt(sess *model.PelletTestSession, displayName string) string {
+	label := "Pellet test"
+	if sess.Pellet != nil {
+		if p := strings.TrimSpace(sess.Pellet.Brand + " " + sess.Pellet.Model); p != "" {
+			label = "Pellet test: " + p
+		}
+	}
+	if sess.BestGroupSizeMM != nil {
+		label += fmt.Sprintf(" — Best %.2fmm", *sess.BestGroupSizeMM)
+	}
+	if displayName != "" {
+		return displayName + " — " + label + " on sub-12"
+	}
+	return label + " on sub-12"
+}
+
+func leagueImageAlt(league *model.League) string {
+	return fmt.Sprintf("%s — %d member%s on sub-12", league.Name, league.MemberCount, plural(league.MemberCount))
+}
+
+func clubImageAlt(club *model.Club) string {
+	return fmt.Sprintf("%s — %d member%s on sub-12", club.Name, club.MemberCount, plural(club.MemberCount))
+}
+
+func userImageAlt(profile *model.PublicProfile) string {
+	return fmt.Sprintf("%s on sub-12", profile.DisplayName)
 }
 
 // topAchievementNames returns a comma-joined list of the most recently earned

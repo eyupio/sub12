@@ -158,6 +158,33 @@ func TestTruncate_HandlesRunes(t *testing.T) {
 	assert.Equal(t, "short", truncate("   short   ", 10))
 }
 
+func TestImageAlt_EveryShareTypeProducesNonEmptyAlt(t *testing.T) {
+	// og:image:alt was only populated for score cards; screen readers and
+	// accessibility linters flagged every other share type. Verify each
+	// helper returns descriptive, non-empty text even when metadata is thin.
+	best := 8.42
+	sess := &model.PelletTestSession{
+		Pellet:          &model.Pellet{Brand: "JSB", Model: "Hades"},
+		BestGroupSizeMM: &best,
+	}
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "John Shooter")
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "JSB Hades")
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "Best 8.42mm")
+	assert.Contains(t, pelletTestImageAlt(&model.PelletTestSession{}, ""), "Pellet test")
+
+	league := &model.League{Name: "Rotary Shooting League", MemberCount: 12}
+	assert.Contains(t, leagueImageAlt(league), "Rotary Shooting League")
+	assert.Contains(t, leagueImageAlt(league), "12 members")
+
+	club := &model.Club{Name: "Birmingham Club", MemberCount: 1}
+	assert.Contains(t, clubImageAlt(club), "Birmingham Club")
+	assert.Contains(t, clubImageAlt(club), "1 member")
+	assert.NotContains(t, clubImageAlt(club), "1 members")
+
+	profile := &model.PublicProfile{DisplayName: "John Shooter"}
+	assert.Contains(t, userImageAlt(profile), "John Shooter")
+}
+
 func TestFallbackTemplate_IsSafeForOutages(t *testing.T) {
 	// Crawlers landing on the holding page during a cold start must not index
 	// "Getting things ready" as the canonical title. The inline reload must
