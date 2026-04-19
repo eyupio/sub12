@@ -46,6 +46,10 @@ func (h *ScoreCardHandler) Create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrNotLeagueMember) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to save score card")
 		return
 	}

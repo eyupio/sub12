@@ -196,9 +196,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
           <button
             onClick={() => confirmMutation.mutate()}
             disabled={confirmMutation.isPending}
-            className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+            className="bg-[var(--success-text)] hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
           >
-            {confirmMutation.isPending ? 'Confirming...' : 'Confirm Score'}
+            {confirmMutation.isPending ? 'Confirming…' : 'Confirm Score'}
           </button>
           {confirmMutation.isError && (
             <p className="text-[var(--error-text)] text-xs">
@@ -217,7 +217,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
             <Tooltip content={tips.scoreAmend}>
               <button
                 onClick={() => { setShowAmend(!showAmend); setShowReject(false) }}
-                className="text-[11px] tracking-widest uppercase border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 px-3 py-1.5 rounded transition-colors"
+                className="text-[11px] tracking-widest uppercase border border-amber-600/30 dark:border-amber-400/30 text-amber-600 dark:text-amber-400 hover:bg-amber-600/10 dark:hover:bg-amber-400/10 px-3 py-1.5 rounded transition-colors"
               >
                 Amend
               </button>
@@ -225,7 +225,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
             <Tooltip content={tips.scoreReject}>
               <button
                 onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
-                className="text-[11px] tracking-widest uppercase border border-red-500/30 text-[var(--error-text)] hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
+                className="text-[11px] tracking-widest uppercase border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 px-3 py-1.5 rounded transition-colors"
               >
                 Reject
               </button>
@@ -242,9 +242,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
               <button
                 onClick={() => amendMutation.mutate()}
                 disabled={amendMutation.isPending || !amendScore || !amendX}
-                className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+                className="bg-amber-600 dark:bg-amber-500 hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
               >
-                {amendMutation.isPending ? 'Amending...' : 'Submit Amendment'}
+                {amendMutation.isPending ? 'Amending…' : 'Submit Amendment'}
               </button>
               {amendMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to amend score.</p>}
             </div>
@@ -262,9 +262,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
               <button
                 onClick={() => rejectMutation.mutate()}
                 disabled={rejectMutation.isPending || !rejectReason.trim()}
-                className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+                className="bg-[var(--error-text)] hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
               >
-                {rejectMutation.isPending ? 'Rejecting...' : 'Submit Rejection'}
+                {rejectMutation.isPending ? 'Rejecting…' : 'Submit Rejection'}
               </button>
               {rejectMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to reject. Reason required.</p>}
             </div>

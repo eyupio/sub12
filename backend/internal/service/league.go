@@ -28,6 +28,7 @@ var (
 	ErrNotClubMember    = errors.New("club membership required")
 	ErrLeagueLastAdmin  = errors.New("cannot leave as the last admin; promote another member first")
 	ErrUnauthenticated  = errors.New("authentication required")
+	ErrInvalidAmend     = errors.New("invalid amendment")
 )
 
 type LeagueService struct {
@@ -608,6 +609,13 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 }
 
 func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error {
+	if input.NewTotalScore < 0 || input.NewTotalScore > 250 {
+		return fmt.Errorf("%w: new_total_score must be 0-250", ErrInvalidAmend)
+	}
+	if input.NewXCount < 0 || input.NewXCount > 25 {
+		return fmt.Errorf("%w: new_x_count must be 0-25", ErrInvalidAmend)
+	}
+
 	isAdmin, leagueID, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrLeagueNotFound
