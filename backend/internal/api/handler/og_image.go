@@ -399,12 +399,22 @@ func primaryFontSize(primary string) float64 {
 
 func (h *OGImage) writePNG(w http.ResponseWriter, png []byte) {
 	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// 10-minute cache with a short stale-while-revalidate window. Social
+	// platforms and CDNs re-request the PNG at their own cadence; we bound how
+	// long a previously-public entity can linger as a rich preview if the
+	// owner flips visibility. Shorter than the 1h we used to use, longer than
+	// a humans-only render would need, and paired with no-store on the 302
+	// below so a flipped-to-private entity clears from edge caches promptly.
+	w.Header().Set("Cache-Control", "public, max-age=600, stale-while-revalidate=60")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(png)
 }
 
 func (h *OGImage) redirectDefault(w http.ResponseWriter, r *http.Request) {
+	// Don't let CDNs or browsers cache the fallback redirect: if a card later
+	// becomes public again we want the next request to render the real PNG,
+	// not a stuck 302 pointing at the generic site image.
+	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, "/og-image.png", http.StatusFound)
 }
 
