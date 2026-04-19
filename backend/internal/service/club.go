@@ -169,6 +169,10 @@ func (s *ClubService) IsMember(ctx context.Context, clubID, userID string) (bool
 	return s.repo.IsMember(ctx, clubID, userID)
 }
 
+func (s *ClubService) IsAdmin(ctx context.Context, clubID, userID string) (bool, error) {
+	return s.repo.IsAdmin(ctx, clubID, userID)
+}
+
 // ListMembers returns club members. Private clubs are gated to members only.
 func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID string) ([]*model.ClubMember, error) {
 	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {

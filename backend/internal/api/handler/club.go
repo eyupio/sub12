@@ -421,6 +421,16 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 	clubID := chi.URLParam(r, "id")
 
+	isAdmin, err := h.svc.IsAdmin(r.Context(), clubID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check permissions")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+
 	data, contentType, err := parseAndValidateImage(r, "image", 5<<20)
 	if err != nil {
 		if errors.Is(err, ErrFileTooLarge) {
