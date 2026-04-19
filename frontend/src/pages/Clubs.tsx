@@ -5,6 +5,7 @@ import { Plus, Users, ChevronRight, X, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { toast } from '../store/toast'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -18,6 +19,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
     mutationFn: (input: CreateClubInput) => clubsApi.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Club created', 'success')
       onClose()
     },
     onError: () => setError('Failed to create club. Please try again.'),
@@ -35,12 +37,24 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
     })
   }
 
+  const toggleCls = (active: boolean) =>
+    `flex-1 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+      active
+        ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+        : 'border-subtle text-muted hover:text-secondary'
+    }`
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-club-modal-title"
+        className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm tracking-widest uppercase text-secondary">New Club</h2>
+          <h2 id="new-club-modal-title" className="text-sm tracking-widest uppercase text-secondary">New Club</h2>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
@@ -72,17 +86,13 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
 
           <div className="space-y-1.5">
             <label className="text-[11px] tracking-widest uppercase text-muted">Visibility</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex gap-3">
               {(['public', 'private'] as const).map(value => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setType(value)}
-                  className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
-                    type === value
-                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
-                      : 'border-subtle text-muted hover:text-secondary'
-                  }`}
+                  className={toggleCls(type === value)}
                 >
                   {value}
                 </button>
@@ -96,28 +106,28 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">Join Policy</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['open', 'invite_code', 'approval'] as const).map(value => (
+            <label className="text-[11px] tracking-widest uppercase text-muted">How members join</label>
+            <div className="space-y-1.5">
+              {([
+                { value: 'open' as const, label: 'Open', desc: 'Anyone can join' },
+                { value: 'invite_code' as const, label: 'Invite Code', desc: 'Requires a code to join' },
+                { value: 'approval' as const, label: 'Approval', desc: 'Admin must approve requests' },
+              ]).map(opt => (
                 <button
-                  key={value}
+                  key={opt.value}
                   type="button"
-                  onClick={() => setJoinPolicy(value)}
-                  className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors ${
-                    joinPolicy === value
+                  onClick={() => setJoinPolicy(opt.value)}
+                  className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${
+                    joinPolicy === opt.value
                       ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                       : 'border-subtle text-muted hover:text-secondary'
                   }`}
                 >
-                  {value === 'invite_code' ? 'Code' : value}
+                  <span className="text-[11px] tracking-widest uppercase font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted ml-2">{opt.desc}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted">
-              {joinPolicy === 'open' && 'Anyone can join instantly.'}
-              {joinPolicy === 'invite_code' && 'Members need the join code to join.'}
-              {joinPolicy === 'approval' && 'Admins review and approve each join request.'}
-            </p>
           </div>
 
           {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}

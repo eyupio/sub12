@@ -60,11 +60,23 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*mo
 	if club.Type == "private" && !club.IsMember {
 		return nil, ErrClubNotFound
 	}
+	if !club.IsMember {
+		club.JoinCode = ""
+	}
 	return club, nil
 }
 
 func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
-	return s.repo.List(ctx, viewerID)
+	clubs, err := s.repo.List(ctx, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range clubs {
+		if !c.IsMember {
+			c.JoinCode = ""
+		}
+	}
+	return clubs, nil
 }
 
 // SummaryByID returns a minimal public summary of any club, including private
@@ -157,6 +169,10 @@ func (s *ClubService) IsMember(ctx context.Context, clubID, userID string) (bool
 	return s.repo.IsMember(ctx, clubID, userID)
 }
 
+func (s *ClubService) IsAdmin(ctx context.Context, clubID, userID string) (bool, error) {
+	return s.repo.IsAdmin(ctx, clubID, userID)
+}
+
 // ListMembers returns club members. Private clubs are gated to members only.
 func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID string) ([]*model.ClubMember, error) {
 	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {
@@ -240,14 +256,14 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 			return err
 		}
 		if s.activity != nil {
-			club, _ := s.repo.GetByID(ctx, clubID, "")
-			clubName := ""
-			if club != nil {
-				clubName = club.Name
+			// Skip the activity feed entry entirely if we can't resolve the
+			// club name — better to drop one best-effort entry than to write
+			// a blank-name "joined club" record that nobody can debug later.
+			if club, err := s.repo.GetByID(ctx, clubID, ""); err == nil && club != nil {
+				cid, tt := clubID, "club"
+				meta := model.JoinedClubMeta{ClubName: club.Name}
+				go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 			}
-			cid, tt := clubID, "club"
-			meta := model.JoinedClubMeta{ClubName: clubName}
-			go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 		}
 		if s.achievements != nil {
 			go s.achievements.EvaluateForClubJoin(context.Background(), req.UserID)
@@ -327,27 +343,14 @@ func (s *ClubService) RegenerateJoinCode(ctx context.Context, clubID, requesterI
 
 // LeaveClub allows a member to remove themselves from a club.
 func (s *ClubService) LeaveClub(ctx context.Context, clubID, userID string) error {
-	isMember, err := s.repo.IsMember(ctx, clubID, userID)
-	if err != nil {
-		return err
-	}
-	if !isMember {
+	err := s.repo.LeaveClubGuarded(ctx, clubID, userID)
+	if errors.Is(err, repository.ErrClubMemberNotFound) {
 		return ErrClubNotMember
 	}
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, userID)
-	if err != nil {
-		return err
+	if errors.Is(err, repository.ErrClubLastAdmin) {
+		return ErrClubLastAdmin
 	}
-	if isAdmin {
-		count, err := s.repo.CountAdmins(ctx, clubID)
-		if err != nil {
-			return err
-		}
-		if count <= 1 {
-			return ErrClubLastAdmin
-		}
-	}
-	return s.repo.RemoveMember(ctx, clubID, userID)
+	return err
 }
 
 // UpdateMemberRole allows a club admin to promote or demote another member.
@@ -359,21 +362,13 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 	if !reqIsAdmin {
 		return ErrClubNotAdmin
 	}
-	// Prevent demoting the last admin
 	if !isAdmin {
-		count, err := s.repo.CountAdmins(ctx, clubID)
-		if err != nil {
-			return err
+		// Demotion: enforce the last-admin invariant atomically.
+		err := s.repo.DemoteMemberGuarded(ctx, clubID, targetID)
+		if errors.Is(err, repository.ErrClubLastAdmin) {
+			return ErrClubLastAdmin
 		}
-		if count <= 1 {
-			targetIsAdmin, err := s.repo.IsAdmin(ctx, clubID, targetID)
-			if err != nil {
-				return err
-			}
-			if targetIsAdmin {
-				return ErrClubLastAdmin
-			}
-		}
+		return err
 	}
 	return s.repo.UpdateMemberRole(ctx, clubID, targetID, isAdmin)
 }

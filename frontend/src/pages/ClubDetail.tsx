@@ -186,7 +186,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <button
           onClick={() => setConfirmRole(true)}
           disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
-          className="text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
+          className="p-1.5 rounded text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
           title={member.is_admin ? 'Demote from admin' : 'Promote to admin'}
           aria-label={member.is_admin ? `Demote ${member.display_name} from admin` : `Promote ${member.display_name} to admin`}
         >
@@ -197,7 +197,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
-          className="text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
+          className="p-1.5 rounded text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
           title="Remove member"
           aria-label={`Remove ${member.display_name} from club`}
         >
@@ -421,6 +421,7 @@ export default function ClubDetail() {
                   value={joinCodeInput}
                   onChange={e => setJoinCodeInput(e.target.value)}
                   placeholder="Join code"
+                  aria-label="Club join code"
                   className="w-32 bg-surface border border-subtle rounded px-2 py-1 text-xs text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50"
                 />
               )}
@@ -571,21 +572,30 @@ export default function ClubDetail() {
             onSubmit={e => { e.preventDefault(); createLeagueMutation.mutate() }}
             className="p-4 rounded border border-subtle bg-card space-y-3"
           >
-            <input
-              type="text"
-              placeholder="League name"
-              value={newLeagueName}
-              onChange={e => setNewLeagueName(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Description (optional)"
-              value={newLeagueDesc}
-              onChange={e => setNewLeagueDesc(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
-            />
+            <div className="space-y-1.5">
+              <label htmlFor="club-new-league-name" className="text-[11px] tracking-widest uppercase text-muted">League Name</label>
+              <input
+                id="club-new-league-name"
+                type="text"
+                placeholder="e.g. Spring Series 2026"
+                value={newLeagueName}
+                onChange={e => setNewLeagueName(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="club-new-league-desc" className="text-[11px] tracking-widest uppercase text-muted">Description <span className="text-muted">(optional)</span></label>
+              <input
+                id="club-new-league-desc"
+                type="text"
+                placeholder="What's this league for?"
+                value={newLeagueDesc}
+                onChange={e => setNewLeagueDesc(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
+              />
+            </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
                 <input

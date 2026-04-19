@@ -14,6 +14,13 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/model"
 )
 
+// ErrClubLastAdmin is returned when a demote or leave would remove the last
+// remaining admin from a club.
+var ErrClubLastAdmin = errors.New("cannot remove the last club admin")
+
+// ErrClubMemberNotFound is returned when a targeted club_members row is missing.
+var ErrClubMemberNotFound = errors.New("club member not found")
+
 type ClubRepository struct {
 	db *pgxpool.Pool
 }
@@ -407,6 +414,125 @@ func (r *ClubRepository) UpdateMemberRole(ctx context.Context, clubID, userID st
 	}
 	if ct.RowsAffected() == 0 {
 		return fmt.Errorf("member not found")
+	}
+	return nil
+}
+
+// DemoteMemberGuarded sets is_admin = false for the target member atomically
+// with a last-admin check. Returns ErrClubLastAdmin if the target is the sole
+// remaining admin, ErrClubMemberNotFound if the target isn't a member.
+func (r *ClubRepository) DemoteMemberGuarded(ctx context.Context, clubID, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock all admin rows for this club so concurrent demote/leave operations
+	// serialize and cannot both pass the last-admin check.
+	adminRows, err := tx.Query(ctx, `
+		SELECT user_id FROM club_members
+		WHERE club_id = $1 AND is_admin = TRUE
+		FOR UPDATE
+	`, clubID)
+	if err != nil {
+		return fmt.Errorf("lock admins: %w", err)
+	}
+	adminIDs := make(map[string]struct{})
+	for adminRows.Next() {
+		var id string
+		if err := adminRows.Scan(&id); err != nil {
+			adminRows.Close()
+			return fmt.Errorf("scan admin: %w", err)
+		}
+		adminIDs[id] = struct{}{}
+	}
+	adminRows.Close()
+	if err := adminRows.Err(); err != nil {
+		return fmt.Errorf("iter admins: %w", err)
+	}
+
+	// Confirm the target is a member at all.
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM club_members WHERE club_id = $1 AND user_id = $2)
+	`, clubID, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("check member: %w", err)
+	}
+	if !exists {
+		return ErrClubMemberNotFound
+	}
+
+	if _, isAdmin := adminIDs[userID]; isAdmin && len(adminIDs) <= 1 {
+		return ErrClubLastAdmin
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE club_members SET is_admin = FALSE WHERE club_id = $1 AND user_id = $2
+	`, clubID, userID); err != nil {
+		return fmt.Errorf("demote member: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+// LeaveClubGuarded removes the caller's membership atomically with a
+// last-admin check. Returns ErrClubLastAdmin if the user is an admin and the
+// sole admin, ErrClubMemberNotFound if the user isn't a member.
+func (r *ClubRepository) LeaveClubGuarded(ctx context.Context, clubID, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	adminRows, err := tx.Query(ctx, `
+		SELECT user_id FROM club_members
+		WHERE club_id = $1 AND is_admin = TRUE
+		FOR UPDATE
+	`, clubID)
+	if err != nil {
+		return fmt.Errorf("lock admins: %w", err)
+	}
+	adminIDs := make(map[string]struct{})
+	for adminRows.Next() {
+		var id string
+		if err := adminRows.Scan(&id); err != nil {
+			adminRows.Close()
+			return fmt.Errorf("scan admin: %w", err)
+		}
+		adminIDs[id] = struct{}{}
+	}
+	adminRows.Close()
+	if err := adminRows.Err(); err != nil {
+		return fmt.Errorf("iter admins: %w", err)
+	}
+
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM club_members WHERE club_id = $1 AND user_id = $2)
+	`, clubID, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("check member: %w", err)
+	}
+	if !exists {
+		return ErrClubMemberNotFound
+	}
+
+	if _, isAdmin := adminIDs[userID]; isAdmin && len(adminIDs) <= 1 {
+		return ErrClubLastAdmin
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM club_members WHERE club_id = $1 AND user_id = $2
+	`, clubID, userID); err != nil {
+		return fmt.Errorf("delete member: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
 }

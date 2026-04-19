@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -251,7 +252,12 @@ func (h *ClubHandler) Join(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		JoinCode string `json:"join_code"`
 	}
-	_ = decodeJSON(r, &body)
+	// Empty body is allowed (open-policy clubs don't need a join code); any
+	// other decode failure is a malformed request.
+	if err := decodeJSON(r, &body); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
 
 	joined, pending, err := h.svc.Join(r.Context(), clubID, userID, body.JoinCode)
 	if err != nil {
@@ -420,6 +426,16 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clubID := chi.URLParam(r, "id")
+
+	isAdmin, err := h.svc.IsAdmin(r.Context(), clubID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check permissions")
+		return
+	}
+	if !isAdmin {
+		writeError(w, http.StatusForbidden, "admin access required")
+		return
+	}
 
 	data, contentType, err := parseAndValidateImage(r, "image", 5<<20)
 	if err != nil {
