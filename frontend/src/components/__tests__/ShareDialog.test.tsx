@@ -99,6 +99,23 @@ describe('ShareDialog', () => {
     expect(toasts.some((t) => t.message === 'Link copied' && t.variant === 'success')).toBe(true)
   })
 
+  it('reveals a manual-copy field when programmatic clipboard fails', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('blocked')) },
+    })
+
+    renderDialog()
+
+    fireEvent.click(screen.getByRole('button', { name: /copy link/i }))
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('https://app.test/score-cards/sc-1')).toBeTruthy()
+    })
+    const toasts = useToastStore.getState().toasts
+    expect(toasts.some((t) => t.message === 'Copy the link below')).toBe(true)
+  })
+
   it('closes on Escape and labels the dialog by its heading', async () => {
     const onClose = vi.fn()
     renderDialog({ onClose })

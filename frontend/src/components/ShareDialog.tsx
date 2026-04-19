@@ -45,7 +45,9 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
   const [destination, setDestination] = useState<Destination>('personal')
   const [entityId, setEntityId] = useState('')
   const [body, setBody] = useState('')
+  const [manualCopy, setManualCopy] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const manualCopyRef = useRef<HTMLInputElement>(null)
 
   const canPostInternal = isInternalShareType(targetType)
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
@@ -144,10 +146,19 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
 
   async function copyLink() {
     try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(shareUrl)
       toast('Link copied', 'success')
     } catch {
-      toast('Could not copy link', 'error')
+      // Programmatic clipboard fails on HTTP origins and in some in-app
+      // browsers. Reveal the URL in a selectable field so the user still has
+      // a path to copy it manually instead of being left with just a toast.
+      setManualCopy(true)
+      toast('Copy the link below', 'info')
+      requestAnimationFrame(() => {
+        manualCopyRef.current?.select()
+        manualCopyRef.current?.focus()
+      })
     }
   }
 
@@ -315,6 +326,22 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
               />
             )}
           </div>
+          {manualCopy && (
+            <div className="space-y-1">
+              <label htmlFor="share-dialog-manual-copy" className="text-[11px] tracking-widest uppercase text-muted">
+                Link
+              </label>
+              <input
+                id="share-dialog-manual-copy"
+                ref={manualCopyRef}
+                type="text"
+                readOnly
+                value={shareUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="w-full bg-surface border border-subtle rounded px-3 py-1.5 text-xs text-secondary focus:outline-none focus:border-[var(--brass)]/50"
+              />
+            </div>
+          )}
         </section>
       </div>
     </div>
