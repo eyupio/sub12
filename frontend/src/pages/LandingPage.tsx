@@ -10,7 +10,6 @@ import {
   Clock3,
   Crosshair,
   Gauge,
-  ImageUp,
   LineChart,
   Medal,
   NotebookPen,
@@ -20,7 +19,6 @@ import {
   SlidersHorizontal,
   TableProperties,
   Target,
-  Trophy,
   Users2,
 } from 'lucide-react'
 import { CornerMark } from '../components/CornerMark'
@@ -45,34 +43,24 @@ type FeaturePoint = {
   description: string
 }
 
-const workflowSteps = [
+const whyMeasureCards = [
   {
-    icon: Crosshair,
-    step: '01',
-    title: 'Build your rifle and pellet record',
+    icon: ShieldCheck,
+    title: 'Remove subjective bias',
     description:
-      'Store the rifle, pellet, head size, batch code, and setup details once so every test and score card stays traceable.',
+      'Eye-balling and memory reward lucky cards. Calibrated measurement of every group rewards the setup that actually repeats.',
   },
   {
-    icon: ImageUp,
-    step: '02',
-    title: 'Log real sessions from the range',
+    icon: Radar,
+    title: 'Build comparable, auditable evidence',
     description:
-      'Capture target photos, multiple groups, distances, chrono figures, weather, and notes while the session is still fresh.',
+      'Every shot is tied to the same photo, scale, range, batch, and conditions — so a surprising target can be re-checked later instead of trusted from memory.',
   },
   {
-    icon: ScanLine,
-    step: '03',
-    title: 'Measure and compare repeat performance',
+    icon: Gauge,
+    title: 'Decide equipment with confidence, not feel',
     description:
-      'Review best group, average group, and confidence instead of chasing one lucky card or one clean target.',
-  },
-  {
-    icon: Trophy,
-    step: '04',
-    title: 'Turn private data into better decisions',
-    description:
-      'Use the same record for trends, pellet selection, club standings, and league submissions without rebuilding it elsewhere.',
+      'Measured groups feed directly into pellet ranking, batch comparison, and setup-change validation — the decisions serious shooters refuse to guess at.',
   },
 ] as const
 
@@ -122,7 +110,17 @@ const comparisonRows = [
   },
 ] as const
 
-const pelletTestingPoints: FeaturePoint[] = [
+const imageAnalysisPoints: FeaturePoint[] = [
+  {
+    title: 'One measurement workflow across every group',
+    description:
+      'Apply the same image-analysis method to every target so repeatability is judged on consistent evidence, not a mix of methods.',
+  },
+  {
+    title: 'Interpret best, average, and spread together',
+    description:
+      'Read smallest group, session average, and variability in one view to separate genuine gains from normal shot-to-shot noise.',
+  },
   {
     title: 'Rank pellet setups by repeatable outcomes',
     description:
@@ -134,37 +132,14 @@ const pelletTestingPoints: FeaturePoint[] = [
       'Spot tins or batch codes that drift from baseline and keep only combinations that stay tight across real sessions.',
   },
   {
-    title: 'Promote confidence over one-off wins',
-    description:
-      'Confidence scoring rewards useful sample sizes, helping you avoid decisions based on one standout card.',
-  },
-  {
-    title: 'Back equipment changes with trend evidence',
-    description:
-      'Track whether a pellet decision still holds after more sessions, weather changes, and maintenance cycles.',
-  },
-] as const
-
-const groupAnalysisPoints: FeaturePoint[] = [
-  {
-    title: 'Use one measurement workflow across every group',
-    description:
-      'Apply the same image-analysis method to multi-group sessions so repeatability is judged on consistent evidence.',
-  },
-  {
-    title: 'Interpret best, average, and spread together',
-    description:
-      'Read smallest group, session average, and variability in one view to separate genuine gains from normal shot-to-shot noise.',
-  },
-  {
     title: 'Keep measured-image proof attached',
     description:
-      'Every reviewed target stays linked to its measurement overlay, making later validation and coaching discussions straightforward.',
+      'Every reviewed target stays linked to its measurement overlay, so later validation, coaching, and score verification are straightforward.',
   },
   {
     title: 'Correct edge cases with manual judgement',
     description:
-      'Use assisted detection when paper quality, tears, or shadow confuse auto-picking, then refine points without losing traceability.',
+      'Use assisted detection when paper tears or shadow confuse auto-picking, then refine points without losing traceability.',
   },
 ] as const
 
@@ -265,24 +240,6 @@ function SurfaceCard({ children, className = '', style }: SurfaceCardProps) {
       style={style}
     >
       {children}
-    </div>
-  )
-}
-
-function FeatureList({ items }: { items: FeaturePoint[] }) {
-  return (
-    <div className="space-y-4">
-      {items.map((item) => (
-        <div key={item.title} className="flex gap-4 rounded-2xl border border-subtle bg-surface-hover p-4">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--brass)]/12 text-[var(--brass)]">
-            <Check size={16} />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">{item.title}</h3>
-            <p className="mt-1 text-sm leading-6 text-secondary">{item.description}</p>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -515,11 +472,8 @@ export default function LandingPage() {
             <img src={headerLogoSrc} alt="SUB12" className="h-8 w-auto" />
           </Link>
           <nav className="hidden items-center gap-6 lg:flex">
-            <a href="#how-it-works" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
-              How it works
-            </a>
-            <a href="#pellet-testing" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
-              Pellet decisions
+            <a href="#image-analysis" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
+              Image analysis
             </a>
             <a href="#analytics" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Trends & analytics
@@ -561,7 +515,7 @@ export default function LandingPage() {
                   Track Your First Session
                   <ArrowRight size={16} />
                 </Link>
-                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
+                <a href="#image-analysis" className="inline-flex items-center justify-center gap-2 rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
                   See How SUB12 Works
                   <ChevronRight size={16} />
                 </a>
@@ -585,32 +539,6 @@ export default function LandingPage() {
                 {point}
               </div>
             ))}
-          </div>
-        </section>
-
-        <section id="how-it-works" className="px-4 py-20 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <SectionHeader
-              eyebrow="How It Works"
-              title="From target photo to better equipment decisions"
-              description="SUB12 is built around the actual sequence serious shooters follow: set up the rifle, log the session properly, measure the target, then compare results over time."
-              align="center"
-            />
-
-            <div className="mt-12 grid gap-5 lg:grid-cols-4">
-              {workflowSteps.map(({ icon: Icon, step, title, description }) => (
-                <SurfaceCard key={step} className="rounded-[24px] p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brass)]/12 text-[var(--brass)]">
-                      <Icon size={20} />
-                    </div>
-                    <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">{step}</span>
-                  </div>
-                  <h3 className="mt-5 text-lg font-semibold text-primary">{title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-secondary">{description}</p>
-                </SurfaceCard>
-              ))}
-            </div>
           </div>
         </section>
 
@@ -665,130 +593,246 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="pellet-testing" className="px-4 py-20 lg:py-24">
+        <section id="image-analysis" className="px-4 py-20 lg:py-24">
           <div className="mx-auto max-w-7xl">
             <SectionHeader
-              eyebrow="Pellet Testing — Image Measurement"
-              title="Image analysis that powers pellet ranking decisions"
-              description="Run each target through one measurement workflow, then roll those measured groups into ranking, batch comparison, and confidence-backed pellet choices."
+              eyebrow="Image Analysis"
+              title="From target photo to better equipment decisions"
+              description="Measured-image evidence is what separates a lucky card from a repeatable setup. Every downstream feature — pellet ranking, trend analysis, score verification — is only as trustworthy as the measurement that fed it."
               align="center"
             />
 
-            <div className="mt-12 grid gap-5 lg:grid-cols-5 md:grid-cols-2">
-              <SurfaceCard className="rounded-[24px] p-5">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 01</span>
-                  <Crosshair size={16} className="text-[var(--brass)]" />
-                </div>
-                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
-                  <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/25">
-                    <div className="absolute h-16 w-16 rounded-full border border-subtle" />
-                    <div className="absolute h-8 w-8 rounded-full border border-[var(--brass)]/35" />
-                    <span className="relative h-2.5 w-2.5 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
-                  </div>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Capture a comparable test target</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Start each candidate pellet on the same target style so later ranking compares like with like.</p>
-              </SurfaceCard>
-
-              <SurfaceCard className="rounded-[24px] p-5">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 02</span>
-                  <SlidersHorizontal size={16} className="text-[var(--brass)]" />
-                </div>
-                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
-                  <div className="relative flex h-20 w-full max-w-[160px] items-center justify-center">
-                    <span className="absolute left-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
-                    <span className="absolute right-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
-                    <span className="absolute left-4 right-4 h-px border-t border-dashed border-[var(--brass)]/55" />
-                    <span className="relative -top-5 rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">25 mm</span>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Normalise measurements</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Calibrate once so every pellet entry is measured on the same scale before comparisons begin.</p>
-              </SurfaceCard>
-
-              <SurfaceCard className="rounded-[24px] p-5">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 03</span>
-                  <Gauge size={16} className="text-[var(--brass)]" />
-                </div>
-                <div className="mt-4 flex h-32 flex-col items-center justify-center gap-2 rounded-[18px] border border-subtle bg-page">
-                  <div className="rounded-full border border-[var(--brass)]/25 bg-surface px-4 py-1.5 font-mono text-sm font-semibold text-[var(--brass)]">45 m</div>
-                  <div className="flex gap-2">
-                    <span className="rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--brass)]">.177</span>
-                    <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.22</span>
-                    <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.25</span>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Measure each candidate consistently</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Apply range and caliber context so each measured group is directly comparable across sessions.</p>
-              </SurfaceCard>
-
-              <SurfaceCard className="rounded-[24px] p-5">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 04</span>
-                  <ScanLine size={16} className="text-[var(--brass)]" />
-                </div>
-                <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
-                  <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/20">
-                    <div className="absolute h-16 w-16 rounded-full border border-subtle" />
-                    {[
-                      'left-[28px] top-[30px]',
-                      'left-[40px] top-[34px]',
-                      'left-[34px] top-[44px]',
-                      'left-[46px] top-[48px]',
-                      'left-[30px] top-[54px]',
-                    ].map((position) => (
-                      <span
-                        key={position}
-                        className={`absolute h-2 w-2 rounded-full bg-[var(--brass)] shadow-[0_0_0_3px_rgba(184,136,44,0.18)] ${position}`}
-                      />
-                    ))}
-                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">Auto-detected · 5 shots</span>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Validate outliers before ranking</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Review auto-detected groups and fix edge cases so one bad read does not distort pellet comparisons.</p>
-              </SurfaceCard>
-
-              <SurfaceCard className="rounded-[24px] p-5">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 05</span>
-                  <BarChart3 size={16} className="text-[var(--brass)]" />
-                </div>
-                <div className="mt-4 flex h-32 flex-col justify-center gap-2 rounded-[18px] border border-subtle bg-page p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Group</span>
-                    <span className="font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">MOA</span>
-                    <span className="font-mono text-sm font-semibold text-primary">0.63</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Mean R.</span>
-                    <span className="font-mono text-sm font-semibold text-primary">3.12mm</span>
-                  </div>
-                </div>
-                <h3 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Rank setups with confidence</h3>
-                <p className="mt-2 text-sm leading-6 text-secondary">Turn measured outcomes into evidence-backed ordering so pellet changes are justified, not guessed.</p>
-              </SurfaceCard>
-            </div>
-
-            <div className="mt-16 grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
-              <div>
-                <FeatureList items={pelletTestingPoints} />
+            <div className="mt-14">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--brass)]">Why professionals measure</p>
+                <h3 className="mt-3 text-2xl font-semibold tracking-tight text-primary">What you stop guessing at, and what you start proving</h3>
               </div>
 
-              <SurfaceCard className="rounded-[28px] p-0">
-                <div className="border-b border-subtle px-6 py-5">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Pellet Test Detail</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-primary">Know why a pellet wins, not just that it won</h3>
-                </div>
+              <div className="mt-10 grid gap-5 md:grid-cols-3">
+                {whyMeasureCards.map(({ icon: Icon, title, description }) => (
+                  <SurfaceCard key={title} className="rounded-[24px] p-6">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brass)]/12 text-[var(--brass)]">
+                      <Icon size={20} />
+                    </div>
+                    <h4 className="mt-5 text-lg font-semibold text-primary">{title}</h4>
+                    <p className="mt-3 text-sm leading-6 text-secondary">{description}</p>
+                  </SurfaceCard>
+                ))}
+              </div>
+            </div>
 
-                <div className="grid gap-5 p-6 md:grid-cols-[1.05fr_0.95fr]">
-                  <div className="space-y-4">
+            <div className="mt-20">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--brass)]">How the measurement works</p>
+                <h3 className="mt-3 text-2xl font-semibold tracking-tight text-primary">One workflow, applied to every target</h3>
+              </div>
+
+              <div className="mt-10 grid gap-5 lg:grid-cols-5 md:grid-cols-2">
+                <SurfaceCard className="rounded-[24px] p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 01</span>
+                    <Crosshair size={16} className="text-[var(--brass)]" />
+                  </div>
+                  <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/25">
+                      <div className="absolute h-16 w-16 rounded-full border border-subtle" />
+                      <div className="absolute h-8 w-8 rounded-full border border-[var(--brass)]/35" />
+                      <span className="relative h-2.5 w-2.5 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                    </div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Capture a comparable test target</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary">Start each candidate pellet on the same target style so later ranking compares like with like.</p>
+                </SurfaceCard>
+
+                <SurfaceCard className="rounded-[24px] p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 02</span>
+                    <SlidersHorizontal size={16} className="text-[var(--brass)]" />
+                  </div>
+                  <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                    <div className="relative flex h-20 w-full max-w-[160px] items-center justify-center">
+                      <span className="absolute left-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                      <span className="absolute right-2 h-3 w-3 rounded-full bg-[var(--brass)] shadow-[0_0_0_4px_rgba(184,136,44,0.18)]" />
+                      <span className="absolute left-4 right-4 h-px border-t border-dashed border-[var(--brass)]/55" />
+                      <span className="relative -top-5 rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">25 mm</span>
+                    </div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Normalise measurements</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary">Calibrate once so every pellet entry is measured on the same scale before comparisons begin.</p>
+                </SurfaceCard>
+
+                <SurfaceCard className="rounded-[24px] p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 03</span>
+                    <Gauge size={16} className="text-[var(--brass)]" />
+                  </div>
+                  <div className="mt-4 flex h-32 flex-col items-center justify-center gap-2 rounded-[18px] border border-subtle bg-page">
+                    <div className="rounded-full border border-[var(--brass)]/25 bg-surface px-4 py-1.5 font-mono text-sm font-semibold text-[var(--brass)]">45 m</div>
+                    <div className="flex gap-2">
+                      <span className="rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--brass)]">.177</span>
+                      <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.22</span>
+                      <span className="rounded-full border border-subtle bg-surface px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted">.25</span>
+                    </div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Measure each candidate consistently</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary">Apply range and caliber context so each measured group is directly comparable across sessions.</p>
+                </SurfaceCard>
+
+                <SurfaceCard className="rounded-[24px] p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 04</span>
+                    <ScanLine size={16} className="text-[var(--brass)]" />
+                  </div>
+                  <div className="mt-4 flex h-32 items-center justify-center rounded-[18px] border border-subtle bg-page">
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[var(--brass)]/20">
+                      <div className="absolute h-16 w-16 rounded-full border border-subtle" />
+                      {[
+                        'left-[28px] top-[30px]',
+                        'left-[40px] top-[34px]',
+                        'left-[34px] top-[44px]',
+                        'left-[46px] top-[48px]',
+                        'left-[30px] top-[54px]',
+                      ].map((position) => (
+                        <span
+                          key={position}
+                          className={`absolute h-2 w-2 rounded-full bg-[var(--brass)] shadow-[0_0_0_3px_rgba(184,136,44,0.18)] ${position}`}
+                        />
+                      ))}
+                      <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[var(--brass)]/25 bg-surface px-2 py-0.5 font-mono text-[10px] text-[var(--brass)]">Auto-detected · 5 shots</span>
+                    </div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Validate outliers before ranking</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary">Review auto-detected groups and fix edge cases so one bad read does not distort pellet comparisons.</p>
+                </SurfaceCard>
+
+                <SurfaceCard className="rounded-[24px] p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">Step 05</span>
+                    <BarChart3 size={16} className="text-[var(--brass)]" />
+                  </div>
+                  <div className="mt-4 flex h-32 flex-col justify-center gap-2 rounded-[18px] border border-subtle bg-page p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Group</span>
+                      <span className="font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-[0.16em] text-muted">MOA</span>
+                      <span className="font-mono text-sm font-semibold text-primary">0.63</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-[0.16em] text-muted">Mean R.</span>
+                      <span className="font-mono text-sm font-semibold text-primary">3.12mm</span>
+                    </div>
+                  </div>
+                  <h4 className="mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-primary">Rank setups with confidence</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary">Turn measured outcomes into evidence-backed ordering so pellet changes are justified, not guessed.</p>
+                </SurfaceCard>
+              </div>
+            </div>
+
+            <div className="mt-20">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--brass)]">What it produces</p>
+                <h3 className="mt-3 text-2xl font-semibold tracking-tight text-primary">The group, the context, and the ranked setup — in one record</h3>
+              </div>
+
+              <div className="mt-10 grid gap-6 lg:grid-cols-2 lg:items-start">
+                <SurfaceCard className="rounded-[28px] p-0">
+                  <div className="border-b border-subtle px-6 py-5">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Group Analysis</p>
+                    <h4 className="mt-2 text-xl font-semibold text-primary">See the group, the scale, and the spread</h4>
+                  </div>
+
+                  <div className="space-y-5 p-6">
+                    <div className="rounded-[24px] border border-subtle bg-page p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Measured Target</p>
+                        <span className="rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--brass)]">
+                          Analysed &middot; 92%
+                        </span>
+                      </div>
+                      <div className="relative mt-4 aspect-square overflow-hidden rounded-[24px] border border-subtle" style={{ background: '#f5efe2' }}>
+                        <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(60,40,20,0.06) 1px, transparent 1px)', backgroundSize: '6px 6px' }} />
+                        <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+                          <g fill="none" stroke="rgba(60,40,20,0.18)" strokeWidth="1.2">
+                            <circle cx="200" cy="200" r="160" />
+                            <circle cx="200" cy="200" r="120" />
+                            <circle cx="200" cy="200" r="80" />
+                            <circle cx="200" cy="200" r="44" />
+                            <circle cx="200" cy="200" r="18" fill="rgba(60,40,20,0.30)" />
+                          </g>
+                          <line x1="64" y1="356" x2="172" y2="356" stroke="#eab308" strokeWidth="1.4" strokeDasharray="5 4" opacity="0.85" />
+                          <circle cx="64" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
+                          <text x="64" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">A</text>
+                          <circle cx="172" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
+                          <text x="172" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">B</text>
+                          <rect x="98" y="332" width="40" height="16" rx="4" fill="rgba(20,20,20,0.85)" />
+                          <text x="118" y="343" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fill="#eab308">25 mm</text>
+                          <g stroke="#ef4444" strokeWidth="1.4" opacity="0.85">
+                            <line x1="0" y1="195" x2="400" y2="195" />
+                            <line x1="205" y1="0" x2="205" y2="400" />
+                          </g>
+                          <g stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.18)">
+                            <circle cx="194" cy="180" r="11" />
+                            <circle cx="210" cy="186" r="11" />
+                            <circle cx="201" cy="198" r="11" />
+                            <circle cx="217" cy="202" r="11" />
+                            <circle cx="196" cy="210" r="11" />
+                          </g>
+                          <rect x="178" y="164" width="58" height="62" rx="4" fill="none" stroke="rgba(184,136,44,0.85)" strokeWidth="1.3" strokeDasharray="4 3" />
+                          <rect x="186" y="232" width="76" height="18" rx="4" fill="rgba(20,20,20,0.85)" stroke="rgba(184,136,44,0.5)" strokeWidth="1" />
+                          <text x="224" y="244" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="11" fontWeight="500" fill="#d4a44a">Group: 8.31 mm</text>
+                        </svg>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Group</p>
+                          <p className="mt-0.5 font-mono text-xs font-semibold text-[var(--brass)]">8.31 mm</p>
+                        </div>
+                        <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">MOA</p>
+                          <p className="mt-0.5 font-mono text-xs font-semibold text-primary">0.63</p>
+                        </div>
+                        <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
+                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Distance</p>
+                          <p className="mt-0.5 font-mono text-xs font-semibold text-primary">45 m</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[24px] border border-subtle bg-page p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Session Summary</p>
+                          <p className="mt-2 text-lg font-semibold text-primary">One image, three decisions</p>
+                        </div>
+                        <Crosshair size={18} className="text-[var(--brass)]" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-3">
+                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best</p>
+                          <p className="mt-2 font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</p>
+                        </div>
+                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
+                          <p className="mt-2 font-mono text-lg font-semibold text-primary">10.02mm</p>
+                        </div>
+                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Spread</p>
+                          <p className="mt-2 font-mono text-lg font-semibold text-primary">1.71mm</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </SurfaceCard>
+
+                <SurfaceCard className="rounded-[28px] p-0">
+                  <div className="border-b border-subtle px-6 py-5">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Pellet Test Detail</p>
+                    <h4 className="mt-2 text-xl font-semibold text-primary">Know why a pellet wins, not just that it won</h4>
+                  </div>
+
+                  <div className="space-y-5 p-6">
                     <div className="rounded-[22px] border border-subtle bg-page p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -823,152 +867,41 @@ export default function LandingPage() {
                         <p className="mt-1 text-xs text-secondary">Enough evidence to back the choice</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-subtle bg-page p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Data kept with the result</p>
-                    <div className="mt-4 space-y-3">
-                      {[
-                        'Distance, chrono, temperature, humidity, and wind',
-                        'Target photos with measured group data in mm and MOA',
-                        'Session notes, bench setup, scope, and rifle details',
-                        'Batch or lot analysis when one tin clearly behaves differently',
-                      ].map((line) => (
-                        <div key={line} className="flex gap-3 rounded-2xl border border-subtle bg-surface p-3">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brass)]/12 text-[var(--brass)]">
-                            <Check size={14} />
-                          </div>
-                          <p className="text-sm leading-6 text-secondary">{line}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </SurfaceCard>
-            </div>
-          </div>
-        </section>
-
-        <section className="border-y border-subtle bg-surface px-4 py-20 lg:py-24">
-          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:items-start">
-            <div className="order-2 lg:order-1">
-              <SurfaceCard className="rounded-[28px] p-0">
-                <div className="border-b border-subtle px-6 py-5">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Group Analysis</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-primary">See the group, the context, and the trend line</h3>
-                </div>
-
-                <div className="grid gap-5 p-6 md:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-[24px] border border-subtle bg-page p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Measured Target</p>
-                      <span className="rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--brass)]">
-                        Analysed &middot; 92%
-                      </span>
-                    </div>
-                    <div className="relative mt-4 aspect-square overflow-hidden rounded-[24px] border border-subtle" style={{ background: '#f5efe2' }}>
-                      <div className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(rgba(60,40,20,0.06) 1px, transparent 1px)', backgroundSize: '6px 6px' }} />
-                      <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
-                        <g fill="none" stroke="rgba(60,40,20,0.18)" strokeWidth="1.2">
-                          <circle cx="200" cy="200" r="160" />
-                          <circle cx="200" cy="200" r="120" />
-                          <circle cx="200" cy="200" r="80" />
-                          <circle cx="200" cy="200" r="44" />
-                          <circle cx="200" cy="200" r="18" fill="rgba(60,40,20,0.30)" />
-                        </g>
-                        <line x1="64" y1="356" x2="172" y2="356" stroke="#eab308" strokeWidth="1.4" strokeDasharray="5 4" opacity="0.85" />
-                        <circle cx="64" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
-                        <text x="64" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">A</text>
-                        <circle cx="172" cy="356" r="9" fill="rgba(234,179,8,0.35)" stroke="#eab308" strokeWidth="2" />
-                        <text x="172" y="360" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fontWeight="600" fill="#7a5b00">B</text>
-                        <rect x="98" y="332" width="40" height="16" rx="4" fill="rgba(20,20,20,0.85)" />
-                        <text x="118" y="343" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="10" fill="#eab308">25 mm</text>
-                        <g stroke="#ef4444" strokeWidth="1.4" opacity="0.85">
-                          <line x1="0" y1="195" x2="400" y2="195" />
-                          <line x1="205" y1="0" x2="205" y2="400" />
-                        </g>
-                        <g stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.18)">
-                          <circle cx="194" cy="180" r="11" />
-                          <circle cx="210" cy="186" r="11" />
-                          <circle cx="201" cy="198" r="11" />
-                          <circle cx="217" cy="202" r="11" />
-                          <circle cx="196" cy="210" r="11" />
-                        </g>
-                        <rect x="178" y="164" width="58" height="62" rx="4" fill="none" stroke="rgba(184,136,44,0.85)" strokeWidth="1.3" strokeDasharray="4 3" />
-                        <rect x="186" y="232" width="76" height="18" rx="4" fill="rgba(20,20,20,0.85)" stroke="rgba(184,136,44,0.5)" strokeWidth="1" />
-                        <text x="224" y="244" textAnchor="middle" fontFamily="'JetBrains Mono',monospace" fontSize="11" fontWeight="500" fill="#d4a44a">Group: 8.31 mm</text>
-                      </svg>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Group</p>
-                        <p className="mt-0.5 font-mono text-xs font-semibold text-[var(--brass)]">8.31 mm</p>
-                      </div>
-                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">MOA</p>
-                        <p className="mt-0.5 font-mono text-xs font-semibold text-primary">0.63</p>
-                      </div>
-                      <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                        <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Distance</p>
-                        <p className="mt-0.5 font-mono text-xs font-semibold text-primary">45 m</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-[24px] border border-subtle bg-page p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Session Summary</p>
-                          <p className="mt-2 text-lg font-semibold text-primary">One image, three decisions</p>
-                        </div>
-                        <Crosshair size={18} className="text-[var(--brass)]" />
-                      </div>
-                      <div className="mt-4 grid grid-cols-3 gap-3">
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</p>
-                        </div>
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-primary">10.02mm</p>
-                        </div>
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Spread</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-primary">1.71mm</p>
-                        </div>
-                      </div>
-                    </div>
 
                     <div className="rounded-[24px] border border-subtle bg-page p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Why it matters</p>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Data kept with the result</p>
                       <div className="mt-4 space-y-3">
                         {[
-                          'Best/average/spread together tells you whether dispersion is tightening or simply fluctuating.',
-                          'Overlay-retained measured images let you audit surprising targets without relying on memory.',
-                          'Validation at this stage protects downstream pellet rankings from misread holes or torn paper.',
+                          'Distance, chrono, temperature, humidity, and wind',
+                          'Target photos with measured group data in mm and MOA',
+                          'Session notes, bench setup, scope, and rifle details',
+                          'Batch or lot analysis when one tin clearly behaves differently',
                         ].map((line) => (
                           <div key={line} className="flex gap-3 rounded-2xl border border-subtle bg-surface p-3">
-                            <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--brass)]" />
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brass)]/12 text-[var(--brass)]">
+                              <Check size={14} />
+                            </div>
                             <p className="text-sm leading-6 text-secondary">{line}</p>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
-                </div>
-              </SurfaceCard>
-            </div>
+                </SurfaceCard>
+              </div>
 
-            <div className="order-1 lg:order-2">
-              <SectionHeader
-                eyebrow="Group Analysis"
-                title="Group analysis that separates a lucky card from a repeatable setup"
-                description="Use this view to interpret and validate measured groups: read spread behaviour, inspect overlays, and confirm whether the session evidence matches the story."
-              />
-
-              <div className="mt-8">
-                <FeatureList items={groupAnalysisPoints} />
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                {imageAnalysisPoints.map((item) => (
+                  <div key={item.title} className="flex gap-4 rounded-2xl border border-subtle bg-surface-hover p-4">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--brass)]/12 text-[var(--brass)]">
+                      <Check size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-primary">{item.title}</h4>
+                      <p className="mt-1 text-sm leading-6 text-secondary">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
