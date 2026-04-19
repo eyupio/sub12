@@ -119,12 +119,13 @@ func TestScoreCardDescription_RichesWithGear(t *testing.T) {
 	got := scoreCardDescription(card, "John Shooter", rifle, pellet, nil)
 
 	assert.Contains(t, got, "John Shooter")
-	assert.Contains(t, got, "245 (12X)")
+	assert.Contains(t, got, "245 points (12X)")
 	assert.Contains(t, got, "2026-04-18")
 	assert.Contains(t, got, "Birmingham Club")
 	assert.Contains(t, got, "Air Arms S510")
 	assert.Contains(t, got, "JSB Exact 4.52mm")
-	assert.Contains(t, got, "shared via sub-12")
+	// Brand tail removed so first line of the preview card is all signal; og:site_name carries the brand.
+	assert.NotContains(t, got, "shared via sub-12")
 }
 
 func TestScoreCardDescription_IncludesTopAchievements(t *testing.T) {
@@ -147,9 +148,21 @@ func TestScoreCardDescription_MinimalCardDegrades(t *testing.T) {
 	card := &model.ScoreCard{TotalScore: 200, XCount: 0}
 	got := scoreCardDescription(card, "", nil, nil, nil)
 
-	assert.Contains(t, got, "200 (0X)")
-	assert.Contains(t, got, "shared via sub-12")
-	assert.NotContains(t, got, " • Birmingham")
+	// Zero-X omits the "(0X)" noise; title and description both just say "points".
+	assert.Contains(t, got, "200 points")
+	assert.NotContains(t, got, "(0X)")
+	assert.NotContains(t, got, "shared via sub-12")
+}
+
+func TestScoreCardDescription_UsesMiddleDotSeparator(t *testing.T) {
+	// All entity descriptions should use the same " · " (U+00B7) joiner; score
+	// cards previously used " • " (U+2022) which showed up as a second bullet
+	// next to all the others in a unified social feed.
+	card := &model.ScoreCard{TotalScore: 200}
+	got := scoreCardDescription(card, "John", nil, nil, nil)
+
+	assert.Contains(t, got, " · ")
+	assert.NotContains(t, got, " • ")
 }
 
 func TestTruncate_HandlesRunes(t *testing.T) {

@@ -549,7 +549,11 @@ func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *mode
 	if displayName != "" {
 		parts = append(parts, displayName)
 	}
-	parts = append(parts, fmt.Sprintf("%d (%dX)", card.TotalScore, card.XCount))
+	score := fmt.Sprintf("%d points", card.TotalScore)
+	if card.XCount > 0 {
+		score = fmt.Sprintf("%d points (%dX)", card.TotalScore, card.XCount)
+	}
+	parts = append(parts, score)
 	if card.ShotAt != "" {
 		parts = append(parts, card.ShotAt)
 	}
@@ -575,7 +579,7 @@ func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *mode
 	if names := topAchievementNames(achievements, 2); names != "" {
 		parts = append(parts, names)
 	}
-	return strings.Join(parts, " • ") + " — shared via sub-12."
+	return strings.Join(parts, " · ")
 }
 
 // scoreCardImageAlt builds descriptive alt text used for og:image:alt so
@@ -674,9 +678,9 @@ func pelletTestDescription(sess *model.PelletTestSession, displayName string) st
 		parts = append(parts, sess.TestDate)
 	}
 	if len(parts) == 0 {
-		return "Pellet testing session shared via sub-12."
+		return "Pellet testing session"
 	}
-	return strings.Join(parts, " · ") + " — shared via sub-12."
+	return strings.Join(parts, " · ")
 }
 
 func leagueDescription(league *model.League) string {
@@ -684,7 +688,7 @@ func leagueDescription(league *model.League) string {
 	if league.Description != nil && strings.TrimSpace(*league.Description) != "" {
 		parts = append(parts, truncate(*league.Description, 160))
 	}
-	return strings.Join(parts, " · ") + " — sub-12 league."
+	return strings.Join(parts, " · ")
 }
 
 func clubDescription(club *model.Club) string {
@@ -692,7 +696,7 @@ func clubDescription(club *model.Club) string {
 	if club.Description != nil && strings.TrimSpace(*club.Description) != "" {
 		parts = append(parts, truncate(*club.Description, 160))
 	}
-	return strings.Join(parts, " · ") + " — sub-12 club."
+	return strings.Join(parts, " · ")
 }
 
 func userDescription(profile *model.PublicProfile) string {
@@ -707,9 +711,9 @@ func userDescription(profile *model.PublicProfile) string {
 		parts = append(parts, truncate(*profile.Bio, 160))
 	}
 	if len(parts) == 0 {
-		return fmt.Sprintf("%s's profile on sub-12.", profile.DisplayName)
+		return fmt.Sprintf("%s's profile", profile.DisplayName)
 	}
-	return strings.Join(parts, " · ") + " — on sub-12."
+	return strings.Join(parts, " · ")
 }
 
 func plural(n int) string {
