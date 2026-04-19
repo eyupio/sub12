@@ -99,6 +99,19 @@ describe('ShareDialog', () => {
     expect(toasts.some((t) => t.message === 'Link copied' && t.variant === 'success')).toBe(true)
   })
 
+  it('closes on Escape and labels the dialog by its heading', async () => {
+    const onClose = vi.fn()
+    renderDialog({ onClose })
+
+    const dialog = screen.getByRole('dialog')
+    const heading = screen.getByText(/^Share Score Card$/i)
+    expect(dialog.getAttribute('aria-labelledby')).toBe(heading.id)
+    expect(heading.id).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('opens Twitter/X intent in a new tab with the score-card url', async () => {
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
     const clubsSpy = vi.spyOn(clubsApi, 'list')

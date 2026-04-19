@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { X, Share2, Link as LinkIcon, Twitter, Facebook, Mail, MessageCircle } from 'lucide-react'
@@ -36,12 +36,16 @@ function isInternalShareType(t: ShareTargetType): t is InternalTargetType {
   return t === 'score_card' || t === 'pellet_test'
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export function ShareDialog({ targetId, targetType, targetLabel, onClose }: ShareDialogProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [destination, setDestination] = useState<Destination>('personal')
   const [entityId, setEntityId] = useState('')
   const [body, setBody] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const canPostInternal = isInternalShareType(targetType)
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
@@ -98,6 +102,46 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
 
   const needsEntity = (destination === 'league' || destination === 'club') && !entityId
 
+  // Restore focus to whatever opened the dialog when it closes — standard
+  // modal behaviour; without it keyboard users lose their place in the page.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+    firstFocusable?.focus()
+    return () => {
+      previouslyFocused?.focus?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      // Keep Tab cycling inside the dialog. The league/club <select> would
+      // otherwise let focus escape to the page behind the overlay on the
+      // next Tab, defeating the modal contract.
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -130,14 +174,19 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="bg-card border border-subtle rounded-lg shadow-lg w-full max-w-md mx-4 p-4 space-y-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="share-dialog-title"
       >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+          <h2
+            id="share-dialog-title"
+            className="text-sm font-medium tracking-widest uppercase text-secondary flex items-center gap-2"
+          >
             <Share2 size={14} />
             Share {targetLabel}
           </h2>
