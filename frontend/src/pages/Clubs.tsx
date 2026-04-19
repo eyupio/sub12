@@ -5,6 +5,7 @@ import { Plus, Users, ChevronRight, X, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { toast } from '../store/toast'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -18,6 +19,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
     mutationFn: (input: CreateClubInput) => clubsApi.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Club created', 'success')
       onClose()
     },
     onError: () => setError('Failed to create club. Please try again.'),
