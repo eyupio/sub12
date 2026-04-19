@@ -482,12 +482,12 @@ export default function LandingPage() {
               Clubs and leagues
             </a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <Link to="/login" className="inline-flex text-sm font-medium uppercase tracking-[0.16em] text-[var(--brass)] transition-opacity hover:opacity-80">
+            <Link to="/login" className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-[var(--brass)]/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--brass)] transition-colors hover:border-[var(--brass)] hover:bg-[var(--brass)]/10 sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.16em]">
               Sign In
             </Link>
-            <Link to="/register" className="inline-flex items-center rounded-lg bg-[var(--brass)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-inverse transition-all hover:-translate-y-0.5 hover:opacity-90">
+            <Link to="/register" className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-[var(--brass)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-inverse transition-all hover:-translate-y-0.5 hover:opacity-90 sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.16em]">
               Start Tracking
             </Link>
           </div>
