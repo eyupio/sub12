@@ -158,6 +158,16 @@ func TestTruncate_HandlesRunes(t *testing.T) {
 	assert.Equal(t, "short", truncate("   short   ", 10))
 }
 
+func TestFallbackTemplate_IsSafeForOutages(t *testing.T) {
+	// Crawlers landing on the holding page during a cold start must not index
+	// "Getting things ready" as the canonical title. The inline reload must
+	// also be the only retry mechanism — a <meta http-equiv="refresh"> would
+	// combine with the JS reload and hammer the backend from every tab.
+	assert.Contains(t, fallbackTemplate, `name="robots" content="noindex"`)
+	assert.NotContains(t, fallbackTemplate, `http-equiv="refresh"`)
+	assert.Contains(t, fallbackTemplate, "fallbackReloadDelay", "reload should back off across retries")
+}
+
 func TestInjectOG_ReplacesTagsInPlace(t *testing.T) {
 	tmpl := []byte(`<!doctype html>
 <html>

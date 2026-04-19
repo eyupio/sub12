@@ -4,11 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0C0C0C" />
-    <meta http-equiv="refresh" content="3" />
 
     <title>SUB12</title>
     <meta name="description" content="SUB12 — Precision Shooting Platform" />
-    <meta name="robots" content="index, follow" />
+    <!-- Holding page served only while the frontend container is unreachable.
+         Tell crawlers not to index the placeholder so a cold start can't poison
+         search results with "Getting things ready" titles. -->
+    <meta name="robots" content="noindex" />
 
     <meta property="og:site_name" content="SUB12" />
     <meta property="og:type" content="website" />
@@ -52,9 +54,22 @@
     </div>
     <script>
       // Self-heal: when the backend serves this fallback during a brief
-      // cold-start window, retry the same URL in a few seconds. Once the
-      // frontend shell is reachable again the real SPA takes over.
-      setTimeout(function () { location.reload(); }, 2500);
+      // cold-start window, retry the same URL. Backoff grows 8s → 60s across
+      // reloads so a longer outage doesn't hammer the backend from every open
+      // tab. Reset the counter as soon as the real SPA boots.
+      (function () {
+        var KEY = 'sub12.fallbackReloadDelay';
+        var MIN = 8000, MAX = 60000;
+        var next;
+        try {
+          var prev = parseInt(sessionStorage.getItem(KEY) || '', 10);
+          next = isFinite(prev) && prev > 0 ? Math.min(prev * 2, MAX) : MIN;
+          sessionStorage.setItem(KEY, String(next));
+        } catch (e) {
+          next = MIN;
+        }
+        setTimeout(function () { location.reload(); }, next);
+      })();
     </script>
   </body>
 </html>
