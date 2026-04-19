@@ -143,23 +143,39 @@ export default function NewPelletTest() {
         barometric_pressure_mbar: barometricPressure ? Number(barometricPressure) : undefined,
       })
 
+      let groupFailures = 0
       for (const g of validGroups) {
-        await pelletTestApi.createGroup(session.id, {
-          shot_count: g.shotCount,
-          group_size_mm: Number(g.groupSizeMM),
-          notes: g.notes || undefined,
-        })
+        try {
+          await pelletTestApi.createGroup(session.id, {
+            shot_count: g.shotCount,
+            group_size_mm: Number(g.groupSizeMM),
+            notes: g.notes || undefined,
+          })
+        } catch {
+          groupFailures++
+        }
       }
 
+      let imageFailures = 0
       for (const file of imageFiles) {
-        await pelletTestApi.uploadImage(session.id, file)
+        try {
+          await pelletTestApi.uploadImage(session.id, file)
+        } catch {
+          imageFailures++
+        }
       }
 
-      return session
+      return { session, groupFailures, imageFailures }
     },
-    onSuccess: (session) => {
+    onSuccess: ({ session, groupFailures, imageFailures }) => {
       qc.invalidateQueries({ queryKey: ['pellet-tests'] })
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
+      if (groupFailures > 0 || imageFailures > 0) {
+        const parts = []
+        if (groupFailures > 0) parts.push(`${groupFailures} group${groupFailures === 1 ? '' : 's'}`)
+        if (imageFailures > 0) parts.push(`${imageFailures} image${imageFailures === 1 ? '' : 's'}`)
+        toast(`Test saved, but ${parts.join(' and ')} failed to upload`, 'error')
+      }
       navigate({ to: '/pellet-testing/$id', params: { id: session.id } })
     },
     onError: (err: unknown) => {

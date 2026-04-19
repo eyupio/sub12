@@ -100,14 +100,19 @@ export default function AdminSupportInbox() {
                     Open ticket
                   </Link>
                 </div>
-                <select
-                  className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-xs"
-                  value={ticket.status}
-                  disabled={transitionStatusMutation.isPending}
-                  onChange={(e) => transitionStatusMutation.mutate({ id: ticket.id, status: e.target.value as SupportTicketStatus })}
-                >
-                  {ticketStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="flex items-center gap-2">
+                  {transitionStatusMutation.isPending && transitionStatusMutation.variables?.id === ticket.id && (
+                    <span className="text-xs text-muted">Updating…</span>
+                  )}
+                  <select
+                    className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-xs"
+                    value={ticket.status}
+                    disabled={transitionStatusMutation.isPending}
+                    onChange={(e) => transitionStatusMutation.mutate({ id: ticket.id, status: e.target.value as SupportTicketStatus })}
+                  >
+                    {ticketStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
               {ticket.description && <p className="text-sm text-secondary whitespace-pre-wrap">{ticket.description}</p>}
             </li>

@@ -112,7 +112,9 @@ export default function FeatureRequestDetail() {
 
             {currentUser ? (
               <form onSubmit={onSubmitComment} className="space-y-2">
+                <label htmlFor="feature-request-comment" className="sr-only">Comment</label>
                 <textarea
+                  id="feature-request-comment"
                   className="min-h-24 w-full rounded-md border border-subtle bg-transparent p-2 text-sm"
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}

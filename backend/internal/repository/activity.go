@@ -104,6 +104,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			WHERE a.visibility = 'public'
 			  AND u.feed_opt_out = FALSE
 			  AND u.profile_visibility <> 'private'
+			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $1
 			      UNION
@@ -121,6 +122,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			`+activityJoinScoreCard+`
 			WHERE a.league_id = $1
+			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $2
 			      UNION
@@ -138,6 +140,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			`+activityJoinScoreCard+`
 			WHERE a.club_id = $1
+			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND a.user_id NOT IN (
 			      SELECT blocker_id FROM user_blocks WHERE blocked_id = $2
 			      UNION
@@ -165,6 +168,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			)
 			AND (u.feed_opt_out = FALSE OR a.user_id = $1)
 			AND (a.visibility IN ('public', 'followers') OR a.user_id = $1)
+			AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			AND ($3 = '' OR a.created_at < $3::timestamptz)
 			ORDER BY a.created_at DESC
 			LIMIT $2

@@ -245,11 +245,25 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 	return clubs, rows.Err()
 }
 
+// Join adds a user to a club. Returns ErrNotFound if the club doesn't exist,
+// ErrAlreadyMember if the user is already in it.
 func (r *ClubRepository) Join(ctx context.Context, clubID, userID string) error {
+	var exists bool
+	if err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM clubs WHERE id = $1)`, clubID).Scan(&exists); err != nil {
+		return fmt.Errorf("check club exists: %w", err)
+	}
+	if !exists {
+		return ErrNotFound
+	}
+
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO club_members (club_id, user_id, is_admin) VALUES ($1, $2, false)
 	`, clubID, userID)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrAlreadyMember
+		}
 		return fmt.Errorf("join club: %w", err)
 	}
 	return nil
