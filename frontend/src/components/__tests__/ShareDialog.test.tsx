@@ -42,6 +42,10 @@ describe('ShareDialog', () => {
     navigateMock.mockReset()
     useToastStore.setState({ toasts: [] })
     Object.assign(window, { location: { ...window.location, origin: 'https://app.test' } })
+    // Default tests run without navigator.share so the fallback channel grid
+    // is visible up-front. Individual tests that exercise the Web Share API
+    // install their own stub.
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
   })
 
   afterEach(() => {
@@ -127,6 +131,40 @@ describe('ShareDialog', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('invokes the Web Share API when supported and hides the channel grid by default', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+
+    renderDialog()
+
+    // No X/Facebook etc. while Web Share is available — those sit behind "More options".
+    expect(screen.queryByRole('button', { name: /^x$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^facebook$/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /^share externally$/i }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    expect(share).toHaveBeenCalledWith({
+      title: 'Score Card',
+      text: 'Score Card on sub-12',
+      url: 'https://app.test/score-cards/sc-1',
+    })
+  })
+
+  it('reveals the channel grid when Web Share fails so the user has a fallback', async () => {
+    const share = vi.fn().mockRejectedValue(new Error('boom'))
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+
+    renderDialog()
+
+    fireEvent.click(screen.getByRole('button', { name: /^share externally$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^x$/i })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /^facebook$/i })).toBeTruthy()
+    })
   })
 
   it('opens Twitter/X intent in a new tab with the score-card url', async () => {

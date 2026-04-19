@@ -63,6 +63,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
   const [entityId, setEntityId] = useState('')
   const [body, setBody] = useState('')
   const [manualCopy, setManualCopy] = useState(false)
+  const [showChannels, setShowChannels] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const manualCopyRef = useRef<HTMLInputElement>(null)
 
@@ -183,12 +184,24 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
     window.open(href, '_blank', 'noopener,noreferrer')
   }
 
-  async function nativeShare() {
-    try {
-      await navigator.share({ title: targetLabel, text: shareText, url: shareUrl })
-    } catch {
-      // User dismissed or share failed — no toast needed for user-cancelled share.
+  // Primary external share: delegate to the OS share sheet where available,
+  // fall back to an inline grid of explicit channels otherwise. Keeps the
+  // dialog uncluttered on modern mobile while still working on desktop Chrome
+  // and platforms that haven't shipped the Web Share API.
+  async function primaryShare() {
+    if (hasWebShare) {
+      try {
+        await navigator.share({ title: targetLabel, text: shareText, url: shareUrl })
+      } catch {
+        // Native share was dismissed or errored. A dismissal is a cancel,
+        // not a failure, so no toast — but reveal the fallback channels in
+        // case the user wanted a specific destination the OS sheet didn't
+        // offer (common for desktop browsers and locked-down work phones).
+        setShowChannels(true)
+      }
+      return
     }
+    setShowChannels(true)
   }
 
   const twitterHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`
@@ -313,36 +326,65 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
         {/* External sharing — offered for every target type */}
         <section className={`space-y-3 ${canPostInternal ? 'border-t border-subtle pt-4' : ''}`}>
           <h3 className="text-[11px] tracking-widest uppercase text-muted">Share externally</h3>
-          <div className="flex flex-wrap gap-2">
-            <ExternalButton onClick={copyLink} label="Copy link" icon={<LinkIcon size={14} />} />
-            <ExternalButton
-              onClick={() => openExternal(twitterHref)}
-              label="X"
-              icon={<XMarkIcon size={14} />}
-            />
-            <ExternalButton
-              onClick={() => openExternal(facebookHref)}
-              label="Facebook"
-              icon={<Facebook size={14} />}
-            />
-            <ExternalButton
-              onClick={() => openExternal(whatsappHref)}
-              label="WhatsApp"
-              icon={<MessageCircle size={14} />}
-            />
-            <ExternalButton
-              onClick={() => openExternal(emailHref)}
-              label="Email"
-              icon={<Mail size={14} />}
-            />
-            {hasWebShare && (
-              <ExternalButton
-                onClick={nativeShare}
-                label="More…"
-                icon={<Share2 size={14} />}
-              />
+
+          {/* Primary: single Share button. Platforms that support the Web
+              Share API get the native share sheet (which includes the user's
+              preferred channels, including Copy). Everywhere else the button
+              expands the explicit channel grid below. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={primaryShare}
+              aria-label="Share externally"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium hover:opacity-90 transition-opacity"
+            >
+              <Share2 size={14} />
+              Share
+            </button>
+            <button
+              onClick={copyLink}
+              aria-label="Copy link"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/40 transition-colors"
+            >
+              <LinkIcon size={14} />
+              Copy link
+            </button>
+            {hasWebShare && !showChannels && (
+              <button
+                onClick={() => setShowChannels(true)}
+                className="ml-auto text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              >
+                More options
+              </button>
             )}
           </div>
+
+          {/* Fallback channel grid: rendered automatically on browsers without
+              navigator.share, revealed on demand otherwise. */}
+          {(!hasWebShare || showChannels) && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <ExternalButton
+                onClick={() => openExternal(twitterHref)}
+                label="X"
+                icon={<XMarkIcon size={14} />}
+              />
+              <ExternalButton
+                onClick={() => openExternal(facebookHref)}
+                label="Facebook"
+                icon={<Facebook size={14} />}
+              />
+              <ExternalButton
+                onClick={() => openExternal(whatsappHref)}
+                label="WhatsApp"
+                icon={<MessageCircle size={14} />}
+              />
+              <ExternalButton
+                onClick={() => openExternal(emailHref)}
+                label="Email"
+                icon={<Mail size={14} />}
+              />
+            </div>
+          )}
+
           {manualCopy && (
             <div className="space-y-1">
               <label htmlFor="share-dialog-manual-copy" className="text-[11px] tracking-widest uppercase text-muted">
