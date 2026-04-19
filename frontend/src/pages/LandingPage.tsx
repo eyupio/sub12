@@ -382,7 +382,7 @@ function HeroMockup() {
                     </div>
                     <div className="rounded-2xl border border-subtle bg-page px-3 py-3">
                       <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best Card</p>
-                      <p className="mt-2 font-mono text-lg font-semibold text-primary">247.4</p>
+                      <p className="mt-2 font-mono text-lg font-semibold text-primary">247</p>
                     </div>
                   </div>
                 </div>
