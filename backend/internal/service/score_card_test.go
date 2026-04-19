@@ -294,8 +294,7 @@ func TestCreate_LeagueSubmission_RequiresMembership(t *testing.T) {
 		ShotXs:        xs,
 		LeagueRoundID: &roundID,
 	})
-	assert.ErrorIs(t, err, ErrInvalidCard)
-	assert.Contains(t, err.Error(), "not a member")
+	assert.ErrorIs(t, err, ErrNotLeagueMember)
 	assert.False(t, repo.createCalled)
 }
 

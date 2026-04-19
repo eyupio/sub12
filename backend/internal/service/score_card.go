@@ -11,9 +11,10 @@ import (
 
 
 var (
-	ErrInvalidCard    = errors.New("invalid score card")
-	ErrMaxSubmissions = errors.New("maximum submissions per round reached")
-	ErrEditsLocked    = errors.New("score card is locked by league policy")
+	ErrInvalidCard      = errors.New("invalid score card")
+	ErrMaxSubmissions   = errors.New("maximum submissions per round reached")
+	ErrEditsLocked      = errors.New("score card is locked by league policy")
+	ErrNotLeagueMember  = errors.New("league membership required")
 )
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
@@ -96,7 +97,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			return nil, fmt.Errorf("check league membership: %w", err)
 		}
 		if !isMember {
-			return nil, fmt.Errorf("%w: not a member of this league", ErrInvalidCard)
+			return nil, ErrNotLeagueMember
 		}
 
 		cfg, err := s.leagueRepo.GetConfigByRoundID(ctx, *input.LeagueRoundID)
