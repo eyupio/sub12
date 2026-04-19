@@ -102,14 +102,18 @@ func NewRouter(
 	r.Route("/api/v1", func(r chi.Router) {
 		// Pre-instantiate comment handler so it can be used in both protected and public groups
 		commentH := handler.NewComment(comments)
-		// Public auth routes
+		// Public auth routes. Password-bearing endpoints are rate-limited
+		// per-IP to blunt credential stuffing and password-reset flooding.
+		// /auth/refresh and /auth/logout are intentionally unbounded here so
+		// that normal token-refresh traffic from returning users isn't
+		// throttled shared with login attempts on the same IP.
 		authHandler := handler.NewAuth(auth)
-		r.Post("/auth/register", authHandler.Register)
-		r.Post("/auth/login", authHandler.Login)
+		r.With(rl.Limit("auth")).Post("/auth/register", authHandler.Register)
+		r.With(rl.Limit("auth")).Post("/auth/login", authHandler.Login)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/auth/logout", authHandler.Logout)
-		r.Post("/auth/forgot-password", authHandler.ForgotPassword)
-		r.Post("/auth/reset-password", authHandler.ResetPassword)
+		r.With(rl.Limit("auth")).Post("/auth/forgot-password", authHandler.ForgotPassword)
+		r.With(rl.Limit("auth")).Post("/auth/reset-password", authHandler.ResetPassword)
 
 		// Public image serving (no auth required)
 		ih := handler.NewImage(images)

@@ -177,7 +177,7 @@ export default function AdminSupportTicketDetail() {
               {detail.ticket.assignee_id === currentUserId ? (
                 <button
                   type="button"
-                  className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50"
+                  className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => assignMutation.mutate(null)}
                   disabled={assignMutation.isPending}
                 >
@@ -187,7 +187,7 @@ export default function AdminSupportTicketDetail() {
                 currentUserId && (
                   <button
                     type="button"
-                    className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50"
+                    className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => assignMutation.mutate(currentUserId)}
                     disabled={assignMutation.isPending}
                   >
@@ -242,7 +242,7 @@ export default function AdminSupportTicketDetail() {
                   <div className="flex items-center gap-2">
                     <button
                       type="submit"
-                      className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+                      className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={convertMutation.isPending}
                     >
                       {convertMutation.isPending ? 'Converting…' : 'Convert feature request'}
@@ -317,7 +317,7 @@ export default function AdminSupportTicketDetail() {
                 Internal note (visible to admins only)
               </label>
               <div className="flex items-center gap-3">
-                <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50" disabled={addMessageMutation.isPending}>
+                <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed" disabled={addMessageMutation.isPending}>
                   {addMessageMutation.isPending ? 'Sending…' : 'Post message'}
                 </button>
                 {submitMessage && <p className="text-xs text-muted">{submitMessage}</p>}

@@ -276,7 +276,7 @@ export default function LeagueDetail() {
               <button
                 onClick={() => joinMutation.mutate()}
                 disabled={joinMutation.isPending || (leagueSummary.join_policy === 'invite_code' && !joinCode)}
-                className="w-full px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+                className="w-full px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {leagueSummary.join_policy === 'approval' ? 'Request to join' : 'Join league'}
               </button>
@@ -395,16 +395,16 @@ export default function LeagueDetail() {
               <button
                 onClick={() => { setJoinError(''); joinMutation.mutate() }}
                 disabled={joinMutation.isPending}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
+                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
               >
-                {joinMutation.isPending ? 'Joining...' : 'Join'}
+                {joinMutation.isPending ? 'Joining…' : 'Join'}
               </button>
             )}
             {joinPolicy === 'approval' && (
               <button
                 onClick={() => { setJoinError(''); joinMutation.mutate() }}
                 disabled={joinMutation.isPending}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
+                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
               >
                 {joinMutation.isPending ? 'Requesting...' : 'Request to Join'}
               </button>
@@ -423,9 +423,9 @@ export default function LeagueDetail() {
               <button
                 onClick={() => { setJoinError(''); joinMutation.mutate() }}
                 disabled={joinMutation.isPending || !joinCode.trim()}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
+                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
               >
-                {joinMutation.isPending ? 'Joining...' : 'Join'}
+                {joinMutation.isPending ? 'Joining…' : 'Join'}
               </button>
             </div>
           )}

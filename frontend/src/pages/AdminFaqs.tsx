@@ -19,7 +19,7 @@ const inputCls =
 const textareaCls = `${inputCls} min-h-[260px] font-mono`
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const btnPrimary =
-  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary =
   'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const btnDanger =
@@ -323,7 +323,7 @@ export default function AdminFaqs() {
         </aside>
 
         <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
-          {listQuery.isLoading && <p className="text-sm text-muted">Loading...</p>}
+          {listQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {serverError && <p className="text-sm text-[var(--error-text)]">{serverError}</p>}
@@ -404,10 +404,10 @@ export default function AdminFaqs() {
               >
                 {creating
                   ? createMutation.isPending
-                    ? 'Creating...'
+                    ? 'Creating…'
                     : 'Create FAQ'
                   : updateMutation.isPending
-                    ? 'Saving...'
+                    ? 'Saving…'
                     : 'Save FAQ'}
               </button>
               {!creating && selectedId && (

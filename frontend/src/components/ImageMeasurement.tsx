@@ -105,9 +105,18 @@ export default function ImageMeasurement({
   const [manualShotCount, setManualShotCount] = useState('')
   const [detectStatus, setDetectStatus] = useState<string | null>(null)
 
-  const rawDistance = Number(distanceToTarget) || distanceM
-  const effectiveDistanceM = distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance
-  const displayDistance = distanceUnit === 'yards' ? rawDistance : rawDistance
+  // parseFloat handles edge cases that `Number()` silently coerces:
+  // `Number('')` is 0 (|| fallback kicks in, masking an empty field);
+  // `Number(' ')` is 0; `Number('abc')` is NaN (falsy, also silently falls
+  // back). parseFloat + isFinite distinguishes "empty/garbage" from "0" so
+  // we can gate the flow instead of saving a silent fallback distance.
+  const parsedDistance = parseFloat(distanceToTarget)
+  const isValidDistance = Number.isFinite(parsedDistance) && parsedDistance > 0
+  const rawDistance = isValidDistance ? parsedDistance : 0
+  const effectiveDistanceM = isValidDistance
+    ? (distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance)
+    : 0
+  const displayDistance = rawDistance
   const distanceLabel = distanceUnit === 'yards' ? 'yd' : 'm'
   const pelletDiameterMM = CALIBER_MAP[markerSize] ?? (Number(markerSize) || 4.5)
 
@@ -251,13 +260,13 @@ export default function ImageMeasurement({
   }, [centroid, impacts, pixelsPerMM])
 
   const groupResult = useMemo(() => computeGroupSizeFromImpacts(impacts, pixelsPerMM, pelletDiameterMM), [impacts, pixelsPerMM, pelletDiameterMM])
-  const groupSizeMOA = groupResult ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
+  const groupSizeMOA = groupResult && isValidDistance ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
   const groupSizeRaw = groupResult?.mm ?? null
   const manualGroupSizeMM = useMemo(() => {
     if (!lineStart || !lineEnd || pixelsPerMM <= 0) return null
     return Math.hypot(lineEnd.x - lineStart.x, lineEnd.y - lineStart.y) / pixelsPerMM
   }, [lineStart, lineEnd, pixelsPerMM])
-  const manualGroupSizeMOA = manualGroupSizeMM !== null ? Math.round(mmToMOA(manualGroupSizeMM, effectiveDistanceM) * 10) / 10 : null
+  const manualGroupSizeMOA = manualGroupSizeMM !== null && isValidDistance ? Math.round(mmToMOA(manualGroupSizeMM, effectiveDistanceM) * 10) / 10 : null
   const manualMidpoint = useMemo(() => {
     if (!lineStart || !lineEnd) return null
     return { x: (lineStart.x + lineEnd.x) / 2, y: (lineStart.y + lineEnd.y) / 2 }
@@ -271,10 +280,10 @@ export default function ImageMeasurement({
   const referencePoint = measureMethod === 'manual_line' ? manualMidpoint : centroid
   const elevationMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (aimPoint.y - referencePoint.y) / pixelsPerMM : null
   const windageMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (referencePoint.x - aimPoint.x) / pixelsPerMM : null
-  const elevMOA = elevationMM !== null ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
-  const windMOA = windageMM !== null ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
-  const elevMRAD = elevationMM !== null ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
-  const windMRAD = windageMM !== null ? Math.round(mmToMRAD(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const elevMOA = elevationMM !== null && isValidDistance ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMOA = windageMM !== null && isValidDistance ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const elevMRAD = elevationMM !== null && isValidDistance ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMRAD = windageMM !== null && isValidDistance ? Math.round(mmToMRAD(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
 
 
   // ── Drawing ────────────────────────────────────────────────────────
@@ -549,6 +558,10 @@ export default function ImageMeasurement({
 
   const handleDone = useCallback(async () => {
     if (!pointA || pixelsPerMM <= 0) { onClose(); return }
+    if (!isValidDistance) {
+      toast('Enter a distance greater than 0', 'error')
+      return
+    }
     const pd = pointB ? Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y) : 0
     const refMM = calibUnit === 'cm' ? Number(calibDistance) * 10 : Number(calibDistance)
     const payload: CreateMeasurementPayload = {
@@ -598,7 +611,7 @@ export default function ImageMeasurement({
       const blob = await generateAnnotatedBlob()
       onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
     } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit }) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit, aimPoint, rotation, markerSize, effectiveDistanceM, displayUnit, lineStart, lineEnd])
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit, aimPoint, rotation, markerSize, effectiveDistanceM, displayUnit, lineStart, lineEnd, isValidDistance])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
@@ -629,7 +642,7 @@ export default function ImageMeasurement({
     else if (step === 5) { setStep(4); setSubMode('add_impact') }
   }
 
-  const inputCls = 'w-full bg-gray-100 border border-gray-300 rounded px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-blue-400'
+  const inputCls = 'w-full bg-surface-hover border border-subtle rounded px-3 py-2 text-primary text-sm focus:outline-none focus:border-[var(--brass)]'
 
   // ── Stats Overlay ──────────────────────────────────────────────────
   const unitToggle = (
@@ -654,21 +667,21 @@ export default function ImageMeasurement({
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#1a1a1a]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-page">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#2a2a2a] border-b border-white/10">
-        <button onClick={goBack} className="text-white p-1"><ArrowLeft size={20} /></button>
-        <span className="text-white font-medium text-sm tracking-wide">{stepTitles[step]}</span>
+      <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-subtle">
+        <button onClick={goBack} className="text-primary p-1"><ArrowLeft size={20} /></button>
+        <span className="text-primary font-medium text-sm tracking-wide">{stepTitles[step]}</span>
         <div className="flex items-center gap-2">
           {existingMeasurement && (
             <button
               onClick={handleReset}
-              className="text-white/80 hover:text-white text-[11px] tracking-widest uppercase px-2 py-1 rounded border border-white/20"
+              className="text-secondary hover:text-primary text-[11px] tracking-widest uppercase px-2 py-1 rounded border border-subtle"
             >
               Reset
             </button>
           )}
-          <button onClick={onClose} className="text-white p-1"><XIcon size={20} /></button>
+          <button onClick={onClose} className="text-primary p-1"><XIcon size={20} /></button>
         </div>
       </div>
 
@@ -688,9 +701,9 @@ export default function ImageMeasurement({
       </div>
 
       {/* Bottom Panel */}
-      <div className="bg-white rounded-t-xl px-4 pb-4 pt-0 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+      <div className="bg-surface rounded-t-xl px-4 pb-4 pt-0 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
         {/* Title bar */}
-        <div className="bg-[#8B7355] text-white text-center py-2.5 text-xs font-semibold tracking-widest uppercase -mx-4 rounded-t-xl mb-3">
+        <div className="bg-[var(--brass)] text-white text-center py-2.5 text-xs font-semibold tracking-widest uppercase -mx-4 rounded-t-xl mb-3">
           {step === 1 && 'SET AIM POINT'}
           {step === 2 && 'SET MEASUREMENT POINTS'}
           {step === 3 && 'TARGET DISTANCE AND MARKER SIZE'}
@@ -702,10 +715,10 @@ export default function ImageMeasurement({
         {step === 1 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setRotation(r => ((r + 270) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">
+              <button onClick={() => setRotation(r => ((r + 270) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-subtle text-secondary text-sm font-medium">
                 <RotateCcw size={16} /> ROTATE
               </button>
-              <button onClick={() => setRotation(r => ((r + 90) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">
+              <button onClick={() => setRotation(r => ((r + 90) % 360) as number)} className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-subtle text-secondary text-sm font-medium">
                 <RotateCw size={16} /> ROTATE
               </button>
             </div>
@@ -713,7 +726,7 @@ export default function ImageMeasurement({
               <button onClick={() => { setSubMode('set_aim'); fitToView() }} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium">
                 <Maximize size={16} /> SET
               </button>
-              <button onClick={goNext} disabled={!aimPoint} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+              <button onClick={goNext} disabled={!aimPoint} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                 {'>'} NEXT
               </button>
             </div>
@@ -724,23 +737,23 @@ export default function ImageMeasurement({
         {step === 2 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setSubMode('set_point_a')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_a' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+              <button onClick={() => setSubMode('set_point_a')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_a' ? 'bg-blue-500 text-white border-blue-500' : 'border-subtle text-secondary'}`}>
                 SET POINT A {pointA && '\u2713'}
               </button>
-              <button onClick={() => setSubMode('set_point_b')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_b' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+              <button onClick={() => setSubMode('set_point_b')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'set_point_b' ? 'bg-blue-500 text-white border-blue-500' : 'border-subtle text-secondary'}`}>
                 SET POINT B {pointB && '\u2713'}
               </button>
             </div>
-            <p className="text-gray-500 text-xs text-center">Distance between points ({calibUnit})</p>
+            <p className="text-muted text-xs text-center">Distance between points ({calibUnit})</p>
             <div className="flex gap-2">
               <input type="number" step="0.1" min="0" value={calibDistance} onChange={e => setCalibDistance(e.target.value)} placeholder={calibUnit === 'cm' ? '5.5' : '55'} className={inputCls} />
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
-                <button onClick={() => { setCalibUnit('cm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>cm</button>
-                <button onClick={() => { setCalibUnit('mm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>mm</button>
+              <div className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
+                <button onClick={() => { setCalibUnit('cm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>cm</button>
+                <button onClick={() => { setCalibUnit('mm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>mm</button>
               </div>
-              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium disabled:opacity-40">SET</button>
+              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-subtle text-secondary text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">SET</button>
             </div>
-            <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+            <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
               {'>'} NEXT
             </button>
           </div>
@@ -749,22 +762,25 @@ export default function ImageMeasurement({
         {/* Step 3 controls */}
         {step === 3 && (
           <div className="space-y-3">
-            <p className="text-gray-500 text-xs text-center">Distance to target ({distanceUnit === 'yards' ? 'yd' : 'm'})</p>
+            <p className="text-muted text-xs text-center">Distance to target ({distanceUnit === 'yards' ? 'yd' : 'm'})</p>
             <div className="flex gap-2">
               <input type="number" step="0.1" min="0" value={distanceToTarget} onChange={e => setDistanceToTarget(e.target.value)} className={inputCls} />
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0">
-                <button onClick={() => { if (distanceUnit !== 'meters') { setDistanceUnit('meters'); setDistanceToTarget(String(Math.round(yardsToMeters(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'meters' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>m</button>
-                <button onClick={() => { if (distanceUnit !== 'yards') { setDistanceUnit('yards'); setDistanceToTarget(String(Math.round(metersToYards(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'yards' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>yd</button>
+              <div className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
+                <button onClick={() => { if (distanceUnit !== 'meters') { setDistanceUnit('meters'); setDistanceToTarget(String(Math.round(yardsToMeters(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'meters' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>m</button>
+                <button onClick={() => { if (distanceUnit !== 'yards') { setDistanceUnit('yards'); setDistanceToTarget(String(Math.round(metersToYards(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'yards' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>yd</button>
               </div>
             </div>
-            <p className="text-gray-500 text-xs text-center">Impact marker size</p>
+            <p className="text-muted text-xs text-center">Impact marker size</p>
             <div className="flex gap-2">
               <select value={markerSize} onChange={e => setMarkerSize(e.target.value)} className={inputCls}>
                 {Object.keys(CALIBER_MAP).map(k => <option key={k} value={k}>{k}</option>)}
               </select>
-              <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
+              <button className="px-6 py-2 rounded-lg border border-subtle text-secondary text-sm font-medium">SET</button>
             </div>
-            <button onClick={goNext} disabled={!distanceToTarget || Number(distanceToTarget) <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+            {!isValidDistance && (
+              <p role="alert" className="text-[11px] text-red-400">Enter a distance greater than 0.</p>
+            )}
+            <button onClick={goNext} disabled={!isValidDistance} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
               {'>'} NEXT
             </button>
           </div>
@@ -774,25 +790,25 @@ export default function ImageMeasurement({
         {step === 4 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setMeasurementMethod('impacts')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'impacts' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+              <button onClick={() => setMeasurementMethod('impacts')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'impacts' ? 'bg-blue-500 text-white border-blue-500' : 'border-subtle text-secondary'}`}>
                 MARK IMPACTS
               </button>
-              <button onClick={() => setMeasurementMethod('manual_line')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'manual_line' ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-300 text-gray-700'}`}>
+              <button onClick={() => setMeasurementMethod('manual_line')} className={`py-2.5 rounded-lg text-sm font-medium border ${measureMethod === 'manual_line' ? 'bg-blue-500 text-white border-blue-500' : 'border-subtle text-secondary'}`}>
                 DRAW LINE
               </button>
             </div>
 
             {measureMethod === 'impacts' && (
               <>
-              <button onClick={() => { handleAutoDetect(); setSubMode('add_impact') }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#8B7355] text-white text-sm font-medium">
+              <button onClick={() => { handleAutoDetect(); setSubMode('add_impact') }} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--brass)] text-white text-sm font-medium">
                 <Scan size={16} /> AUTO DETECT
               </button>
-              {detectStatus && <p className="text-xs text-center text-gray-500">{detectStatus}</p>}
+              {detectStatus && <p className="text-xs text-center text-muted">{detectStatus}</p>}
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                <button onClick={() => setSubMode('add_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'add_impact' ? 'bg-green-500 text-white' : 'border border-subtle text-secondary'}`}>
                   ADD
                 </button>
-                <button onClick={() => setSubMode('remove_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'remove_impact' ? 'bg-red-500 text-white' : 'border border-gray-300 text-gray-700'}`}>
+                <button onClick={() => setSubMode('remove_impact')} className={`py-2.5 rounded-lg text-sm font-medium ${subMode === 'remove_impact' ? 'bg-red-500 text-white' : 'border border-subtle text-secondary'}`}>
                   REMOVE
                 </button>
               </div>
@@ -802,14 +818,14 @@ export default function ImageMeasurement({
             {measureMethod === 'manual_line' && (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setSubMode('draw_line_start')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_start' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}>
+                  <button onClick={() => setSubMode('draw_line_start')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_start' ? 'bg-green-500 text-white border-green-500' : 'border-subtle text-secondary'}`}>
                     SET START {lineStart && '\u2713'}
                   </button>
-                  <button onClick={() => setSubMode('draw_line_end')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_end' ? 'bg-green-500 text-white border-green-500' : 'border-gray-300 text-gray-700'}`}>
+                  <button onClick={() => setSubMode('draw_line_end')} className={`py-2.5 rounded-lg text-sm font-medium border ${subMode === 'draw_line_end' ? 'bg-green-500 text-white border-green-500' : 'border-subtle text-secondary'}`}>
                     SET END {lineEnd && '\u2713'}
                   </button>
                 </div>
-                <p className="text-xs text-gray-600 text-center">
+                <p className="text-xs text-muted text-center">
                   Group size: {manualGroupSizeMM !== null ? `${fmtLen(manualGroupSizeMM)} ${displayUnit} (${manualGroupSizeMOA ?? '—'} MOA)` : '—'}
                 </p>
                 <input
@@ -827,7 +843,7 @@ export default function ImageMeasurement({
             <button
               onClick={goNext}
               disabled={measureMethod === 'impacts' ? impacts.length < 2 : !(lineStart && lineEnd && Number(manualShotCount) > 0)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {'>'} ANALYZE
             </button>
@@ -837,30 +853,30 @@ export default function ImageMeasurement({
         {/* Step 5 controls */}
         {step === 5 && (
           <div className="space-y-3">
-            <div className="bg-[#2a2a2a] border border-white/10 rounded-xl p-4 space-y-3">
+            <div className="bg-surface border border-subtle rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-white font-semibold text-sm">Group Analysis Results</h2>
-                <div className="flex rounded border border-white/20 overflow-hidden">
-                  <button onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>mm</button>
-                  <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}>cm</button>
+                <h2 className="text-primary font-semibold text-sm">Group Analysis Results</h2>
+                <div className="flex rounded border border-subtle overflow-hidden">
+                  <button onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-muted'}`}>mm</button>
+                  <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-muted'}`}>cm</button>
                 </div>
               </div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Shots:</span><span className="text-white font-semibold">{analysisShotCount}</span></div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Distance:</span><span className="text-white font-semibold">{displayDistance}{distanceLabel}</span></div>
-              <div className="h-px bg-white/10 my-1" />
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{analysisGroupSizeMOA !== null ? `${analysisGroupSizeMOA} MOA` : '—'}</span></div>
-              <div className="flex justify-between text-xs"><span className="text-gray-400">Group Size:</span><span className="text-white font-bold">{analysisGroupSizeMM !== null ? `${fmtLen(analysisGroupSizeMM)} ${displayUnit}` : '—'}</span></div>
-              {measureMethod === 'impacts' && <div className="flex justify-between text-xs"><span className="text-gray-400">Mean Radius:</span><span className="text-white font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)} ${displayUnit}` : '—'}</span></div>}
+              <div className="flex justify-between text-xs"><span className="text-muted">Shots:</span><span className="text-primary font-semibold">{analysisShotCount}</span></div>
+              <div className="flex justify-between text-xs"><span className="text-muted">Distance:</span><span className="text-primary font-semibold">{displayDistance}{distanceLabel}</span></div>
+              <div className="h-px bg-[var(--border-subtle)] my-1" />
+              <div className="flex justify-between text-xs"><span className="text-muted">Group Size:</span><span className="text-primary font-bold">{analysisGroupSizeMOA !== null ? `${analysisGroupSizeMOA} MOA` : '—'}</span></div>
+              <div className="flex justify-between text-xs"><span className="text-muted">Group Size:</span><span className="text-primary font-bold">{analysisGroupSizeMM !== null ? `${fmtLen(analysisGroupSizeMM)} ${displayUnit}` : '—'}</span></div>
+              {measureMethod === 'impacts' && <div className="flex justify-between text-xs"><span className="text-muted">Mean Radius:</span><span className="text-primary font-semibold">{meanRadiusMM !== null ? `${fmtLen(meanRadiusMM)} ${displayUnit}` : '—'}</span></div>}
             </div>
 
             <button
               onClick={handleDone}
               disabled={isSaving}
-              className="w-full py-3 rounded-lg bg-blue-500 text-white font-semibold text-sm tracking-wider uppercase disabled:opacity-60"
+              className="w-full py-3 rounded-lg bg-blue-500 text-white font-semibold text-sm tracking-wider uppercase disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? 'SAVING...' : 'DONE'}
+              {isSaving ? 'SAVING…' : 'DONE'}
             </button>
-            {saveError && <p className="text-xs text-red-600 text-center">{saveError}</p>}
+            {saveError && <p className="text-xs text-[var(--error-text)] text-center">{saveError}</p>}
           </div>
         )}
       </div>

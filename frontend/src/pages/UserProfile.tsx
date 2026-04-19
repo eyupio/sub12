@@ -154,7 +154,7 @@ export default function UserProfile() {
         <button
           onClick={() => setConfirmUnfollow(true)}
           disabled={followMutation.isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:border-[var(--error-text)]/40 hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:border-[var(--error-text)]/40 hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <UserMinus size={12} />
           Unfollow
@@ -166,7 +166,7 @@ export default function UserProfile() {
       return (
         <button
           disabled
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted disabled:opacity-60"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Clock size={12} />
           Requested
@@ -178,7 +178,7 @@ export default function UserProfile() {
       <button
         onClick={() => followMutation.mutate()}
         disabled={followMutation.isPending}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-40"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <UserPlus size={12} />
         {profile.is_private && !profile.is_following ? 'Request' : 'Follow'}
@@ -278,7 +278,7 @@ export default function UserProfile() {
                             <button
                               onClick={() => blockMutation.mutate()}
                               disabled={blockMutation.isPending}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] tracking-widest uppercase text-[var(--error-text)] hover:bg-surface-hover transition-colors disabled:opacity-40"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] tracking-widest uppercase text-[var(--error-text)] hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <ShieldOff size={12} />
                               {profile.is_blocked ? 'Unblock' : 'Block'}

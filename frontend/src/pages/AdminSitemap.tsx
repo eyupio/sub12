@@ -10,7 +10,7 @@ const engines = [
 ] as const
 
 const btnPrimary =
-  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity inline-flex items-center gap-2'
+  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity inline-flex items-center gap-2'
 
 function parseError(error: unknown) {
   if (!(error instanceof Error)) return 'Request failed.'

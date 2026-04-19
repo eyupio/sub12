@@ -54,7 +54,7 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={isPending}
-        className="relative w-10 h-10 rounded overflow-hidden border border-subtle hover:border-[var(--brass)]/50 transition-colors shrink-0 disabled:opacity-50"
+        className="relative w-10 h-10 rounded overflow-hidden border border-subtle hover:border-[var(--brass)]/50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Upload image"
       >
         {imageUrl ? (
@@ -176,7 +176,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
           </div>
           {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save rifle. Please try again.</p>}
           <div className="flex gap-2">
-            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.make || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.make || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
               {mutation.isPending ? 'Saving…' : 'Add Rifle'}
             </button>
             <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
@@ -239,7 +239,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
         </div>
         {updateMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save. Please try again.</p>}
         <div className="flex gap-2">
-          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.make || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40">
+          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.make || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
           </button>
           <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
@@ -424,7 +424,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
           </Field>
           {mutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save pellet. Please try again.</p>}
           <div className="flex gap-2">
-            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.brand || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+            <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !form.brand || !form.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
               {mutation.isPending ? 'Saving…' : 'Add Pellet'}
             </button>
             <button onClick={onDone} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
@@ -491,7 +491,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
         </Field>
         {updateMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to save. Please try again.</p>}
         <div className="flex gap-2">
-          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.brand || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40">
+          <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.brand || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
           </button>
           <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">

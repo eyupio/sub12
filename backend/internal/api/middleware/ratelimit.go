@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -19,6 +20,7 @@ type RateLimitConfig struct {
 	ReportPerMin        int
 	LikePerMin          int
 	SocialTogglePerMin  int
+	AuthPerMin          int
 }
 
 // RateLimiter is a simple token-bucket per (bucket, user) that prefers Redis
@@ -55,16 +57,25 @@ func (rl *RateLimiter) Limit(bucket string) func(http.Handler) http.Handler {
 				return
 			}
 			userID, ok := UserIDFromContext(r.Context())
-			if !ok {
-				// Not authenticated — the route will reject anyway, but keep
-				// per-IP? For now pass through.
-				next.ServeHTTP(w, r)
-				return
+			var key string
+			if ok {
+				key = fmt.Sprintf("rl:%s:u:%s", bucket, userID)
+			} else {
+				// Unauthenticated (e.g. /auth/*) — key by client IP. RealIP
+				// middleware populates r.RemoteAddr from X-Forwarded-For when
+				// present, so we inherit the LB's trust configuration.
+				key = fmt.Sprintf("rl:%s:ip:%s", bucket, clientIP(r))
 			}
-			key := fmt.Sprintf("rl:%s:%s", bucket, userID)
 			allowed, retryAfter := rl.check(r, key, limit)
 			if !allowed {
-				w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+				// Ceiling-divide to seconds — a sub-second TTL would
+				// otherwise round down to 0 and send the client into an
+				// immediate spin-retry.
+				secs := int((retryAfter + time.Second - 1) / time.Second)
+				if secs < 1 {
+					secs = 1
+				}
+				w.Header().Set("Retry-After", strconv.Itoa(secs))
 				http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
 				return
 			}
@@ -87,8 +98,20 @@ func (rl *RateLimiter) bucketLimit(bucket string) int {
 		return rl.cfg.LikePerMin
 	case "social_toggle":
 		return rl.cfg.SocialTogglePerMin
+	case "auth":
+		return rl.cfg.AuthPerMin
 	}
 	return 0
+}
+
+// clientIP extracts the best-effort client IP from the request. RealIP
+// middleware rewrites r.RemoteAddr from X-Forwarded-For / X-Real-IP when
+// configured, so we inherit the LB's trust configuration here.
+func clientIP(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func (rl *RateLimiter) check(r *http.Request, key string, limit int) (bool, time.Duration) {
@@ -96,10 +119,12 @@ func (rl *RateLimiter) check(r *http.Request, key string, limit int) (bool, time
 		ctx := r.Context()
 		count, err := rl.rdb.Incr(ctx, key).Result()
 		if err == nil {
-			if count == 1 {
-				// first increment — start the 60s window
-				_ = rl.rdb.Expire(ctx, key, time.Minute).Err()
-			}
+			// ExpireNX is idempotent: sets the TTL only if the key has no
+			// existing expiry. Unlike the prior `if count == 1` branch it
+			// recovers when the initial Expire failed or when the key was
+			// seeded without a TTL (Redis debugging, DUMP/RESTORE, etc.),
+			// preventing the key from becoming a permanent counter.
+			_ = rl.rdb.ExpireNX(ctx, key, time.Minute).Err()
 			if int(count) > limit {
 				ttl, _ := rl.rdb.TTL(ctx, key).Result()
 				if ttl <= 0 {

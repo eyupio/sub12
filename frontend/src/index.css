@@ -129,6 +129,17 @@
     position: relative;
     z-index: 1;
   }
+
+  /* Keyboard focus ring. Most components use `focus:outline-none` plus a
+     border-color change, which satisfies pointer focus but leaves keyboard
+     users without a visible indicator (WCAG 2.4.7). Adding a global
+     focus-visible rule restores the ring only when focus came from
+     keyboard/AT, without disturbing pointer-focus styling. */
+  :focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 }
 
 @keyframes slide-in {

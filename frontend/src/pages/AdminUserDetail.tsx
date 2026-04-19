@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/auth'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnDanger = 'border border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-bg)] text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
 
@@ -47,7 +47,7 @@ function ConfirmDeleteModal({ user, onConfirm, onCancel, isPending }: {
           <button onClick={onCancel} className="border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors">
             Cancel
           </button>
-          <button onClick={onConfirm} disabled={isPending} className="bg-[var(--error-text)] hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity">
+          <button onClick={onConfirm} disabled={isPending} className="bg-[var(--error-text)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity">
             {isPending ? 'Deleting…' : 'Delete'}
           </button>
         </div>

@@ -186,7 +186,7 @@ export default function FollowManagement() {
           <button
             onClick={() => setConfirmBulk(true)}
             disabled={selected.size === 0 || bulkUnfollowMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40 disabled:hover:bg-[var(--brass)]/20"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--brass)]/20"
           >
             <UserMinus size={12} />
             Unfollow{selected.size > 0 ? ` (${selected.size})` : ''}
@@ -251,7 +251,7 @@ export default function FollowManagement() {
                   <button
                     onClick={() => setConfirmSingle(item)}
                     disabled={unfollowMutation.isPending}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/40 transition-colors disabled:opacity-40"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <UserMinus size={11} />
                     Unfollow

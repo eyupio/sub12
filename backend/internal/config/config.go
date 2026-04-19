@@ -62,6 +62,10 @@ type Config struct {
 	RateLimitReportPerMin       int  `envconfig:"RATELIMIT_REPORT_PER_MIN" default:"5"`
 	RateLimitLikePerMin         int  `envconfig:"RATELIMIT_LIKE_PER_MIN" default:"60"`
 	RateLimitSocialTogglePerMin int  `envconfig:"RATELIMIT_SOCIAL_TOGGLE_PER_MIN" default:"30"`
+	// Auth bucket applies to password-bearing endpoints (login, register,
+	// forgot/reset password). Keyed by client IP rather than user ID since
+	// the request is unauthenticated.
+	RateLimitAuthPerMin int `envconfig:"RATELIMIT_AUTH_PER_MIN" default:"10"`
 
 	// Moderation flag grace window. When a comment or post is flagged by an
 	// admin, the author gets this long to amend (edit) before the sweeper

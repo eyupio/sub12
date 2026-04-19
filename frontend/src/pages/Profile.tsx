@@ -68,7 +68,7 @@ function AvatarUpload() {
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={avatarMutation.isPending}
-        className="relative w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors group disabled:opacity-50"
+        className="relative w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Change profile picture"
       >
         {user?.avatar_url ? (
@@ -139,7 +139,7 @@ function FollowRequestsSection() {
               <button
                 onClick={() => decideMutation.mutate({ id: req.id, decision: 'accepted' })}
                 disabled={decideMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <UserCheck size={11} />
                 Accept
@@ -147,7 +147,7 @@ function FollowRequestsSection() {
               <button
                 onClick={() => decideMutation.mutate({ id: req.id, decision: 'rejected' })}
                 disabled={decideMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
+                className="flex items-center gap-1 px-2 py-1 rounded border border-subtle text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <UserX size={11} />
                 Decline
@@ -232,7 +232,7 @@ function PrivacySettings() {
                 type="button"
                 onClick={() => mutation.mutate({ default_score_visibility: value })}
                 disabled={mutation.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   (user?.default_score_visibility ?? 'public') === value
                     ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                     : 'border-subtle text-muted hover:text-secondary'
@@ -322,7 +322,7 @@ function UnitPreferences() {
                 type="button"
                 onClick={() => mutation.mutate({ default_distance_unit: value })}
                 disabled={mutation.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   (user?.default_distance_unit ?? 'meters') === value
                     ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                     : 'border-subtle text-muted hover:text-secondary'
@@ -348,7 +348,7 @@ function UnitPreferences() {
                 type="button"
                 onClick={() => mutation.mutate({ default_measurement_unit: value })}
                 disabled={mutation.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   (user?.default_measurement_unit ?? 'cm') === value
                     ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                     : 'border-subtle text-muted hover:text-secondary'
@@ -412,7 +412,7 @@ function RegionalPreferences() {
                 type="button"
                 onClick={() => mutation.mutate({ date_format: value })}
                 disabled={mutation.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   currentDateFormat === value
                     ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                     : 'border-subtle text-muted hover:text-secondary'
@@ -438,7 +438,7 @@ function RegionalPreferences() {
                 type="button"
                 onClick={() => mutation.mutate({ time_format: v })}
                 disabled={mutation.isPending}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   currentTimeFormat === v
                     ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                     : 'border-subtle text-muted hover:text-secondary'
@@ -459,7 +459,7 @@ function RegionalPreferences() {
             value={currentTimezone}
             onChange={(e) => mutation.mutate({ timezone: e.target.value })}
             disabled={mutation.isPending}
-            className="w-full max-w-xs px-3 py-1.5 rounded border border-subtle bg-surface text-secondary text-sm disabled:opacity-40"
+            className="w-full max-w-xs px-3 py-1.5 rounded border border-subtle bg-surface text-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {!timezones.includes(currentTimezone) && (
               <option value={currentTimezone}>{currentTimezone}</option>
@@ -716,7 +716,7 @@ export default function Profile() {
                   <button
                     onClick={handleSave}
                     disabled={mutation.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Check size={13} />
                     {mutation.isPending ? 'Saving…' : 'Save'}
@@ -724,7 +724,7 @@ export default function Profile() {
                   <button
                     onClick={cancelEdit}
                     disabled={mutation.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <X size={13} />
                     Cancel
@@ -788,7 +788,7 @@ export default function Profile() {
               <button
                 onClick={() => emailChangeMutation.mutate(newEmail)}
                 disabled={emailChangeMutation.isPending || !newEmail.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check size={13} />
                 {emailChangeMutation.isPending ? 'Sending…' : 'Send Confirmation'}

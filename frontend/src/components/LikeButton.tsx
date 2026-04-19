@@ -65,7 +65,7 @@ export function LikeButton({ targetId, targetType, initialLiked, initialCount, s
     <button
       onClick={toggle}
       disabled={pending}
-      className="flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50"
+      className="flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       aria-label={liked ? 'Unlike' : 'Like'}
     >
       <Heart

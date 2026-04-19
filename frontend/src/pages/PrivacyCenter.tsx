@@ -193,7 +193,7 @@ export default function PrivacyCenter() {
         <button
           onClick={() => updateMutation.mutate()}
           disabled={updateMutation.isPending}
-          className="px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+          className="px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {updateMutation.isPending ? 'Saving…' : 'Save settings'}
         </button>
@@ -264,7 +264,7 @@ export default function PrivacyCenter() {
         <button
           onClick={() => exportMutation.mutate()}
           disabled={exportMutation.isPending}
-          className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-40"
+          className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {exportMutation.isPending ? 'Preparing…' : 'Download my data'}
         </button>

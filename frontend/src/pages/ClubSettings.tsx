@@ -17,7 +17,7 @@ const TIMEZONES: string[] = (() => {
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 
 // ---------------------------------------------------------------------------
 // Club Image Section
@@ -58,7 +58,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={mutation.isPending}
-          className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50"
+          className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Upload club image"
         >
           {club.image_url ? (
@@ -74,7 +74,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
             {club.image_url ? 'Click to change image' : 'Add a profile picture for this club'}
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
-          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading...</p>}
+          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading…</p>}
           {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">{mutation.error instanceof Error ? mutation.error.message : 'Upload failed. Please try again.'}</p>}
         </div>
       </div>
@@ -136,7 +136,7 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
       </div>
 
       <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary}>
-        {mutation.isPending ? 'Saving...' : 'Save'}
+        {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
     </div>
   )
@@ -185,7 +185,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ type: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.type === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -211,7 +211,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ join_policy: value })}
-              className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.join_policy === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -237,7 +237,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               onClick={() => regenMutation.mutate()}
               disabled={regenMutation.isPending}
-              className="text-muted hover:text-secondary transition-colors disabled:opacity-40"
+              className="text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Regenerate code"
               aria-label="Regenerate join code"
             >
@@ -257,7 +257,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ post_visibility: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.post_visibility === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -313,7 +313,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ date_format: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -334,7 +334,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ time_format: v })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -428,7 +428,7 @@ function JoinRequestsSection({ clubId }: { clubId: string }) {
             <button
               onClick={() => decideMutation.mutate({ requestId: req.id, decision: 'approved' })}
               disabled={decideMutation.isPending}
-              className="p-1.5 rounded border border-[var(--success-text)]/30 text-[var(--success-text)] hover:bg-[var(--success-text)]/10 transition-colors disabled:opacity-40"
+              className="p-1.5 rounded border border-[var(--success-text)]/30 text-[var(--success-text)] hover:bg-[var(--success-text)]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Approve"
               aria-label={`Approve ${req.display_name ?? 'request'}`}
             >
@@ -437,7 +437,7 @@ function JoinRequestsSection({ clubId }: { clubId: string }) {
             <button
               onClick={() => decideMutation.mutate({ requestId: req.id, decision: 'rejected' })}
               disabled={decideMutation.isPending}
-              className="p-1.5 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 transition-colors disabled:opacity-40"
+              className="p-1.5 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Reject"
               aria-label={`Reject ${req.display_name ?? 'request'}`}
             >
@@ -536,7 +536,7 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
                   <button
                     onClick={() => setConfirmRemove(member.user_id)}
                     disabled={removeMutation.isPending}
-                    className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                    className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Remove member"
                   >
                     <Trash2 size={14} />

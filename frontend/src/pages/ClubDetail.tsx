@@ -71,7 +71,7 @@ function PrivateClubSummary({ clubId }: { clubId: string }) {
           <button
             onClick={() => joinMutation.mutate()}
             disabled={joinMutation.isPending || !joinCode}
-            className="w-full px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+            className="w-full px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {joinMutation.isPending ? 'Joining…' : 'Join with code'}
           </button>
@@ -197,7 +197,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
-          className="p-1.5 rounded text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
+          className="p-1.5 rounded text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Remove member"
           aria-label={`Remove ${member.display_name} from club`}
         >
@@ -428,7 +428,7 @@ export default function ClubDetail() {
               <button
                 onClick={() => { setJoinError(''); joinMutation.mutate() }}
                 disabled={joinMutation.isPending || (needsJoinCode && !joinCodeInput.trim())}
-                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
+                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
               >
                 {joinMutation.isPending ? 'Joining…' : joinLabel}
               </button>
@@ -471,7 +471,7 @@ export default function ClubDetail() {
               <button
                 onClick={() => setConfirmLeave(true)}
                 disabled={leaveMutation.isPending}
-                className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Leave club"
               >
                 <LogOut size={12} />
@@ -627,7 +627,7 @@ export default function ClubDetail() {
               <button
                 type="submit"
                 disabled={!newLeagueName.trim() || createLeagueMutation.isPending}
-                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
+                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
               >
                 {createLeagueMutation.isPending ? 'Creating…' : 'Create'}
               </button>

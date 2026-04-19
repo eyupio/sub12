@@ -196,7 +196,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
           <button
             onClick={() => confirmMutation.mutate()}
             disabled={confirmMutation.isPending}
-            className="bg-[var(--success-text)] hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+            className="bg-[var(--success-text)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
           >
             {confirmMutation.isPending ? 'Confirming…' : 'Confirm Score'}
           </button>
@@ -242,7 +242,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
               <button
                 onClick={() => amendMutation.mutate()}
                 disabled={amendMutation.isPending || !amendScore || !amendX}
-                className="bg-amber-600 dark:bg-amber-500 hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+                className="bg-amber-600 dark:bg-amber-500 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
               >
                 {amendMutation.isPending ? 'Amending…' : 'Submit Amendment'}
               </button>
@@ -262,7 +262,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
               <button
                 onClick={() => rejectMutation.mutate()}
                 disabled={rejectMutation.isPending || !rejectReason.trim()}
-                className="bg-[var(--error-text)] hover:opacity-90 disabled:opacity-50 text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
+                className="bg-[var(--error-text)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-2 px-4 rounded transition-colors"
               >
                 {rejectMutation.isPending ? 'Rejecting…' : 'Submit Rejection'}
               </button>
@@ -424,7 +424,7 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
                   <button
                     onClick={() => updateReplyMutation.mutate({ id: r.id, body: editBody.trim() })}
                     disabled={updateReplyMutation.isPending || !editBody.trim()}
-                    className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                    className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {updateReplyMutation.isPending ? 'Saving…' : 'Save'}
                   </button>
@@ -453,7 +453,7 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
                       <button
                         onClick={() => setConfirmDeleteId(r.id)}
                         disabled={deleteReplyMutation.isPending}
-                        className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                        className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Delete reply"
                         title="Delete reply"
                       >
@@ -498,7 +498,7 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
           <button
             onClick={() => replyMutation.mutate()}
             disabled={replyMutation.isPending || !replyBody.trim()}
-            className="p-1.5 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-40 self-end"
+            className="p-1.5 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-end"
             aria-label="Post reply"
           >
             <Send size={12} />
@@ -650,7 +650,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
                       <button
                         onClick={() => updateMutation.mutate({ id: c.id, body: editBody.trim() })}
                         disabled={updateMutation.isPending || !editBody.trim()}
-                        className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                        className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {updateMutation.isPending ? 'Saving…' : 'Save'}
                       </button>
@@ -691,7 +691,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
                             <button
                               onClick={() => setConfirmDeleteId(c.id)}
                               disabled={deleteMutation.isPending}
-                              className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                              className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               aria-label="Delete comment"
                             >
                               <Trash2 size={12} />
@@ -703,7 +703,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
                             <button
                               onClick={() => unflagMutation.mutate(c.id)}
                               disabled={unflagMutation.isPending}
-                              className="p-1 text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity disabled:opacity-40"
+                              className="p-1 text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                               aria-label="Clear flag"
                               title="Clear flag"
                             >
@@ -782,7 +782,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
           <button
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending || !newBody.trim()}
-            className="p-2 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-40 self-end"
+            className="p-2 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/10 text-[var(--brass)] hover:bg-[var(--brass)]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-end"
             aria-label="Post comment"
           >
             <Send size={14} />
@@ -1030,7 +1030,7 @@ export default function ScoreCardDetail() {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleteMutation.isPending}
-              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete score card"
             >
               <Trash2 size={13} /> Delete
@@ -1173,8 +1173,8 @@ export default function ScoreCardDetail() {
           {updateMutation.isError && <p className="text-[var(--error-text)] text-sm">Failed to save changes. Please try again.</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !editMeta.shot_at} className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
-              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !editMeta.shot_at} className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
+              {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
             <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="px-4 py-2.5 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
           </div>

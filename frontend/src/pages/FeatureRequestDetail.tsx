@@ -123,7 +123,7 @@ export default function FeatureRequestDetail() {
                 <div className="flex items-center gap-3">
                   <button
                     type="submit"
-                    className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+                    className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={addCommentMutation.isPending}
                   >
                     {addCommentMutation.isPending ? 'Posting…' : 'Post comment'}

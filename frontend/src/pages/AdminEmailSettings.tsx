@@ -5,7 +5,7 @@ import { SMTPSettingsFormState, validateSMTPSettingsForm } from './adminEmailVal
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
 function parseError(error: unknown) {
@@ -250,7 +250,7 @@ export default function AdminEmailSettings() {
 
         <div className="flex flex-wrap gap-2">
           <button type="submit" className={btnPrimary} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving...' : 'Save Settings'}
+            {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
           </button>
           <button type="button" className={btnSecondary} disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>
             {testMutation.isPending ? 'Testing...' : 'Test Send'}

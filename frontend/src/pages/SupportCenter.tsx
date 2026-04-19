@@ -170,7 +170,7 @@ export default function SupportCenter() {
           </label>
 
           <div className="flex items-center gap-3">
-            <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50" disabled={createMutation.isPending}>
+            <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed" disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Submitting…' : 'Submit ticket'}
             </button>
             {submitMessage && <p className="text-xs text-muted">{submitMessage}</p>}
