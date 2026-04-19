@@ -44,6 +44,10 @@ export function CatalogSearch<T>({
   }, [query])
 
   useEffect(() => {
+    setOpen(true)
+  }, [items])
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
