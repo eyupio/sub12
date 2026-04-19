@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ChevronLeft, Trophy, ArrowLeftRight, TrendingDown } from 'lucide-react'
+import { AlertCircle, ChevronLeft, Trophy, ArrowLeftRight, TrendingDown } from 'lucide-react'
 import { pelletTestApi, type PelletComparisonData } from '../api/pelletTesting'
 import { gearApi } from '../api/gear'
 
@@ -108,7 +108,11 @@ export default function PelletComparison() {
       )}
 
       {isError && (
-        <p className="text-sm text-[var(--error-text)] text-center py-4">Not enough data to compare. Test both pellets with this rifle first.</p>
+        <div role="status" className="text-center py-12">
+          <AlertCircle size={32} className="mx-auto mb-3 text-muted opacity-30" />
+          <p className="text-sm text-muted">Not enough data to compare</p>
+          <p className="text-[11px] text-muted mt-1">Test both pellets with this rifle first</p>
+        </div>
       )}
 
       {/* Comparison cards */}
