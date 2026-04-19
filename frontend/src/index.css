@@ -5,6 +5,8 @@
 @layer base {
   /* ── Light mode (default) ─────────────────────────────── */
   :root {
+    color-scheme: light;
+
     --gunmetal: #F5F5F0;
     --carbon: #FFFFFF;
     --brass: #B8882C;
@@ -45,6 +47,8 @@
 
   /* ── Dark mode ────────────────────────────────────────── */
   .dark {
+    color-scheme: dark;
+
     --gunmetal: #0C0C0C;
     --carbon: #111111;
     --brass: #D4A44A;
