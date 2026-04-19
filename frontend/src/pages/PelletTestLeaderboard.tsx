@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Trophy, Crosshair } from 'lucide-react'
 import { pelletTestApi, PelletLeaderboardEntry } from '../api/pelletTesting'
@@ -24,9 +24,11 @@ export default function PelletTestLeaderboard() {
   const entries = leaderboardData?.items ?? []
 
   // Auto-select first rifle if only one
-  if (!selectedRifleId && rifles.length === 1) {
-    setSelectedRifleId(rifles[0].id)
-  }
+  useEffect(() => {
+    if (!selectedRifleId && rifles.length === 1) {
+      setSelectedRifleId(rifles[0].id)
+    }
+  }, [rifles, selectedRifleId])
 
   return (
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
