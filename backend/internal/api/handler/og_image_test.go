@@ -3,6 +3,8 @@ package handler
 import (
 	"bytes"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -90,4 +92,32 @@ func TestLeagueMetaLines_PluralisesMembersCorrectly(t *testing.T) {
 	many := &model.League{MemberCount: 8}
 	assert.Equal(t, "1 member", leagueMetaLines(one)[0])
 	assert.Equal(t, "8 members", leagueMetaLines(many)[0])
+}
+
+func TestOGImage_FallbackRedirectIsNotCacheable(t *testing.T) {
+	// A CDN that caches the 302 would keep serving /og-image.png even after a
+	// previously-private entity becomes public again. Insist no-store.
+	h, err := NewOGImage(nil, nil, nil, nil, nil, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	h.redirectDefault(rec, httptest.NewRequest(http.MethodGet, "/og/score-cards/abc.png", nil))
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	assert.Equal(t, "/og-image.png", rec.Header().Get("Location"))
+}
+
+func TestOGImage_SuccessfulPNGCacheWindowIsBounded(t *testing.T) {
+	// The rendered PNG is cached at the edge for 10 minutes so a visibility
+	// flip can't leave a rich preview in circulation for an hour.
+	h, err := NewOGImage(nil, nil, nil, nil, nil, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	h.writePNG(rec, []byte{0x89, 'P', 'N', 'G'})
+
+	assert.Equal(t, "image/png", rec.Header().Get("Content-Type"))
+	assert.Contains(t, rec.Header().Get("Cache-Control"), "max-age=600")
+	assert.Contains(t, rec.Header().Get("Cache-Control"), "stale-while-revalidate")
 }

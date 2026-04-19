@@ -445,7 +445,7 @@ export default function ClubDetail() {
               title="Share club"
               aria-label="Share club"
             >
-              <Share2 size={16} />
+              <Share2 size={18} />
             </button>
             {club.is_admin && (
               <Link

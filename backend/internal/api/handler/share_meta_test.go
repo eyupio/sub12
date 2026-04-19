@@ -119,12 +119,13 @@ func TestScoreCardDescription_RichesWithGear(t *testing.T) {
 	got := scoreCardDescription(card, "John Shooter", rifle, pellet, nil)
 
 	assert.Contains(t, got, "John Shooter")
-	assert.Contains(t, got, "245 (12X)")
+	assert.Contains(t, got, "245 points (12X)")
 	assert.Contains(t, got, "2026-04-18")
 	assert.Contains(t, got, "Birmingham Club")
 	assert.Contains(t, got, "Air Arms S510")
 	assert.Contains(t, got, "JSB Exact 4.52mm")
-	assert.Contains(t, got, "shared via sub-12")
+	// Brand tail removed so first line of the preview card is all signal; og:site_name carries the brand.
+	assert.NotContains(t, got, "shared via sub-12")
 }
 
 func TestScoreCardDescription_IncludesTopAchievements(t *testing.T) {
@@ -147,15 +148,92 @@ func TestScoreCardDescription_MinimalCardDegrades(t *testing.T) {
 	card := &model.ScoreCard{TotalScore: 200, XCount: 0}
 	got := scoreCardDescription(card, "", nil, nil, nil)
 
-	assert.Contains(t, got, "200 (0X)")
-	assert.Contains(t, got, "shared via sub-12")
-	assert.NotContains(t, got, " • Birmingham")
+	// Zero-X omits the "(0X)" noise; title and description both just say "points".
+	assert.Contains(t, got, "200 points")
+	assert.NotContains(t, got, "(0X)")
+	assert.NotContains(t, got, "shared via sub-12")
+}
+
+func TestScoreCardDescription_UsesMiddleDotSeparator(t *testing.T) {
+	// All entity descriptions should use the same " · " (U+00B7) joiner; score
+	// cards previously used " • " (U+2022) which showed up as a second bullet
+	// next to all the others in a unified social feed.
+	card := &model.ScoreCard{TotalScore: 200}
+	got := scoreCardDescription(card, "John", nil, nil, nil)
+
+	assert.Contains(t, got, " · ")
+	assert.NotContains(t, got, " • ")
 }
 
 func TestTruncate_HandlesRunes(t *testing.T) {
 	assert.Equal(t, "abc", truncate("abc", 10))
 	assert.Equal(t, "abcdefgh…", truncate("abcdefghij", 9))
 	assert.Equal(t, "short", truncate("   short   ", 10))
+}
+
+func TestAbsoluteFromRequest_OnlyAcceptsHTTPOrHTTPS(t *testing.T) {
+	// When SITE_URL is empty, absoluteFromRequest falls back to Host + scheme
+	// inference. Only accept canonical schemes so a crafted X-Forwarded-Proto
+	// like "javascript" can't slip into og:url / canonical metadata.
+	s := &ShareMeta{log: zerolog.Nop()} // siteURL intentionally blank
+
+	cases := []struct {
+		name    string
+		header  string
+		expect  string
+	}{
+		{"https forwarded", "https", "https://example.test/x"},
+		{"http forwarded", "http", "http://example.test/x"},
+		{"empty forwarded", "", "http://example.test/x"},
+		{"bogus forwarded", "javascript", "http://example.test/x"},
+		{"mixed case https", "HTTPS", "https://example.test/x"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://example.test/x", nil)
+			if tc.header != "" {
+				req.Header.Set("X-Forwarded-Proto", tc.header)
+			}
+			assert.Equal(t, tc.expect, s.absoluteFromRequest(req))
+		})
+	}
+}
+
+func TestImageAlt_EveryShareTypeProducesNonEmptyAlt(t *testing.T) {
+	// og:image:alt was only populated for score cards; screen readers and
+	// accessibility linters flagged every other share type. Verify each
+	// helper returns descriptive, non-empty text even when metadata is thin.
+	best := 8.42
+	sess := &model.PelletTestSession{
+		Pellet:          &model.Pellet{Brand: "JSB", Model: "Hades"},
+		BestGroupSizeMM: &best,
+	}
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "John Shooter")
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "JSB Hades")
+	assert.Contains(t, pelletTestImageAlt(sess, "John Shooter"), "Best 8.42mm")
+	assert.Contains(t, pelletTestImageAlt(&model.PelletTestSession{}, ""), "Pellet test")
+
+	league := &model.League{Name: "Rotary Shooting League", MemberCount: 12}
+	assert.Contains(t, leagueImageAlt(league), "Rotary Shooting League")
+	assert.Contains(t, leagueImageAlt(league), "12 members")
+
+	club := &model.Club{Name: "Birmingham Club", MemberCount: 1}
+	assert.Contains(t, clubImageAlt(club), "Birmingham Club")
+	assert.Contains(t, clubImageAlt(club), "1 member")
+	assert.NotContains(t, clubImageAlt(club), "1 members")
+
+	profile := &model.PublicProfile{DisplayName: "John Shooter"}
+	assert.Contains(t, userImageAlt(profile), "John Shooter")
+}
+
+func TestFallbackTemplate_IsSafeForOutages(t *testing.T) {
+	// Crawlers landing on the holding page during a cold start must not index
+	// "Getting things ready" as the canonical title. The inline reload must
+	// also be the only retry mechanism — a <meta http-equiv="refresh"> would
+	// combine with the JS reload and hammer the backend from every tab.
+	assert.Contains(t, fallbackTemplate, `name="robots" content="noindex"`)
+	assert.NotContains(t, fallbackTemplate, `http-equiv="refresh"`)
+	assert.Contains(t, fallbackTemplate, "fallbackReloadDelay", "reload should back off across retries")
 }
 
 func TestInjectOG_ReplacesTagsInPlace(t *testing.T) {

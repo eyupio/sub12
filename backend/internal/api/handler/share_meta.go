@@ -70,6 +70,14 @@ func NewShareMeta(
 	siteURL, frontendOrigin string,
 	log zerolog.Logger,
 ) *ShareMeta {
+	trimmedSite := strings.TrimRight(siteURL, "/")
+	if trimmedSite == "" {
+		// absoluteFromRequest falls back to r.Host when siteURL is empty,
+		// which is safe behind a trusted reverse proxy but opens host-header
+		// injection into og:url when no such proxy is in front. Log loudly so
+		// a missing SITE_URL in a non-dev env is hard to miss.
+		log.Warn().Msg("share_meta: SITE_URL not configured; og:url will echo the request Host header — ensure a trusted reverse proxy rewrites Host, or set SITE_URL")
+	}
 	return &ShareMeta{
 		scoreCards:     scoreCards,
 		pelletTest:     pelletTest,
@@ -79,7 +87,7 @@ func NewShareMeta(
 		rifles:         rifles,
 		pellets:        pellets,
 		achievements:   achievements,
-		siteURL:        strings.TrimRight(siteURL, "/"),
+		siteURL:        trimmedSite,
 		siteName:       "SUB12",
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            log,
@@ -141,7 +149,12 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 				og.Title = pelletTestTitle(sess)
 				og.Description = pelletTestDescription(sess, displayName)
 				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
+				og.ImageAlt = pelletTestImageAlt(sess, displayName)
 				og.Type = "article"
+				if displayName != "" {
+					og.AuthorName = displayName
+					og.AuthorURL = s.absolute("/share/users/" + sess.UserID)
+				}
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -159,6 +172,7 @@ func (s *ShareMeta) League() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
 				og.Description = leagueDescription(league)
 				og.Image = s.absolute("/og/leagues/" + id + ".png")
+				og.ImageAlt = leagueImageAlt(league)
 				og.Type = "article"
 			}
 		}
@@ -177,6 +191,7 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
 				og.Description = clubDescription(club)
 				og.Image = s.absolute("/og/clubs/" + id + ".png")
+				og.ImageAlt = clubImageAlt(club)
 				og.Type = "article"
 			}
 		}
@@ -195,6 +210,7 @@ func (s *ShareMeta) User() http.HandlerFunc {
 				og.Title = fmt.Sprintf("%s on sub-12", profile.DisplayName)
 				og.Description = userDescription(profile)
 				og.Image = s.absolute("/og/users/" + id + ".png")
+				og.ImageAlt = userImageAlt(profile)
 				og.Type = "profile"
 			}
 		}
@@ -285,9 +301,18 @@ func (s *ShareMeta) absoluteFromRequest(r *http.Request) string {
 	if s.siteURL != "" {
 		return s.siteURL + r.URL.Path
 	}
+	// Only two valid forwarded schemes; reject anything else so a crafted
+	// X-Forwarded-Proto can't inject something like "javascript" into og:url.
 	scheme := "https"
-	if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" {
-		scheme = "http"
+	if r.TLS == nil {
+		switch strings.ToLower(r.Header.Get("X-Forwarded-Proto")) {
+		case "https":
+			scheme = "https"
+		case "http":
+			scheme = "http"
+		default:
+			scheme = "http"
+		}
 	}
 	return scheme + "://" + r.Host + r.URL.Path
 }
@@ -524,7 +549,11 @@ func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *mode
 	if displayName != "" {
 		parts = append(parts, displayName)
 	}
-	parts = append(parts, fmt.Sprintf("%d (%dX)", card.TotalScore, card.XCount))
+	score := fmt.Sprintf("%d points", card.TotalScore)
+	if card.XCount > 0 {
+		score = fmt.Sprintf("%d points (%dX)", card.TotalScore, card.XCount)
+	}
+	parts = append(parts, score)
 	if card.ShotAt != "" {
 		parts = append(parts, card.ShotAt)
 	}
@@ -550,7 +579,7 @@ func scoreCardDescription(card *model.ScoreCard, displayName string, rifle *mode
 	if names := topAchievementNames(achievements, 2); names != "" {
 		parts = append(parts, names)
 	}
-	return strings.Join(parts, " • ") + " — shared via sub-12."
+	return strings.Join(parts, " · ")
 }
 
 // scoreCardImageAlt builds descriptive alt text used for og:image:alt so
@@ -564,6 +593,36 @@ func scoreCardImageAlt(card *model.ScoreCard, displayName string) string {
 		return fmt.Sprintf("%s — %s on sub-12", displayName, score)
 	}
 	return score + " on sub-12"
+}
+
+// pelletTestImageAlt describes the pellet-test preview card so screen readers
+// parse it as more than just "image". Mirrors scoreCardImageAlt in tone.
+func pelletTestImageAlt(sess *model.PelletTestSession, displayName string) string {
+	label := "Pellet test"
+	if sess.Pellet != nil {
+		if p := strings.TrimSpace(sess.Pellet.Brand + " " + sess.Pellet.Model); p != "" {
+			label = "Pellet test: " + p
+		}
+	}
+	if sess.BestGroupSizeMM != nil {
+		label += fmt.Sprintf(" — Best %.2fmm", *sess.BestGroupSizeMM)
+	}
+	if displayName != "" {
+		return displayName + " — " + label + " on sub-12"
+	}
+	return label + " on sub-12"
+}
+
+func leagueImageAlt(league *model.League) string {
+	return fmt.Sprintf("%s — %d member%s on sub-12", league.Name, league.MemberCount, plural(league.MemberCount))
+}
+
+func clubImageAlt(club *model.Club) string {
+	return fmt.Sprintf("%s — %d member%s on sub-12", club.Name, club.MemberCount, plural(club.MemberCount))
+}
+
+func userImageAlt(profile *model.PublicProfile) string {
+	return fmt.Sprintf("%s on sub-12", profile.DisplayName)
 }
 
 // topAchievementNames returns a comma-joined list of the most recently earned
@@ -619,9 +678,9 @@ func pelletTestDescription(sess *model.PelletTestSession, displayName string) st
 		parts = append(parts, sess.TestDate)
 	}
 	if len(parts) == 0 {
-		return "Pellet testing session shared via sub-12."
+		return "Pellet testing session"
 	}
-	return strings.Join(parts, " · ") + " — shared via sub-12."
+	return strings.Join(parts, " · ")
 }
 
 func leagueDescription(league *model.League) string {
@@ -629,7 +688,7 @@ func leagueDescription(league *model.League) string {
 	if league.Description != nil && strings.TrimSpace(*league.Description) != "" {
 		parts = append(parts, truncate(*league.Description, 160))
 	}
-	return strings.Join(parts, " · ") + " — sub-12 league."
+	return strings.Join(parts, " · ")
 }
 
 func clubDescription(club *model.Club) string {
@@ -637,7 +696,7 @@ func clubDescription(club *model.Club) string {
 	if club.Description != nil && strings.TrimSpace(*club.Description) != "" {
 		parts = append(parts, truncate(*club.Description, 160))
 	}
-	return strings.Join(parts, " · ") + " — sub-12 club."
+	return strings.Join(parts, " · ")
 }
 
 func userDescription(profile *model.PublicProfile) string {
@@ -652,9 +711,9 @@ func userDescription(profile *model.PublicProfile) string {
 		parts = append(parts, truncate(*profile.Bio, 160))
 	}
 	if len(parts) == 0 {
-		return fmt.Sprintf("%s's profile on sub-12.", profile.DisplayName)
+		return fmt.Sprintf("%s's profile", profile.DisplayName)
 	}
-	return strings.Join(parts, " · ") + " — on sub-12."
+	return strings.Join(parts, " · ")
 }
 
 func plural(n int) string {

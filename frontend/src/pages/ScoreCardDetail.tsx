@@ -1297,9 +1297,11 @@ export default function ScoreCardDetail() {
         </span>
         <button
           onClick={() => setShowShare(true)}
-          className="flex items-center gap-1.5 text-sm text-muted hover:text-secondary transition-colors ml-auto"
+          className="text-muted hover:text-[var(--brass)] transition-colors ml-auto"
+          aria-label="Share score card"
+          title="Share score card"
         >
-          <Share2 size={18} /> Share
+          <Share2 size={18} />
         </button>
         {card.user_id !== currentUser?.id && (
           <button
