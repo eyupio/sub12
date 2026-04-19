@@ -771,7 +771,7 @@ export default function Feed() {
             className="flex items-center gap-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw size={12} className={isFetchingNextPage ? 'animate-spin' : ''} />
-            {isFetchingNextPage ? 'Loading...' : 'Load more'}
+            {isFetchingNextPage ? 'Loading…' : 'Load more'}
           </button>
         </div>
       )}

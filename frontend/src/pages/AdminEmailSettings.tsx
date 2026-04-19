@@ -250,7 +250,7 @@ export default function AdminEmailSettings() {
 
         <div className="flex flex-wrap gap-2">
           <button type="submit" className={btnPrimary} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving...' : 'Save Settings'}
+            {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
           </button>
           <button type="button" className={btnSecondary} disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>
             {testMutation.isPending ? 'Testing...' : 'Test Send'}

@@ -243,7 +243,7 @@ export default function AdminEmailTemplates() {
 
               <div className="flex flex-wrap gap-2">
                 <button type="submit" disabled={saveMutation.isPending} className={btnPrimary}>
-                  {saveMutation.isPending ? 'Saving...' : 'Save Template'}
+                  {saveMutation.isPending ? 'Saving…' : 'Save Template'}
                 </button>
                 <button
                   type="button"

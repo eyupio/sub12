@@ -136,7 +136,7 @@ export function PostComposer({ leagueId, clubId, queryKey, groupPostVisibility }
           className="flex items-center gap-2 px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Send size={12} />
-          {mutation.isPending ? 'Posting...' : 'Post'}
+          {mutation.isPending ? 'Posting…' : 'Post'}
         </button>
       </div>
       {mutation.isError && (

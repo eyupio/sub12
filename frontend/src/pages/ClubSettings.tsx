@@ -74,7 +74,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
             {club.image_url ? 'Click to change image' : 'Add a profile picture for this club'}
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
-          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading...</p>}
+          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading…</p>}
           {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">{mutation.error instanceof Error ? mutation.error.message : 'Upload failed. Please try again.'}</p>}
         </div>
       </div>
@@ -136,7 +136,7 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
       </div>
 
       <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary}>
-        {mutation.isPending ? 'Saving...' : 'Save'}
+        {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
     </div>
   )

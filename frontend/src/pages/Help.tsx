@@ -92,7 +92,7 @@ export default function Help() {
         </aside>
 
         <section className="space-y-5">
-          {faqsQuery.isLoading && <p className="text-sm text-muted">Loading...</p>}
+          {faqsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
           {!faqsQuery.isLoading && visibleGrouped.length === 0 && (
             <p className="text-sm text-muted">No help articles match your search.</p>
           )}

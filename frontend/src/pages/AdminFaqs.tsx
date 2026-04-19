@@ -323,7 +323,7 @@ export default function AdminFaqs() {
         </aside>
 
         <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
-          {listQuery.isLoading && <p className="text-sm text-muted">Loading...</p>}
+          {listQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {serverError && <p className="text-sm text-[var(--error-text)]">{serverError}</p>}
@@ -404,10 +404,10 @@ export default function AdminFaqs() {
               >
                 {creating
                   ? createMutation.isPending
-                    ? 'Creating...'
+                    ? 'Creating…'
                     : 'Create FAQ'
                   : updateMutation.isPending
-                    ? 'Saving...'
+                    ? 'Saving…'
                     : 'Save FAQ'}
               </button>
               {!creating && selectedId && (

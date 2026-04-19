@@ -397,7 +397,7 @@ export default function LeagueDetail() {
                 disabled={joinMutation.isPending}
                 className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
               >
-                {joinMutation.isPending ? 'Joining...' : 'Join'}
+                {joinMutation.isPending ? 'Joining…' : 'Join'}
               </button>
             )}
             {joinPolicy === 'approval' && (
@@ -425,7 +425,7 @@ export default function LeagueDetail() {
                 disabled={joinMutation.isPending || !joinCode.trim()}
                 className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
               >
-                {joinMutation.isPending ? 'Joining...' : 'Join'}
+                {joinMutation.isPending ? 'Joining…' : 'Join'}
               </button>
             </div>
           )}

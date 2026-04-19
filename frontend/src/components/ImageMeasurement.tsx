@@ -874,7 +874,7 @@ export default function ImageMeasurement({
               disabled={isSaving}
               className="w-full py-3 rounded-lg bg-blue-500 text-white font-semibold text-sm tracking-wider uppercase disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? 'SAVING...' : 'DONE'}
+              {isSaving ? 'SAVING…' : 'DONE'}
             </button>
             {saveError && <p className="text-xs text-[var(--error-text)] text-center">{saveError}</p>}
           </div>

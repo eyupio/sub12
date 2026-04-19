@@ -76,7 +76,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
             {league.image_url ? 'Click to change image' : 'Add a profile picture for this league'}
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
-          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading...</p>}
+          {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading…</p>}
           {mutation.isError && <p className="text-[11px] text-[var(--error-text)] mt-1">{mutation.error instanceof Error ? mutation.error.message : 'Upload failed. Please try again.'}</p>}
         </div>
       </div>
@@ -378,7 +378,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
       </label>
 
       <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary}>
-        {mutation.isPending ? 'Saving...' : 'Save Rules'}
+        {mutation.isPending ? 'Saving…' : 'Save Rules'}
       </button>
     </div>
   )
@@ -450,7 +450,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
       )}
 
       <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className={btnPrimary}>
-        {saveMutation.isPending ? 'Saving...' : 'Save Join Policy'}
+        {saveMutation.isPending ? 'Saving…' : 'Save Join Policy'}
       </button>
 
       {joinPolicy === 'approval' && <JoinRequestsList leagueId={leagueId} />}
