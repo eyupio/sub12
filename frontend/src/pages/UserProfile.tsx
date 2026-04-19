@@ -388,6 +388,10 @@ export default function UserProfile() {
               targetId={id}
               targetType="user"
               targetLabel={profile.display_name}
+              shareTitle={profile.display_name}
+              shareText={profile.location
+                ? `${profile.display_name} on sub-12 · ${profile.location}`
+                : `${profile.display_name} on sub-12`}
               onClose={() => setShowShare(false)}
             />
           )}

@@ -902,14 +902,28 @@ export default function PelletTestDetail() {
         />
       )}
 
-      {showShare && id && (
-        <ShareDialog
-          targetId={id}
-          targetType="pellet_test"
-          targetLabel="Pellet Test"
-          onClose={() => setShowShare(false)}
-        />
-      )}
+      {showShare && id && session && (() => {
+        const pelletName = session.pellet ? `${session.pellet.brand} ${session.pellet.model}`.trim() : ''
+        const rifleName = session.rifle ? `${session.rifle.make} ${session.rifle.model}`.trim() : ''
+        const bits: string[] = []
+        if (pelletName) bits.push(`Pellet test: ${pelletName}`)
+        else bits.push('Pellet test')
+        if (session.best_group_size_mm != null) bits.push(`Best ${session.best_group_size_mm.toFixed(2)}mm`)
+        if (session.distance_m > 0) bits.push(`${session.distance_m.toFixed(1)}m`)
+        if (rifleName) bits.push(rifleName)
+        const shareText = `${bits.join(' · ')} on sub-12`
+        const shareTitle = pelletName ? `Pellet test: ${pelletName}` : 'Pellet test'
+        return (
+          <ShareDialog
+            targetId={id}
+            targetType="pellet_test"
+            targetLabel="Pellet Test"
+            shareTitle={shareTitle}
+            shareText={shareText}
+            onClose={() => setShowShare(false)}
+          />
+        )
+      })()}
 
       <ConfirmDialog
         open={pendingDelete !== null}

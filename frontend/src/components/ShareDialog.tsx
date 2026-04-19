@@ -16,6 +16,8 @@ interface ShareDialogProps {
   targetId: string
   targetType: ShareTargetType
   targetLabel: string
+  shareTitle?: string
+  shareText?: string
   onClose: () => void
 }
 
@@ -56,7 +58,7 @@ function XMarkIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-export function ShareDialog({ targetId, targetType, targetLabel, onClose }: ShareDialogProps) {
+export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, shareText: shareTextProp, onClose }: ShareDialogProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [destination, setDestination] = useState<Destination>('personal')
@@ -70,7 +72,8 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
   const canPostInternal = isInternalShareType(targetType)
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const shareUrl = `${origin}${publicPathByType[targetType]}/${targetId}`
-  const shareText = `${targetLabel} on sub-12`
+  const shareText = shareTextProp?.trim() || `${targetLabel} on sub-12`
+  const effectiveTitle = shareTitle?.trim() || targetLabel
   const hasWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
   const { data: leagues } = useQuery({
@@ -191,7 +194,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
   async function primaryShare() {
     if (hasWebShare) {
       try {
-        await navigator.share({ title: targetLabel, text: shareText, url: shareUrl })
+        await navigator.share({ title: effectiveTitle, text: shareText, url: shareUrl })
       } catch {
         // Native share was dismissed or errored. A dismissal is a cancel,
         // not a failure, so no toast — but reveal the fallback channels in

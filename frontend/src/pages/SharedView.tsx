@@ -269,14 +269,24 @@ function PublicScoreCard({ id }: { id: string }) {
           })}
         </div>
       </article>
-      {showShare && (
-        <ShareDialog
-          targetId={id}
-          targetType="score_card"
-          targetLabel={`${card.total_score} points`}
-          onClose={() => setShowShare(false)}
-        />
-      )}
+      {showShare && (() => {
+        const authorName = author?.display_name || ''
+        const score = card.x_count > 0 ? `${card.total_score} (${card.x_count}X)` : String(card.total_score)
+        const who = authorName ? `${authorName} shot ` : ''
+        const where = card.location ? ` at ${card.location}` : ''
+        const shareText = `${who}${score}${where} on sub-12`
+        const shareTitle = authorName ? `${authorName} — ${score}` : score
+        return (
+          <ShareDialog
+            targetId={id}
+            targetType="score_card"
+            targetLabel={`${card.total_score} points`}
+            shareTitle={shareTitle}
+            shareText={shareText}
+            onClose={() => setShowShare(false)}
+          />
+        )
+      })()}
     </Shell>
   )
 }
@@ -416,14 +426,26 @@ function PublicPelletTest({ id }: { id: string }) {
           </div>
         )}
       </article>
-      {showShare && (
-        <ShareDialog
-          targetId={id}
-          targetType="pellet_test"
-          targetLabel={pelletLabel}
-          onClose={() => setShowShare(false)}
-        />
-      )}
+      {showShare && (() => {
+        const rifleName = session.rifle ? `${session.rifle.make} ${session.rifle.model}`.trim() : ''
+        const bits: string[] = []
+        bits.push(session.pellet ? `Pellet test: ${pelletLabel}` : 'Pellet test')
+        if (session.best_group_size_mm != null) bits.push(`Best ${session.best_group_size_mm.toFixed(2)}mm`)
+        if (session.distance_m > 0) bits.push(`${session.distance_m.toFixed(1)}m`)
+        if (rifleName) bits.push(rifleName)
+        const shareText = `${bits.join(' · ')} on sub-12`
+        const shareTitle = session.pellet ? `Pellet test: ${pelletLabel}` : 'Pellet test'
+        return (
+          <ShareDialog
+            targetId={id}
+            targetType="pellet_test"
+            targetLabel={pelletLabel}
+            shareTitle={shareTitle}
+            shareText={shareText}
+            onClose={() => setShowShare(false)}
+          />
+        )
+      })()}
     </Shell>
   )
 }
@@ -477,6 +499,8 @@ function PublicLeague({ id }: { id: string }) {
           targetId={id}
           targetType="league"
           targetLabel={league.name}
+          shareTitle={league.name}
+          shareText={`Join ${league.name} on sub-12 — ${league.member_count} member${league.member_count === 1 ? '' : 's'}`}
           onClose={() => setShowShare(false)}
         />
       )}
@@ -533,6 +557,8 @@ function PublicClub({ id }: { id: string }) {
           targetId={id}
           targetType="club"
           targetLabel={club.name}
+          shareTitle={club.name}
+          shareText={`${club.name} on sub-12 — ${club.member_count} member${club.member_count === 1 ? '' : 's'}`}
           onClose={() => setShowShare(false)}
         />
       )}
@@ -596,6 +622,10 @@ function PublicUser({ id }: { id: string }) {
           targetId={id}
           targetType="user"
           targetLabel={profile.display_name}
+          shareTitle={profile.display_name}
+          shareText={profile.location
+            ? `${profile.display_name} on sub-12 · ${profile.location}`
+            : `${profile.display_name} on sub-12`}
           onClose={() => setShowShare(false)}
         />
       )}

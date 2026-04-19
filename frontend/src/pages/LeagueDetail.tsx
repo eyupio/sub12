@@ -364,6 +364,8 @@ export default function LeagueDetail() {
           targetId={leagueId}
           targetType="league"
           targetLabel={league.name}
+          shareTitle={league.name}
+          shareText={`Join ${league.name} on sub-12 — ${league.member_count} member${league.member_count === 1 ? '' : 's'}`}
           onClose={() => setShowShare(false)}
         />
       )}
