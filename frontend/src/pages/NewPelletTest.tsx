@@ -392,7 +392,7 @@ export default function NewPelletTest() {
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {imagePreviews.map((preview, i) => (
                   <div key={i} className="relative">
-                    <img src={preview} alt="" className="rounded border border-subtle w-full aspect-square object-cover" />
+                    <img src={preview} alt={`Target photo ${i + 1} preview`} className="rounded border border-subtle w-full aspect-square object-cover" />
                     <button
                       onClick={() => removeImage(i)}
                       className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
