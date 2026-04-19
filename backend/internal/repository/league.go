@@ -967,12 +967,15 @@ func (r *LeagueRepository) ListScoreActions(ctx context.Context, scoreCardID str
 }
 
 func (r *LeagueRepository) UpdateScoreVerification(ctx context.Context, scoreCardID, status string) error {
-	_, err := r.db.Exec(ctx,
+	tag, err := r.db.Exec(ctx,
 		`UPDATE score_cards SET verification = $2::verification_status, updated_at = NOW() WHERE id = $1`,
 		scoreCardID, status,
 	)
 	if err != nil {
 		return fmt.Errorf("update verification: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

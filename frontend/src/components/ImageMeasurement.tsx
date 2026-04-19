@@ -5,6 +5,7 @@ import { detectHoles } from '../utils/holeDetection'
 import type { DetectedHole } from '../utils/holeDetection'
 import { CALIBER_MAP } from '../utils/caliber'
 import type { PelletTestMeasurement, PelletTestDetection, CreateMeasurementPayload } from '../api/pelletTesting'
+import { toast } from '../store/toast'
 
 interface Props {
   imageUrl: string
@@ -572,6 +573,11 @@ export default function ImageMeasurement({
       display_unit: displayUnit,
     }
     if (measureMethod === 'manual_line') {
+      const shotCount = Number(manualShotCount)
+      if (!Number.isFinite(shotCount) || shotCount <= 0) {
+        toast('Enter a shot count greater than 0', 'error')
+        return
+      }
       onSave({
         ...payload,
         line_start_x: lineStart?.x,
@@ -579,7 +585,7 @@ export default function ImageMeasurement({
         line_end_x: lineEnd?.x,
         line_end_y: lineEnd?.y,
         manual_group_size_mm: manualGroupSizeMM ?? undefined,
-        manual_shot_count: Number(manualShotCount) || 0,
+        manual_shot_count: shotCount,
       }, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
       return
     }

@@ -32,8 +32,11 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 	}
 
 	visibility := "public"
-	if input.Visibility != nil && *input.Visibility == "private" {
-		visibility = "private"
+	if input.Visibility != nil {
+		switch *input.Visibility {
+		case "private", "followers":
+			visibility = *input.Visibility
+		}
 	}
 
 	err := r.db.QueryRow(ctx, `
@@ -321,7 +324,7 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	case "league":
 		query += ` AND sc.is_draft = FALSE AND sc.league_round_id IS NOT NULL`
 	case "club":
-		query += ` AND sc.is_draft = FALSE AND sc.club_id IS NOT NULL`
+		query += ` AND sc.is_draft = FALSE AND sc.club_id IS NOT NULL AND sc.league_round_id IS NULL`
 	default:
 		query += ` AND sc.is_draft = FALSE`
 	}

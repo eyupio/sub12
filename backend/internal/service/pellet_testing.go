@@ -338,7 +338,10 @@ func (s *PelletTestService) distanceForMeasurement(ctx context.Context, sessionI
 	return session.DistanceM, nil
 }
 
-func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imageID string) ([]*model.PelletTestMeasurement, error) {
+func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imageID, userID string) ([]*model.PelletTestMeasurement, error) {
+	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
 	return s.repo.GetMeasurementsByImage(ctx, sessionID, imageID)
 }
 
@@ -535,7 +538,10 @@ func (s *PelletTestService) computeAutoGroupSize(ctx context.Context, sessionID,
 	return nil, nil, &avgConf
 }
 
-func (s *PelletTestService) ListDetections(ctx context.Context, measurementID string) ([]*model.PelletTestDetection, error) {
+func (s *PelletTestService) ListDetections(ctx context.Context, sessionID, measurementID, userID string) ([]*model.PelletTestDetection, error) {
+	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
 	return s.repo.ListDetections(ctx, measurementID)
 }
 

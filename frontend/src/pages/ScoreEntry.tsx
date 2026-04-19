@@ -579,9 +579,11 @@ export default function ScoreEntry() {
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
-            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
+            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
           >
-            {mutation.isPending ? 'Saving…' : 'Save Card'}
+            {mutation.isPending
+              ? (leagueId ? 'Submitting…' : 'Saving…')
+              : (leagueId ? 'Submit Score' : 'Save Card')}
           </button>
 
           <p className="text-center text-xs text-muted tracking-wide">

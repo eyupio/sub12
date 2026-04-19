@@ -72,7 +72,8 @@ func (m *mockScoreCardRepo) IsPersonalBest(_ context.Context, _, _ string, _ int
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
 type mockLeagueRepo struct {
-	cfg *model.LeagueConfig
+	cfg      *model.LeagueConfig
+	isMember bool
 }
 
 func (m *mockLeagueRepo) GetConfigByRoundID(_ context.Context, _ string) (*model.LeagueConfig, error) {
@@ -82,10 +83,13 @@ func (m *mockLeagueRepo) CountUserSubmissionsForRound(_ context.Context, _, _ st
 	return 0, nil
 }
 func (m *mockLeagueRepo) GetLeagueIDByRoundID(_ context.Context, _ string) (string, error) {
-	return "", nil
+	return "league-1", nil
 }
 func (m *mockLeagueRepo) GetByID(_ context.Context, _ string) (*model.League, error) {
 	return nil, nil
+}
+func (m *mockLeagueRepo) IsMember(_ context.Context, _, _ string) (bool, error) {
+	return m.isMember, nil
 }
 
 func newTestService(repo *mockScoreCardRepo) *ScoreCardService {
@@ -335,4 +339,48 @@ func TestUpdate_LockedLeagueCard(t *testing.T) {
 	})
 	assert.ErrorIs(t, err, ErrEditsLocked)
 	assert.False(t, repo.updateCalled)
+}
+
+// --- League membership tests ---
+
+func TestCreate_LeagueSubmission_RequiresMembership(t *testing.T) {
+	repo := &mockScoreCardRepo{}
+	roundID := "round-1"
+	svc := &ScoreCardService{
+		cards:      repo,
+		leagueRepo: &mockLeagueRepo{isMember: false},
+	}
+
+	scores := make([]int16, 25)
+	xs := make([]bool, 25)
+
+	_, err := svc.Create(context.Background(), "user1", &model.CreateScoreCardInput{
+		ShotAt:        "2025-01-01",
+		ShotScores:    scores,
+		ShotXs:        xs,
+		LeagueRoundID: &roundID,
+	})
+	assert.ErrorIs(t, err, ErrNotLeagueMember)
+	assert.False(t, repo.createCalled)
+}
+
+func TestCreate_LeagueSubmission_MemberSucceeds(t *testing.T) {
+	repo := &mockScoreCardRepo{}
+	roundID := "round-1"
+	svc := &ScoreCardService{
+		cards:      repo,
+		leagueRepo: &mockLeagueRepo{isMember: true},
+	}
+
+	scores := make([]int16, 25)
+	xs := make([]bool, 25)
+
+	_, err := svc.Create(context.Background(), "user1", &model.CreateScoreCardInput{
+		ShotAt:        "2025-01-01",
+		ShotScores:    scores,
+		ShotXs:        xs,
+		LeagueRoundID: &roundID,
+	})
+	require.NoError(t, err)
+	assert.True(t, repo.createCalled)
 }

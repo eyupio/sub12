@@ -11,9 +11,10 @@ import (
 
 
 var (
-	ErrInvalidCard    = errors.New("invalid score card")
-	ErrMaxSubmissions = errors.New("maximum submissions per round reached")
-	ErrEditsLocked    = errors.New("score card is locked by league policy")
+	ErrInvalidCard      = errors.New("invalid score card")
+	ErrMaxSubmissions   = errors.New("maximum submissions per round reached")
+	ErrEditsLocked      = errors.New("score card is locked by league policy")
+	ErrNotLeagueMember  = errors.New("league membership required")
 )
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
@@ -37,6 +38,7 @@ type LeagueConfigRepo interface {
 	CountUserSubmissionsForRound(ctx context.Context, userID, roundID string) (int, error)
 	GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error)
 	GetByID(ctx context.Context, id string) (*model.League, error)
+	IsMember(ctx context.Context, leagueID, userID string) (bool, error)
 }
 
 // UserProfileReader returns the profile-visibility flag needed when deciding
@@ -88,6 +90,19 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 
 	// Enforce max_submissions_per_round when submitting to a league round
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
+		// Verify the user is a member of this league
+		lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve league for round: %w", err)
+		}
+		isMember, err := s.leagueRepo.IsMember(ctx, lid, userID)
+		if err != nil {
+			return nil, fmt.Errorf("check league membership: %w", err)
+		}
+		if !isMember {
+			return nil, ErrNotLeagueMember
+		}
+
 		cfg, err := s.leagueRepo.GetConfigByRoundID(ctx, *input.LeagueRoundID)
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", err)
@@ -104,10 +119,8 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 
 		// Auto-populate club_id from the league if not explicitly provided
 		if (input.ClubID == nil || *input.ClubID == "") {
-			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID); err == nil {
-				if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league.ClubID != nil {
-					input.ClubID = league.ClubID
-				}
+			if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league != nil && league.ClubID != nil {
+				input.ClubID = league.ClubID
 			}
 		}
 	}
