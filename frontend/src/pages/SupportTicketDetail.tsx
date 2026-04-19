@@ -173,14 +173,14 @@ export default function SupportTicketDetail() {
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="submit"
-                  className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+                  className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
                 >
                   {updateTicketMutation.isPending ? 'Saving…' : 'Save changes'}
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-subtle px-3 py-2 text-sm disabled:opacity-50"
+                  className="rounded-md border border-subtle px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
                   onClick={onToggleClosed}
                 >
@@ -188,7 +188,7 @@ export default function SupportTicketDetail() {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-[var(--error-text)] px-3 py-2 text-sm text-[var(--error-text)] disabled:opacity-50"
+                  className="rounded-md border border-[var(--error-text)] px-3 py-2 text-sm text-[var(--error-text)] disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={updateTicketMutation.isPending || deleteTicketMutation.isPending}
                   onClick={onDeleteTicket}
                 >
@@ -222,7 +222,7 @@ export default function SupportTicketDetail() {
                 placeholder="Write a reply..."
               />
               <div className="flex items-center gap-3">
-                <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50" disabled={addMessageMutation.isPending}>
+                <button type="submit" className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed" disabled={addMessageMutation.isPending}>
                   {addMessageMutation.isPending ? 'Sending…' : 'Send reply'}
                 </button>
                 {submitMessage && <p className="text-xs text-muted">{submitMessage}</p>}

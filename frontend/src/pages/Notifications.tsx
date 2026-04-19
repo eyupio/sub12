@@ -64,7 +64,7 @@ export default function Notifications() {
               type="button"
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
-              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary disabled:opacity-40"
+              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Mark all read
             </button>
@@ -154,7 +154,7 @@ export default function Notifications() {
           <button
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
-            className="px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-40"
+            className="px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isFetchingNextPage ? 'Loading...' : 'Load more'}
           </button>

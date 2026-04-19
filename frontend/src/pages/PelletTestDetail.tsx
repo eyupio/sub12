@@ -587,7 +587,7 @@ export default function PelletTestDetail() {
               <button
                 onClick={() => updateSessionMutation.mutate()}
                 disabled={updateSessionMutation.isPending || !editMeta.test_date}
-                className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40"
+                className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateSessionMutation.isPending ? 'Saving…' : 'Save Changes'}
               </button>
@@ -788,7 +788,7 @@ export default function PelletTestDetail() {
                   (newGroupMethod === 'manual' && (!newGroupSize || Number(newGroupSize) <= 0)) ||
                   (newGroupMethod === 'image' && !newGroupImageId)
                 }
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase hover:opacity-90 transition-opacity disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check size={13} /> {addGroupMutation.isPending ? 'Saving…' : newGroupMethod === 'image' ? 'Analyze image' : 'Save'}
               </button>
@@ -860,10 +860,10 @@ export default function PelletTestDetail() {
         )}
 
         <div className="flex gap-2">
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending} className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors disabled:opacity-40">
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadMutation.isPending} className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Upload size={16} /> {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
           </button>
-          <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploadMutation.isPending} className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors disabled:opacity-40">
+          <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploadMutation.isPending} className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Camera size={16} /> Camera
           </button>
         </div>

@@ -320,7 +320,7 @@ export default function NewPelletTest() {
               </div>
               {addPelletMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to add pellet.</p>}
               <div className="flex gap-2">
-                <button onClick={() => addPelletMutation.mutate()} disabled={addPelletMutation.isPending || !newPellet.brand || !newPellet.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-40">
+                <button onClick={() => addPelletMutation.mutate()} disabled={addPelletMutation.isPending || !newPellet.brand || !newPellet.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
                   {addPelletMutation.isPending ? 'Saving…' : 'Add Pellet'}
                 </button>
                 <button onClick={() => setShowAddPellet(false)} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
@@ -485,7 +485,7 @@ export default function NewPelletTest() {
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !canSubmit}
-            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
+            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
           >
             {mutation.isPending ? 'Saving…' : 'Save Test'}
           </button>

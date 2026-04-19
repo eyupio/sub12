@@ -726,7 +726,7 @@ export default function ImageMeasurement({
               <button onClick={() => { setSubMode('set_aim'); fitToView() }} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium">
                 <Maximize size={16} /> SET
               </button>
-              <button onClick={goNext} disabled={!aimPoint} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+              <button onClick={goNext} disabled={!aimPoint} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                 {'>'} NEXT
               </button>
             </div>
@@ -751,9 +751,9 @@ export default function ImageMeasurement({
                 <button onClick={() => { setCalibUnit('cm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>cm</button>
                 <button onClick={() => { setCalibUnit('mm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-blue-500 text-white' : 'text-secondary'}`}>mm</button>
               </div>
-              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-subtle text-secondary text-sm font-medium disabled:opacity-40">SET</button>
+              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-subtle text-secondary text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">SET</button>
             </div>
-            <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+            <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
               {'>'} NEXT
             </button>
           </div>
@@ -843,7 +843,7 @@ export default function ImageMeasurement({
             <button
               onClick={goNext}
               disabled={measureMethod === 'impacts' ? impacts.length < 2 : !(lineStart && lineEnd && Number(manualShotCount) > 0)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {'>'} ANALYZE
             </button>
@@ -872,7 +872,7 @@ export default function ImageMeasurement({
             <button
               onClick={handleDone}
               disabled={isSaving}
-              className="w-full py-3 rounded-lg bg-blue-500 text-white font-semibold text-sm tracking-wider uppercase disabled:opacity-60"
+              className="w-full py-3 rounded-lg bg-blue-500 text-white font-semibold text-sm tracking-wider uppercase disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'SAVING...' : 'DONE'}
             </button>

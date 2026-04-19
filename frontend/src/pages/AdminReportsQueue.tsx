@@ -67,7 +67,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
             <button
               onClick={() => onDecide('hide')}
               disabled={disabled}
-              className="px-3 py-1.5 rounded bg-[var(--error-text)] text-white text-[11px] tracking-widest uppercase font-medium disabled:opacity-40"
+              className="px-3 py-1.5 rounded bg-[var(--error-text)] text-white text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Hide
             </button>
@@ -75,14 +75,14 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
           <button
             onClick={() => onDecide('warn_user')}
             disabled={disabled}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Warn
           </button>
           <button
             onClick={() => onDecide('no_action')}
             disabled={disabled}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-40"
+            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Dismiss
           </button>

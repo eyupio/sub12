@@ -142,7 +142,7 @@ export function ReportDialog({ open, targetType, targetId, onClose, contextLeagu
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
-            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {mutation.isPending ? 'Submitting…' : 'Report'}
           </button>

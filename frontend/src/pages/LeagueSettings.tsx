@@ -17,7 +17,7 @@ const TIMEZONES: string[] = (() => {
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 
 // ---------------------------------------------------------------------------
 // League Image Section
@@ -60,7 +60,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={mutation.isPending}
-          className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50"
+          className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Upload league image"
         >
           {league.image_url ? (
@@ -115,7 +115,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ type: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.type === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -141,7 +141,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ post_visibility: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.post_visibility === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -197,7 +197,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ date_format: value })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -218,7 +218,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
               type="button"
               disabled={mutation.isPending}
               onClick={() => mutation.mutate({ time_format: v })}
-              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-40 ${
+              className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
                   ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -496,7 +496,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
               <button
                 onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'approved' })}
                 disabled={decideMutation.isPending}
-                className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Approve"
                 aria-label={`Approve ${jr.display_name}`}
               >
@@ -505,7 +505,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
               <button
                 onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'rejected' })}
                 disabled={decideMutation.isPending}
-                className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Reject"
                 aria-label={`Reject ${jr.display_name}`}
               >
@@ -574,7 +574,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
               <button
                 onClick={() => setPendingRemove(member)}
                 disabled={removeMutation.isPending}
-                className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Remove member"
                 aria-label={`Remove ${member.display_name} from league`}
               >

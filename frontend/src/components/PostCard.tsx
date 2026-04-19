@@ -280,7 +280,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                     role="menuitem"
                     onClick={() => { setMenuOpen(false); unflagMutation.mutate() }}
                     disabled={unflagMutation.isPending}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 hover:bg-surface-hover disabled:opacity-40"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Flag size={12} /> Clear flag
                   </button>
@@ -341,7 +341,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
             <button
               onClick={() => updatePostMutation.mutate()}
               disabled={updatePostMutation.isPending || !editPostBody.trim()}
-              className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+              className="px-2.5 py-1 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updatePostMutation.isPending ? 'Saving…' : 'Save'}
             </button>
@@ -424,7 +424,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                           <button
                             onClick={() => setConfirmDeleteCommentId(c.id)}
                             disabled={deleteCommentMutation.isPending}
-                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-40"
+                            className="p-1 text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             aria-label="Delete comment"
                             title="Delete comment"
                           >
@@ -457,7 +457,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                         <button
                           onClick={() => updateCommentMutation.mutate({ id: c.id, body: editCommentBody.trim() })}
                           disabled={updateCommentMutation.isPending || !editCommentBody.trim()}
-                          className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                          className="px-2 py-0.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {updateCommentMutation.isPending ? 'Saving…' : 'Save'}
                         </button>
@@ -497,7 +497,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                 type="submit"
                 disabled={!newComment.trim() || createCommentMutation.isPending}
                 aria-label="Post comment"
-                className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-40"
+                className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send size={12} />
               </button>

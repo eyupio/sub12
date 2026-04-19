@@ -85,7 +85,7 @@ export function RifleProfileCard({
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}
               disabled={isUploadPending}
-              className="w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-40"
+              className="w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Upload image"
             >
               {isUploadPending ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}

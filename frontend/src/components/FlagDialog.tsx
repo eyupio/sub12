@@ -131,7 +131,7 @@ export function FlagDialog({ open, targetLabel, onClose, onSubmit }: FlagDialogP
           <button
             onClick={submit}
             disabled={submitting}
-            className="px-4 py-2 rounded bg-[var(--warning-text,#b45309)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            className="px-4 py-2 rounded bg-[var(--warning-text,#b45309)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Flagging…' : 'Flag'}
           </button>
