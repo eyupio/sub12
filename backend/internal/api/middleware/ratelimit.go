@@ -112,10 +112,12 @@ func (rl *RateLimiter) check(r *http.Request, key string, limit int) (bool, time
 		ctx := r.Context()
 		count, err := rl.rdb.Incr(ctx, key).Result()
 		if err == nil {
-			if count == 1 {
-				// first increment — start the 60s window
-				_ = rl.rdb.Expire(ctx, key, time.Minute).Err()
-			}
+			// ExpireNX is idempotent: sets the TTL only if the key has no
+			// existing expiry. Unlike the prior `if count == 1` branch it
+			// recovers when the initial Expire failed or when the key was
+			// seeded without a TTL (Redis debugging, DUMP/RESTORE, etc.),
+			// preventing the key from becoming a permanent counter.
+			_ = rl.rdb.ExpireNX(ctx, key, time.Minute).Err()
 			if int(count) > limit {
 				ttl, _ := rl.rdb.TTL(ctx, key).Result()
 				if ttl <= 0 {
