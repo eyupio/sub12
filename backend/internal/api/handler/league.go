@@ -913,6 +913,10 @@ func (h *LeagueHandler) AmendScore(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "not a league admin")
 			return
 		}
+		if errors.Is(err, service.ErrInvalidAmend) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to amend score")
 		return
 	}
