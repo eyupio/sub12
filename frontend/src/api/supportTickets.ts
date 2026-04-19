@@ -105,4 +105,6 @@ export const supportTicketsApi = {
   markRead: (id: string) => api.post<void>(`/tickets/${id}/read`, {}),
   adminTransitionStatus: (id: string, status: SupportTicketStatus) =>
     api.post<SupportTicket>(`/admin/tickets/${id}/status`, { status }),
+  adminAssign: (id: string, assigneeId: string | null) =>
+    api.post<SupportTicket>(`/admin/tickets/${id}/assign`, { assignee_id: assigneeId }),
 }

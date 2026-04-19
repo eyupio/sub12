@@ -11,7 +11,7 @@ export default function FeatureBoard() {
   const [scopeID, setScopeID] = useState('')
   const [status, setStatus] = useState<(typeof statuses)[number]>('all')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['feature-requests', 'ranking', scopeType, scopeID],
     queryFn: () => featureRequestsApi.ranking({ scopeType, scopeID: scopeID || undefined, limit: 100 }),
   })
@@ -54,7 +54,8 @@ export default function FeatureBoard() {
 
       <div className="space-y-3">
         {isLoading && <p className="text-sm text-muted">Loading feature requests…</p>}
-        {!isLoading && items.length === 0 && <p className="text-sm text-muted">No visible feature requests for this scope yet.</p>}
+        {isError && <p role="alert" className="text-sm text-[var(--error-text)]">Failed to load feature requests.</p>}
+        {!isLoading && !isError && items.length === 0 && <p className="text-sm text-muted">No visible feature requests for this scope yet.</p>}
         {items.map(item => (
           <article key={item.id} className="rounded-xl border border-subtle bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
