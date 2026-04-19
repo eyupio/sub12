@@ -491,9 +491,9 @@ export default function PelletTestDetail() {
             )}
             <button
               onClick={() => setShowShare(true)}
-              className="text-muted hover:text-secondary transition-colors"
-              aria-label="Share test"
-              title="Share"
+              className="text-muted hover:text-[var(--brass)] transition-colors"
+              aria-label="Share pellet test"
+              title="Share pellet test"
             >
               <Share2 size={18} />
             </button>
