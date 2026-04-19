@@ -2,7 +2,7 @@ import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { pelletTestApi } from '../api/pelletTesting'
+import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 
@@ -71,6 +71,7 @@ export default function NewPelletTest() {
   ])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [existingImages, setExistingImages] = useState<PelletTestImage[]>([])
   const imagePreviewsRef = useRef<string[]>([])
   imagePreviewsRef.current = imagePreviews
   useEffect(() => () => {
@@ -108,9 +109,7 @@ export default function NewPelletTest() {
     if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
     if (draft.humidity_pct != null) setHumidityPct(String(draft.humidity_pct))
     if (draft.notes) setNotes(draft.notes)
-    // Images and groups already live on the server; no preview hydration
-    // needed — the existing attach list for NEW uploads stays empty until
-    // the user adds more photos.
+    setExistingImages(draft.images ?? [])
   }, [draft])
 
   const addPelletMutation = useMutation({
@@ -156,10 +155,19 @@ export default function NewPelletTest() {
     setImagePreviews(p => p.filter((_, i) => i !== index))
   }
 
+  const deleteExistingImage = useMutation({
+    mutationFn: (id: string) => pelletTestApi.deleteImage(draftId!, id),
+    onSuccess: (_, id) => {
+      setExistingImages(imgs => imgs.filter(i => i.id !== id))
+      qc.invalidateQueries({ queryKey: ['pellet-test', draftId] })
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to remove photo', 'error'),
+  })
+
   const validGroups = groups.filter(g => g.groupSizeMM && Number(g.groupSizeMM) > 0)
   const hasDistance = !!distanceValue && Number(distanceValue) > 0
-  const hasGroupOrImage = validGroups.length > 0 || imageFiles.length > 0
-  const canSubmit = rifleId && pelletId && testDate && hasGroupOrImage && (hasDistance || imageFiles.length > 0)
+  const hasGroupOrImage = validGroups.length > 0 || imageFiles.length > 0 || existingImages.length > 0
+  const canSubmit = rifleId && pelletId && testDate && hasGroupOrImage && (hasDistance || imageFiles.length > 0 || existingImages.length > 0)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -451,10 +459,23 @@ export default function NewPelletTest() {
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
 
-            {imagePreviews.length > 0 && (
+            {(existingImages.length > 0 || imagePreviews.length > 0) && (
               <div className="grid grid-cols-3 gap-2 mb-2">
+                {existingImages.map((img, i) => (
+                  <div key={img.id} className="relative">
+                    <img src={img.image_url} alt={`Draft photo ${i + 1}`} className="rounded border border-subtle w-full aspect-square object-cover" />
+                    <button
+                      onClick={() => deleteExistingImage.mutate(img.id)}
+                      disabled={deleteExistingImage.isPending}
+                      className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors disabled:opacity-50"
+                      aria-label="Remove photo"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
                 {imagePreviews.map((preview, i) => (
-                  <div key={i} className="relative">
+                  <div key={`new-${i}`} className="relative">
                     <img src={preview} alt={`Target photo ${i + 1} preview`} className="rounded border border-subtle w-full aspect-square object-cover" />
                     <button
                       onClick={() => removeImage(i)}
@@ -495,7 +516,7 @@ export default function NewPelletTest() {
                 : !pelletId ? 'Select or add a pellet.'
                 : !testDate ? 'Pick a test date.'
                 : !hasGroupOrImage ? 'Add at least one group size or upload a target photo.'
-                : !hasDistance && imageFiles.length === 0 ? 'Enter a distance.'
+                : !hasDistance && imageFiles.length === 0 && existingImages.length === 0 ? 'Enter a distance.'
                 : 'Complete the highlighted fields to save.'}
             </p>
           )}
