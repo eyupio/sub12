@@ -439,14 +439,24 @@ func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/leagues/{id}/ensure-round
 func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	leagueID := chi.URLParam(r, "id")
 	if !isUUID(leagueID) {
 		writeInvalidUUIDError(w, "league id")
 		return
 	}
 
-	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID)
+	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID, userID)
 	if err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
