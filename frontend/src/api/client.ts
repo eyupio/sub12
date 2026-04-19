@@ -30,7 +30,12 @@ async function tryRefreshToken(): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
-    if (!res.ok) return false
+    if (!res.ok) {
+      // The stored refresh token is dead (expired / revoked). Drop it now
+      // so a subsequent rehydrate doesn't try to replay the same 4xx.
+      clearAuth()
+      return false
+    }
     const tokens = await res.json()
     const user = useAuthStore.getState().user
     if (user) {
