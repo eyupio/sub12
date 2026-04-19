@@ -517,7 +517,7 @@ export default function PelletTestDetail() {
         </div>
 
         {editing && (
-          <div className="mt-4 space-y-3 border border-amber-500/30 rounded-lg p-4 bg-amber-500/5">
+          <div className="mt-4 space-y-3 border border-amber-500/30 dark:border-amber-400/30 rounded-lg p-4 bg-amber-500/5 dark:bg-amber-500/10">
             <h2 className="text-[11px] tracking-widest uppercase text-muted">Edit Test Details</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
