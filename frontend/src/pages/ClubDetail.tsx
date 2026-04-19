@@ -186,7 +186,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <button
           onClick={() => setConfirmRole(true)}
           disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
-          className="text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
+          className="p-1.5 rounded text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
           title={member.is_admin ? 'Demote from admin' : 'Promote to admin'}
           aria-label={member.is_admin ? `Demote ${member.display_name} from admin` : `Promote ${member.display_name} to admin`}
         >
@@ -197,7 +197,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
-          className="text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
+          className="p-1.5 rounded text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
           title="Remove member"
           aria-label={`Remove ${member.display_name} from club`}
         >
