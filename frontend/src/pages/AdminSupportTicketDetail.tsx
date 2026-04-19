@@ -57,6 +57,18 @@ export default function AdminSupportTicketDetail() {
     },
   })
 
+  const assignMutation = useMutation({
+    mutationFn: (assigneeId: string | null) => supportTicketsApi.adminAssign(id, assigneeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['support-ticket', 'admin', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] })
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError ? err.message : 'Failed to update assignment.'
+      toast(msg, 'error')
+    },
+  })
+
   const featureRequestsQuery = useQuery({
     queryKey: ['admin', 'feature-requests', 'all'],
     queryFn: () => featureRequestsApi.list({ limit: 100 }),
@@ -154,13 +166,36 @@ export default function AdminSupportTicketDetail() {
             <p className="text-xs text-muted">
               {detail.ticket.category ?? 'issue'} · {detail.ticket.priority ?? 'normal'} · {detail.ticket.scope_type ?? 'platform'}
             </p>
-            <p className="text-xs text-muted">
-              {detail.ticket.assignee_id
-                ? detail.ticket.assignee_id === currentUserId
-                  ? 'Assigned to you'
-                  : 'Assigned'
-                : 'Unassigned'}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span>
+                {detail.ticket.assignee_id
+                  ? detail.ticket.assignee_id === currentUserId
+                    ? 'Assigned to you'
+                    : 'Assigned'
+                  : 'Unassigned'}
+              </span>
+              {detail.ticket.assignee_id === currentUserId ? (
+                <button
+                  type="button"
+                  className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50"
+                  onClick={() => assignMutation.mutate(null)}
+                  disabled={assignMutation.isPending}
+                >
+                  {assignMutation.isPending ? 'Updating…' : 'Unassign'}
+                </button>
+              ) : (
+                currentUserId && (
+                  <button
+                    type="button"
+                    className="rounded-md border border-subtle px-2 py-1 text-xs hover:bg-[color:var(--surface-muted)] disabled:opacity-50"
+                    onClick={() => assignMutation.mutate(currentUserId)}
+                    disabled={assignMutation.isPending}
+                  >
+                    {assignMutation.isPending ? 'Updating…' : 'Assign to me'}
+                  </button>
+                )
+              )}
+            </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted">Status</span>
               <select
@@ -210,7 +245,7 @@ export default function AdminSupportTicketDetail() {
                       className="rounded-md bg-[var(--brass)] px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
                       disabled={convertMutation.isPending}
                     >
-                      {convertMutation.isPending ? 'Converting…' : 'Create feature request'}
+                      {convertMutation.isPending ? 'Converting…' : 'Convert feature request'}
                     </button>
                     <button type="button" className="rounded-md border border-subtle px-3 py-2 text-sm" onClick={() => setConvertOpen(false)}>
                       Cancel
