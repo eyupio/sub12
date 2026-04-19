@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2, Flag } from 'lucide-react'
-import { leagueApi, LeagueConfig, League } from '../api/leagues'
+import { leagueApi, LeagueConfig, League, LeagueMember } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 
 const TIMEZONES: string[] = (() => {
@@ -30,6 +31,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
     mutationFn: (file: File) => leagueApi.uploadImage(leagueId, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      toast('League image updated', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to upload image', 'error'),
   })
@@ -263,22 +265,18 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
   const [confirmations, setConfirmations] = useState(config.required_confirmations)
   const [requireImage, setRequireImage] = useState(config.require_image_upload)
   const [lockAfterVerification, setLockAfterVerification] = useState(config.lock_edits_after_verification)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
 
   const mutation = useMutation({
     mutationFn: (payload: Parameters<typeof leagueApi.updateConfig>[1]) =>
       leagueApi.updateConfig(leagueId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'config'] })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      toast('Rules saved', 'success')
     },
-    onError: () => setError('Failed to save.'),
+    onError: () => toast('Failed to save rules', 'error'),
   })
 
   function handleSave() {
-    setError('')
     mutation.mutate({
       scoring_rule: scoringRule,
       max_submissions_per_round: maxSubs,
@@ -379,9 +377,6 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
         </span>
       </label>
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-      {saved && <p className="text-green-400 text-xs">Saved</p>}
-
       <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary}>
         {mutation.isPending ? 'Saving...' : 'Save Rules'}
       </button>
@@ -396,24 +391,22 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; config: LeagueConfig; joinCode?: string }) {
   const queryClient = useQueryClient()
   const [joinPolicy, setJoinPolicy] = useState(config.join_policy)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
 
   const saveMutation = useMutation({
     mutationFn: () => leagueApi.updateConfig(leagueId, { join_policy: joinPolicy }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'config'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      toast('Join policy saved', 'success')
     },
-    onError: () => setError('Failed to save.'),
+    onError: () => toast('Failed to save join policy', 'error'),
   })
 
   const regenMutation = useMutation({
     mutationFn: () => leagueApi.regenerateJoinCode(leagueId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      toast('Join code regenerated', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to regenerate code', 'error'),
   })
@@ -456,9 +449,6 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
         </div>
       )}
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-      {saved && <p className="text-green-400 text-xs">Saved</p>}
-
       <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className={btnPrimary}>
         {saveMutation.isPending ? 'Saving...' : 'Save Join Policy'}
       </button>
@@ -479,14 +469,16 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
   const decideMutation = useMutation({
     mutationFn: ({ requestId, decision }: { requestId: string; decision: string }) =>
       leagueApi.decideJoinRequest(leagueId, requestId, decision),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'join-requests'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      toast(variables.decision === 'approved' ? 'Request approved' : 'Request rejected', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update request', 'error'),
   })
 
   const requests = data?.items ?? []
+  const pendingId = decideMutation.isPending ? decideMutation.variables?.requestId : undefined
 
   if (requests.length === 0) {
     return <p className="text-muted text-xs">No pending requests.</p>
@@ -495,27 +487,34 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
   return (
     <div className="space-y-2">
       <p className="text-[11px] tracking-widest uppercase text-muted">Pending Requests</p>
-      {requests.map(jr => (
-        <div key={jr.id} className="flex items-center justify-between bg-surface rounded p-2.5">
-          <span className="text-sm text-secondary">{jr.display_name}</span>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'approved' })}
-              className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-              title="Approve"
-            >
-              <Check size={14} />
-            </button>
-            <button
-              onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'rejected' })}
-              className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-              title="Reject"
-            >
-              <X size={14} />
-            </button>
+      {requests.map(jr => {
+        const busy = pendingId === jr.id
+        return (
+          <div key={jr.id} className="flex items-center justify-between bg-surface rounded p-2.5">
+            <span className="text-sm text-secondary">{jr.display_name}</span>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'approved' })}
+                disabled={decideMutation.isPending}
+                className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Approve"
+                aria-label={`Approve ${jr.display_name}`}
+              >
+                <Check size={14} className={busy ? 'animate-pulse' : ''} />
+              </button>
+              <button
+                onClick={() => decideMutation.mutate({ requestId: jr.id, decision: 'rejected' })}
+                disabled={decideMutation.isPending}
+                className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Reject"
+                aria-label={`Reject ${jr.display_name}`}
+              >
+                <X size={14} className={busy ? 'animate-pulse' : ''} />
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -527,6 +526,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
 function MembersSection({ leagueId, currentUserId }: { leagueId: string; currentUserId: string }) {
   const queryClient = useQueryClient()
   const prefs = useRegionalPrefs()
+  const [pendingRemove, setPendingRemove] = useState<LeagueMember | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
@@ -538,8 +538,13 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'standings'] })
+      toast('Member removed', 'success')
+      setPendingRemove(null)
     },
-    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to remove member', 'error'),
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to remove member', 'error')
+      setPendingRemove(null)
+    },
   })
 
   const members = data?.items ?? []
@@ -567,7 +572,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
             </span>
             {!member.is_admin && member.user_id !== currentUserId && (
               <button
-                onClick={() => removeMutation.mutate(member.user_id)}
+                onClick={() => setPendingRemove(member)}
                 disabled={removeMutation.isPending}
                 className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 title="Remove member"
@@ -579,6 +584,21 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
           </div>
         </div>
       ))}
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        title="Remove member?"
+        message={
+          pendingRemove
+            ? `${pendingRemove.display_name} will lose access to this league. They can rejoin if the join policy allows.`
+            : ''
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingRemove) removeMutation.mutate(pendingRemove.user_id)
+        }}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -351,6 +352,13 @@ func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID strin
 	if input.StartsOn == "" {
 		return nil, fmt.Errorf("%w: starts_on is required", ErrInvalidSeason)
 	}
+	if input.EndsOn != nil && *input.EndsOn != "" {
+		start, errStart := time.Parse("2006-01-02", input.StartsOn)
+		end, errEnd := time.Parse("2006-01-02", *input.EndsOn)
+		if errStart == nil && errEnd == nil && end.Before(start) {
+			return nil, fmt.Errorf("%w: ends_on must be on or after starts_on", ErrInvalidSeason)
+		}
+	}
 	season, err := s.leagues.CreateSeason(ctx, leagueID, input)
 	if err != nil {
 		return nil, err
@@ -379,6 +387,13 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
 	}
+	if input.OpensAt != nil && *input.OpensAt != "" && input.ClosesAt != nil && *input.ClosesAt != "" {
+		opens, errOpens := time.Parse(time.RFC3339, *input.OpensAt)
+		closes, errCloses := time.Parse(time.RFC3339, *input.ClosesAt)
+		if errOpens == nil && errCloses == nil && closes.Before(opens) {
+			return nil, fmt.Errorf("%w: closes_at must be on or after opens_at", ErrInvalidRound)
+		}
+	}
 	round, err := s.leagues.CreateRound(ctx, seasonID, input)
 	if err != nil {
 		return nil, err
@@ -402,12 +417,16 @@ func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*mod
 
 // EnsureDefaultRound guarantees that the league has at least one round,
 // creating a default season+round if necessary. Returns the round ID.
-func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID string) (string, error) {
+// Only league admins may trigger creation of league structure.
+func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID string) (string, error) {
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return "", ErrLeagueNotFound
 	}
 	if err != nil {
+		return "", err
+	}
+	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
 		return "", err
 	}
 	return s.leagues.GetOrCreateDefaultRound(ctx, leagueID)
@@ -453,7 +472,7 @@ func (s *LeagueService) DecideJoinRequest(ctx context.Context, leagueID, request
 	if decision != "approved" && decision != "rejected" {
 		return fmt.Errorf("%w: decision must be 'approved' or 'rejected'", ErrInvalidLeague)
 	}
-	err := s.leagues.DecideJoinRequest(ctx, requestID, adminID, decision)
+	err := s.leagues.DecideJoinRequest(ctx, leagueID, requestID, adminID, decision)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrLeagueNotFound
 	}
@@ -565,19 +584,23 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 		return err
 	}
 
-	// Check if confirmation threshold is met
+	// Check if confirmation threshold is met. The confirmation row is already
+	// persisted; surface lookup failures so the caller knows auto-verification
+	// did not run (a retry is safe — the unique constraint dedupes).
 	cfg, err := s.leagues.GetConfig(ctx, league.ID)
 	if err != nil {
-		return nil // confirmation recorded, config lookup failed but not critical
+		return err
 	}
 
 	if cfg.RequireScoreVerification && cfg.RequiredConfirmations > 0 {
 		count, err := s.leagues.GetConfirmationCount(ctx, scoreCardID)
 		if err != nil {
-			return nil // confirmation recorded, count check failed but not critical
+			return err
 		}
 		if count >= int(cfg.RequiredConfirmations) {
-			_ = s.leagues.UpdateScoreVerification(ctx, scoreCardID, "verified")
+			if err := s.leagues.UpdateScoreVerification(ctx, scoreCardID, "verified"); err != nil {
+				return err
+			}
 		}
 	}
 

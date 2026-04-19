@@ -392,17 +392,34 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 	defer rows.Close()
 
 	var standings []*model.LeagueStanding
-	rank := 1
+	// Competition ranking: members with identical scores share a rank, and the
+	// next distinct score skips over the tied positions (1, 1, 3, ...).
+	var prevScore *float64
+	currentRank := 0
+	position := 0
 	for rows.Next() {
 		var s model.LeagueStanding
 		if err := rows.Scan(&s.UserID, &s.DisplayName, &s.BestScore, &s.BestX, &s.CardCount, &s.JoinedAt); err != nil {
 			return nil, fmt.Errorf("scan standing: %w", err)
 		}
-		s.Rank = rank
-		rank++
+		position++
+		if currentRank == 0 || !sameScore(prevScore, s.BestScore) {
+			currentRank = position
+		}
+		s.Rank = currentRank
+		prevScore = s.BestScore
 		standings = append(standings, &s)
 	}
 	return standings, rows.Err()
+}
+
+// sameScore returns true when two nullable scores represent the same value
+// (both nil counts as equal so unscored members share a rank).
+func sameScore(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 // ---------------------------------------------------------------------------
@@ -725,20 +742,20 @@ func (r *LeagueRepository) ListJoinRequests(ctx context.Context, leagueID, statu
 	return requests, rows.Err()
 }
 
-func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, requestID, adminID, decision string) error {
+func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requestID, adminID, decision string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	var leagueID, userID string
+	var userID string
 	err = tx.QueryRow(ctx, `
 		UPDATE league_join_requests
 		SET status = $2, decided_by = $3, decided_at = NOW()
-		WHERE id = $1 AND status = 'pending'
-		RETURNING league_id, user_id
-	`, requestID, decision, adminID).Scan(&leagueID, &userID)
+		WHERE id = $1 AND league_id = $4 AND status = 'pending'
+		RETURNING user_id
+	`, requestID, decision, adminID, leagueID).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
