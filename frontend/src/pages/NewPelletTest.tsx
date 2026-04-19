@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
@@ -28,10 +28,15 @@ const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = useId()
+  const child = isValidElement(children)
+    ? cloneElement(children as React.ReactElement<{ id?: string }>, { id: (children.props as { id?: string }).id ?? id })
+    : children
+  const childId = isValidElement(children) ? ((children.props as { id?: string }).id ?? id) : undefined
   return (
     <div>
-      <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
-      {children}
+      <label htmlFor={childId} className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
+      {child}
     </div>
   )
 }

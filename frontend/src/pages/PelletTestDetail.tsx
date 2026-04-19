@@ -521,8 +521,9 @@ export default function PelletTestDetail() {
             <h2 className="text-[11px] tracking-widest uppercase text-muted">Edit Test Details</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Test Date</label>
+                <label htmlFor="pellet-edit-test-date" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Test Date</label>
                 <input
+                  id="pellet-edit-test-date"
                   type="date"
                   value={editMeta.test_date}
                   onChange={e => setEditMeta(m => ({ ...m, test_date: e.target.value }))}
@@ -530,8 +531,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+                <label htmlFor="pellet-edit-location" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
                 <input
+                  id="pellet-edit-location"
                   type="text"
                   value={editMeta.location}
                   onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))}
@@ -540,8 +542,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>
+                <label htmlFor="pellet-edit-distance" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>
                 <input
+                  id="pellet-edit-distance"
                   type="number"
                   inputMode="decimal"
                   value={editMeta.distance_value}
@@ -550,8 +553,9 @@ export default function PelletTestDetail() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Unit</label>
+                <label htmlFor="pellet-edit-distance-unit" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Unit</label>
                 <select
+                  id="pellet-edit-distance-unit"
                   value={editMeta.distance_unit}
                   onChange={e => setEditMeta(m => ({ ...m, distance_unit: e.target.value }))}
                   className={inputCls}
@@ -562,8 +566,9 @@ export default function PelletTestDetail() {
               </div>
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+              <label htmlFor="pellet-edit-notes" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
               <textarea
+                id="pellet-edit-notes"
                 value={editMeta.notes}
                 onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))}
                 rows={2}
