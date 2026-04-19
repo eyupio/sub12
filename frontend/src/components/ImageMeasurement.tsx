@@ -105,9 +105,18 @@ export default function ImageMeasurement({
   const [manualShotCount, setManualShotCount] = useState('')
   const [detectStatus, setDetectStatus] = useState<string | null>(null)
 
-  const rawDistance = Number(distanceToTarget) || distanceM
-  const effectiveDistanceM = distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance
-  const displayDistance = distanceUnit === 'yards' ? rawDistance : rawDistance
+  // parseFloat handles edge cases that `Number()` silently coerces:
+  // `Number('')` is 0 (|| fallback kicks in, masking an empty field);
+  // `Number(' ')` is 0; `Number('abc')` is NaN (falsy, also silently falls
+  // back). parseFloat + isFinite distinguishes "empty/garbage" from "0" so
+  // we can gate the flow instead of saving a silent fallback distance.
+  const parsedDistance = parseFloat(distanceToTarget)
+  const isValidDistance = Number.isFinite(parsedDistance) && parsedDistance > 0
+  const rawDistance = isValidDistance ? parsedDistance : 0
+  const effectiveDistanceM = isValidDistance
+    ? (distanceUnit === 'yards' ? yardsToMeters(rawDistance) : rawDistance)
+    : 0
+  const displayDistance = rawDistance
   const distanceLabel = distanceUnit === 'yards' ? 'yd' : 'm'
   const pelletDiameterMM = CALIBER_MAP[markerSize] ?? (Number(markerSize) || 4.5)
 
@@ -251,13 +260,13 @@ export default function ImageMeasurement({
   }, [centroid, impacts, pixelsPerMM])
 
   const groupResult = useMemo(() => computeGroupSizeFromImpacts(impacts, pixelsPerMM, pelletDiameterMM), [impacts, pixelsPerMM, pelletDiameterMM])
-  const groupSizeMOA = groupResult ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
+  const groupSizeMOA = groupResult && isValidDistance ? Math.round(mmToMOA(groupResult.mm, effectiveDistanceM) * 10) / 10 : null
   const groupSizeRaw = groupResult?.mm ?? null
   const manualGroupSizeMM = useMemo(() => {
     if (!lineStart || !lineEnd || pixelsPerMM <= 0) return null
     return Math.hypot(lineEnd.x - lineStart.x, lineEnd.y - lineStart.y) / pixelsPerMM
   }, [lineStart, lineEnd, pixelsPerMM])
-  const manualGroupSizeMOA = manualGroupSizeMM !== null ? Math.round(mmToMOA(manualGroupSizeMM, effectiveDistanceM) * 10) / 10 : null
+  const manualGroupSizeMOA = manualGroupSizeMM !== null && isValidDistance ? Math.round(mmToMOA(manualGroupSizeMM, effectiveDistanceM) * 10) / 10 : null
   const manualMidpoint = useMemo(() => {
     if (!lineStart || !lineEnd) return null
     return { x: (lineStart.x + lineEnd.x) / 2, y: (lineStart.y + lineEnd.y) / 2 }
@@ -271,10 +280,10 @@ export default function ImageMeasurement({
   const referencePoint = measureMethod === 'manual_line' ? manualMidpoint : centroid
   const elevationMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (aimPoint.y - referencePoint.y) / pixelsPerMM : null
   const windageMM = aimPoint && referencePoint && pixelsPerMM > 0 ? (referencePoint.x - aimPoint.x) / pixelsPerMM : null
-  const elevMOA = elevationMM !== null ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
-  const windMOA = windageMM !== null ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
-  const elevMRAD = elevationMM !== null ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
-  const windMRAD = windageMM !== null ? Math.round(mmToMRAD(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const elevMOA = elevationMM !== null && isValidDistance ? Math.round(mmToMOA(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMOA = windageMM !== null && isValidDistance ? Math.round(mmToMOA(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
+  const elevMRAD = elevationMM !== null && isValidDistance ? Math.round(mmToMRAD(Math.abs(elevationMM), effectiveDistanceM) * 10) / 10 : null
+  const windMRAD = windageMM !== null && isValidDistance ? Math.round(mmToMRAD(Math.abs(windageMM), effectiveDistanceM) * 10) / 10 : null
 
 
   // ── Drawing ────────────────────────────────────────────────────────
@@ -549,6 +558,10 @@ export default function ImageMeasurement({
 
   const handleDone = useCallback(async () => {
     if (!pointA || pixelsPerMM <= 0) { onClose(); return }
+    if (!isValidDistance) {
+      toast('Enter a distance greater than 0', 'error')
+      return
+    }
     const pd = pointB ? Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y) : 0
     const refMM = calibUnit === 'cm' ? Number(calibDistance) * 10 : Number(calibDistance)
     const payload: CreateMeasurementPayload = {
@@ -598,7 +611,7 @@ export default function ImageMeasurement({
       const blob = await generateAnnotatedBlob()
       onSaveDetections(payload, dets, blob, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit })
     } else { onSave(payload, { groupSizeMM: analysisGroupSizeMM, shotCount: analysisShotCount, distanceValue: analysisDistanceValue, distanceUnit }) }
-  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit, aimPoint, rotation, markerSize, effectiveDistanceM, displayUnit, lineStart, lineEnd])
+  }, [pointA, pointB, pixelsPerMM, calibDistance, calibUnit, impacts, pelletDiameterMM, onSave, onSaveDetections, onClose, generateAnnotatedBlob, measureMethod, manualGroupSizeMM, manualShotCount, analysisGroupSizeMM, analysisShotCount, analysisDistanceValue, distanceUnit, aimPoint, rotation, markerSize, effectiveDistanceM, displayUnit, lineStart, lineEnd, isValidDistance])
 
   const stepTitles: Record<WizardStep, string> = { 1: 'Set Aim Point', 2: 'Set Measurement Points', 3: 'Distance and marker size', 4: 'Add impacts', 5: 'Group Analysis Summary' }
 
@@ -764,7 +777,10 @@ export default function ImageMeasurement({
               </select>
               <button className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium">SET</button>
             </div>
-            <button onClick={goNext} disabled={!distanceToTarget || Number(distanceToTarget) <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-40">
+            {!isValidDistance && (
+              <p role="alert" className="text-[11px] text-red-400">Enter a distance greater than 0.</p>
+            )}
+            <button onClick={goNext} disabled={!isValidDistance} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
               {'>'} NEXT
             </button>
           </div>
