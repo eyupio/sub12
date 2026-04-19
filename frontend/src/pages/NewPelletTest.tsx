@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
@@ -64,6 +64,11 @@ export default function NewPelletTest() {
   ])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const imagePreviewsRef = useRef<string[]>([])
+  imagePreviewsRef.current = imagePreviews
+  useEffect(() => () => {
+    imagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url))
+  }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [showAddPellet, setShowAddPellet] = useState(false)
