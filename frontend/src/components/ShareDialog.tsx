@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { X, Share2, Link as LinkIcon, Twitter, Facebook, Mail, MessageCircle } from 'lucide-react'
+import { X, Share2, Link as LinkIcon, Facebook, Mail, MessageCircle } from 'lucide-react'
 import { postApi, SharePayload } from '../api/posts'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
@@ -38,6 +38,23 @@ function isInternalShareType(t: ShareTargetType): t is InternalTargetType {
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// Inline X-mark for the X (formerly Twitter) share button. Lucide still ships
+// the old bird under "Twitter" which reads as a different brand next to the
+// "X" label.
+function XMarkIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M18.244 2H21l-6.49 7.41L22 22h-6.63l-4.87-6.36L4.77 22H2l6.97-7.96L2 2h6.76l4.4 5.81L18.244 2Zm-1.16 18h1.86L7.02 4H5.06l12.024 16Z" />
+    </svg>
+  )
+}
 
 export function ShareDialog({ targetId, targetType, targetLabel, onClose }: ShareDialogProps) {
   const queryClient = useQueryClient()
@@ -301,7 +318,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, onClose }: Shar
             <ExternalButton
               onClick={() => openExternal(twitterHref)}
               label="X"
-              icon={<Twitter size={14} />}
+              icon={<XMarkIcon size={14} />}
             />
             <ExternalButton
               onClick={() => openExternal(facebookHref)}
