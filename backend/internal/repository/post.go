@@ -66,7 +66,9 @@ func (r *PostRepository) Create(ctx context.Context, userID string, input *model
 	// Fetch user info for the response
 	var displayName string
 	var avatarURL *string
-	_ = r.db.QueryRow(ctx, `SELECT display_name, avatar_url FROM users WHERE id = $1`, userID).Scan(&displayName, &avatarURL)
+	if err := r.db.QueryRow(ctx, `SELECT display_name, avatar_url FROM users WHERE id = $1`, userID).Scan(&displayName, &avatarURL); err != nil {
+		return nil, fmt.Errorf("fetch post author: %w", err)
+	}
 	post.DisplayName = displayName
 	post.AvatarURL = avatarURL
 	if post.Attachments == nil {

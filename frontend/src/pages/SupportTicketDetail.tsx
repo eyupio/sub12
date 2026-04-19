@@ -5,6 +5,7 @@ import { ApiError } from '../api/client'
 import { supportTicketsApi } from '../api/supportTickets'
 import { useAuthStore } from '../store/auth'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function labelForMessageAuthor(authorId: string | undefined, currentUserId: string | undefined): string {
   if (!authorId) return 'System'
@@ -23,6 +24,7 @@ export default function SupportTicketDetail() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [editMessage, setEditMessage] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const ticketQuery = useQuery({
     queryKey: ['support-ticket', 'mine', id],
@@ -117,8 +119,11 @@ export default function SupportTicketDetail() {
 
   function onDeleteTicket() {
     setEditMessage(null)
-    const confirmed = window.confirm('Delete this ticket permanently? This action cannot be undone.')
-    if (!confirmed) return
+    setConfirmDelete(true)
+  }
+
+  function onConfirmDelete() {
+    setConfirmDelete(false)
     deleteTicketMutation.mutate()
   }
 
@@ -226,6 +231,13 @@ export default function SupportTicketDetail() {
           </section>
         </>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete ticket"
+        message="Delete this ticket permanently? This action cannot be undone."
+        onConfirm={onConfirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }

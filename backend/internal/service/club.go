@@ -134,6 +134,12 @@ func (s *ClubService) Join(ctx context.Context, clubID, userID, joinCode string)
 	}
 
 	if err := s.repo.Join(ctx, clubID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return false, false, ErrClubNotFound
+		}
+		if errors.Is(err, repository.ErrAlreadyMember) {
+			return false, false, ErrClubAlreadyMember
+		}
 		return false, false, err
 	}
 	if s.activity != nil {

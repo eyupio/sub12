@@ -207,13 +207,22 @@ export default function ScoreEntry() {
         league_round_id: leagueId ? leagueRoundId : undefined,
         visibility,
       })
+      let imageFailed = false
       if (imageFile) {
-        await scoreCardApi.uploadImage(card.id, imageFile)
+        try {
+          await scoreCardApi.uploadImage(card.id, imageFile)
+        } catch {
+          imageFailed = true
+        }
       }
-      return card
+      return { card, imageFailed }
     },
-    onSuccess: (card) => {
-      toast('Score card saved', 'success')
+    onSuccess: ({ card, imageFailed }) => {
+      if (imageFailed) {
+        toast('Score card saved, but image upload failed — try again from the card', 'error')
+      } else {
+        toast('Score card saved', 'success')
+      }
       navigate({ to: '/scores/$id', params: { id: card.id } })
     },
     onError: (err: unknown) => {
@@ -515,11 +524,6 @@ export default function ScoreEntry() {
               </div>
             )}
           </div>
-
-          {/* Error */}
-          {mutation.isError && (
-            <p className="text-[var(--error-text)] text-sm">Failed to save score card. Please try again.</p>
-          )}
 
           {/* Submit */}
           <button

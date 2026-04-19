@@ -90,8 +90,6 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(club.name)
   const [description, setDescription] = useState(club.description ?? '')
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
 
   const mutation = useMutation({
     mutationFn: (input: { name?: string; description?: string }) =>
@@ -99,14 +97,12 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      toast('Club saved', 'success')
     },
-    onError: () => setError('Failed to save.'),
+    onError: () => toast('Failed to save', 'error'),
   })
 
   function handleSave() {
-    setError('')
     mutation.mutate({
       name: name.trim() || undefined,
       description: description.trim() || undefined,
@@ -138,9 +134,6 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
           placeholder="A short description of the club"
         />
       </div>
-
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-      {saved && <p className="text-green-400 text-xs">Saved</p>}
 
       <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary}>
         {mutation.isPending ? 'Saving...' : 'Save'}
