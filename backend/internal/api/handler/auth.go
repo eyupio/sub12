@@ -177,6 +177,10 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "new_password must be at least 8 characters")
 		return
 	}
+	if len(body.NewPassword) > 128 {
+		writeError(w, http.StatusBadRequest, "new_password is too long")
+		return
+	}
 
 	if err := h.auth.ResetPassword(r.Context(), body.Token, body.NewPassword); err != nil {
 		if errors.Is(err, service.ErrInvalidResetToken) {
