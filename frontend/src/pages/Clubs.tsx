@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, ChevronRight, X, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
+import { ApiError } from '../api/client'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { toast } from '../store/toast'
@@ -22,7 +23,10 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
       toast('Club created', 'success')
       onClose()
     },
-    onError: () => setError('Failed to create club. Please try again.'),
+    onError: (err: unknown) => {
+      const msg = err instanceof ApiError && err.message ? err.message : 'Failed to create club. Please try again.'
+      setError(msg)
+    },
   })
 
   function handleSubmit(e: React.FormEvent) {
