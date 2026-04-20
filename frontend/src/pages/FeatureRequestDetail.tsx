@@ -115,7 +115,7 @@ export default function FeatureRequestDetail() {
                 <label htmlFor="feature-request-comment" className="sr-only">Comment</label>
                 <textarea
                   id="feature-request-comment"
-                  className="min-h-24 w-full rounded-md border border-subtle bg-transparent p-2 text-sm"
+                  className="min-h-24 w-full rounded-md border border-subtle bg-transparent p-2 text-sm focus:outline-none focus:border-[var(--brass)]/50"
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
                   placeholder="Share feedback, a use case, or a clarifying question…"
