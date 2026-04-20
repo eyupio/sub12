@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
@@ -130,21 +132,26 @@ func (s *LeagueService) ListMyLeagues(ctx context.Context, userID string) ([]*mo
 	if err != nil {
 		return nil, err
 	}
-
-	for _, l := range leagues {
-		standings, err := s.Standings(ctx, l.ID)
-		if err != nil {
-			// If standings fail, leave rank as 0 (unknown)
-			continue
-		}
-		for _, st := range standings {
-			if st.UserID == userID {
-				l.UserRank = st.Rank
-				break
-			}
-		}
+	if len(leagues) == 0 {
+		return leagues, nil
 	}
 
+	ids := make([]string, len(leagues))
+	for i, l := range leagues {
+		ids[i] = l.ID
+	}
+	ranks, err := s.leagues.GetUserRanksForLeagues(ctx, userID, ids)
+	if err != nil {
+		// Leave ranks as 0 (unknown) but surface the error in logs so
+		// intermittent DB failures do not silently degrade the UI.
+		log.Warn().Err(err).Str("user_id", userID).Msg("ListMyLeagues: rank lookup failed")
+		return leagues, nil
+	}
+	for _, l := range leagues {
+		if r, ok := ranks[l.ID]; ok {
+			l.UserRank = r
+		}
+	}
 	return leagues, nil
 }
 

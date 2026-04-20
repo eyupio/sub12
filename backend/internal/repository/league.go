@@ -413,6 +413,58 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 	return standings, rows.Err()
 }
 
+// GetUserRanksForLeagues returns the user's rank in each of the given leagues
+// in a single query. Missing entries mean the user is not in that league's
+// standings (or the league has no members). Ranks use competition ranking and
+// respect each league's scoring_rule (highest/average), matching Standings.
+func (r *LeagueRepository) GetUserRanksForLeagues(ctx context.Context, userID string, leagueIDs []string) (map[string]int, error) {
+	if len(leagueIDs) == 0 {
+		return map[string]int{}, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		WITH per_user_scores AS (
+			SELECT
+				lm.league_id,
+				lm.user_id,
+				CASE WHEN lc.scoring_rule = 'average'
+					THEN AVG(sc.total_score::double precision)
+					ELSE MAX(sc.total_score::double precision)
+				END AS score
+			FROM league_members lm
+			LEFT JOIN league_configs lc ON lc.league_id = lm.league_id
+			LEFT JOIN score_cards sc ON sc.user_id = lm.user_id
+				AND sc.verification = 'verified' AND sc.is_draft = FALSE
+			WHERE lm.league_id = ANY($1)
+			GROUP BY lm.league_id, lm.user_id, lc.scoring_rule
+		),
+		ranked AS (
+			SELECT
+				league_id,
+				user_id,
+				RANK() OVER (PARTITION BY league_id ORDER BY score DESC NULLS LAST) AS rnk
+			FROM per_user_scores
+		)
+		SELECT league_id, rnk::int
+		FROM ranked
+		WHERE user_id = $2
+	`, leagueIDs, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user ranks for leagues: %w", err)
+	}
+	defer rows.Close()
+
+	ranks := make(map[string]int, len(leagueIDs))
+	for rows.Next() {
+		var leagueID string
+		var rank int
+		if err := rows.Scan(&leagueID, &rank); err != nil {
+			return nil, fmt.Errorf("scan user rank: %w", err)
+		}
+		ranks[leagueID] = rank
+	}
+	return ranks, rows.Err()
+}
+
 // sameScore returns true when two nullable scores represent the same value
 // (both nil counts as equal so unscored members share a rank).
 func sameScore(a, b *float64) bool {

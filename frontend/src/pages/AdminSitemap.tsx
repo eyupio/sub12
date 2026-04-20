@@ -30,9 +30,9 @@ function formatDate(iso: string) {
 }
 
 function StatusBadge({ code }: { code?: number }) {
-  if (code == null) return <span className="text-red-400 text-xs" role="status"><span className="sr-only">Error: </span>Network Error</span>
-  if (code >= 200 && code < 300) return <span className="text-green-400 text-xs flex items-center gap-1" role="status"><CheckCircle size={12} aria-hidden="true" /><span className="sr-only">Success: </span>{code}</span>
-  return <span className="text-red-400 text-xs flex items-center gap-1" role="status"><XCircle size={12} aria-hidden="true" /><span className="sr-only">Error: </span>{code}</span>
+  if (code == null) return <span className="text-[var(--error-text)] text-xs" role="status"><span className="sr-only">Error: </span>Network Error</span>
+  if (code >= 200 && code < 300) return <span className="text-[var(--success-text)] text-xs flex items-center gap-1" role="status"><CheckCircle size={12} aria-hidden="true" /><span className="sr-only">Success: </span>{code}</span>
+  return <span className="text-[var(--error-text)] text-xs flex items-center gap-1" role="status"><XCircle size={12} aria-hidden="true" /><span className="sr-only">Error: </span>{code}</span>
 }
 
 export default function AdminSitemap() {
@@ -83,7 +83,7 @@ export default function AdminSitemap() {
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Sitemap Overview</h2>
         {statsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
         {statsQuery.error && (
-          <p className="text-sm text-red-400">{parseError(statsQuery.error)}</p>
+          <p className="text-sm text-[var(--error-text)]">{parseError(statsQuery.error)}</p>
         )}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
@@ -115,7 +115,7 @@ export default function AdminSitemap() {
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Submit Sitemap to Search Engines</h2>
         {indexNowKeyQuery.error && (
-          <p className="text-sm text-red-400">{parseError(indexNowKeyQuery.error)}</p>
+          <p className="text-sm text-[var(--error-text)]">{parseError(indexNowKeyQuery.error)}</p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
@@ -171,10 +171,10 @@ export default function AdminSitemap() {
           </button>
         </div>
         {pingMutation.isError && (
-          <p className="text-sm text-red-400">{parseError(pingMutation.error)}</p>
+          <p className="text-sm text-[var(--error-text)]">{parseError(pingMutation.error)}</p>
         )}
         {pingMutation.isSuccess && (
-          <p className="text-sm text-green-400">Ping submitted successfully!</p>
+          <p className="text-sm text-[var(--success-text)]">Ping submitted successfully!</p>
         )}
       </section>
 
@@ -183,7 +183,7 @@ export default function AdminSitemap() {
         <h2 className="text-[11px] tracking-widest uppercase text-muted">Submission History</h2>
         {submissionsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
         {submissionsQuery.error && (
-          <p className="text-sm text-red-400">{parseError(submissionsQuery.error)}</p>
+          <p className="text-sm text-[var(--error-text)]">{parseError(submissionsQuery.error)}</p>
         )}
         {submissions.length === 0 && !submissionsQuery.isLoading && (
           <p className="text-sm text-muted">No submissions yet.</p>
