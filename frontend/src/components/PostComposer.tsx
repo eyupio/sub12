@@ -139,9 +139,6 @@ export function PostComposer({ leagueId, clubId, queryKey, groupPostVisibility }
           {mutation.isPending ? 'Posting…' : 'Post'}
         </button>
       </div>
-      {mutation.isError && (
-        <p className="text-[var(--error-text)] text-xs">Failed to create post.</p>
-      )}
     </div>
   )
 }
