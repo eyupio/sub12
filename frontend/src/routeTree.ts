@@ -314,6 +314,10 @@ const scoreTrendsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/trends',
   component: ScoreTrends,
+  validateSearch: (search: Record<string, unknown>): { period?: 'week' | 'month'; rifleId?: string } => ({
+    period: search.period === 'month' ? 'month' : search.period === 'week' ? 'week' : undefined,
+    rifleId: (search.rifleId as string) || undefined,
+  }),
 })
 
 const comboAnalyticsRoute = createRoute({

@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -10,8 +9,25 @@ import { statsApi } from '../api/stats'
 import { gearApi } from '../api/gear'
 
 export default function ScoreTrends() {
-  const [period, setPeriod] = useState<'week' | 'month'>('week')
-  const [rifleId, setRifleId] = useState<string>('')
+  const navigate = useNavigate()
+  const search = useSearch({ strict: false }) as { period?: 'week' | 'month'; rifleId?: string }
+  const period: 'week' | 'month' = search.period === 'month' ? 'month' : 'week'
+  const rifleId = search.rifleId ?? ''
+
+  const setPeriod = (next: 'week' | 'month') => {
+    navigate({
+      to: '/scores/trends',
+      search: { period: next, rifleId: rifleId || undefined },
+      replace: true,
+    })
+  }
+  const setRifleId = (next: string) => {
+    navigate({
+      to: '/scores/trends',
+      search: { period, rifleId: next || undefined },
+      replace: true,
+    })
+  }
 
   const { data: trendsData, isLoading } = useQuery({
     queryKey: ['score-trends', period, rifleId || null],

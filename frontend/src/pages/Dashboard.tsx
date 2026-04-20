@@ -201,6 +201,9 @@ function StatCard({
   gold,
   trend,
   trendLabel,
+  to,
+  params,
+  search,
 }: {
   label: string
   value: string
@@ -208,10 +211,18 @@ function StatCard({
   gold?: boolean
   trend?: 'up' | 'down' | null
   trendLabel?: string
+  to?: string
+  params?: Record<string, string>
+  search?: Record<string, string | undefined>
 }) {
-  return (
-    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5 flex flex-col">
-      <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
+  const baseClass = 'bg-surface border border-subtle rounded-lg p-4 lg:p-5 flex flex-col relative'
+  const linkClass = `${baseClass} hover:border-[var(--brass)]/30 transition-colors`
+  const inner = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
+        {to && <ChevronRight size={12} className="text-muted/60 shrink-0 mt-0.5" />}
+      </div>
       <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
         {value}
       </p>
@@ -224,8 +235,13 @@ function StatCard({
           <span>{trendLabel}</span>
         </div>
       )}
-    </div>
+    </>
   )
+  if (to) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return <Link to={to as any} params={params as any} search={search as any} className={linkClass}>{inner}</Link>
+  }
+  return <div className={baseClass}>{inner}</div>
 }
 
 function ScoreBar({ score, max = 250 }: { score: number; max?: number }) {
@@ -345,26 +361,59 @@ function EmptySection({ icon, heading, body, cta }: {
   )
 }
 
-function PerformanceStrip({ items }: { items: { label: string; value: string; sub?: string }[] }) {
+type PerformanceStripItem = {
+  label: string
+  value: string
+  sub?: string
+  to?: string
+  params?: Record<string, string>
+  search?: Record<string, string | undefined>
+}
+
+function PerformanceStrip({ items }: { items: PerformanceStripItem[] }) {
   const displayed = items.slice(0, 4)
   return (
     <div className="bg-surface border border-subtle rounded-lg overflow-hidden">
       <div className="grid grid-cols-2 lg:grid-cols-4">
-        {displayed.map((item, i) => (
-          <div
-            key={i}
-            className={[
-              'px-4 py-3',
-              i % 2 === 1 ? 'border-l border-subtle' : '',
-              i >= 2 ? 'border-t border-subtle lg:border-t-0' : '',
-              i > 0 ? 'lg:border-l lg:border-subtle' : '',
-            ].join(' ')}
-          >
-            <p className="text-[10px] tracking-widest uppercase text-muted">{item.label}</p>
-            <p className="text-base font-mono text-secondary mt-0.5 truncate">{item.value}</p>
-            {item.sub && <p className="text-[10px] text-muted mt-0.5">{item.sub}</p>}
-          </div>
-        ))}
+        {displayed.map((item, i) => {
+          const cellClass = [
+            'px-4 py-3 relative',
+            i % 2 === 1 ? 'border-l border-subtle' : '',
+            i >= 2 ? 'border-t border-subtle lg:border-t-0' : '',
+            i > 0 ? 'lg:border-l lg:border-subtle' : '',
+          ].join(' ')
+          const inner = (
+            <>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] tracking-widest uppercase text-muted">{item.label}</p>
+                {item.to && <ChevronRight size={12} className="text-muted/60 shrink-0 mt-0.5" />}
+              </div>
+              <p className="text-base font-mono text-secondary mt-0.5 truncate">{item.value}</p>
+              {item.sub && <p className="text-[10px] text-muted mt-0.5">{item.sub}</p>}
+            </>
+          )
+          if (item.to) {
+            return (
+              <Link
+                key={i}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                to={item.to as any}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                params={item.params as any}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                search={item.search as any}
+                className={`${cellClass} hover:bg-surface-hover/50 transition-colors block`}
+              >
+                {inner}
+              </Link>
+            )
+          }
+          return (
+            <div key={i} className={cellClass}>
+              {inner}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -504,12 +553,13 @@ export default function Dashboard() {
   const topCombo: ComboPerformanceSummary | undefined = comboData?.items?.[0]
 
   // Performance strip items (all derived from existing queries)
-  const perfStripItems: { label: string; value: string; sub?: string }[] = []
+  const perfStripItems: PerformanceStripItem[] = []
   if (topCombo) {
     perfStripItems.push({
       label: 'Top Combo',
       value: `${topCombo.rifle_name} + ${topCombo.pellet_name}`,
       sub: topCombo.avg_group_mm != null ? `${topCombo.avg_group_mm.toFixed(2)}mm avg · ${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}` : `${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}`,
+      to: '/pellet-testing/combo-analytics',
     })
   }
   if (mostUsedRifle) {
@@ -517,13 +567,25 @@ export default function Dashboard() {
       label: 'Most Used Rifle',
       value: `${mostUsedRifle.make} ${mostUsedRifle.model}`,
       sub: `${mostUsedRifle.card_count} card${mostUsedRifle.card_count !== 1 ? 's' : ''}`,
+      to: '/scores/trends',
+      search: { rifleId: mostUsedRifle.rifle_id },
     })
   }
   if (pelletTestStats?.best_group_mm != null) {
-    perfStripItems.push({ label: 'Best Group', value: `${pelletTestStats.best_group_mm.toFixed(2)}mm`, sub: 'tightest measured' })
+    perfStripItems.push({
+      label: 'Best Group',
+      value: `${pelletTestStats.best_group_mm.toFixed(2)}mm`,
+      sub: 'tightest measured',
+      to: '/pellet-testing/leaderboard',
+    })
   }
   if (pelletTestStats?.avg_group_mm != null) {
-    perfStripItems.push({ label: 'Avg Group', value: `${pelletTestStats.avg_group_mm.toFixed(2)}mm`, sub: 'across all sessions' })
+    perfStripItems.push({
+      label: 'Avg Group',
+      value: `${pelletTestStats.avg_group_mm.toFixed(2)}mm`,
+      sub: 'across all sessions',
+      to: '/pellet-testing',
+    })
   }
 
   // Header context line
@@ -605,17 +667,20 @@ export default function Dashboard() {
           value={stats?.best_score != null ? String(stats.best_score) : '—'}
           subtext={stats?.best_score != null ? 'Personal best' : 'No sessions yet'}
           gold
+          to={stats?.best_score != null ? '/scores/trends' : undefined}
         />
         <StatCard
           label="Best Group"
           value={pelletTestStats?.best_group_mm != null ? `${pelletTestStats.best_group_mm.toFixed(2)}mm` : '—'}
           subtext={pelletTestStats?.best_group_mm != null ? 'Tightest group measured' : 'No tests yet'}
           gold={pelletTestStats?.best_group_mm != null}
+          to={pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
         />
         <StatCard
           label="Cards Logged"
           value={stats ? String(stats.cards_logged) : '—'}
           subtext={stats && stats.cards_logged > 0 ? 'Total sessions recorded' : 'Start logging'}
+          to={stats && stats.cards_logged > 0 ? '/scores' : undefined}
         />
         <StatCard
           label={stats?.rolling_10_avg != null ? 'Recent Form' : 'Avg Score'}
@@ -631,6 +696,7 @@ export default function Dashboard() {
               ? `${trendDelta > 0 ? '+' : ''}${trendDelta} over last ${recentCards.length}`
               : undefined
           }
+          to={stats?.rolling_10_avg != null || stats?.avg_score != null ? '/scores/trends' : undefined}
         />
       </div>
 
