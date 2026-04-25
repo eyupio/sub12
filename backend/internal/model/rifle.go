@@ -22,6 +22,7 @@ type CreateRifleInput struct {
 	Calibre   string   `json:"calibre"`
 	PowerFtLb *float64 `json:"power_ftlb"`
 	TuneNotes *string  `json:"tune_notes"`
+	ImageURL  *string  `json:"image_url"`
 }
 
 type UpdateRifleInput struct {
