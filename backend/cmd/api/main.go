@@ -144,6 +144,7 @@ func main() {
 		cfg.PasswordResetTTLMinutes,
 		cfg.PasswordResetURL,
 	)
+	userSvc.SetSessionInvalidator(authSvc)
 
 	imageRepo := repository.NewImageRepository(pool)
 
