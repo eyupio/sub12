@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { authApi } from '../api/auth'
+import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 
@@ -25,8 +26,12 @@ export default function Login() {
       const { user, tokens } = await authApi.login(email, password)
       setAuth(user, tokens.access_token, tokens.refresh_token)
       navigate({ to: '/' })
-    } catch {
-      setError('Invalid email or password.')
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+        setError('Invalid email or password.')
+      } else {
+        setError("Couldn't reach the server. Please check your connection and try again.")
+      }
     } finally {
       setLoading(false)
     }

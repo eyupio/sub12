@@ -1055,7 +1055,7 @@ function TextPost({
             <img
               key={idx}
               src={src}
-              alt=""
+              alt={images.length > 1 ? `Attached image ${idx + 1}` : 'Attached image'}
               style={{ width: '100%', maxHeight: 320, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in' }}
               onClick={() => setZoomSrc(src)}
             />
