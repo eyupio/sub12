@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { userApi, type PublicProfile } from '../api/users'
+import { usersApi, type PublicProfile } from '../api/users'
 
 interface MentionPopoverProps {
   query: string
@@ -19,7 +19,7 @@ export function MentionPopover({ query, onSelect, onClose }: MentionPopoverProps
 
   const { data, isLoading } = useQuery({
     queryKey: ['mention-search', debounced],
-    queryFn: () => userApi.search(debounced, 8),
+    queryFn: () => usersApi.search(debounced, 8),
     enabled: debounced.length >= 1,
   })
 
