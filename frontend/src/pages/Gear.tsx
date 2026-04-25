@@ -9,6 +9,7 @@ import { CatalogSearch } from '../components/CatalogSearch'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, PelletCatalogEntry } from '../catalog/pelletCatalog'
+import { rifleImage, pelletImage, UNKNOWN_BRAND_IMAGE } from '../catalog/brandImages'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 
@@ -150,6 +151,8 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
             searchKeys={['make', 'model']}
             renderItem={(e) => `${e.make} ${e.model}`}
             renderDetail={(e) => [e.calibre, e.power_ftlb != null ? `${e.power_ftlb} ft·lb` : ''].filter(Boolean).join(' · ')}
+            renderImage={rifleImage}
+            fallbackImage={UNKNOWN_BRAND_IMAGE}
             onSelect={handleCatalogSelect}
             onManualEntry={() => setShowFields(true)}
             placeholder="Search rifles — e.g. HW100, Air Arms..."
@@ -402,6 +405,8 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
             searchKeys={['brand', 'model']}
             renderItem={(e) => `${e.brand} ${e.model}`}
             renderDetail={(e) => [e.head_size_mm != null ? `${e.head_size_mm}mm` : '', e.weight_grains != null ? `${e.weight_grains}gr` : ''].filter(Boolean).join(' · ')}
+            renderImage={pelletImage}
+            fallbackImage={UNKNOWN_BRAND_IMAGE}
             onSelect={handleCatalogSelect}
             onManualEntry={() => setShowFields(true)}
             placeholder="Search pellets — e.g. JSB Exact, H&N..."

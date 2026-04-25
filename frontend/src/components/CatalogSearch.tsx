@@ -6,6 +6,8 @@ interface CatalogSearchProps<T> {
   searchKeys: (keyof T)[]
   renderItem: (item: T) => string
   renderDetail?: (item: T) => string
+  renderImage?: (item: T) => string | undefined
+  fallbackImage?: string
   onSelect: (item: T) => void
   onManualEntry: () => void
   placeholder: string
@@ -19,6 +21,8 @@ export function CatalogSearch<T>({
   searchKeys,
   renderItem,
   renderDetail,
+  renderImage,
+  fallbackImage,
   onSelect,
   onManualEntry,
   placeholder,
@@ -105,28 +109,47 @@ export function CatalogSearch<T>({
           ref={listRef}
           className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded border border-subtle bg-surface shadow-lg"
         >
-          {filtered.map((item, i) => (
-            <li
-              key={i}
-              className={[
-                'px-3 py-2 cursor-pointer text-sm transition-colors',
-                i === activeIndex
-                  ? 'bg-[var(--brass)]/10 text-[var(--brass)]'
-                  : 'text-secondary hover:bg-surface-hover',
-              ].join(' ')}
-              onMouseEnter={() => setActiveIndex(i)}
-              onMouseDown={e => {
-                e.preventDefault()
-                onSelect(item)
-                setOpen(false)
-              }}
-            >
-              <span className="font-medium">{renderItem(item)}</span>
-              {renderDetail && (
-                <span className="ml-2 text-[11px] text-muted">{renderDetail(item)}</span>
-              )}
-            </li>
-          ))}
+          {filtered.map((item, i) => {
+            const src = renderImage?.(item)
+            return (
+              <li
+                key={i}
+                className={[
+                  'px-3 py-2 cursor-pointer text-sm transition-colors flex items-center gap-2',
+                  i === activeIndex
+                    ? 'bg-[var(--brass)]/10 text-[var(--brass)]'
+                    : 'text-secondary hover:bg-surface-hover',
+                ].join(' ')}
+                onMouseEnter={() => setActiveIndex(i)}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  onSelect(item)
+                  setOpen(false)
+                }}
+              >
+                {renderImage && (
+                  <img
+                    src={src}
+                    alt=""
+                    className="w-8 h-8 rounded object-contain bg-surface-hover flex-shrink-0"
+                    onError={e => {
+                      const img = e.currentTarget
+                      if (fallbackImage && img.src !== fallbackImage && !img.dataset.fallback) {
+                        img.dataset.fallback = '1'
+                        img.src = fallbackImage
+                      }
+                    }}
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{renderItem(item)}</span>
+                  {renderDetail && (
+                    <span className="ml-2 text-[11px] text-muted">{renderDetail(item)}</span>
+                  )}
+                </span>
+              </li>
+            )
+          })}
           {filtered.length === 0 && query.trim() && (
             <li className="px-3 py-2 text-sm text-muted">No matches found</li>
           )}
