@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useSearch, useNavigate, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, XCircle, AlertCircle, Lock, LogOut, Share2 } from 'lucide-react'
-import { leagueApi, LeagueStanding, LeagueScore } from '../api/leagues'
+import {
+  Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, AlertCircle,
+  Lock, LogOut, Share2, Flame, Trophy as TrophyIcon, Activity,
+  ListChecks, Inbox,
+} from 'lucide-react'
+import { leagueApi, type LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
@@ -14,6 +18,26 @@ import { toast } from '../store/toast'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import {
+  PageGrid,
+  EntityDetailHeader,
+  DisciplineThumb,
+  Section,
+  Tabs,
+  Badge,
+  EmptyState,
+  Avatar,
+  LeagueTable,
+  rankColumn,
+  shooterColumn,
+  cardsColumn,
+  bestColumn,
+  avgColumn,
+  recentColumn,
+  trendColumn,
+  type StandingRow,
+  type TabSpec,
+} from '../components/leagues'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -28,71 +52,23 @@ function normalizeInviteCode(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="text-[var(--brass)] font-mono text-sm font-semibold">1st</span>
-  if (rank === 2) return <span className="text-secondary font-mono text-sm font-semibold">2nd</span>
-  if (rank === 3) return <span className="text-amber-700 dark:text-amber-600 font-mono text-sm font-semibold">3rd</span>
-  return <span className="font-mono text-sm text-muted">{rank}th</span>
+type StandingsTab = 'table' | 'form' | 'history'
+type ScoreTab = '' | 'pending' | 'verified' | 'rejected'
+
+function statusBadge(verification: string) {
+  if (verification === 'verified') return <Badge variant="green">Verified</Badge>
+  if (verification === 'rejected') return <Badge variant="red">Rejected</Badge>
+  return <Badge variant="gold">Pending</Badge>
 }
 
-function VerificationDot({ status }: { status: string }) {
-  if (status === 'verified') return <span title="Verified by league admin"><CheckCircle size={14} className="text-[var(--success-text)] shrink-0" /></span>
-  if (status === 'rejected') return <span title="Rejected by league admin"><XCircle size={14} className="text-[var(--error-text)] shrink-0" /></span>
-  return <span title="Pending review by league admin"><AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0" /></span>
-}
-
-function LeagueScoreRow({ score }: { score: LeagueScore }) {
-  return (
-    <Link
-      to="/scores/$id"
-      params={{ id: score.id }}
-      className="flex items-center justify-between py-3 border-b border-subtle last:border-0"
-    >
-      <div className="min-w-0">
-        <p className="text-sm text-secondary truncate">{score.display_name}</p>
-        <p className="text-[11px] text-muted font-mono">{score.shot_at}</p>
-      </div>
-      <div className="flex items-center gap-3 font-mono shrink-0">
-        <VerificationDot status={score.verification} />
-        <span className="text-lg font-semibold text-primary">{score.total_score}</span>
-        {score.x_count > 0 && (
-          <span className="text-sm text-[var(--brass)]">{score.x_count}X</span>
-        )}
-      </div>
-    </Link>
-  )
-}
-
-function StandingRow({ standing }: { standing: LeagueStanding }) {
-  return (
-    <div className="flex items-center gap-3 py-3 border-b border-subtle last:border-0">
-      <div className="w-10 text-center">
-        <RankBadge rank={standing.rank} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-secondary truncate">{standing.display_name}</p>
-        <p className="text-[11px] text-muted">
-          {standing.card_count} card{standing.card_count !== 1 ? 's' : ''}
-        </p>
-      </div>
-      <div className="text-right font-mono shrink-0">
-        {standing.best_score != null ? (
-          <>
-            <span className="text-lg font-semibold text-primary">
-              {typeof standing.best_score === 'number' && !Number.isInteger(standing.best_score)
-                ? standing.best_score.toFixed(1)
-                : standing.best_score}
-            </span>
-            {standing.best_x != null && standing.best_x > 0 && (
-              <span className="text-xs text-[var(--brass)] ml-1.5">{standing.best_x}X</span>
-            )}
-          </>
-        ) : (
-          <span className="text-muted text-sm">—</span>
-        )}
-      </div>
-    </div>
-  )
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toISOString().slice(0, 10)
+  } catch {
+    return iso
+  }
 }
 
 export default function LeagueDetail() {
@@ -109,13 +85,12 @@ export default function LeagueDetail() {
   const [joinPending, setJoinPending] = useState(false)
   const [joinCode, setJoinCode] = useState(initialJoinCode)
   const [copied, setCopied] = useState(false)
-  const [scoreFilter, setScoreFilter] = useState<string>('')
+  const [scoreFilter, setScoreFilter] = useState<ScoreTab>('')
+  const [standingsTab, setStandingsTab] = useState<StandingsTab>('table')
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showShare, setShowShare] = useState(false)
 
-  useEffect(() => {
-    setJoinCode(initialJoinCode)
-  }, [initialJoinCode])
+  useEffect(() => { setJoinCode(initialJoinCode) }, [initialJoinCode])
 
   const { data: league, isLoading: leagueLoading, error: leagueError } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid'],
@@ -125,9 +100,6 @@ export default function LeagueDetail() {
   })
 
   const isLeaguePrivate = leagueError instanceof ApiError && leagueError.status === 404
-
-  // When the league detail is denied, fall back to the public summary so the
-  // UI can render a members-only banner with join CTA instead of a 404.
   const { data: leagueSummary } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid', 'summary'],
     queryFn: () => leagueApi.summary(leagueId!),
@@ -147,7 +119,7 @@ export default function LeagueDetail() {
     enabled: !!currentUser && !!leagueId,
   })
 
-  const { data: standings, isLoading: standingsLoading, isError, error: standingsError, refetch: refetchStandings } = useQuery({
+  const { data: standings, isLoading: standingsLoading, isError } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid', 'standings'],
     queryFn: () => leagueApi.standings(leagueId!),
     retry: 2,
@@ -160,11 +132,28 @@ export default function LeagueDetail() {
     enabled: !!leagueId,
   })
 
-  // Pending scores count for admin badge
+  const { data: allScoresData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'all-tally'],
+    queryFn: () => leagueApi.listScores(leagueId!, 200, 0),
+    enabled: !!leagueId,
+  })
+
   const { data: pendingData } = useQuery({
     queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'pending'],
     queryFn: () => leagueApi.listScores(leagueId!, 100, 0, 'pending'),
     enabled: !!leagueId && !!members?.items?.find(m => m.user_id === currentUser?.id)?.is_admin,
+  })
+
+  const { data: verifiedData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'verified-tally'],
+    queryFn: () => leagueApi.listScores(leagueId!, 200, 0, 'verified'),
+    enabled: !!leagueId,
+  })
+
+  const { data: rejectedData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'rejected-tally'],
+    queryFn: () => leagueApi.listScores(leagueId!, 200, 0, 'rejected'),
+    enabled: !!leagueId,
   })
 
   const isLoading = leagueLoading || standingsLoading
@@ -178,11 +167,8 @@ export default function LeagueDetail() {
       return leagueApi.join(leagueId, joinCode || undefined)
     },
     onSuccess: (data) => {
-      if (data.pending) {
-        setJoinPending(true)
-      } else {
-        setJoinSuccess(true)
-      }
+      if (data.pending) setJoinPending(true)
+      else setJoinSuccess(true)
       setJoinError('')
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
       if (leagueId) {
@@ -191,13 +177,9 @@ export default function LeagueDetail() {
       }
     },
     onError: (err: Error) => {
-      if (err instanceof ApiError && err.status === 409) {
-        setJoinError('You\'re already a member of this league.')
-      } else if (err instanceof ApiError && err.status === 403) {
-        setJoinError('Invalid or missing invite code.')
-      } else {
-        setJoinError('Failed to join. Please try again.')
-      }
+      if (err instanceof ApiError && err.status === 409) setJoinError("You're already a member of this league.")
+      else if (err instanceof ApiError && err.status === 403) setJoinError('Invalid or missing invite code.')
+      else setJoinError('Failed to join. Please try again.')
     },
   })
 
@@ -210,154 +192,168 @@ export default function LeagueDetail() {
       toast('Left league', 'success')
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
       queryClient.invalidateQueries({ queryKey: ['users', 'me', 'leagues'] })
-      if (leagueId) {
-        queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
-      }
+      if (leagueId) queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
       navigate({ to: '/leagues' })
     },
     onError: (err: Error) => {
       setConfirmLeave(false)
-      if (err instanceof ApiError && err.status === 409) {
-        toast('You are the last admin — promote another member before leaving.', 'error')
-      } else {
-        toast('Failed to leave league', 'error')
-      }
+      if (err instanceof ApiError && err.status === 409) toast('You are the last admin — promote another member before leaving.', 'error')
+      else toast('Failed to leave league', 'error')
     },
   })
 
   const canLeave = isMember && (!isAdmin || adminCount > 1)
-
   const joinPolicy = config?.join_policy ?? 'open'
   const scoringRule = config?.scoring_rule ?? 'highest'
 
+  // Build standings rows (with optional sparkline data computed from scores)
+  const standingsRows: StandingRow[] = useMemo(() => {
+    const items = standings?.items ?? []
+    const scoreMap = new Map<string, number[]>()
+    if (allScoresData?.items) {
+      for (const s of allScoresData.items) {
+        if (!scoreMap.has(s.user_id)) scoreMap.set(s.user_id, [])
+        scoreMap.get(s.user_id)!.push(s.total_score)
+      }
+    }
+    return items.map((s) => ({
+      id: s.user_id,
+      rank: s.rank,
+      name: s.display_name,
+      cards: s.card_count,
+      best: s.best_score ?? null,
+      bestX: s.best_x ?? null,
+      avg: typeof s.best_score === 'number' ? s.best_score : null,
+      recent: (scoreMap.get(s.user_id) ?? []).slice(0, 6).reverse(),
+      trend: null,
+      isMe: s.user_id === currentUser?.id,
+    }))
+  }, [standings, allScoresData, currentUser])
+
+  const podium = standingsRows.slice(0, 3)
+
+  const visibility: 'public' | 'private' = league?.type === 'private' ? 'private' : 'public'
+  const code = league?.join_code
+
   if (!leagueId) {
     return (
-      <div className="p-4 lg:p-8 max-w-lg mx-auto space-y-4">
-        <div className="flex items-center gap-3">
-          <Link to="/leagues" className="text-muted hover:text-secondary transition-colors">
-            <ChevronLeft size={20} />
-          </Link>
-          <h1 className="text-lg font-medium tracking-widest uppercase text-secondary">Invalid League Link</h1>
-        </div>
-        <p className="text-sm text-muted">
+      <PageGrid>
+        <EntityDetailHeader
+          onBack={() => navigate({ to: '/leagues' })}
+          thumb={<DisciplineThumb size={48} icon={<Trophy size={20} />} />}
+          title="Invalid League Link"
+        />
+        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
           This invite link is malformed. Open the league again from the app or ask for a fresh invite link.
         </p>
-      </div>
+      </PageGrid>
     )
   }
 
   if (isLeaguePrivate) {
     return (
-      <div className="p-4 lg:p-8 max-w-md mx-auto text-center space-y-3">
-        <Lock className="mx-auto text-muted" size={32} />
-        <h1 className="text-lg tracking-widest uppercase text-secondary">
-          {leagueSummary?.name ?? 'Private League'}
-        </h1>
-        {leagueSummary?.description && (
-          <p className="text-sm text-muted">{leagueSummary.description}</p>
-        )}
-        <p className="text-xs text-muted">
-          {leagueSummary
-            ? `This league is private — members only. ${leagueSummary.member_count} member${leagueSummary.member_count === 1 ? '' : 's'}.`
-            : 'This league is private or no longer exists. Ask an admin for an invite.'}
-        </p>
-        {leagueSummary && leagueId && (
-          <div className="pt-1 space-y-2 max-w-xs mx-auto">
-            {leagueSummary.join_policy === 'invite_code' && (
-              <input
-                type="text"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="INVITE CODE"
-                className="w-full bg-surface border border-subtle rounded px-2 py-1.5 text-sm text-secondary text-center font-mono tracking-widest focus:outline-none focus:border-[var(--brass)]/50"
-              />
-            )}
-            {currentUser && (
-              <button
-                onClick={() => joinMutation.mutate()}
-                disabled={joinMutation.isPending || (leagueSummary.join_policy === 'invite_code' && !joinCode)}
-                className="w-full px-3 py-1.5 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {leagueSummary.join_policy === 'approval' ? 'Request to join' : 'Join league'}
-              </button>
-            )}
-          </div>
-        )}
-        <Link
-          to="/leagues"
-          className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-        >
-          &larr; Back to leagues
-        </Link>
-      </div>
+      <PageGrid>
+        <div style={{ maxWidth: 420, margin: '40px auto', textAlign: 'center' }}>
+          <Lock size={32} style={{ color: 'var(--muted)' }} />
+          <h1 className="lc-display" style={{ fontSize: 22, marginTop: 12 }}>
+            {leagueSummary?.name ?? 'Private League'}
+          </h1>
+          {leagueSummary?.description && <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>{leagueSummary.description}</p>}
+          <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 12 }}>
+            {leagueSummary
+              ? `This league is private — members only. ${leagueSummary.member_count} member${leagueSummary.member_count === 1 ? '' : 's'}.`
+              : 'This league is private or no longer exists. Ask an admin for an invite.'}
+          </p>
+          {leagueSummary && leagueId && (
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280, marginLeft: 'auto', marginRight: 'auto' }}>
+              {leagueSummary.join_policy === 'invite_code' && (
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="INVITE CODE"
+                  style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)', textAlign: 'center', letterSpacing: '0.16em' }}
+                />
+              )}
+              {currentUser && (
+                <button
+                  className="lc-cta"
+                  onClick={() => joinMutation.mutate()}
+                  disabled={joinMutation.isPending || (leagueSummary.join_policy === 'invite_code' && !joinCode)}
+                >
+                  {leagueSummary.join_policy === 'approval' ? 'Request to join' : 'Join league'}
+                </button>
+              )}
+            </div>
+          )}
+          <Link to="/leagues" style={{ display: 'inline-block', marginTop: 18, color: 'var(--gold)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}>← Back to leagues</Link>
+        </div>
+      </PageGrid>
     )
   }
 
+  const allCount = scoresData ? scoresData.items.length : 0
+  const pendingCount = pendingData?.items.length ?? null
+  const verifiedCount = verifiedData?.items.length ?? null
+  const rejectedCount = rejectedData?.items.length ?? null
+  const totalCards = allScoresData?.items.length ?? 0
+
+  const scoreTabs: TabSpec<ScoreTab>[] = [
+    { value: '', label: 'All', count: allCount },
+    { value: 'pending', label: 'Pending', count: pendingCount },
+    { value: 'verified', label: 'Verified', count: verifiedCount },
+    { value: 'rejected', label: 'Rejected', count: rejectedCount },
+  ]
+
+  const standingsTabs: TabSpec<StandingsTab>[] = [
+    { value: 'table', label: 'Table', count: standingsRows.length },
+    { value: 'form', label: 'Form' },
+    { value: 'history', label: 'History' },
+  ]
+
   return (
-    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={smartBack}
-          aria-label="Back"
-          className="text-muted hover:text-secondary transition-colors"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        {league?.image_url && (
-          <img
-            src={league.image_url}
-            alt={league.name}
-            className="w-10 h-10 rounded-lg object-cover border border-subtle shrink-0"
-          />
-        )}
-        <div className="flex-1 min-w-0">
-          {leagueLoading ? (
-            <div className="h-5 w-40 bg-surface rounded animate-pulse" />
+    <PageGrid>
+      <EntityDetailHeader
+        onBack={smartBack}
+        thumb={
+          league?.image_url ? (
+            <img src={league.image_url} alt={league.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
           ) : (
-            <>
-              <div className="flex items-center gap-2 min-w-0">
-                <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary truncate">
-                  {league?.name ?? 'League'}
-                </h1>
-                <HelpIcon content={pageHelp.leagueDetail} />
-              </div>
-              {league?.description && (
-                <p className="text-xs text-muted truncate mt-0.5">{league.description}</p>
-              )}
-            </>
-          )}
-        </div>
-        <button
-          onClick={() => setShowShare(true)}
-          className="text-muted hover:text-[var(--brass)] transition-colors"
-          title="Share league"
-          aria-label="Share league"
-        >
-          <Share2 size={18} />
-        </button>
-        {canLeave && (
-          <button
-            onClick={() => setConfirmLeave(true)}
-            className="text-muted hover:text-[var(--error-text)] transition-colors"
-            title="Leave league"
-            aria-label="Leave league"
-          >
-            <LogOut size={18} />
-          </button>
-        )}
-        {isAdmin && (
-            <Link
-              to="/leagues/$id/settings"
-            params={{ id: leagueId }}
-            className="text-muted hover:text-[var(--brass)] transition-colors"
-            title="League Settings"
-          >
-            <Settings size={18} />
-          </Link>
-        )}
-      </div>
+            <DisciplineThumb size={48} icon={<Trophy size={20} />} />
+          )
+        }
+        title={leagueLoading ? '…' : (league?.name ?? 'League')}
+        tag={
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            {visibility === 'private' && <Badge variant="neutral"><Lock size={10} /> Private</Badge>}
+            <HelpIcon content={pageHelp.leagueDetail} />
+          </span>
+        }
+        sub={
+          <>
+            {league?.description && <span>{league.description}</span>}
+            {league?.description && <span className="lc-detail-sub-sep">·</span>}
+            <span><Users size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {league?.member_count ?? 0} shooters</span>
+            {code && (<>
+              <span className="lc-detail-sub-sep">·</span>
+              <span style={{ fontFamily: 'var(--mono)' }}><Lock size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {code}</span>
+            </>)}
+          </>
+        }
+        rightActions={
+          <>
+            <button className="lc-icon-btn" onClick={() => setShowShare(true)} aria-label="Share"><Share2 size={14} /></button>
+            {canLeave && (
+              <button className="lc-icon-btn" onClick={() => setConfirmLeave(true)} aria-label="Leave"><LogOut size={14} /></button>
+            )}
+            {isAdmin && leagueId && (
+              <Link to="/leagues/$id/settings" params={{ id: leagueId }} className="lc-icon-btn" aria-label="Settings">
+                <Settings size={14} />
+              </Link>
+            )}
+          </>
+        }
+      />
 
       {showShare && league && leagueId && (
         <ShareDialog
@@ -373,278 +369,239 @@ export default function LeagueDetail() {
       <ConfirmDialog
         open={confirmLeave}
         title="Leave league?"
-        message={
-          isAdmin
-            ? 'You will lose admin access and will need to rejoin (and be re-promoted) to return.'
-            : 'You will need to rejoin to submit scores or see members-only posts.'
-        }
+        message={isAdmin ? 'You will lose admin access and will need to rejoin (and be re-promoted) to return.' : 'You will need to rejoin to submit scores or see members-only posts.'}
         confirmLabel="Leave"
         onConfirm={() => leaveMutation.mutate()}
         onCancel={() => setConfirmLeave(false)}
       />
 
-      {/* Join action */}
-      {!isMember && !joinSuccess && !joinPending && (
-        <div className="border border-subtle rounded p-3 lg:p-4 bg-surface space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-muted text-xs tracking-widest uppercase">
-              <Users size={14} />
-              {joinPolicy === 'open' && 'Public league'}
-              {joinPolicy === 'invite_code' && 'Invite code required'}
-              {joinPolicy === 'approval' && 'Admin approval required'}
+      <div className="lc-stack-lg">
+        {/* Submit Score CTA */}
+        {(isMember || joinSuccess) && (
+          <Link to="/scores/new" search={{ leagueId, roundId: undefined }} className="lc-cta" style={{ textDecoration: 'none' }}>
+            <PenLine size={16} /> Submit Score
+          </Link>
+        )}
+
+        {/* Join action */}
+        {!isMember && !joinSuccess && !joinPending && (
+          <div className="lc-section" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                <Users size={14} />
+                {joinPolicy === 'open' && 'Public league'}
+                {joinPolicy === 'invite_code' && 'Invite code required'}
+                {joinPolicy === 'approval' && 'Admin approval required'}
+              </div>
+              {(joinPolicy === 'open' || joinPolicy === 'approval') && (
+                <button onClick={() => { setJoinError(''); joinMutation.mutate() }} disabled={joinMutation.isPending} className="lc-action-ghost" style={{ background: 'var(--gold)', color: 'white' }}>
+                  {joinMutation.isPending ? 'Joining…' : (joinPolicy === 'approval' ? 'Request to Join' : 'Join')}
+                </button>
+              )}
             </div>
-            {joinPolicy === 'open' && (
-              <button
-                onClick={() => { setJoinError(''); joinMutation.mutate() }}
-                disabled={joinMutation.isPending}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
-              >
-                {joinMutation.isPending ? 'Joining…' : 'Join'}
-              </button>
-            )}
-            {joinPolicy === 'approval' && (
-              <button
-                onClick={() => { setJoinError(''); joinMutation.mutate() }}
-                disabled={joinMutation.isPending}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
-              >
-                {joinMutation.isPending ? 'Requesting...' : 'Request to Join'}
-              </button>
+            {joinPolicy === 'invite_code' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value)}
+                  placeholder="Enter invite code"
+                  style={{ flex: 1, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)' }}
+                />
+                <button onClick={() => { setJoinError(''); joinMutation.mutate() }} disabled={joinMutation.isPending || !joinCode.trim()} className="lc-action-ghost" style={{ background: 'var(--gold)', color: 'white' }}>
+                  {joinMutation.isPending ? 'Joining…' : 'Join'}
+                </button>
+              </div>
             )}
           </div>
+        )}
 
-          {joinPolicy === 'invite_code' && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={joinCode}
-                onChange={e => setJoinCode(e.target.value)}
-                placeholder="Enter invite code"
-                className="flex-1 bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors font-mono"
-              />
-              <button
-                onClick={() => { setJoinError(''); joinMutation.mutate() }}
-                disabled={joinMutation.isPending || !joinCode.trim()}
-                className="text-[11px] tracking-widest uppercase bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium px-4 py-1.5 rounded transition-opacity"
-              >
-                {joinMutation.isPending ? 'Joining…' : 'Join'}
-              </button>
+        {joinSuccess && (
+          <div className="lc-status-row"><Trophy size={14} /> You've joined this league</div>
+        )}
+        {joinPending && (
+          <div className="lc-status-row warn"><Users size={14} /> Your request is pending admin approval</div>
+        )}
+        {joinError && <p style={{ color: 'var(--red)', fontSize: 12 }}>{joinError}</p>}
+
+        {/* Code copy */}
+        {isMember && code && (
+          <button
+            onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+            style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: 0 }}
+          >
+            {copied ? <Check size={12} style={{ color: 'var(--green)' }} /> : <Copy size={12} />}
+            {copied ? 'Copied!' : `Code: ${code}`}
+          </button>
+        )}
+
+        {/* Status row */}
+        {isAdmin && pendingData && pendingData.items.length === 0 && (
+          <div className="lc-status-row"><CheckCircle size={14} /> All scores reviewed</div>
+        )}
+        {isAdmin && pendingData && pendingData.items.length > 0 && (
+          <div className="lc-status-row warn"><AlertCircle size={14} /> {pendingData.items.length} score{pendingData.items.length !== 1 ? 's' : ''} pending review</div>
+        )}
+
+        {/* Standings — full width */}
+        <Section
+          title="Standings"
+          icon={<TrophyIcon size={12} />}
+          tabs={<Tabs<StandingsTab> tabs={standingsTabs} active={standingsTab} onChange={setStandingsTab} />}
+        >
+          {isLoading && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading standings…</div>
+          )}
+          {isError && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--red)' }}>Failed to load standings.</div>
+          )}
+          {standings && standingsRows.length === 0 && (
+            <EmptyState
+              icon={<TrophyIcon size={42} />}
+              title="No cards yet"
+              body="Be the first to submit a score and claim the top spot."
+            />
+          )}
+          {standings && standingsRows.length > 0 && (
+            <LeagueTable<StandingRow>
+              rows={standingsRows}
+              columns={[
+                rankColumn(),
+                shooterColumn(),
+                cardsColumn(),
+                bestColumn(),
+                ...(scoringRule === 'average' ? [avgColumn<StandingRow>()] : []),
+                ...(standingsTab === 'form' ? [recentColumn<StandingRow>()] : []),
+                trendColumn(),
+              ]}
+              initialSortKey="rank"
+              initialSortDir="asc"
+            />
+          )}
+        </Section>
+
+        {/* Two-column row */}
+        <div className="lc-grid-2">
+          <Section title="Podium" icon={<TrophyIcon size={12} />}>
+            {podium.length === 0 ? (
+              <EmptyState icon={<TrophyIcon size={36} />} title="No podium yet" body="Submit cards to populate the podium." />
+            ) : (
+              <div className="lc-podium-list">
+                {podium.map((p) => (
+                  <div className="lc-podium-row" key={p.id}>
+                    <div className="lc-podium-rank-tile">{p.rank}</div>
+                    <Avatar name={p.name} size="md" />
+                    <div>
+                      <div className="lc-podium-name">{p.name}</div>
+                      <div className="lc-podium-meta">
+                        {p.best ?? '—'}
+                        {p.bestX != null && <span style={{ marginLeft: 6, color: 'var(--gold)' }}>· {p.bestX}X</span>}
+                      </div>
+                    </div>
+                    {p.rank === 1 && <Flame size={14} className="lc-podium-flame" />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+          <Section title="League Info" icon={<Activity size={12} />}>
+            <div className="lc-kv">
+              <div className="lc-kv-row">
+                <span className="lc-kv-key">Visibility</span>
+                <span className="lc-kv-val serif">
+                  <span className={`lc-vdot ${visibility === 'private' ? 'lc-vdot-private' : 'lc-vdot-public'}`} />
+                  {visibility}
+                </span>
+              </div>
+              <div className="lc-kv-row">
+                <span className="lc-kv-key">Cards submitted</span>
+                <span className="lc-kv-val">{totalCards}</span>
+              </div>
+              <div className="lc-kv-row">
+                <span className="lc-kv-key">Scoring</span>
+                <span className="lc-kv-val serif">{scoringRule === 'average' ? 'Average' : 'Best'}</span>
+              </div>
+              {code && (
+                <div className="lc-kv-row">
+                  <span className="lc-kv-key">Code</span>
+                  <span className="lc-kv-val">{code}</span>
+                </div>
+              )}
+            </div>
+          </Section>
+        </div>
+
+        {/* Submitted Scores */}
+        <Section
+          title="Submitted Scores"
+          icon={<ListChecks size={12} />}
+          tabs={<Tabs<ScoreTab> tabs={scoreTabs} active={scoreFilter} onChange={setScoreFilter} />}
+        >
+          {scoresLoading && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
+          )}
+          {scoresData && scoresData.items.length === 0 && (
+            <EmptyState
+              icon={<Inbox size={42} />}
+              title={scoreFilter ? `No ${scoreFilter} scores` : 'No scores submitted yet'}
+            />
+          )}
+          {scoresData && scoresData.items.length > 0 && (
+            <div className="lc-list">
+              {scoresData.items.map((s) => <ScoreRow key={s.id} score={s} />)}
             </div>
           )}
-        </div>
-      )}
+        </Section>
 
-      {joinSuccess && (
-        <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 lg:p-4 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
-          <Trophy size={14} />
-          You've joined this league
-        </div>
-      )}
-
-      {joinPending && (
-        <div className="flex items-center gap-2 border border-amber-500/20 rounded p-3 lg:p-4 bg-amber-500/5 text-amber-600 dark:text-amber-400 text-xs tracking-widest uppercase">
-          <Users size={14} />
-          Your request is pending admin approval
-        </div>
-      )}
-
-      {joinError && (
-        <p className="text-amber-600 dark:text-amber-400 text-xs">{joinError}</p>
-      )}
-
-      {/* Join code — shown to members when league has an invite code */}
-      {isMember && league?.join_code && (
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(league.join_code!)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-          }}
-          className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-          title="Copy join code"
-          aria-label="Copy join code"
-        >
-          {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
-          {copied ? 'Copied!' : `Code: ${league.join_code}`}
-        </button>
-      )}
-
-      {/* Submit Score — shown to members */}
-      {(isMember || joinSuccess) && (
-        <Link
-          to="/scores/new"
-          search={{ leagueId, roundId: undefined }}
-          className="flex items-center justify-center gap-2 w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors bg-[var(--brass)] text-inverse hover:opacity-90"
-        >
-          <PenLine size={16} />
-          Submit Score
-        </Link>
-      )}
-
-      {/* Standings */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">Standings</h2>
-          <span className="text-[11px] tracking-widest uppercase text-muted">
-            {scoringRule === 'average' ? 'Avg score' : 'Best score'}
-          </span>
-        </div>
-
-        {isLoading && (
-          <div className="space-y-px pt-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-surface rounded animate-pulse" />
-            ))}
-          </div>
-        )}
-
-        {isError && (
-          <div className="pt-2 space-y-2">
-            <p className="text-[var(--error-text)] text-sm">
-              {standingsError instanceof Error && standingsError.message.includes('401')
-                ? 'Session expired. Please log in again.'
-                : 'Failed to load standings.'}
-            </p>
-            <button
-              onClick={() => refetchStandings()}
-              className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {standings && standings.items.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted text-sm tracking-widest uppercase">No members yet</p>
-          </div>
-        )}
-
-        {standings && standings.items.length > 0 && (
-          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
-            {standings.items.map(standing => (
-              <StandingRow key={standing.user_id} standing={standing} />
-            ))}
-          </div>
+        {/* Feed */}
+        {isMember && league && (
+          <LeagueFeed leagueId={league.id} postVisibility={league.post_visibility} />
         )}
       </div>
-
-      {/* Admin: Pending Review */}
-      {isAdmin && pendingData && pendingData.items.length > 0 && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[11px] tracking-widest uppercase text-muted">Review Scores</h2>
-            <span className="bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded">
-              {pendingData.items.length}
-            </span>
-          </div>
-          <div className="border border-amber-500/20 rounded bg-amber-500/5 px-3 lg:px-4 mt-2">
-            {pendingData.items.map(score => (
-              <LeagueScoreRow key={score.id} score={score} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {isAdmin && pendingData && pendingData.items.length === 0 && (
-        <div className="flex items-center gap-2 border border-[var(--success-border)] rounded p-3 bg-[var(--success-bg)] text-[var(--success-text)] text-xs tracking-widest uppercase">
-          <CheckCircle size={14} />
-          All scores reviewed
-        </div>
-      )}
-
-      {/* Submitted Scores */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">Submitted Scores</h2>
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1 pt-1">
-          {[
-            { value: '', label: 'All' },
-            { value: 'pending', label: 'Pending' },
-            { value: 'verified', label: 'Verified' },
-            { value: 'rejected', label: 'Rejected' },
-          ].map(tab => (
-            <button
-              key={tab.value}
-              onClick={() => setScoreFilter(tab.value)}
-              className={[
-                'text-[10px] tracking-widest uppercase px-2.5 py-1 rounded transition-colors',
-                scoreFilter === tab.value
-                  ? 'bg-[var(--brass)]/15 text-[var(--brass)] font-medium'
-                  : 'text-muted hover:text-secondary',
-              ].join(' ')}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {scoresLoading && (
-          <div className="space-y-px pt-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-12 bg-surface rounded animate-pulse" />
-            ))}
-          </div>
-        )}
-
-        {scoresData && scoresData.items.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted text-sm tracking-widest uppercase">
-              {scoreFilter ? `No ${scoreFilter} scores` : 'No scores submitted yet'}
-            </p>
-          </div>
-        )}
-
-        {scoresData && scoresData.items.length > 0 && (
-          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
-            {scoresData.items.map(score => (
-              <LeagueScoreRow key={score.id} score={score} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* League Feed */}
-      {isMember && league && (
-        <LeagueFeed leagueId={league.id} postVisibility={league.post_visibility} />
-      )}
-    </div>
+    </PageGrid>
   )
 }
 
-function LeagueFeed({
-  leagueId,
-  postVisibility,
-}: {
-  leagueId: string
-  postVisibility: 'members' | 'public'
-}) {
+function ScoreRow({ score }: { score: LeagueScore }) {
+  return (
+    <Link to="/scores/$id" params={{ id: score.id }} className="lc-score-row" style={{ textDecoration: 'none', color: 'inherit' }}>
+      <Avatar name={score.display_name} size="md" />
+      <div style={{ minWidth: 0 }}>
+        <div className="lc-score-name">{score.display_name}</div>
+        <div className="lc-score-date">{formatDate(score.shot_at)}</div>
+      </div>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+        {statusBadge(score.verification)}
+        <div style={{ textAlign: 'right' }}>
+          <span className="lc-score-val">{score.total_score}</span>
+          {score.x_count > 0 && <span className="lc-score-x">{score.x_count}X</span>}
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function LeagueFeed({ leagueId, postVisibility }: { leagueId: string; postVisibility: 'members' | 'public' }) {
   const { data } = useQuery({
     queryKey: ['league', leagueId, 'posts'],
     queryFn: () => postApi.listByLeague(leagueId),
   })
-
   const posts = data?.items ?? []
-
   return (
-    <div className="space-y-3">
-      <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
-        Feed
-      </h2>
-      <PostComposer
-        leagueId={leagueId}
-        queryKey={['league', leagueId, 'posts']}
-        groupPostVisibility={postVisibility}
-      />
-      {posts.length === 0 && (
-        <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
-      )}
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </div>
+    <Section title="Feed" icon={<Activity size={12} />}>
+      <div style={{ padding: 16 }}>
+        <PostComposer
+          leagueId={leagueId}
+          queryKey={['league', leagueId, 'posts']}
+          groupPostVisibility={postVisibility}
+        />
+        {posts.length === 0 && (
+          <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>No posts yet — be the first.</p>
+        )}
+        <div className="lc-stack" style={{ marginTop: 12 }}>
+          {posts.map((post) => <PostCard key={post.id} post={post} />)}
+        </div>
+      </div>
+    </Section>
   )
 }

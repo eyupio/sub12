@@ -24,6 +24,7 @@ type CreatePelletInput struct {
 	WeightGrains *float64 `json:"weight_grains"`
 	BatchCode    *string  `json:"batch_code"`
 	Notes        *string  `json:"notes"`
+	ImageURL     *string  `json:"image_url"`
 }
 
 type UpdatePelletInput struct {

@@ -1,12 +1,24 @@
-import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, ChevronRight, X } from 'lucide-react'
-import { leagueApi, CreateLeaguePayload, MyLeagueSummary } from '../api/leagues'
+import { Plus, Users, Lock, Trophy, X, FileText } from 'lucide-react'
+import { leagueApi, CreateLeaguePayload, MyLeagueSummary, type League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import {
+  PageGrid,
+  PageHeader,
+  StatsStrip,
+  FilterRow,
+  EmptyState,
+  EntityCard,
+  Badge,
+  VisibilityDot,
+  type StatCell,
+} from '../components/leagues'
+
+type Filter = 'all' | 'active' | 'joined' | 'owned' | 'closed'
 
 function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -43,7 +55,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const toggleCls = (active: boolean) =>
     `flex-1 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
       active
-        ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+        ? 'border-[var(--gold)]/50 bg-[var(--gold-tint)] text-[var(--gold)]'
         : 'border-subtle text-muted hover:text-secondary'
     }`
 
@@ -66,7 +78,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Club Winter Series 2026"
-              className="w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors"
+              className="w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors"
               autoFocus
             />
           </div>
@@ -78,7 +90,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
               onChange={e => setDescription(e.target.value)}
               placeholder="What's this league for?"
               rows={2}
-              className="w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors resize-none"
+              className="w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors resize-none"
             />
           </div>
 
@@ -105,9 +117,6 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted">
-              {scoringRule === 'highest' ? 'Rank members by their single best score.' : 'Rank members by their average across all scores.'}
-            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -124,7 +133,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
                   onClick={() => setJoinPolicy(opt.value)}
                   className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${
                     joinPolicy === opt.value
-                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      ? 'border-[var(--gold)]/50 bg-[var(--gold-tint)] text-[var(--gold)]'
                       : 'border-subtle text-muted hover:text-secondary'
                   }`}
                 >
@@ -140,7 +149,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="w-full bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-opacity"
+            className="w-full bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-opacity"
           >
             {mutation.isPending ? 'Creating…' : 'Create League'}
           </button>
@@ -150,60 +159,15 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function ordinal(n: number): string {
-  if (n <= 0) return '—'
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
-
-function LeagueRow({ league, myLeague }: { league: import('../api/leagues').League; myLeague?: MyLeagueSummary }) {
-  return (
-    <Link
-      to="/leagues/$id"
-      params={{ id: league.id }}
-      className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
-    >
-      {league.image_url ? (
-        <img
-          src={league.image_url}
-          alt={league.name}
-          className="w-9 h-9 rounded-lg object-cover border border-subtle shrink-0"
-        />
-      ) : (
-        <div className="w-9 h-9 rounded-lg border border-subtle shrink-0 bg-surface-hover flex items-center justify-center">
-          <Users size={16} className="text-muted opacity-40" />
-        </div>
-      )}
-      <div className="space-y-0.5 min-w-0 flex-1">
-        <p className="text-sm text-secondary font-medium truncate">{league.name}</p>
-        {league.description && (
-          <p className="text-[11px] text-muted truncate">{league.description}</p>
-        )}
-        <div className="flex items-center gap-1 text-muted">
-          <Users size={10} />
-          <span className="text-[11px]">{league.member_count}</span>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 ml-3 shrink-0">
-        {myLeague && myLeague.user_rank > 0 ? (
-          <div className="text-right font-mono">
-            <span className="text-sm text-primary">{ordinal(myLeague.user_rank)}</span>
-            <span className="text-[11px] text-muted ml-0.5">/{league.member_count}</span>
-            {league.member_count >= 5 && (
-              <p className="text-[10px] text-muted mt-0.5">top {Math.round((myLeague.user_rank / league.member_count) * 100)}%</p>
-            )}
-          </div>
-        ) : (
-          <ChevronRight size={16} className="text-muted" />
-        )}
-      </div>
-    </Link>
-  )
+function shortCode(joinCode?: string): string {
+  if (!joinCode) return ''
+  return joinCode.slice(0, 4).toUpperCase()
 }
 
 export default function Leagues() {
   const [showCreate, setShowCreate] = useState(false)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [search, setSearch] = useState('')
   const user = useAuthStore((s) => s.user)
 
   const { data, isLoading, isError } = useQuery({
@@ -217,61 +181,145 @@ export default function Leagues() {
     enabled: !!user,
   })
 
-  const myLeagueMap = new Map(
-    myLeagues?.items?.map((l) => [l.id, l]) ?? [],
+  const myLeagueMap = useMemo(
+    () => new Map<string, MyLeagueSummary>((myLeagues?.items ?? []).map((l) => [l.id, l])),
+    [myLeagues],
   )
 
+  const filtered: League[] = useMemo(() => {
+    const all = data?.items ?? []
+    const q = search.trim().toLowerCase()
+    return all.filter((l) => {
+      if (q && !l.name.toLowerCase().includes(q)) return false
+      const isJoined = myLeagueMap.has(l.id)
+      const isOwned = user?.id === l.created_by
+      switch (filter) {
+        case 'all': return true
+        case 'active': return true
+        case 'joined': return isJoined
+        case 'owned': return isOwned
+        case 'closed': return false
+        default: return true
+      }
+    })
+  }, [data, filter, search, myLeagueMap, user])
+
+  const stats: StatCell[] = useMemo(() => {
+    const joined = myLeagues?.items?.length ?? 0
+    const bestRank = (myLeagues?.items ?? []).reduce(
+      (acc, l) => (l.user_rank > 0 && (acc === 0 || l.user_rank < acc) ? l.user_rank : acc),
+      0,
+    )
+    const bestRankLeague = (myLeagues?.items ?? []).find((l) => l.user_rank === bestRank && bestRank > 0)
+    return [
+      { label: 'Joined', value: joined, sub: joined > 0 ? `across ${joined} league${joined !== 1 ? 's' : ''}` : 'none yet' },
+      {
+        label: 'Best Position',
+        value: bestRank > 0 ? bestRank : '—',
+        unit: bestRank > 0 ? <sup style={{ fontSize: 11 }}>{ordinalSuffix(bestRank)}</sup> : null,
+        sub: bestRankLeague?.name,
+      },
+      { label: 'Available', value: data?.items?.length ?? 0, sub: 'leagues' },
+      { label: 'Owned', value: (data?.items ?? []).filter(l => l.created_by === user?.id).length, sub: 'created by you' },
+    ]
+  }, [myLeagues, data, user])
+
   return (
-    <>
-      <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Leagues</h1>
-            <HelpIcon content={pageHelp.leagues} />
-          </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-          >
-            <Plus size={14} />
-            New
+    <PageGrid>
+      <PageHeader
+        title="Leagues"
+        info={<HelpIcon content={pageHelp.leagues} />}
+        action={
+          <button className="lc-action-ghost" onClick={() => setShowCreate(true)}>
+            <Plus size={14} /> New
           </button>
-        </div>
+        }
+      />
+
+      <div className="lc-stack">
+        <StatsStrip cells={stats} />
+        <FilterRow<Filter>
+          search={search}
+          onSearch={setSearch}
+          placeholder="Search leagues…"
+          chips={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'joined', label: 'Joined' },
+            { value: 'owned', label: 'Owned' },
+            { value: 'closed', label: 'Closed' },
+          ]}
+          activeChip={filter}
+          onChip={setFilter}
+        />
 
         {isLoading && (
-          <div className="space-y-2">
+          <div className="lc-stack" aria-busy>
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-14 rounded border border-subtle bg-surface animate-pulse" />
+              <div key={i} style={{ height: 88, borderRadius: 'var(--radius-lg)', background: 'var(--lc-surface)', border: '1px solid var(--line)', opacity: 0.6 }} />
             ))}
           </div>
         )}
 
-        {isError && (
-          <p className="text-[var(--error-text)] text-sm">Failed to load leagues.</p>
+        {isError && <p style={{ color: 'var(--red)' }}>Failed to load leagues.</p>}
+
+        {data && filtered.length === 0 && (
+          <EmptyState
+            icon={<Trophy size={42} />}
+            title="No leagues here"
+            body={search || filter !== 'all' ? 'Try a different search or filter.' : 'Create the first league to get started.'}
+            cta={
+              <button className="lc-action-ghost" onClick={() => setShowCreate(true)}>
+                <Plus size={14} /> New league
+              </button>
+            }
+          />
         )}
 
-        {data && data.items.length === 0 && (
-          <div className="text-center py-16 space-y-3">
-            <p className="text-muted text-sm tracking-widest uppercase">No leagues yet</p>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="inline-block text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              Create the first one →
-            </button>
-          </div>
-        )}
-
-        {data && data.items.length > 0 && (
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {data.items.map(league => (
-              <LeagueRow key={league.id} league={league} myLeague={myLeagueMap.get(league.id)} />
-            ))}
+        {data && filtered.length > 0 && (
+          <div className="lc-stack">
+            {filtered.map((league) => {
+              const myInfo = myLeagueMap.get(league.id)
+              const visibility = league.type === 'private' ? 'private' : 'public'
+              const code = shortCode(league.join_code)
+              const meta = [
+                { icon: <Users size={12} />, text: `${league.member_count} shooter${league.member_count !== 1 ? 's' : ''}` },
+                { icon: <FileText size={12} />, text: `${league.member_count > 0 ? '—' : '0'} cards` },
+                { icon: <VisibilityDot visibility={visibility} />, text: visibility },
+                ...(code ? [{ icon: null, text: <span className="lc-code-chip"><span className="lc-code-label">CODE</span>{code}</span> }] : []),
+              ]
+              return (
+                <EntityCard
+                  key={league.id}
+                  to="/leagues/$id"
+                  toParams={{ id: league.id }}
+                  thumbImage={league.image_url}
+                  name={league.name}
+                  badges={
+                    <>
+                      {visibility === 'private' && <Badge variant="neutral"><Lock size={10} /> Private</Badge>}
+                    </>
+                  }
+                  meta={meta}
+                  rightRail={myInfo && myInfo.user_rank > 0 ? 'rank' : 'chevron'}
+                  rank={myInfo && myInfo.user_rank > 0 ? {
+                    position: myInfo.user_rank,
+                    total: league.member_count,
+                  } : null}
+                />
+              )
+            })}
           </div>
         )}
       </div>
 
       {showCreate && <CreateLeagueModal onClose={() => setShowCreate(false)} />}
-    </>
+    </PageGrid>
   )
+}
+
+function ordinalSuffix(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return s[(v - 20) % 10] || s[v] || s[0]
 }

@@ -72,6 +72,11 @@
 
     --mobile-nav-height: 76px;
     --mobile-nav-offset: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+
+    /* Aliases consumed by the Leagues/Clubs redesign */
+    --lc-surface: var(--surface);
+    --serif: 'Cormorant Garamond', 'Times New Roman', serif;
+    --ui: 'Inter', 'DM Sans', system-ui, sans-serif;
   }
 
   /* ── Dark mode ────────────────────────────────────────── */
@@ -133,6 +138,10 @@
     --success-bg: var(--green-soft);
     --success-border: rgba(135, 176, 109, 0.35);
     --success-text: var(--green);
+
+    /* Aliases consumed by the Leagues/Clubs redesign */
+    --lc-surface: var(--surface);
+    --gold-soft: #8a6a25;
   }
 
   html {
