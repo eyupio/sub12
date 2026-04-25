@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
 
 // mockScoreCardRepo is a minimal stub that lets us test service-level
@@ -22,6 +23,8 @@ type mockScoreCardRepo struct {
 	lastXCount        int16
 	// card is returned from GetByID; if nil, a placeholder is returned.
 	card *model.ScoreCard
+	// priorStats overrides the GetPriorScoreStats response when non-nil.
+	priorStats *repository.PriorScoreStats
 }
 
 func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
@@ -49,6 +52,9 @@ func (m *mockScoreCardRepo) GetByID(_ context.Context, _, _ string) (*model.Scor
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
 func (m *mockScoreCardRepo) GetPublicByID(_ context.Context, _ string) (*model.ScoreCard, error) {
+	if m.card != nil {
+		return m.card, nil
+	}
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
 func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ string, _ string) ([]*model.ScoreCardSummary, error) {
@@ -68,6 +74,12 @@ func (m *mockScoreCardRepo) Delete(_ context.Context, _, _ string) error {
 }
 func (m *mockScoreCardRepo) IsPersonalBest(_ context.Context, _, _ string, _ int16) (bool, error) {
 	return false, nil
+}
+func (m *mockScoreCardRepo) GetPriorScoreStats(_ context.Context, _, _ string) (*repository.PriorScoreStats, error) {
+	if m.priorStats != nil {
+		return m.priorStats, nil
+	}
+	return &repository.PriorScoreStats{}, nil
 }
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
@@ -362,6 +374,75 @@ func TestCreate_LeagueSubmission_RequiresMembership(t *testing.T) {
 	})
 	assert.ErrorIs(t, err, ErrNotLeagueMember)
 	assert.False(t, repo.createCalled)
+}
+
+// --- GetForViewerWithAuthor: PB / running_avg derivation ---
+
+func TestGetForViewerWithAuthor_NoPriorScores_NoPBNoRunningAvg(t *testing.T) {
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID: "card-1", UserID: "owner", TotalScore: 200, Visibility: "public",
+		},
+		priorStats: &repository.PriorScoreStats{Count: 0},
+	}
+	svc := &ScoreCardService{cards: repo}
+
+	out, err := svc.GetForViewerWithAuthor(context.Background(), "card-1", "owner")
+	require.NoError(t, err)
+	assert.False(t, out.IsPB)
+	assert.Nil(t, out.PBDelta)
+	assert.Nil(t, out.RunningAvg)
+}
+
+func TestGetForViewerWithAuthor_NewBest_FlagsPBAndDelta(t *testing.T) {
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID: "card-1", UserID: "owner", TotalScore: 233, Visibility: "public",
+		},
+		priorStats: &repository.PriorScoreStats{Count: 5, PreviousMax: 229, Mean: 220.6},
+	}
+	svc := &ScoreCardService{cards: repo}
+
+	out, err := svc.GetForViewerWithAuthor(context.Background(), "card-1", "owner")
+	require.NoError(t, err)
+	assert.True(t, out.IsPB)
+	require.NotNil(t, out.PBDelta)
+	assert.Equal(t, int16(4), *out.PBDelta)
+	require.NotNil(t, out.RunningAvg)
+	assert.InDelta(t, 220.6, *out.RunningAvg, 0.01)
+}
+
+func TestGetForViewerWithAuthor_NotABest_NoPBButRunningAvg(t *testing.T) {
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID: "card-1", UserID: "owner", TotalScore: 215, Visibility: "public",
+		},
+		priorStats: &repository.PriorScoreStats{Count: 5, PreviousMax: 229, Mean: 220.6},
+	}
+	svc := &ScoreCardService{cards: repo}
+
+	out, err := svc.GetForViewerWithAuthor(context.Background(), "card-1", "owner")
+	require.NoError(t, err)
+	assert.False(t, out.IsPB)
+	assert.Nil(t, out.PBDelta)
+	require.NotNil(t, out.RunningAvg)
+	assert.InDelta(t, 220.6, *out.RunningAvg, 0.01)
+}
+
+func TestGetForViewerWithAuthor_TieIsNotPB(t *testing.T) {
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID: "card-1", UserID: "owner", TotalScore: 229, Visibility: "public",
+		},
+		priorStats: &repository.PriorScoreStats{Count: 1, PreviousMax: 229, Mean: 229},
+	}
+	svc := &ScoreCardService{cards: repo}
+
+	out, err := svc.GetForViewerWithAuthor(context.Background(), "card-1", "owner")
+	require.NoError(t, err)
+	assert.False(t, out.IsPB)
+	assert.Nil(t, out.PBDelta)
+	require.NotNil(t, out.RunningAvg)
 }
 
 func TestCreate_LeagueSubmission_MemberSucceeds(t *testing.T) {

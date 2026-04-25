@@ -174,8 +174,10 @@ type LeagueMember struct {
 
 // ScoreCardLeague is a lightweight league reference resolved from a score card.
 type ScoreCardLeague struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	RoundID   *string `json:"round_id,omitempty"`
+	RoundName *string `json:"round_name,omitempty"`
 }
 
 type MyLeagueSummary struct {

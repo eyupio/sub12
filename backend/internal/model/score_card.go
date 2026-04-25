@@ -11,6 +11,8 @@ type ScoreCard struct {
 	Location      *string   `json:"location,omitempty"`
 	WindMPH       *float64  `json:"wind_mph,omitempty"`
 	TempCelsius   *float64  `json:"temp_celsius,omitempty"`
+	DistanceM     *int      `json:"distance_m,omitempty"`
+	Discipline    *string   `json:"discipline,omitempty"`
 	Notes         *string   `json:"notes,omitempty"`
 	ShotScores    []int16   `json:"shot_scores"`
 	ShotXs        []bool    `json:"shot_xs"`
@@ -39,6 +41,8 @@ type QuickCreateScoreCardInput struct {
 	Location      *string  `json:"location"`
 	WindMPH       *float64 `json:"wind_mph"`
 	TempCelsius   *float64 `json:"temp_celsius"`
+	DistanceM     *int     `json:"distance_m"`
+	Discipline    *string  `json:"discipline"`
 	Notes         *string  `json:"notes"`
 	LeagueRoundID *string  `json:"league_round_id"`
 	ClubID        *string  `json:"club_id"`
@@ -73,6 +77,15 @@ type ScoreCardWithAuthor struct {
 	*ScoreCard
 	Author       *ScoreCardAuthor        `json:"author,omitempty"`
 	Achievements []*ScoreCardAchievement `json:"achievements,omitempty"`
+	// IsPB indicates this card is the user's all-time-best total score
+	// (strict inequality vs all prior non-draft cards). False when the user
+	// has no prior cards.
+	IsPB bool `json:"is_pb"`
+	// PBDelta is total_score - previous best, set only when IsPB is true.
+	PBDelta *int16 `json:"pb_delta,omitempty"`
+	// RunningAvg is the mean total_score across all the user's prior
+	// non-draft cards. Null when the user has no prior cards.
+	RunningAvg *float64 `json:"running_avg,omitempty"`
 }
 
 type CreateScoreCardInput struct {
@@ -82,6 +95,8 @@ type CreateScoreCardInput struct {
 	Location      *string  `json:"location"`
 	WindMPH       *float64 `json:"wind_mph"`
 	TempCelsius   *float64 `json:"temp_celsius"`
+	DistanceM     *int     `json:"distance_m"`
+	Discipline    *string  `json:"discipline"`
 	Notes         *string  `json:"notes"`
 	ShotScores    []int16  `json:"shot_scores"`
 	ShotXs        []bool   `json:"shot_xs"`
@@ -98,6 +113,8 @@ type UpdateScoreCardInput struct {
 	Location    *string  `json:"location"`
 	WindMPH     *float64 `json:"wind_mph"`
 	TempCelsius *float64 `json:"temp_celsius"`
+	DistanceM   *int     `json:"distance_m"`
+	Discipline  *string  `json:"discipline"`
 	Notes       *string  `json:"notes"`
 	ShotScores  []int16  `json:"shot_scores"`
 	ShotXs      []bool   `json:"shot_xs"`

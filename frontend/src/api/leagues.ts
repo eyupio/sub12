@@ -159,6 +159,8 @@ export interface MyLeagueSummary {
 export interface ScoreCardLeague {
   id: string
   name: string
+  round_id?: string
+  round_name?: string
 }
 
 export interface LeagueSummary {
