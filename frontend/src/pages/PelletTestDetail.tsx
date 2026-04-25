@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
-import { Link, useParams, useNavigate } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2, X, Pencil } from 'lucide-react'
 import { toast } from '../store/toast'
@@ -53,7 +53,6 @@ function sourceLabel(notes: string | undefined): string {
 
 export default function PelletTestDetail() {
   const { id } = useParams({ strict: false })
-  const navigate = useNavigate()
   const smartBack = useSmartBack('/pellet-testing', ['/feed', '/pellet-testing', '/leagues/', '/clubs/', '/profile'])
   const qc = useQueryClient()
   const authUser = useAuthStore(s => s.user)
@@ -145,7 +144,7 @@ export default function PelletTestDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pellet-tests'] })
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-      navigate({ to: '/pellet-testing' })
+      smartBack()
     },
   })
 

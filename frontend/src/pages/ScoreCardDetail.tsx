@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useParams, Link, useNavigate } from '@tanstack/react-router'
+import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
@@ -819,7 +819,6 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
 
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
-  const navigate = useNavigate()
   const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
   const [showLightbox, setShowLightbox] = useState(false)
   const [showShare, setShowShare] = useState(false)
@@ -918,7 +917,7 @@ export default function ScoreCardDetail() {
         queryClient.invalidateQueries({ queryKey: ['leagues', cardLeague.id, 'standings'] })
       }
       toast('Score card deleted', 'success')
-      navigate({ to: '/scores' })
+      smartBack()
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 403) {
