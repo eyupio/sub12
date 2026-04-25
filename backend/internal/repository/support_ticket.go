@@ -75,7 +75,6 @@ func (r *SupportTicketRepository) List(ctx context.Context, in *model.ListSuppor
 	args := []any{in.ViewerID}
 	where := []string{}
 	if in.ParticipantID != nil && *in.ParticipantID != "" {
-		args[0] = *in.ParticipantID
 		args = append(args, *in.ParticipantID)
 		where = append(where, fmt.Sprintf("EXISTS (SELECT 1 FROM support_ticket_participants p WHERE p.ticket_id = t.id AND p.user_id = $%d)", len(args)))
 	}
@@ -125,6 +124,9 @@ func (r *SupportTicketRepository) List(ctx context.Context, in *model.ListSuppor
 			return nil, fmt.Errorf("scan support ticket: %w", err)
 		}
 		items = append(items, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate support tickets: %w", err)
 	}
 	return items, nil
 }

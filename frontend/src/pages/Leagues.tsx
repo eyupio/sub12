@@ -62,9 +62,9 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm tracking-widest uppercase text-secondary">New League</h2>
+          <h2 id="new-league-modal-title" className="text-sm tracking-widest uppercase text-secondary">New League</h2>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
