@@ -372,7 +372,12 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 			(
 				SELECT sc2.x_count
 				FROM score_cards sc2
-				WHERE sc2.user_id = u.id AND sc2.verification = 'verified' AND sc2.is_draft = FALSE
+				JOIN rounds rd2 ON rd2.id = sc2.league_round_id
+				JOIN seasons sn2 ON sn2.id = rd2.season_id
+				WHERE sc2.user_id = u.id
+				  AND sn2.league_id = $1
+				  AND sc2.verification = 'verified'
+				  AND sc2.is_draft = FALSE
 				ORDER BY sc2.total_score DESC, sc2.x_count DESC
 				LIMIT 1
 			) AS best_x,
@@ -380,7 +385,15 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 			lm.joined_at
 		FROM league_members lm
 		JOIN users u ON u.id = lm.user_id
-		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id AND sc.verification = 'verified' AND sc.is_draft = FALSE
+		LEFT JOIN (
+			SELECT sc.id, sc.user_id, sc.total_score, sc.x_count
+			FROM score_cards sc
+			JOIN rounds rd ON rd.id = sc.league_round_id
+			JOIN seasons sn ON sn.id = rd.season_id
+			WHERE sn.league_id = $1
+			  AND sc.verification = 'verified'
+			  AND sc.is_draft = FALSE
+		) sc ON sc.user_id = lm.user_id
 		WHERE lm.league_id = $1
 		GROUP BY u.id, u.display_name, u.avatar_url, lm.joined_at
 		ORDER BY %s(sc.total_score::double precision) DESC NULLS LAST, lm.joined_at ASC

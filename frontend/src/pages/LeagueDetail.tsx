@@ -491,7 +491,7 @@ export default function LeagueDetail() {
                 {podium.map((p) => (
                   <div className="lc-podium-row" key={p.id}>
                     <div className="lc-podium-rank-tile">{p.rank}</div>
-                    <Avatar name={p.name} size="md" />
+                    <Avatar name={p.name} size="md" src={p.avatarUrl} />
                     <div>
                       <div className="lc-podium-name">{p.name}</div>
                       <div className="lc-podium-meta">
