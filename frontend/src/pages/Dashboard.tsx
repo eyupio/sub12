@@ -2,48 +2,33 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   Plus, Users, Package, Target,
-  TrendingUp, TrendingDown, Crosshair, Trophy, MapPin,
-  FlaskConical, Layers, ChevronRight,
+  TrendingUp, Crosshair, Trophy, MapPin,
+  FlaskConical, Sparkles, Bell,
 } from 'lucide-react'
 import { statsApi, UserStats, RifleStats } from '../api/stats'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
 import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
+import { clubsApi, Club } from '../api/clubs'
 import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
+import { activityApi, ActivityItem as FeedItem } from '../api/activity'
 import { useAuthStore } from '../store/auth'
-import { RifleProfileCard } from '../components/RifleProfileCard'
 import { UserAvatar } from '../components/UserAvatar'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import {
+  Section,
+  SectionAction,
+  StatTile,
+  RifleCard,
+  ActivityRow,
+  ActivityItem as DashActivityItem,
+  NoticeCard,
+  StatsStrip,
+  MiniEntityCard,
+  TrendPill,
+} from '../components/dashboard'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function ordinal(n: number): string {
-  if (n <= 0) return '—'
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
-
-function leagueTimingBadge(startsOn?: string, endsOn?: string): { label: string; urgent: boolean } | null {
-  const today = new Date().toISOString().slice(0, 10)
-  if (startsOn && startsOn > today) return { label: `Starts ${startsOn}`, urgent: false }
-  if (endsOn) {
-    if (endsOn < today) return { label: 'Ended', urgent: false }
-    const daysLeft = Math.ceil((new Date(endsOn).getTime() - Date.now()) / 86400000)
-    if (daysLeft <= 7) return { label: `Ends in ${daysLeft}d`, urgent: true }
-    return { label: `Ends ${endsOn}`, urgent: false }
-  }
-  return null
-}
-
-function scoreDelta(score: number, avg: number): { label: string; sign: 'pos' | 'neg' | 'flat' } {
-  const diff = score - avg
-  if (Math.abs(diff) < 0.5) return { label: 'avg', sign: 'flat' }
-  return {
-    label: `${diff > 0 ? '+' : ''}${diff.toFixed(1)} vs avg`,
-    sign: diff > 0 ? 'pos' : 'neg',
-  }
-}
 
 function leagueIsActive(l: MyLeagueSummary): boolean {
   const today = new Date().toISOString().slice(0, 10)
@@ -52,7 +37,20 @@ function leagueIsActive(l: MyLeagueSummary): boolean {
   return true
 }
 
-// ─── insight engine ─────────────────────────────────────────────────────────
+function formatRelative(iso: string): string {
+  const d = new Date(iso)
+  const diffMs = Date.now() - d.getTime()
+  const m = Math.floor(diffMs / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const days = Math.floor(h / 24)
+  if (days < 7) return `${days}d ago`
+  return d.toISOString().slice(0, 10)
+}
+
+// ─── insight engine (kept from previous Dashboard) ──────────────────────────
 
 interface Insight {
   id: string
@@ -60,7 +58,6 @@ interface Insight {
   title: string
   body: string
   cta?: { label: string; to: string; params?: Record<string, string> }
-  variant: 'default' | 'highlight'
 }
 
 type EnrichedRifleStats = RifleStats & { make: string; model: string; image_url?: string; calibre: string }
@@ -76,7 +73,6 @@ function computeInsights(p: {
 }): Insight[] {
   const insights: Insight[] = []
 
-  // 1. PB proximity
   if (
     p.stats?.cards_logged != null &&
     p.stats.cards_logged >= 5 &&
@@ -91,12 +87,10 @@ function computeInsights(p: {
         title: `${gap.toFixed(1)} below your best`,
         body: 'Your average is tracking close to your personal best. Consistency is your next lever.',
         cta: { label: 'Log a card', to: '/scores/new' },
-        variant: 'highlight',
       })
     }
   }
 
-  // 2. Rifles exist but none linked to scored cards
   if (p.rifles.length > 0 && p.enrichedRifleStats.length === 0) {
     insights.push({
       id: 'no-rifle-stats',
@@ -104,11 +98,9 @@ function computeInsights(p: {
       title: 'Link a rifle to your next card',
       body: 'Assigning a rifle unlocks per-platform analysis and shows which setup is performing best.',
       cta: { label: 'Log card', to: '/scores/new' },
-      variant: 'default',
     })
   }
 
-  // 3. A rifle exists with no stats entry
   if (insights.length < 4) {
     const untested = p.rifles.find(r => !p.rifleStats.some(rs => rs.rifle_id === r.id))
     if (untested) {
@@ -118,12 +110,10 @@ function computeInsights(p: {
         title: `${untested.make} ${untested.model} has no data yet`,
         body: 'Log a card with this rifle to start building per-platform performance history.',
         cta: { label: 'Log card', to: '/scores/new' },
-        variant: 'default',
       })
     }
   }
 
-  // 4. No ammo testing
   if (insights.length < 4 && p.rifles.length > 0 && (p.pelletTestStats?.total_tests ?? 0) === 0) {
     insights.push({
       id: 'no-ammo-test',
@@ -131,11 +121,9 @@ function computeInsights(p: {
       title: 'Ammunition untested',
       body: 'Pellet selection can account for significant group-size variation. Start a test session to find your optimal load.',
       cta: { label: 'Start test', to: '/pellet-testing' },
-      variant: 'default',
     })
   }
 
-  // 5. League ending soon
   if (insights.length < 4) {
     const today = new Date().toISOString().slice(0, 10)
     const urgent = p.myLeagues.find(l => {
@@ -151,12 +139,10 @@ function computeInsights(p: {
         title: `${urgent.name} closes soon`,
         body: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining. Submit your best card before the window closes.`,
         cta: { label: 'View league', to: '/leagues/$id', params: { id: urgent.id } },
-        variant: 'highlight',
       })
     }
   }
 
-  // 6. No leagues, has cards
   if (insights.length < 4 && p.myLeagues.length === 0 && (p.stats?.cards_logged ?? 0) >= 3) {
     insights.push({
       id: 'no-leagues',
@@ -164,11 +150,9 @@ function computeInsights(p: {
       title: 'Compete in a league',
       body: 'You have cards logged — see how you rank against other shooters at your level.',
       cta: { label: 'Browse leagues', to: '/leagues' },
-      variant: 'default',
     })
   }
 
-  // 7. Last 3 cards above average (positive trend signal)
   if (
     insights.length < 4 &&
     p.recentCards.length >= 3 &&
@@ -176,8 +160,7 @@ function computeInsights(p: {
   ) {
     const last3 = p.recentCards.slice(0, 3)
     const avg = p.stats.avg_score
-    const allAbove = last3.every(c => c.total_score > avg)
-    if (allAbove) {
+    if (last3.every(c => c.total_score > avg)) {
       const lowest = Math.min(...last3.map(c => c.total_score))
       insights.push({
         id: 'positive-trend',
@@ -185,7 +168,6 @@ function computeInsights(p: {
         title: "You're above average for 3 in a row",
         body: `Your last three cards are all above your rolling average (${avg.toFixed(1)}). Lowest was ${lowest} — you're trending up.`,
         cta: { label: 'View trends', to: '/scores/trends' },
-        variant: 'highlight',
       })
     }
   }
@@ -193,260 +175,11 @@ function computeInsights(p: {
   return insights.slice(0, 4)
 }
 
-// ─── components ─────────────────────────────────────────────────────────────
-
-function StatCard({
-  label,
-  value,
-  subtext,
-  gold,
-  trend,
-  trendLabel,
-  to,
-  params,
-  search,
-}: {
-  label: string
-  value: string
-  subtext?: string
-  gold?: boolean
-  trend?: 'up' | 'down' | null
-  trendLabel?: string
-  to?: string
-  params?: Record<string, string>
-  search?: Record<string, string | undefined>
-}) {
-  const baseClass = 'bg-surface border border-subtle rounded-lg p-4 lg:p-5 flex flex-col relative'
-  const linkClass = `${baseClass} hover:border-[var(--brass)]/30 transition-colors`
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
-        {to && <ChevronRight size={12} className="text-muted/60 shrink-0 mt-0.5" />}
-      </div>
-      <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
-        {value}
-      </p>
-      {subtext && (
-        <p className="text-[11px] text-muted mt-1 leading-snug">{subtext}</p>
-      )}
-      {trend && trendLabel && (
-        <div className={`flex items-center gap-1 mt-1.5 text-[10px] font-mono ${trend === 'up' ? 'text-[var(--success-text)]' : 'text-[var(--error-text)]'}`}>
-          {trend === 'up' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-          <span>{trendLabel}</span>
-        </div>
-      )}
-    </>
-  )
-  if (to) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return <Link to={to as any} params={params as any} search={search as any} className={linkClass}>{inner}</Link>
-  }
-  return <div className={baseClass}>{inner}</div>
-}
-
-function ScoreBar({ score, max = 250 }: { score: number; max?: number }) {
-  const pct = Math.min(100, Math.max(0, (score / max) * 100))
-  return (
-    <div className="relative h-1 w-full rounded-full bg-surface-hover overflow-hidden mt-2">
-      <div
-        className="absolute inset-y-0 left-0 rounded-full bg-[var(--brass)]/35"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
-
-function InsightCard({ icon, title, body, cta, variant = 'default' }: {
-  icon: React.ReactNode
-  title: string
-  body: string
-  cta?: { label: string; to: string; params?: Record<string, string> }
-  variant?: 'default' | 'highlight'
-}) {
-  const outer = variant === 'highlight'
-    ? 'border-[var(--brass)]/30 bg-[var(--brass)]/5 hover:border-[var(--brass)]/50'
-    : 'border-subtle bg-surface hover:border-[var(--brass)]/20'
-
-  const inner = (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border transition-colors ${outer}`}>
-      <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-[var(--brass)]/10 text-[var(--brass)] mt-0.5">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-secondary">{title}</p>
-        <p className="text-[11px] text-muted leading-relaxed mt-0.5">{body}</p>
-        {cta && (
-          <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity mt-2 inline-block">
-            {cta.label} →
-          </span>
-        )}
-      </div>
-    </div>
-  )
-
-  if (!cta) return inner
-
-  // Cast to any to satisfy TanStack Router's strict params typing at runtime
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <Link to={cta.to as any} params={cta.params as any}>{inner}</Link>
-}
-
-function ActivityCard({ card, avgScore, scoreMax, rifleName }: {
-  card: ScoreCardSummary
-  avgScore?: number
-  scoreMax: number
-  rifleName?: string
-}) {
-  const delta = avgScore != null ? scoreDelta(card.total_score, avgScore) : null
-  const deltaColour =
-    delta?.sign === 'pos' ? 'text-[var(--success-text)]' :
-    delta?.sign === 'neg' ? 'text-[var(--error-text)]' :
-    'text-muted'
-  const prefs = useRegionalPrefs()
-
-  return (
-    <Link
-      to="/scores/$id"
-      params={{ id: card.id }}
-      className="flex flex-col p-3 lg:p-4 rounded-lg border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-secondary text-sm">{formatDate(card.shot_at, prefs)}</p>
-          {card.location && (
-            <p className="text-[11px] text-muted truncate mt-0.5">{card.location}</p>
-          )}
-          {rifleName && (
-            <p className="text-[10px] text-muted/70 truncate mt-0.5 flex items-center gap-1">
-              <Package size={9} className="shrink-0 opacity-60" />
-              {rifleName}
-            </p>
-          )}
-        </div>
-        <div className="flex items-baseline gap-2 shrink-0">
-          <span className="font-mono text-xl font-semibold text-primary">{card.total_score}</span>
-          {card.x_count > 0 && (
-            <span className="text-xs text-[var(--brass)] font-mono">{card.x_count}X</span>
-          )}
-          {delta && (
-            <span className={`text-[10px] font-mono ${deltaColour}`}>{delta.label}</span>
-          )}
-        </div>
-      </div>
-      <ScoreBar score={card.total_score} max={scoreMax} />
-    </Link>
-  )
-}
-
-function EmptySection({ icon, heading, body, cta }: {
-  icon: React.ReactNode
-  heading: string
-  body: string
-  cta: { label: string; to: string }
-}) {
-  return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <Link to={cta.to as any} className="flex flex-col items-center text-center gap-3 p-6 border border-dashed border-subtle rounded-lg hover:border-[var(--brass)]/30 transition-colors block">
-      <div className="w-10 h-10 rounded-full bg-surface-hover flex items-center justify-center text-muted">
-        {icon}
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-secondary">{heading}</p>
-        <p className="text-[11px] text-muted leading-relaxed max-w-[240px] mx-auto">{body}</p>
-      </div>
-      <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
-        {cta.label} →
-      </span>
-    </Link>
-  )
-}
-
-type PerformanceStripItem = {
-  label: string
-  value: string
-  sub?: string
-  to?: string
-  params?: Record<string, string>
-  search?: Record<string, string | undefined>
-}
-
-function PerformanceStrip({ items }: { items: PerformanceStripItem[] }) {
-  const displayed = items.slice(0, 4)
-  return (
-    <div className="bg-surface border border-subtle rounded-lg overflow-hidden">
-      <div className="grid grid-cols-2 lg:grid-cols-4">
-        {displayed.map((item, i) => {
-          const cellClass = [
-            'px-4 py-3 relative',
-            i % 2 === 1 ? 'border-l border-subtle' : '',
-            i >= 2 ? 'border-t border-subtle lg:border-t-0' : '',
-            i > 0 ? 'lg:border-l lg:border-subtle' : '',
-          ].join(' ')
-          const inner = (
-            <>
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-[10px] tracking-widest uppercase text-muted">{item.label}</p>
-                {item.to && <ChevronRight size={12} className="text-muted/60 shrink-0 mt-0.5" />}
-              </div>
-              <p className="text-base font-mono text-secondary mt-0.5 truncate">{item.value}</p>
-              {item.sub && <p className="text-[10px] text-muted mt-0.5">{item.sub}</p>}
-            </>
-          )
-          if (item.to) {
-            return (
-              <Link
-                key={i}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                to={item.to as any}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                params={item.params as any}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                search={item.search as any}
-                className={`${cellClass} hover:bg-surface-hover/50 transition-colors block`}
-              >
-                {inner}
-              </Link>
-            )
-          }
-          return (
-            <div key={i} className={cellClass}>
-              {inner}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function QuickActionCard({ icon, heading, body, cta }: {
-  icon: React.ReactNode
-  heading: string
-  body: string
-  cta: { label: string; to: string }
-}) {
-  return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <Link to={cta.to as any} className="flex flex-col gap-3 p-4 border border-subtle bg-surface rounded-lg hover:border-[var(--brass)]/30 transition-colors">
-      <div className="w-9 h-9 rounded-full bg-[var(--brass)]/10 flex items-center justify-center text-[var(--brass)]">
-        {icon}
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-secondary">{heading}</p>
-        <p className="text-[11px] text-muted leading-relaxed">{body}</p>
-      </div>
-      <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] mt-auto">
-        {cta.label} →
-      </span>
-    </Link>
-  )
-}
-
 // ─── page ────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const user = useAuthStore(s => s.user)
+  const prefs = useRegionalPrefs()
 
   const { data: stats } = useQuery({
     queryKey: ['stats'],
@@ -454,8 +187,8 @@ export default function Dashboard() {
   })
 
   const { data: history } = useQuery({
-    queryKey: ['score-cards'],
-    queryFn: () => scoreCardApi.list(5, 0),
+    queryKey: ['score-cards', 20],
+    queryFn: () => scoreCardApi.list(20, 0),
   })
 
   const { data: riflesData } = useQuery({
@@ -473,6 +206,11 @@ export default function Dashboard() {
     queryFn: () => leagueApi.listMine(),
   })
 
+  const { data: myClubsData } = useQuery({
+    queryKey: ['my-clubs'],
+    queryFn: () => clubsApi.listMine(),
+  })
+
   const { data: pelletTestStats } = useQuery({
     queryKey: ['pellet-test-stats'],
     queryFn: () => pelletTestApi.stats(),
@@ -483,18 +221,20 @@ export default function Dashboard() {
     queryFn: () => pelletTestApi.comboAnalytics(),
   })
 
+  const { data: feedData } = useQuery({
+    queryKey: ['feed', 'for_you', 20],
+    queryFn: () => activityApi.getFeed(20, undefined, 'for_you'),
+  })
+
   const recentCards = history?.items ?? []
   const rifles = riflesData?.items?.filter((r: Rifle) => r.is_active) ?? []
   const rifleStats = rifleStatsData?.items ?? []
   const myLeagues = myLeaguesData?.items ?? []
+  const myClubs = myClubsData?.items ?? []
+  const feedItems = feedData?.items ?? []
 
   const rifleMap = new Map<string, Rifle>()
   for (const r of riflesData?.items ?? []) rifleMap.set(r.id, r)
-
-  const getRifleName = (id: string | undefined) => {
-    const r = id ? rifleMap.get(id) : undefined
-    return r ? `${r.make} ${r.model}` : undefined
-  }
 
   const enrichedRifleStats: EnrichedRifleStats[] = rifleStats
     .flatMap((rs: RifleStats): EnrichedRifleStats[] => {
@@ -505,21 +245,10 @@ export default function Dashboard() {
     })
     .sort((a, b) => b.best_score - a.best_score)
 
-  // Trend: compare most recent card vs oldest in recent set
   const trendDelta: number | null =
     recentCards.length >= 2
       ? recentCards[0].total_score - recentCards[recentCards.length - 1].total_score
       : null
-
-  const scoreMax = Math.max(
-    ...recentCards.map(c => c.total_score),
-    stats?.best_score ?? 0,
-    250,
-  )
-
-  const globalBest = enrichedRifleStats.length > 0
-    ? Math.max(...enrichedRifleStats.map(r => r.best_score))
-    : 250
 
   const insights = computeInsights({
     stats,
@@ -531,58 +260,105 @@ export default function Dashboard() {
     pelletTestStats,
   })
 
-  // Sort leagues: active first, upcoming, ended
   const sortedLeagues = [...myLeagues].sort((a, b) => {
-    const aActive = leagueIsActive(a) ? 0 : a.starts_on && a.starts_on > new Date().toISOString().slice(0, 10) ? 1 : 2
-    const bActive = leagueIsActive(b) ? 0 : b.starts_on && b.starts_on > new Date().toISOString().slice(0, 10) ? 1 : 2
-    return aActive - bActive
+    const today = new Date().toISOString().slice(0, 10)
+    const score = (l: MyLeagueSummary) =>
+      leagueIsActive(l) ? 0 : l.starts_on && l.starts_on > today ? 1 : 2
+    return score(a) - score(b)
   })
 
-  // Most used rifle = highest card_count among rifles with stats
   const mostUsedRifle = enrichedRifleStats.length > 0
     ? [...enrichedRifleStats].sort((a, b) => b.card_count - a.card_count)[0]
     : undefined
 
-  // Top combo: best rifle+pellet pairing by average group
   const topCombo: ComboPerformanceSummary | undefined = comboData?.items?.[0]
 
-  // Performance strip items (all derived from existing queries)
-  const perfStripItems: PerformanceStripItem[] = []
-  if (topCombo) {
-    perfStripItems.push({
-      label: 'Top Combo',
-      value: `${topCombo.rifle_name} + ${topCombo.pellet_name}`,
-      sub: topCombo.avg_group_mm != null ? `${topCombo.avg_group_mm.toFixed(2)}mm avg · ${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}` : `${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}`,
-      to: '/pellet-testing/combo-analytics',
-    })
-  }
-  if (mostUsedRifle) {
-    perfStripItems.push({
-      label: 'Most Used Rifle',
-      value: `${mostUsedRifle.make} ${mostUsedRifle.model}`,
-      sub: `${mostUsedRifle.card_count} card${mostUsedRifle.card_count !== 1 ? 's' : ''}`,
-      to: '/scores/trends',
-      search: { rifleId: mostUsedRifle.rifle_id },
-    })
-  }
-  if (pelletTestStats?.best_group_mm != null) {
-    perfStripItems.push({
-      label: 'Best Group',
-      value: `${pelletTestStats.best_group_mm.toFixed(2)}mm`,
-      sub: 'tightest measured',
-      to: '/pellet-testing/leaderboard',
-    })
-  }
-  if (pelletTestStats?.avg_group_mm != null) {
-    perfStripItems.push({
-      label: 'Avg Group',
-      value: `${pelletTestStats.avg_group_mm.toFixed(2)}mm`,
-      sub: 'across all sessions',
-      to: '/pellet-testing',
-    })
-  }
+  // Build first 2 RifleCards for the 2-up grid: rifles with stats first, then untouched ones.
+  const rifleCards = (() => {
+    const withStats = enrichedRifleStats
+      .map(rs => {
+        const r = rifleMap.get(rs.rifle_id)
+        if (!r) return null
+        return {
+          rifle: r,
+          stats: rs,
+          hasData: true,
+        }
+      })
+      .filter((x): x is { rifle: Rifle; stats: EnrichedRifleStats; hasData: true } => !!x)
+    const without = rifles
+      .filter(r => !enrichedRifleStats.some(rs => rs.rifle_id === r.id))
+      .map(r => ({ rifle: r, stats: null, hasData: false as const }))
+    return [...withStats, ...without].slice(0, 2)
+  })()
 
-  // Header context line
+  // Combined activity stream
+  const ownStream: DashActivityItem[] = recentCards.slice(0, 6).map((c): DashActivityItem => ({
+    kind: 'score',
+    id: c.id,
+    date: c.shot_at,
+    score: c.total_score,
+    x: c.x_count,
+    delta:
+      stats?.avg_score != null ? c.total_score - stats.avg_score : null,
+    to: '/scores/$id',
+  }))
+
+  const socialStream: DashActivityItem[] = feedItems
+    .filter((f: FeedItem) => f.user_id !== user?.id)
+    .filter((f: FeedItem) =>
+      ['score_posted', 'post_created', 'pellet_test_posted'].includes(f.type),
+    )
+    .filter((f: FeedItem) => Boolean(f.league_id || f.club_id))
+    .slice(0, 6)
+    .map((f: FeedItem): DashActivityItem => ({
+      kind: 'post',
+      id: f.id,
+      who: f.display_name,
+      whoId: f.user_id,
+      avatarUrl: f.avatar_url,
+      whereName: f.metadata?.league_name ?? f.metadata?.club_name,
+      whereType: f.league_id ? 'league' : 'club',
+      whereId: f.league_id ?? f.club_id,
+      date: f.created_at,
+      score: f.metadata?.total_score,
+      x: f.metadata?.x_count,
+      body: f.metadata?.body_preview,
+      likeCount: f.like_count,
+      commentCount: f.comment_count,
+    }))
+
+  const activityStream = [...ownStream, ...socialStream]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 6)
+
+  // Pellet performance cells
+  const pelletCells = pelletTestStats && pelletTestStats.total_tests > 0
+    ? [
+        {
+          label: 'Sessions',
+          value: String(pelletTestStats.total_tests),
+          sub: 'test sessions logged',
+        },
+        {
+          label: 'Best Group',
+          value: pelletTestStats.best_group_mm != null ? `${pelletTestStats.best_group_mm.toFixed(2)}mm` : '—',
+          sub: 'tightest group measured',
+          highlight: true,
+        },
+        {
+          label: 'Avg Group',
+          value: pelletTestStats.avg_group_mm != null ? `${pelletTestStats.avg_group_mm.toFixed(2)}mm` : '—',
+          sub: 'average across sessions',
+        },
+        {
+          label: 'Most Tested',
+          value: pelletTestStats.most_tested_pellet ?? '—',
+          sub: 'pellet with most sessions',
+        },
+      ]
+    : null
+
   const trackingContext = (() => {
     const c = stats?.cards_logged ?? 0
     const r = rifles.length
@@ -592,393 +368,301 @@ export default function Dashboard() {
     return `Tracking ${c} card${c !== 1 ? 's' : ''} across ${r} rifle${r !== 1 ? 's' : ''}`
   })()
 
-  // Gate for new-user quick actions section
-  const isNewUser = (stats?.cards_logged ?? 0) === 0
-
   return (
-    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
+    <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
 
-      {/* ── Page header ────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 py-1 flex-wrap">
+      {/* ── Profile header ───────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <UserAvatar
             user={user ?? {}}
-            size={44}
+            size={36}
             className="shrink-0"
             showHoverCard={false}
           />
           <div className="min-w-0">
-            <p className="text-base lg:text-lg font-medium text-primary truncate">{user?.display_name}</p>
-            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted tracking-wide mt-0.5">
+            <p className="font-serif-display text-[22px] leading-tight text-ink truncate">
+              {user?.display_name}
+              <Link to="/profile" className="ml-3 align-middle font-sans text-[10px] tracking-[0.18em] uppercase text-gold hover:text-gold-2 transition-colors">
+                Edit profile →
+              </Link>
+            </p>
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted mt-1 font-mono">
               {user?.location && (
                 <span className="flex items-center gap-1">
                   <MapPin size={10} className="opacity-60" />
                   {user.location}
                 </span>
               )}
-              {user?.club && <span>{user.club}</span>}
-              <Link to="/profile" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
-                Edit profile →
-              </Link>
+              {user?.club && <span>· {user.club}</span>}
             </div>
             {trackingContext && (
-              <p className="text-[11px] text-muted mt-1 tracking-wide">{trackingContext}</p>
+              <p className="text-[11px] text-muted mt-0.5">{trackingContext}</p>
             )}
           </div>
         </div>
+
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Link
             to="/scores/new"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--brass)]/15 border border-[var(--brass)]/30 text-[var(--brass)] text-[11px] tracking-widest uppercase font-medium hover:bg-[var(--brass)]/25 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[6px] bg-gold text-white text-[10px] tracking-[0.18em] uppercase font-medium hover:bg-gold-2 transition-colors shadow-card"
           >
             <Plus size={12} />
             Log Score
           </Link>
           <Link
             to="/pellet-testing/new"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-subtle text-muted text-[11px] tracking-widest uppercase font-medium hover:border-[var(--brass)]/30 hover:text-secondary transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[6px] border border-line text-muted text-[10px] tracking-[0.18em] uppercase font-medium hover:text-ink hover:border-line-2 transition-colors"
           >
             <FlaskConical size={12} />
             Pellet Test
           </Link>
           <Link
             to="/gear"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-subtle text-muted text-[11px] tracking-widest uppercase font-medium hover:border-[var(--brass)]/30 hover:text-secondary transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[6px] border border-line text-muted text-[10px] tracking-[0.18em] uppercase font-medium hover:text-ink hover:border-line-2 transition-colors"
           >
-            <Layers size={12} />
+            <Plus size={12} />
             Add Rifle
           </Link>
         </div>
       </div>
 
-      {/* ── Stats grid ─────────────────────────────────────────── */}
+      {/* ── Hero stat tiles ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <StatCard
+        <StatTile
           label="Best Score"
           value={stats?.best_score != null ? String(stats.best_score) : '—'}
-          subtext={stats?.best_score != null ? 'Personal best' : 'No sessions yet'}
+          sub={stats?.best_score != null ? 'Personal best' : 'No sessions yet'}
           gold
           to={stats?.best_score != null ? '/scores/trends' : undefined}
         />
-        <StatCard
+        <StatTile
           label="Best Group"
-          value={pelletTestStats?.best_group_mm != null ? `${pelletTestStats.best_group_mm.toFixed(2)}mm` : '—'}
-          subtext={pelletTestStats?.best_group_mm != null ? 'Tightest group measured' : 'No tests yet'}
+          value={pelletTestStats?.best_group_mm != null ? pelletTestStats.best_group_mm.toFixed(2) : '—'}
+          unit={pelletTestStats?.best_group_mm != null ? 'mm' : undefined}
+          sub={pelletTestStats?.best_group_mm != null ? 'Tightest group measured' : 'No tests yet'}
           gold={pelletTestStats?.best_group_mm != null}
           to={pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
         />
-        <StatCard
+        <StatTile
           label="Cards Logged"
           value={stats ? String(stats.cards_logged) : '—'}
-          subtext={stats && stats.cards_logged > 0 ? 'Total sessions recorded' : 'Start logging'}
+          sub={stats && stats.cards_logged > 0 ? 'Total sessions recorded' : 'Start logging'}
           to={stats && stats.cards_logged > 0 ? '/scores' : undefined}
         />
-        <StatCard
+        <StatTile
           label={stats?.rolling_10_avg != null ? 'Recent Form' : 'Avg Score'}
           value={stats?.rolling_10_avg != null ? stats.rolling_10_avg.toFixed(1) : stats?.avg_score != null ? stats.avg_score.toFixed(1) : '—'}
-          subtext={stats?.rolling_10_avg != null
-            ? 'Rolling 10-card average'
-            : stats?.avg_score != null
-            ? `Last ${recentCards.length > 0 ? recentCards.length : stats.cards_logged} cards`
-            : 'Log 1 card to calculate'}
-          trend={trendDelta != null ? (trendDelta > 0 ? 'up' : trendDelta < 0 ? 'down' : null) : null}
-          trendLabel={
-            trendDelta != null && Math.abs(trendDelta) >= 1
-              ? `${trendDelta > 0 ? '+' : ''}${trendDelta} over last ${recentCards.length}`
-              : undefined
+          sub={stats?.rolling_10_avg != null ? 'Rolling 10-card average' : stats?.avg_score != null ? `Across ${recentCards.length} cards` : 'Log 1 card to calculate'}
+          trend={
+            trendDelta != null && Math.abs(trendDelta) >= 1 ? (
+              <TrendPill delta={trendDelta} suffix={`over last ${recentCards.length}`} precision={0} />
+            ) : undefined
           }
           to={stats?.rolling_10_avg != null || stats?.avg_score != null ? '/scores/trends' : undefined}
         />
       </div>
 
-      {/* ── Performance Overview Strip ──────────────────────────── */}
-      {perfStripItems.length > 0 && (
-        <PerformanceStrip items={perfStripItems} />
-      )}
+      {/* ── Secondary compact tiles ──────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        <StatTile
+          compact
+          label="Top Combo"
+          value={topCombo ? `${topCombo.rifle_name} + ${topCombo.pellet_name}` : '—'}
+          sub={topCombo
+            ? `${topCombo.avg_group_mm != null ? `${topCombo.avg_group_mm.toFixed(2)}mm avg · ` : ''}${topCombo.test_count} test${topCombo.test_count !== 1 ? 's' : ''}`
+            : 'No tests yet'}
+          to={topCombo ? '/pellet-testing/combo-analytics' : undefined}
+        />
+        <StatTile
+          compact
+          label="Most Used Rifle"
+          value={mostUsedRifle ? `${mostUsedRifle.make} ${mostUsedRifle.model}` : '—'}
+          sub={mostUsedRifle
+            ? `${mostUsedRifle.card_count} card${mostUsedRifle.card_count !== 1 ? 's' : ''}`
+            : 'No data yet'}
+          to={mostUsedRifle ? '/scores/trends' : undefined}
+          search={mostUsedRifle ? { rifleId: mostUsedRifle.rifle_id } : undefined}
+        />
+        <StatTile
+          compact
+          label="Best Group"
+          value={pelletTestStats?.best_group_mm != null ? pelletTestStats.best_group_mm.toFixed(2) : '—'}
+          unit={pelletTestStats?.best_group_mm != null ? 'mm' : undefined}
+          sub="tightest measured"
+          gold={pelletTestStats?.best_group_mm != null}
+          to={pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
+        />
+        <StatTile
+          compact
+          label="Avg Group"
+          value={pelletTestStats?.avg_group_mm != null ? pelletTestStats.avg_group_mm.toFixed(2) : '—'}
+          unit={pelletTestStats?.avg_group_mm != null ? 'mm' : undefined}
+          sub="across all sessions"
+          to={pelletTestStats?.avg_group_mm != null ? '/pellet-testing' : undefined}
+        />
+      </div>
 
-      {/* ── Worth Noticing ─────────────────────────────────────── */}
+      {/* ── Worth Noticing ───────────────────────────────────────── */}
       {insights.length > 0 && (
-        <div>
-          <p className="text-[10px] tracking-widest uppercase text-muted mb-3">Worth Noticing</p>
+        <Section title="Worth Noticing" icon={<Sparkles size={11} className="text-gold" />}>
           <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {insights.map(insight => (
-              <InsightCard
-                key={insight.id}
-                icon={insight.icon}
-                title={insight.title}
-                body={insight.body}
-                cta={insight.cta}
-                variant={insight.variant}
+            {insights.map(ins => (
+              <NoticeCard
+                key={ins.id}
+                icon={ins.icon}
+                title={ins.title}
+                body={ins.body}
+                cta={ins.cta}
               />
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
-      {/* ── Rifle Performance ──────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] tracking-widest uppercase text-muted">Rifle Performance</h2>
-          <Link
-            to="/gear"
-            className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-          >
-            Manage gear →
-          </Link>
-        </div>
-
+      {/* ── Rifle Performance ────────────────────────────────────── */}
+      <Section
+        title="Rifle Performance"
+        icon={<Package size={11} className="text-gold" />}
+        actions={<SectionAction to="/gear">Manage Gear →</SectionAction>}
+      >
         {rifles.length === 0 ? (
-          <EmptySection
-            icon={<Package size={20} />}
-            heading="Add your rifles"
-            body="Track each platform independently. See which rifle is producing your best scores and how many cards you've logged per setup."
-            cta={{ label: 'Add rifle', to: '/gear' }}
-          />
+          <p className="text-[12px] text-muted text-center py-6">
+            No rifles yet. <Link to="/gear" className="text-gold hover:text-gold-2">Add your first rifle →</Link>
+          </p>
         ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {enrichedRifleStats.map(rs => {
-                const rifle = rifleMap.get(rs.rifle_id)
-                return rifle ? (
-                  <RifleProfileCard
-                    key={rs.rifle_id}
-                    rifle={rifle}
-                    stats={rs}
-                    mode="dashboard"
-                    globalBest={globalBest}
-                  />
-                ) : null
-              })}
-              {rifles
-                .filter(r => !enrichedRifleStats.some(rs => rs.rifle_id === r.id))
-                .map((rifle: Rifle) => (
-                  <RifleProfileCard
-                    key={rifle.id}
-                    rifle={rifle}
-                    mode="dashboard"
-                    globalBest={globalBest}
-                  />
-                ))}
-            </div>
-            {enrichedRifleStats.length === 0 && (
-              <p className="text-[11px] text-muted tracking-wide">
-                Log a card with a rifle selected to start building per-platform stats.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Recent Activity ────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] tracking-widest uppercase text-muted">Recent Activity</h2>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/scores/trends"
-              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-            >
-              Trends →
-            </Link>
-            <Link
-              to="/scores/new"
-              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              <Plus size={12} />
-              Log
-            </Link>
-          </div>
-        </div>
-
-        {recentCards.length === 0 ? (
-          <EmptySection
-            icon={<Target size={20} />}
-            heading="No sessions logged yet"
-            body="Log your first card to start tracking scores, spotting trends, and building your performance history."
-            cta={{ label: 'Log first card', to: '/scores/new' }}
-          />
-        ) : (
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {recentCards.map(card => (
-              <ActivityCard
-                key={card.id}
-                card={card}
-                avgScore={stats?.avg_score}
-                scoreMax={scoreMax}
-                rifleName={getRifleName(card.rifle_id)}
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-line border border-line rounded-[10px] overflow-hidden">
+            {rifleCards.map(({ rifle, stats: rs, hasData }) => (
+              <RifleCard
+                key={rifle.id}
+                name={`${rifle.make} ${rifle.model}`}
+                spec={`${rifle.calibre}${rifle.power_ftlb ? ` · ${rifle.power_ftlb} ft·lb` : ''}`}
+                imageUrl={rifle.image_url}
+                cardsLogged={hasData ? rs.card_count : null}
+                shotsFired={hasData ? rs.card_count * 25 : null}
+                bestScore={hasData ? rs.best_score : null}
+                bestXCount={hasData ? rs.best_x_count : null}
+                hasData={hasData}
               />
             ))}
-            {stats && stats.cards_logged > 5 && (
-              <Link
-                to="/scores"
-                className="block text-center text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors pt-1 lg:col-span-2"
-              >
-                View all {stats.cards_logged} sessions →
-              </Link>
+            {rifleCards.length === 1 && (
+              <div className="hidden md:flex items-center justify-center text-[11px] text-muted px-6 py-10">
+                Only one rifle tracked yet.
+              </div>
             )}
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* ── Pellet Performance ─────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] tracking-widest uppercase text-muted">Pellet Performance</h2>
-          <div className="flex items-center gap-3">
-            {pelletTestStats && pelletTestStats.total_tests > 0 && (
-              <Link
-                to="/pellet-testing/compare"
-                className="flex items-center gap-0.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-              >
-                Compare <ChevronRight size={10} />
-              </Link>
-            )}
-            <Link
-              to="/pellet-testing"
-              className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              All tests →
-            </Link>
-          </div>
-        </div>
-
-        {!pelletTestStats || pelletTestStats.total_tests === 0 ? (
-          <EmptySection
-            icon={<Crosshair size={20} />}
-            heading="No ammunition tests yet"
-            body="Systematic pellet testing reveals which ammo tightens your groups. Even a single session produces actionable data."
-            cta={{ label: 'Start testing', to: '/pellet-testing' }}
-          />
-        ) : (
-          <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] tracking-widest uppercase text-muted">Sessions</p>
-                <p className="text-2xl lg:text-3xl font-mono text-secondary">{pelletTestStats.total_tests}</p>
-                <p className="text-[11px] text-muted">test sessions logged</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] tracking-widest uppercase text-muted">Best Group</p>
-                <p className="text-2xl lg:text-3xl font-mono text-[var(--brass)]">
-                  {pelletTestStats.best_group_mm != null ? `${pelletTestStats.best_group_mm.toFixed(2)}mm` : '—'}
-                </p>
-                <p className="text-[11px] text-muted">tightest group measured</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] tracking-widest uppercase text-muted">Avg Group</p>
-                <p className="text-2xl lg:text-3xl font-mono text-secondary">
-                  {pelletTestStats.avg_group_mm != null ? `${pelletTestStats.avg_group_mm.toFixed(2)}mm` : '—'}
-                </p>
-                <p className="text-[11px] text-muted">average across sessions</p>
-              </div>
-              <div className="space-y-1 min-w-0">
-                <p className="text-[10px] tracking-widest uppercase text-muted">Most Tested</p>
-                <p className="text-lg lg:text-xl font-mono text-secondary truncate">
-                  {pelletTestStats.most_tested_pellet ?? '—'}
-                </p>
-                <p className="text-[11px] text-muted">pellet with most sessions</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Leagues ────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] tracking-widest uppercase text-muted">Leagues</h2>
-          <Link
-            to="/leagues"
-            className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-          >
-            Browse →
-          </Link>
-        </div>
-
-        {sortedLeagues.length === 0 ? (
-          <EmptySection
-            icon={<Trophy size={20} />}
-            heading="Not competing yet"
-            body="Join a league to benchmark your scores against other shooters. Private leagues are available for club use."
-            cta={{ label: 'Browse leagues', to: '/leagues' }}
-          />
-        ) : (
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {sortedLeagues.map((league: MyLeagueSummary) => {
-              const timing = leagueTimingBadge(league.starts_on, league.ends_on)
-              const pct = league.member_count >= 5 && league.user_rank > 0
-                ? Math.round((league.user_rank / league.member_count) * 100)
-                : null
-              return (
-                <Link
-                  key={league.id}
+      {/* ── Leagues + Clubs (high-priority row) ──────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+        <Section
+          title="My Leagues"
+          icon={<Trophy size={11} className="text-gold" />}
+          actions={<SectionAction to="/leagues">Browse →</SectionAction>}
+        >
+          {sortedLeagues.length === 0 ? (
+            <p className="text-[12px] text-muted text-center py-4">
+              Not in any leagues yet. <Link to="/leagues" className="text-gold hover:text-gold-2">Browse leagues →</Link>
+            </p>
+          ) : (
+            <div className="-mx-4 -my-2">
+              {sortedLeagues.slice(0, 4).map((l) => (
+                <MiniEntityCard
+                  key={l.id}
+                  name={l.name}
+                  imageUrl={l.image_url}
+                  metaIcon={<Users size={10} />}
+                  metaLabel={`${l.member_count}`}
+                  rank={l.user_rank > 0 ? l.user_rank : undefined}
+                  total={l.member_count}
                   to="/leagues/$id"
-                  params={{ id: league.id }}
-                  className="flex items-center gap-3 p-3 lg:p-4 rounded-lg border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
-                >
-                  {league.image_url ? (
-                    <img src={league.image_url} alt="" className="w-9 h-9 rounded-lg object-cover border border-subtle shrink-0" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-lg border border-subtle shrink-0 bg-surface-hover flex items-center justify-center">
-                      <Users size={16} className="text-muted opacity-40" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-secondary font-medium truncate">{league.name}</p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted">
-                      <Users size={10} />
-                      <span>{league.member_count}</span>
-                      {timing && (
-                        <span className={timing.urgent ? 'text-[var(--brass)]' : ''}>· {timing.label}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0 font-mono">
-                    {league.user_rank > 0 ? (
-                      <>
-                        <span className="text-sm text-primary">{ordinal(league.user_rank)}</span>
-                        <span className="text-[11px] text-muted ml-0.5">/{league.member_count}</span>
-                        {pct != null && (
-                          <p className="text-[10px] text-muted mt-0.5">top {pct}%</p>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-[11px] text-muted">—</span>
-                    )}
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
+                  params={{ id: l.id }}
+                  thumbIcon={<Trophy size={16} />}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="My Clubs"
+          icon={<Users size={11} className="text-gold" />}
+          actions={<SectionAction to="/clubs">Browse →</SectionAction>}
+        >
+          {myClubs.length === 0 ? (
+            <p className="text-[12px] text-muted text-center py-4">
+              Not in any clubs yet. <Link to="/clubs" className="text-gold hover:text-gold-2">Browse clubs →</Link>
+            </p>
+          ) : (
+            <div className="-mx-4 -my-2">
+              {myClubs.slice(0, 4).map((c: Club) => (
+                <MiniEntityCard
+                  key={c.id}
+                  name={c.name}
+                  imageUrl={c.image_url}
+                  metaIcon={<Users size={10} />}
+                  metaLabel={`${c.member_count}`}
+                  to="/clubs/$id"
+                  params={{ id: c.id }}
+                  thumbIcon={<Users size={16} />}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
       </div>
 
-      {/* ── Get Started (new users only) ───────────────────────── */}
-      {isNewUser && (
-        <div>
-          <p className="text-[10px] tracking-widest uppercase text-muted mb-3">Get Started</p>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <QuickActionCard
-              icon={<Layers size={16} />}
-              heading="Add a rifle"
-              body="Register your air rifle to track per-platform performance and compare setups."
-              cta={{ label: 'Add rifle', to: '/gear' }}
-            />
-            <QuickActionCard
-              icon={<Target size={16} />}
-              heading="Log your first score"
-              body="Record your first score card to begin building your performance history."
-              cta={{ label: 'Log a card', to: '/scores/new' }}
-            />
-            <QuickActionCard
-              icon={<Trophy size={16} />}
-              heading="Browse leagues"
-              body="Join a league to see how you rank against other shooters at your level."
-              cta={{ label: 'Browse leagues', to: '/leagues' }}
-            />
+      {/* ── Recent Activity (combined feed) ──────────────────────── */}
+      <Section
+        title="Recent Activity"
+        icon={<Bell size={11} className="text-gold" />}
+        actions={
+          <>
+            <SectionAction to="/scores/trends" variant="outline">Trends</SectionAction>
+            <SectionAction to="/scores/new" icon={<Plus size={10} className="-mr-0.5" />}>Log</SectionAction>
+          </>
+        }
+      >
+        {activityStream.length === 0 ? (
+          <p className="text-[12px] text-muted text-center py-6">
+            No recent activity. <Link to="/scores/new" className="text-gold hover:text-gold-2">Log your first card →</Link>
+          </p>
+        ) : (
+          <div className="-mx-4 -my-2">
+            {activityStream.map(item => (
+              <ActivityRow
+                key={`${item.kind}-${item.id}`}
+                item={item}
+                scoreIcon={<Target size={13} />}
+                formatRelative={(iso) => formatRelative(iso) + (item.kind === 'score' ? ` · ${formatDate(iso, prefs)}` : '')}
+              />
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </Section>
+
+      {/* ── Pellet Performance ───────────────────────────────────── */}
+      <Section
+        title="Pellet Performance"
+        icon={<Crosshair size={11} className="text-gold" />}
+        actions={
+          <>
+            {pelletCells && (
+              <SectionAction to="/pellet-testing/compare" variant="outline">Compare</SectionAction>
+            )}
+            <SectionAction to="/pellet-testing">All Tests →</SectionAction>
+          </>
+        }
+      >
+        {pelletCells ? (
+          <StatsStrip cells={pelletCells} />
+        ) : (
+          <p className="text-[12px] text-muted text-center py-6">
+            No pellet tests yet. <Link to="/pellet-testing" className="text-gold hover:text-gold-2">Start your first test →</Link>
+          </p>
+        )}
+      </Section>
 
     </div>
   )
