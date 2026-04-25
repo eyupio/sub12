@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,47 +9,10 @@
   :root {
     color-scheme: light;
 
-    --gunmetal: #F5F5F0;
-    --carbon: #FFFFFF;
-    --brass: #B8882C;
-    --brass-dim: rgba(184, 136, 44, 0.12);
-    --brass-glow: rgba(184, 136, 44, 0.03);
-    --brass-pill-bg: #F6EEDC;
-    --paper: #0C0C0C;
-    --steel: #666666;
-    --range: #2D5A27;
-    --grid-line: rgba(0, 0, 0, 0.04);
-
-    --text-primary: #1a1a1a;
-    --text-secondary: #444444;
-    --text-muted: #888888;
-    --text-inverse: #ffffff;
-
-    --border-subtle: rgba(0, 0, 0, 0.10);
-    --border-strong: rgba(0, 0, 0, 0.18);
-
-    --surface: #FFFFFF;
-    --surface-hover: #F7F7F3;
-    --surface-active: #F0F0EB;
-
-    --nav-bg: rgba(255, 255, 255, 0.92);
-    --overlay-bg: rgba(0, 0, 0, 0.40);
-
-    --error-bg: rgba(220, 38, 38, 0.08);
-    --error-border: rgba(220, 38, 38, 0.20);
-    --error-text: #dc2626;
-
-    --success-bg: rgba(34, 197, 94, 0.08);
-    --success-border: rgba(34, 197, 94, 0.20);
-    --success-text: #16a34a;
-
-    --mobile-nav-height: 76px;
-    --mobile-nav-offset: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
-
-    /* Leagues/Clubs redesign tokens (light) */
+    /* Dashboard design-system tokens (warm-cream + olive-gold) */
     --bg: #f5f1e8;
     --bg-2: #efeadd;
-    --lc-surface: #ffffff;
+    --surface: #ffffff;
     --surface-2: #fbf8f0;
     --line: #e6dfcb;
     --line-2: #d9d0b6;
@@ -64,57 +29,63 @@
     --red: #a8463a;
     --red-soft: #f1d9d4;
     --grid: rgba(160, 123, 44, 0.06);
-    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    --serif: 'Cormorant Garamond', 'Times New Roman', serif;
-    --ui: 'Inter', 'DM Sans', system-ui, sans-serif;
+
     --radius: 6px;
     --radius-lg: 10px;
-    --shadow-sm: 0 1px 2px rgba(40, 30, 10, 0.04);
-    --shadow-md: 0 4px 16px rgba(40, 30, 10, 0.08);
+    --shadow-sm: 0 1px 2px rgba(42, 42, 40, 0.04);
+    --shadow-md: 0 4px 12px rgba(42, 42, 40, 0.08);
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Legacy aliases — keep existing pages working with new palette */
+    --gunmetal: var(--bg);
+    --carbon: var(--surface);
+    --brass: var(--gold);
+    --brass-dim: rgba(160, 123, 44, 0.12);
+    --brass-glow: rgba(160, 123, 44, 0.03);
+    --brass-pill-bg: var(--gold-tint);
+    --paper: var(--ink);
+    --steel: var(--muted);
+    --range: var(--green);
+    --grid-line: var(--grid);
+
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --text-muted: var(--muted);
+    --text-inverse: #ffffff;
+
+    --border-subtle: var(--line);
+    --border-strong: var(--line-2);
+
+    --surface-hover: var(--surface-2);
+    --surface-active: var(--bg-2);
+
+    --nav-bg: rgba(245, 241, 232, 0.92);
+    --overlay-bg: rgba(42, 42, 40, 0.40);
+
+    --error-bg: var(--red-soft);
+    --error-border: rgba(168, 70, 58, 0.30);
+    --error-text: var(--red);
+
+    --success-bg: var(--green-soft);
+    --success-border: rgba(79, 122, 63, 0.30);
+    --success-text: var(--green);
+
+    --mobile-nav-height: 76px;
+    --mobile-nav-offset: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+
+    /* Aliases consumed by the Leagues/Clubs redesign */
+    --lc-surface: var(--surface);
+    --serif: 'Cormorant Garamond', 'Times New Roman', serif;
+    --ui: 'Inter', 'DM Sans', system-ui, sans-serif;
   }
 
   /* ── Dark mode ────────────────────────────────────────── */
   .dark {
     color-scheme: dark;
 
-    --gunmetal: #0C0C0C;
-    --carbon: #111111;
-    --brass: #D4A44A;
-    --brass-dim: rgba(212, 164, 74, 0.15);
-    --brass-glow: rgba(212, 164, 74, 0.06);
-    --brass-pill-bg: #2A2113;
-    --paper: #FFFFFF;
-    --steel: #888888;
-    --range: #2D5A27;
-    --grid-line: rgba(255, 255, 255, 0.03);
-
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.80);
-    --text-muted: rgba(255, 255, 255, 0.40);
-    --text-inverse: #0C0C0C;
-
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-strong: rgba(255, 255, 255, 0.12);
-
-    --surface: #161616;
-    --surface-hover: #1C1C1C;
-    --surface-active: #222222;
-
-    --nav-bg: rgba(17, 17, 17, 0.92);
-    --overlay-bg: rgba(0, 0, 0, 0.60);
-
-    --error-bg: rgba(220, 38, 38, 0.15);
-    --error-border: rgba(220, 38, 38, 0.30);
-    --error-text: #f87171;
-
-    --success-bg: rgba(34, 197, 94, 0.10);
-    --success-border: rgba(34, 197, 94, 0.25);
-    --success-text: #4ade80;
-
-    /* Leagues/Clubs redesign tokens (dark) */
     --bg: #16161a;
     --bg-2: #1c1c20;
-    --lc-surface: #202024;
+    --surface: #202024;
     --surface-2: #26262b;
     --line: #2f2f35;
     --line-2: #3a3a42;
@@ -124,15 +95,53 @@
     --muted-2: #6a6558;
     --gold: #d4a44a;
     --gold-2: #e4b75c;
-    --gold-soft: #8a6a25;
+    --gold-soft: #b88a35;
     --gold-tint: #3a2f15;
     --green: #87b06d;
     --green-soft: #1f2e18;
     --red: #d18074;
     --red-soft: #3a1f1c;
     --grid: rgba(212, 164, 74, 0.04);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.40);
+
+    --gunmetal: var(--bg);
+    --carbon: var(--surface);
+    --brass: var(--gold);
+    --brass-dim: rgba(212, 164, 74, 0.15);
+    --brass-glow: rgba(212, 164, 74, 0.06);
+    --brass-pill-bg: var(--gold-tint);
+    --paper: var(--ink);
+    --steel: var(--muted);
+    --range: var(--green);
+    --grid-line: var(--grid);
+
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-2);
+    --text-muted: var(--muted);
+    --text-inverse: var(--bg);
+
+    --border-subtle: var(--line);
+    --border-strong: var(--line-2);
+
+    --surface-hover: var(--surface-2);
+    --surface-active: var(--bg-2);
+
+    --nav-bg: rgba(22, 22, 26, 0.92);
+    --overlay-bg: rgba(0, 0, 0, 0.60);
+
+    --error-bg: var(--red-soft);
+    --error-border: rgba(209, 128, 116, 0.35);
+    --error-text: var(--red);
+
+    --success-bg: var(--green-soft);
+    --success-border: rgba(135, 176, 109, 0.35);
+    --success-text: var(--green);
+
+    /* Aliases consumed by the Leagues/Clubs redesign */
+    --lc-surface: var(--surface);
+    --gold-soft: #8a6a25;
   }
 
   html {
@@ -144,9 +153,9 @@
   }
 
   body {
-    background-color: var(--gunmetal);
-    color: var(--text-primary);
-    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
     position: relative;
@@ -158,9 +167,9 @@
     position: fixed;
     inset: 0;
     background-image:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 60px 60px;
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 56px 56px;
     pointer-events: none;
     z-index: 0;
   }
@@ -228,4 +237,23 @@
 
   .border-subtle { border-color: var(--border-subtle); }
   .border-strong { border-color: var(--border-strong); }
+
+  /* Dashboard design-system shortcuts */
+  .text-ink     { color: var(--ink); }
+  .text-ink-2   { color: var(--ink-2); }
+  .text-muted-2 { color: var(--muted-2); }
+  .text-gold    { color: var(--gold); }
+  .text-gold-2  { color: var(--gold-2); }
+  .bg-bg        { background-color: var(--bg); }
+  .bg-bg-2      { background-color: var(--bg-2); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-gold      { background-color: var(--gold); }
+  .bg-gold-tint { background-color: var(--gold-tint); }
+  .border-line   { border-color: var(--line); }
+  .border-line-2 { border-color: var(--line-2); }
+  .border-gold   { border-color: var(--gold); }
+  .font-serif-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .font-mono-ui       { font-family: var(--mono); }
+  .shadow-card       { box-shadow: var(--shadow-sm); }
+  .shadow-card-hover { box-shadow: var(--shadow-md); }
 }

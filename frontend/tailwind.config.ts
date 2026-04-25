@@ -30,7 +30,8 @@ export default {
         950: '#0C0C0C',
       },
       fontFamily: {
-        sans: ['DM Sans', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+        sans: ['Inter', 'DM Sans', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+        serif: ['Cormorant Garamond', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
     },
