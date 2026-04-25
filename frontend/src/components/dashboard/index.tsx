@@ -292,11 +292,11 @@ export function RifleCard({
         {imageUrl ? (
           <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-white font-serif-display text-[28px]">{initialsOf(name)}</span>
+          <span className="text-white font-serif text-[28px]">{initialsOf(name)}</span>
         )}
       </div>
       <div>
-        <p className="font-serif-display text-[18px] text-ink leading-tight">{name}</p>
+        <p className="font-serif text-[18px] text-ink leading-tight">{name}</p>
         {spec && <p className="font-mono text-[11px] text-muted mt-0.5">{spec}</p>}
       </div>
       <div className="w-full border-t border-line pt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
@@ -528,7 +528,7 @@ export function StatsStrip({ cells }: { cells: PelletCellData[] }) {
       {cells.map((c, i) => (
         <div key={i} className={`px-4 py-4 ${i >= 2 ? 'border-t lg:border-t-0 border-line' : ''}`}>
           <p className="text-[10px] tracking-[0.18em] uppercase text-muted">{c.label}</p>
-          <p className={`font-serif-display text-[24px] mt-1 leading-tight ${c.highlight ? 'text-gold' : 'text-ink'}`}>
+          <p className={`font-serif text-[24px] mt-1 leading-tight ${c.highlight ? 'text-gold' : 'text-ink'}`}>
             {c.value}
           </p>
           {c.sub && <p className="text-[11px] text-muted mt-1">{c.sub}</p>}
@@ -589,7 +589,7 @@ export function MiniEntityCard({
       <div className="shrink-0 text-right">
         {rank != null && rank > 0 ? (
           <p className="font-mono text-[11px] text-muted">
-            <span className="font-serif-display text-[16px] text-gold leading-none">
+            <span className="font-serif text-[16px] text-gold leading-none">
               {ordinalNumber(rank)}
             </span>
             <sup className="ml-0.5">{ordinalSuffix(rank)}</sup>

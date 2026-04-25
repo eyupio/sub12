@@ -80,7 +80,7 @@ function SerifNumber({ value, suffix, size = 'lg' }: { value: string; suffix?: s
         ? 'text-3xl lg:text-4xl'
         : 'text-2xl lg:text-3xl'
   return (
-    <span className={`font-serif-display tracking-tight text-ink ${sizeCls}`}>
+    <span className={`font-serif tracking-tight text-ink ${sizeCls}`}>
       {value}
       {suffix && <span className="text-[10px] uppercase tracking-widest text-muted ml-1 align-baseline font-sans">{suffix}</span>}
     </span>
@@ -210,7 +210,7 @@ function OverviewTab({
       {/* Performance over time */}
       <section className="space-y-3">
         <div>
-          <h2 className="font-serif-display text-2xl lg:text-3xl text-ink">Performance over time</h2>
+          <h2 className="font-serif text-2xl lg:text-3xl text-ink">Performance over time</h2>
           <p className="text-sm text-muted mt-0.5">Best group per session, by pellet — lower is better.</p>
         </div>
         <div className="bg-surface border border-line rounded-lg p-4 lg:p-6 shadow-card">
@@ -282,7 +282,7 @@ function OverviewTab({
       <section className="grid lg:grid-cols-2 gap-8 lg:gap-10">
         <div>
           <div className="flex items-baseline justify-between mb-3">
-            <h3 className="font-serif-display text-xl text-ink">Recent test sessions</h3>
+            <h3 className="font-serif text-xl text-ink">Recent test sessions</h3>
             <span className="text-[11px] text-muted">Last {Math.min(recent.length, 5)} of {recent.length}</span>
           </div>
           {recent.length === 0 ? (
@@ -312,7 +312,7 @@ function OverviewTab({
 
         <div>
           <div className="flex items-baseline justify-between mb-3">
-            <h3 className="font-serif-display text-xl text-ink">Top combos</h3>
+            <h3 className="font-serif text-xl text-ink">Top combos</h3>
             <Link
               to="/pellet-testing"
               search={{ tab: 'combos' }}
@@ -349,7 +349,7 @@ function RecentSessionRow({ test }: { test: PelletTestSessionSummary }) {
     >
       <TargetThumb src={test.first_image_url} />
       <div className="flex-1 min-w-0">
-        <p className="font-serif-display text-lg lg:text-xl text-ink leading-tight truncate">
+        <p className="font-serif text-lg lg:text-xl text-ink leading-tight truncate">
           {test.pellet_brand} {test.pellet_model}
         </p>
         <p className="text-xs text-muted truncate">{test.rifle_make} {test.rifle_model}</p>
@@ -388,10 +388,10 @@ function TopComboRow({
           : 'bg-surface border-line hover:border-gold/40'
       }`}
     >
-      <span className="font-serif-display text-2xl text-muted-2 w-6 text-center shrink-0">{rank}</span>
+      <span className="font-serif text-2xl text-muted-2 w-6 text-center shrink-0">{rank}</span>
       <TargetThumb />
       <div className="flex-1 min-w-0">
-        <p className={`font-serif-display text-lg lg:text-xl leading-tight truncate ${highlight ? 'text-gold' : 'text-ink'}`}>
+        <p className={`font-serif text-lg lg:text-xl leading-tight truncate ${highlight ? 'text-gold' : 'text-ink'}`}>
           {combo.pellet_name}
         </p>
         <p className="text-xs text-muted truncate">{combo.rifle_name}</p>
@@ -466,7 +466,7 @@ function TestsTab({
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="font-serif-display text-2xl lg:text-3xl text-ink">Test sessions</h2>
+          <h2 className="font-serif text-2xl lg:text-3xl text-ink">Test sessions</h2>
           <p className="text-xs text-muted mt-0.5">{filtered.length} of {tests.length} tests</p>
         </div>
         <div className="flex gap-1.5">
@@ -614,7 +614,7 @@ function TestRow({
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm text-ink-2">{formatDate(test.test_date, prefs)}</span>
-          <span className="font-serif-display text-lg text-ink leading-tight truncate">
+          <span className="font-serif text-lg text-ink leading-tight truncate">
             {test.rifle_make} {test.rifle_model}
           </span>
         </div>
@@ -683,7 +683,7 @@ function CombosTab({ combos }: { combos: ComboPerformanceSummary[] }) {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="font-serif-display text-2xl lg:text-3xl text-ink">Rifle × pellet combos</h2>
+          <h2 className="font-serif text-2xl lg:text-3xl text-ink">Rifle × pellet combos</h2>
           <p className="text-xs text-muted mt-0.5">Aggregated across all test sessions. Lower is better.</p>
         </div>
         <div className="flex gap-1.5">
@@ -720,14 +720,14 @@ function CombosTab({ combos }: { combos: ComboPerformanceSummary[] }) {
               <tbody className="divide-y divide-[var(--line)]">
                 {sorted.map((c, i) => (
                   <tr key={`${c.rifle_id}-${c.pellet_id}`} className="hover:bg-bg-2/50">
-                    <td className="px-4 py-3 font-serif-display text-xl text-muted-2">{i + 1}</td>
+                    <td className="px-4 py-3 font-serif text-xl text-muted-2">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <p className="font-serif-display text-lg text-ink leading-tight">{c.pellet_name}</p>
+                      <p className="font-serif text-lg text-ink leading-tight">{c.pellet_name}</p>
                       <p className="text-xs text-muted">{c.rifle_name}</p>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-ink-2">{c.test_count}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-serif-display text-lg text-gold">
+                      <span className="font-serif text-lg text-gold">
                         {c.best_group_mm != null ? c.best_group_mm.toFixed(2) : '—'}
                       </span>
                       <span className="text-[10px] text-muted ml-0.5">mm</span>
@@ -777,9 +777,9 @@ function SortPill({
 function ComboCardMobile({ combo, rank }: { combo: ComboPerformanceSummary; rank: number }) {
   return (
     <div className="p-4 flex items-center gap-3">
-      <span className="font-serif-display text-2xl text-muted-2 w-6 text-center shrink-0">{rank}</span>
+      <span className="font-serif text-2xl text-muted-2 w-6 text-center shrink-0">{rank}</span>
       <div className="flex-1 min-w-0">
-        <p className="font-serif-display text-lg text-ink leading-tight truncate">{combo.pellet_name}</p>
+        <p className="font-serif text-lg text-ink leading-tight truncate">{combo.pellet_name}</p>
         <p className="text-xs text-muted truncate">{combo.rifle_name}</p>
         <div className="flex items-center gap-3 mt-1 text-[11px] text-ink-2">
           <span>{combo.test_count} tests</span>
@@ -806,7 +806,7 @@ function BatchesTab({ batches }: { batches: BatchReportEntry[] }) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-serif-display text-2xl lg:text-3xl text-ink">Pellet batches</h2>
+        <h2 className="font-serif text-2xl lg:text-3xl text-ink">Pellet batches</h2>
         <p className="text-xs text-muted mt-0.5">
           Cross-batch performance for every lot you've tested. Add lot codes to pellets in{' '}
           <Link to="/gear" className="text-gold hover:underline">Gear</Link>.
@@ -833,7 +833,7 @@ function BatchCard({ batch }: { batch: BatchReportEntry }) {
     <article className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-serif-display text-xl lg:text-2xl text-ink leading-tight">
+          <h3 className="font-serif text-xl lg:text-2xl text-ink leading-tight">
             {batch.pellet_brand} {batch.pellet_model}
           </h3>
           <p className="text-xs text-muted font-mono mt-0.5">Lot {batch.batch_code}</p>
@@ -924,7 +924,7 @@ export default function PelletTesting() {
         {/* Header */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="font-serif-display text-3xl lg:text-5xl text-ink leading-tight">Pellet testing</h1>
+            <h1 className="font-serif text-3xl lg:text-5xl text-ink leading-tight">Pellet testing</h1>
             <p className="text-sm text-ink-2 mt-1">Find the smallest groups. Track lot-to-lot. Pick the right pellet for the rifle.</p>
           </div>
           <div className="flex items-center gap-2">

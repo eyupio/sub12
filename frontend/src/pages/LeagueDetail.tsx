@@ -273,7 +273,8 @@ export default function LeagueDetail() {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   placeholder="INVITE CODE"
-                  style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)', textAlign: 'center', letterSpacing: '0.16em' }}
+                  className="font-mono"
+                  style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', textAlign: 'center', letterSpacing: '0.16em' }}
                 />
               )}
               {currentUser && (
@@ -337,7 +338,7 @@ export default function LeagueDetail() {
             <span><Users size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {league?.member_count ?? 0} shooters</span>
             {code && (<>
               <span className="lc-detail-sub-sep">·</span>
-              <span style={{ fontFamily: 'var(--mono)' }}><Lock size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {code}</span>
+              <span className="font-mono"><Lock size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {code}</span>
             </>)}
           </>
         }
@@ -407,7 +408,8 @@ export default function LeagueDetail() {
                   value={joinCode}
                   onChange={e => setJoinCode(e.target.value)}
                   placeholder="Enter invite code"
-                  style={{ flex: 1, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)' }}
+                  className="font-mono"
+                  style={{ flex: 1, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)' }}
                 />
                 <button onClick={() => { setJoinError(''); joinMutation.mutate() }} disabled={joinMutation.isPending || !joinCode.trim()} className="lc-action-ghost" style={{ background: 'var(--gold)', color: 'white' }}>
                   {joinMutation.isPending ? 'Joining…' : 'Join'}
