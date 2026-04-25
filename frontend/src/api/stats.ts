@@ -3,6 +3,7 @@ import { api } from './client'
 export interface UserStats {
   cards_logged: number
   best_score?: number
+  best_score_card_id?: string
   best_x_count?: number
   avg_score?: number
   rolling_10_avg?: number

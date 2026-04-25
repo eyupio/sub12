@@ -582,10 +582,14 @@ func (r *PelletTestRepository) GetStats(ctx context.Context, userID string) (*mo
 			COUNT(DISTINCT s.id)::int,
 			COALESCE(SUM(s.group_count), 0)::int,
 			MIN(s.best_group_size_mm),
-			AVG(s.average_group_size_mm)
+			AVG(s.average_group_size_mm),
+			(SELECT id::text FROM pellet_test_sessions
+			 WHERE user_id = $1 AND is_draft = FALSE AND best_group_size_mm IS NOT NULL
+			 ORDER BY best_group_size_mm ASC
+			 LIMIT 1)
 		FROM pellet_test_sessions s
 		WHERE s.user_id = $1 AND s.is_draft = FALSE
-	`, userID).Scan(&stats.TotalTests, &stats.TotalGroups, &stats.BestGroupMM, &stats.AvgGroupMM)
+	`, userID).Scan(&stats.TotalTests, &stats.TotalGroups, &stats.BestGroupMM, &stats.AvgGroupMM, &stats.BestGroupTestID)
 	if err != nil {
 		return nil, fmt.Errorf("get pellet test stats: %w", err)
 	}
