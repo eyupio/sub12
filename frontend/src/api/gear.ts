@@ -35,6 +35,7 @@ export interface CreateRiflePayload {
   calibre?: string
   power_ftlb?: number
   tune_notes?: string
+  image_url?: string
 }
 
 export interface CreatePelletPayload {
@@ -44,6 +45,7 @@ export interface CreatePelletPayload {
   weight_grains?: number
   batch_code?: string
   notes?: string
+  image_url?: string
 }
 
 export const gearApi = {

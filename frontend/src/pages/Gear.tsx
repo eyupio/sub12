@@ -124,6 +124,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
       model: entry.model,
       calibre: entry.calibre,
       power_ftlb: entry.power_ftlb,
+      image_url: entry.image_url,
     })
     setShowFields(true)
   }
@@ -374,6 +375,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
       model: entry.model,
       head_size_mm: entry.head_size_mm,
       weight_grains: entry.weight_grains,
+      image_url: entry.image_url,
     })
     setShowFields(true)
   }

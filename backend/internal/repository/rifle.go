@@ -38,10 +38,10 @@ func (r *RifleRepository) Create(ctx context.Context, userID string, in *model.C
 		calibre = ".177"
 	}
 	rifle, err := scanRifle(r.db.QueryRow(ctx, `
-		INSERT INTO rifles (user_id, make, model, calibre, power_ftlb, tune_notes)
-		VALUES ($1,$2,$3,$4,$5,$6)
+		INSERT INTO rifles (user_id, make, model, calibre, power_ftlb, tune_notes, image_url)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
-	`, userID, in.Make, in.Model, calibre, in.PowerFtLb, in.TuneNotes))
+	`, userID, in.Make, in.Model, calibre, in.PowerFtLb, in.TuneNotes, in.ImageURL))
 	if err != nil {
 		return nil, fmt.Errorf("create rifle: %w", err)
 	}

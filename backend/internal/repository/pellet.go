@@ -34,10 +34,10 @@ func scanPellet(row pgx.Row) (*model.Pellet, error) {
 
 func (r *PelletRepository) Create(ctx context.Context, userID string, in *model.CreatePelletInput) (*model.Pellet, error) {
 	pellet, err := scanPellet(r.db.QueryRow(ctx, `
-		INSERT INTO pellets (user_id, brand, model, head_size_mm, weight_grains, batch_code, notes)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO pellets (user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		RETURNING id, user_id, brand, model, head_size_mm, weight_grains, batch_code, notes, image_url, is_active, created_at, updated_at
-	`, userID, in.Brand, in.Model, in.HeadSizeMM, in.WeightGrains, in.BatchCode, in.Notes))
+	`, userID, in.Brand, in.Model, in.HeadSizeMM, in.WeightGrains, in.BatchCode, in.Notes, in.ImageURL))
 	if err != nil {
 		return nil, fmt.Errorf("create pellet: %w", err)
 	}
