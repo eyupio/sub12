@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -71,27 +73,39 @@ func (r *ActivityRepository) Ingest(ctx context.Context, userID string, actType 
 }
 
 // activityColumns is the shared SELECT list for all feed queries.
-// Includes star_level from the author, and like/comment counts for score_card targets.
+// Like/comment counts are resolved per target_type: denormalized columns for
+// score_card and post, subquery counts for activity-level engagement on all others.
 const activityColumns = `a.id, a.user_id, u.display_name, u.avatar_url, u.star_level,
        a.type, a.target_id::text, a.target_type, a.metadata,
        a.league_id, a.club_id, a.visibility, a.created_at,
-       COALESCE(sc.like_count, 0),
-       COALESCE(sc.comment_count, 0)`
+       CASE
+           WHEN a.target_type = 'score_card' THEN COALESCE(sc.like_count, 0)
+           WHEN a.target_type = 'post'       THEN COALESCE(p.like_count, 0)
+           ELSE (SELECT COUNT(*)::int FROM likes WHERE target_id = a.id AND target_type = 'activity')
+       END,
+       CASE
+           WHEN a.target_type = 'score_card' THEN COALESCE(sc.comment_count, 0)
+           WHEN a.target_type = 'post'       THEN COALESCE(p.comment_count, 0)
+           ELSE (SELECT COUNT(*)::int FROM comments WHERE target_id = a.id AND target_type = 'activity' AND parent_id IS NULL AND hidden_at IS NULL)
+       END`
 
 // activityColumnsViewer extends activityColumns with a viewer-specific is_liked flag.
 // $viewerParam is the positional parameter placeholder for the viewer UUID (e.g. "$1").
 func activityColumnsViewer(viewerParam string) string {
 	return activityColumns + `,
-       EXISTS(
-           SELECT 1 FROM likes
-           WHERE target_id = a.target_id
-             AND target_type = 'score_card'
-             AND user_id = ` + viewerParam + `
-       )`
+       CASE
+           WHEN a.target_type = 'score_card' THEN EXISTS(
+               SELECT 1 FROM likes WHERE target_id = a.target_id AND target_type = 'score_card' AND user_id = ` + viewerParam + `)
+           WHEN a.target_type = 'post' THEN EXISTS(
+               SELECT 1 FROM likes WHERE target_id = a.target_id AND target_type = 'post' AND user_id = ` + viewerParam + `)
+           ELSE EXISTS(
+               SELECT 1 FROM likes WHERE target_id = a.id AND target_type = 'activity' AND user_id = ` + viewerParam + `)
+       END`
 }
 
-// activityJoinScoreCard is the optional LEFT JOIN added to enrich score_card targets.
-const activityJoinScoreCard = `LEFT JOIN score_cards sc ON sc.id = a.target_id AND a.target_type = 'score_card'`
+// activityJoins are the LEFT JOINs added to enrich score_card and post targets.
+const activityJoins = `LEFT JOIN score_cards sc ON sc.id = a.target_id AND a.target_type = 'score_card'
+       LEFT JOIN posts p ON p.id = a.target_id AND a.target_type = 'post'`
 
 // scanActivity scans a single activity row matching activityColumns order (no viewer).
 func scanActivity(scan func(dest ...any) error) (*model.Activity, error) {
@@ -136,7 +150,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			SELECT `+cols+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
-			`+activityJoinScoreCard+`
+			`+activityJoins+`
 			WHERE a.visibility = 'public'
 			  AND u.feed_opt_out = FALSE
 			  AND u.profile_visibility <> 'private'
@@ -156,7 +170,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			SELECT `+activityColumnsViewer("$2")+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
-			`+activityJoinScoreCard+`
+			`+activityJoins+`
 			WHERE a.league_id = $1
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND a.user_id NOT IN (
@@ -174,7 +188,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			SELECT `+activityColumnsViewer("$2")+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
-			`+activityJoinScoreCard+`
+			`+activityJoins+`
 			WHERE a.club_id = $1
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND a.user_id NOT IN (
@@ -192,7 +206,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			SELECT `+cols+`
 			FROM activities a
 			JOIN users u ON u.id = a.user_id
-			`+activityJoinScoreCard+`
+			`+activityJoins+`
 			WHERE a.user_id IN (
 				SELECT following_id FROM user_follows WHERE follower_id = $1
 				UNION ALL SELECT $1
@@ -241,6 +255,26 @@ func (r *ActivityRepository) GetFeed(ctx context.Context, viewerID string, limit
 		Limit:    limit,
 		Cursor:   cursor,
 	})
+}
+
+// GetByID fetches a single activity by its primary key.
+// Returns ErrNotFound if no such row exists.
+func (r *ActivityRepository) GetByID(ctx context.Context, id string) (*model.Activity, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT `+activityColumns+`
+		FROM activities a
+		JOIN users u ON u.id = a.user_id
+		`+activityJoins+`
+		WHERE a.id = $1
+	`, id)
+	a, err := scanActivity(row.Scan)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get activity by id: %w", err)
+	}
+	return a, nil
 }
 
 // pgxRows is satisfied by pgx query result types.

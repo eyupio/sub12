@@ -16,21 +16,19 @@ import { Tooltip } from './Tooltip'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
 
-// Order reflects user flow: home -> daily activity -> competition -> gear
-// -> account -> help. Admin items are appended for admins only.
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
   { to: '/feed', icon: Activity, label: 'Feed', mobileLabel: 'Feed' },
+  { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
+  { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
+  { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
   { to: '/drafts', icon: Zap, label: 'Drafts', mobileLabel: 'Drafts' },
-  { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
-  { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
-  { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
-  { to: '/help', icon: HelpCircle, label: 'Help', mobileLabel: 'Help' },
   { to: '/support', icon: LifeBuoy, label: 'Support', mobileLabel: 'Tickets' },
   { to: '/feature-requests', icon: Lightbulb, label: 'Features', mobileLabel: 'Ideas' },
+  { to: '/help', icon: HelpCircle, label: 'Help', mobileLabel: 'Help' },
 ] as const
 
 const adminNavItems = [
@@ -47,21 +45,21 @@ const adminNavItems = [
 // Mobile bottom nav is 5 items max. Core daily-use actions.
 const mobileNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
-  { to: '/scores', icon: Target, label: 'Scores' },
-  { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
-  { to: '/leagues', icon: Trophy, label: 'Leagues' },
+  { to: '/feed', icon: Activity, label: 'Feed' },
+  { to: '/clubs', icon: Users, label: 'Clubs' },
+  { to: '/leagues', icon: Trophy, label: 'League' },
 ] as const
 
 // Everything not in mobileNavItems appears in the "More" overlay.
 const moreMenuItems = [
-  { to: '/feed', icon: Activity, label: 'Feed' },
-  { to: '/drafts', icon: Zap, label: 'Drafts' },
   { to: '/gear', icon: Package, label: 'Gear' },
-  { to: '/clubs', icon: Users, label: 'Clubs' },
+  { to: '/scores', icon: Target, label: 'Scores' },
+  { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
+  { to: '/drafts', icon: Zap, label: 'Drafts' },
   { to: '/profile', icon: User, label: 'Profile' },
-  { to: '/help', icon: HelpCircle, label: 'Help' },
   { to: '/support', icon: LifeBuoy, label: 'Support' },
   { to: '/feature-requests', icon: Lightbulb, label: 'Features' },
+  { to: '/help', icon: HelpCircle, label: 'Help' },
 ]
 
 export default function Layout({ children }: PropsWithChildren) {

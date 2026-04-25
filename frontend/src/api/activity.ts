@@ -73,4 +73,10 @@ export const activityApi = {
     if (filter === 'club' && entityId) url += `&club_id=${entityId}`
     return api.get<FeedResponse>(url)
   },
+
+  listComments: (id: string) =>
+    api.get<{ items: import('./scoreCards').Comment[] }>(`/activities/${id}/comments`),
+
+  createComment: (id: string, body: string) =>
+    api.post<import('./scoreCards').Comment>(`/activities/${id}/comments`, { body }),
 }

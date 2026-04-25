@@ -33,6 +33,7 @@ type CommentService struct {
 	leagues         *repository.LeagueRepository
 	clubs           *repository.ClubRepository
 	featureRequests *repository.FeatureRequestRepository
+	activities      *repository.ActivityRepository
 	achievements    *AchievementService // optional; nil disables achievement evaluation
 }
 
@@ -45,6 +46,7 @@ func NewCommentService(
 	leagues *repository.LeagueRepository,
 	clubs *repository.ClubRepository,
 	featureRequests *repository.FeatureRequestRepository,
+	activities *repository.ActivityRepository,
 	achievements *AchievementService,
 ) *CommentService {
 	return &CommentService{
@@ -56,6 +58,7 @@ func NewCommentService(
 		leagues:         leagues,
 		clubs:           clubs,
 		featureRequests: featureRequests,
+		activities:      activities,
 		achievements:    achievements,
 	}
 }
@@ -124,6 +127,23 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 				return nil, ErrCommentDenied
 			}
 			return nil, err
+		}
+	case "activity":
+		act, err := s.activities.GetByID(ctx, targetID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrCommentDenied
+			}
+			return nil, err
+		}
+		if act.UserID != userID {
+			blocked, err := s.blocks.IsBlocked(ctx, act.UserID, userID)
+			if err != nil {
+				return nil, err
+			}
+			if blocked {
+				return nil, ErrCommentDenied
+			}
 		}
 	default:
 		return nil, errors.New("unsupported comment target type")

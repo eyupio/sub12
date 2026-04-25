@@ -3,7 +3,7 @@ import { Heart } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import { likeApi } from '../api/likes'
 
-type LikeTarget = 'score_card' | 'comment' | 'post'
+type LikeTarget = 'score_card' | 'comment' | 'post' | 'activity'
 
 interface LikeButtonProps {
   targetId: string
@@ -18,6 +18,7 @@ function getLikeFn(targetType: LikeTarget) {
     case 'score_card': return { like: likeApi.likeScoreCard, unlike: likeApi.unlikeScoreCard }
     case 'comment': return { like: likeApi.likeComment, unlike: likeApi.unlikeComment }
     case 'post': return { like: likeApi.likePost, unlike: likeApi.unlikePost }
+    case 'activity': return { like: likeApi.likeActivity, unlike: likeApi.unlikeActivity }
   }
 }
 
