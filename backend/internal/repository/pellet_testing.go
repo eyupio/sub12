@@ -210,6 +210,7 @@ func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, li
 	}
 	query := `
 		SELECT s.id, s.test_date, s.distance_m, s.distance_unit, s.location,
+			s.wind_mph, s.temp_celsius,
 			s.average_group_size_mm, s.best_group_size_mm, s.group_count,
 			ri.make, ri.model, p.brand, p.model,
 			(SELECT '/api/v1/images/' || pti.image_id::text
@@ -238,6 +239,7 @@ func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, li
 		var createdAt time.Time
 		if err := rows.Scan(
 			&s.ID, &testDate, &s.DistanceM, &s.DistanceUnit, &s.Location,
+			&s.WindMPH, &s.TempCelsius,
 			&s.AverageGroupSizeMM, &s.BestGroupSizeMM, &s.GroupCount,
 			&s.RifleMake, &s.RifleModel, &s.PelletBrand, &s.PelletModel,
 			&s.FirstImageURL, &s.IsDraft, &createdAt,
