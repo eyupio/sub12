@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react'
-import { Link, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Trash2, Plus, Camera, Upload, Check, Download, Share2, X, Pencil } from 'lucide-react'
 import { toast } from '../store/toast'
