@@ -577,7 +577,7 @@ export default function LeagueDetail() {
 function ScoreRow({ score }: { score: LeagueScore }) {
   return (
     <Link to="/scores/$id" params={{ id: score.id }} className="lc-score-row" style={{ textDecoration: 'none', color: 'inherit' }}>
-      <Avatar name={score.display_name} size="md" />
+      <Avatar name={score.display_name} size="md" src={score.avatar_url} />
       <div style={{ minWidth: 0 }}>
         <div className="lc-score-name">{score.display_name}</div>
         <div className="lc-score-date">{formatDate(score.shot_at)}</div>

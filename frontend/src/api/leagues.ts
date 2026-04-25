@@ -138,6 +138,7 @@ export interface LeagueScore {
   id: string
   user_id: string
   display_name: string
+  avatar_url?: string
   shot_at: string
   total_score: number
   x_count: number
