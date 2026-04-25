@@ -220,6 +220,7 @@ export default function LeagueDetail() {
       id: s.user_id,
       rank: s.rank,
       name: s.display_name,
+      avatarUrl: s.avatar_url,
       cards: s.card_count,
       best: s.best_score ?? null,
       bestX: s.best_x ?? null,
@@ -524,7 +525,16 @@ export default function LeagueDetail() {
               {code && (
                 <div className="lc-kv-row">
                   <span className="lc-kv-key">Code</span>
-                  <span className="lc-kv-val">{code}</span>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                    className="lc-kv-val"
+                    style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, color: 'inherit', font: 'inherit' }}
+                    title="Click to copy"
+                  >
+                    {copied ? <Check size={12} style={{ color: 'var(--green)' }} /> : <Copy size={12} />}
+                    {copied ? 'Copied!' : code}
+                  </button>
                 </div>
               )}
             </div>

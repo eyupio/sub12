@@ -367,6 +367,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 		SELECT
 			u.id,
 			u.display_name,
+			u.avatar_url,
 			%s(sc.total_score::double precision) AS score,
 			(
 				SELECT sc2.x_count
@@ -381,7 +382,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 		JOIN users u ON u.id = lm.user_id
 		LEFT JOIN score_cards sc ON sc.user_id = lm.user_id AND sc.verification = 'verified' AND sc.is_draft = FALSE
 		WHERE lm.league_id = $1
-		GROUP BY u.id, u.display_name, lm.joined_at
+		GROUP BY u.id, u.display_name, u.avatar_url, lm.joined_at
 		ORDER BY %s(sc.total_score::double precision) DESC NULLS LAST, lm.joined_at ASC
 	`, agg, agg)
 
@@ -399,7 +400,7 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 	position := 0
 	for rows.Next() {
 		var s model.LeagueStanding
-		if err := rows.Scan(&s.UserID, &s.DisplayName, &s.BestScore, &s.BestX, &s.CardCount, &s.JoinedAt); err != nil {
+		if err := rows.Scan(&s.UserID, &s.DisplayName, &s.AvatarURL, &s.BestScore, &s.BestX, &s.CardCount, &s.JoinedAt); err != nil {
 			return nil, fmt.Errorf("scan standing: %w", err)
 		}
 		position++

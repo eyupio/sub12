@@ -21,6 +21,7 @@ export interface LeagueStanding {
   rank: number
   user_id: string
   display_name: string
+  avatar_url?: string
   best_score: number | null
   best_x: number | null
   card_count: number

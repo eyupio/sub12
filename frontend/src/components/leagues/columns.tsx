@@ -1,5 +1,7 @@
+import { Link } from '@tanstack/react-router'
 import { Avatar, Sparkline, Trend } from './atoms'
 import type { Column, StandingRow } from './LeagueTable'
+import { UserHoverCard } from '../UserHoverCard'
 
 export function rankColumn<R extends StandingRow>(): Column<R> {
   return {
@@ -26,16 +28,24 @@ export function shooterColumn<R extends StandingRow>(): Column<R> {
     sortable: true,
     sortValue: (r) => r.name,
     render: (r) => (
-      <div className="lc-shooter-cell">
-        <Avatar name={r.name} size="md" src={r.avatarUrl} />
-        <div>
+      <UserHoverCard userId={r.id} displayName={r.name} avatarUrl={r.avatarUrl}>
+        <Link
+          to="/users/$id"
+          params={{ id: r.id }}
+          onClick={(e) => e.stopPropagation()}
+          className="lc-shooter-cell"
+          style={{ display: 'flex', textDecoration: 'none', color: 'inherit' }}
+        >
+          <Avatar name={r.name} size="md" src={r.avatarUrl} />
           <div>
-            <span className="lc-shooter-name">{r.name}</span>
-            {r.isMe && <span className="lc-you-tag">You</span>}
+            <div>
+              <span className="lc-shooter-name">{r.name}</span>
+              {r.isMe && <span className="lc-you-tag">You</span>}
+            </div>
+            {r.handle && <div className="lc-shooter-handle">@{r.handle}</div>}
           </div>
-          {r.handle && <div className="lc-shooter-handle">@{r.handle}</div>}
-        </div>
-      </div>
+        </Link>
+      </UserHoverCard>
     ),
   }
 }

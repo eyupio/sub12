@@ -57,6 +57,7 @@ type LeagueStanding struct {
 	Rank        int       `json:"rank"`
 	UserID      string    `json:"user_id"`
 	DisplayName string    `json:"display_name"`
+	AvatarURL   *string   `json:"avatar_url,omitempty"`
 	BestScore   *float64  `json:"best_score"`
 	BestX       *int16    `json:"best_x"`
 	CardCount   int       `json:"card_count"`
