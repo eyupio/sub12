@@ -114,7 +114,7 @@ export default function ScoreCompare() {
           <div>
             <Link to="/scores" className="scores-compare-back"><ArrowLeft size={15} /> Back to cards</Link>
             <p className="scores-eyebrow">Scores</p>
-            <h1>Compare cards</h1>
+            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Compare cards</h1>
           </div>
         </header>
 

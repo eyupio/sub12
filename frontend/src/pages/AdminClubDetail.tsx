@@ -173,7 +173,7 @@ export default function AdminClubDetail() {
       </Link>
 
       <div>
-        <h1 className="text-xl font-medium text-primary">{club.name}</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">{club.name}</h1>
         <p className="text-xs text-muted mt-0.5">{club.member_count} members</p>
       </div>
 

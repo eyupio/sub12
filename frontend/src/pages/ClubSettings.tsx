@@ -692,7 +692,7 @@ export default function ClubSettings() {
         <Link to="/clubs/$id" params={{ id }} className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-lg font-medium tracking-widest uppercase text-secondary">Club Settings</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Club Settings</h1>
       </div>
 
       <p className="text-xs text-muted">{club.name}</p>

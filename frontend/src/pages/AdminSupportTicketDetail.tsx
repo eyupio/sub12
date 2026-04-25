@@ -152,7 +152,7 @@ export default function AdminSupportTicketDetail() {
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Admin ticket detail</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin ticket detail</h1>
         <Link to="/admin/support" className="text-sm text-[var(--brass)] hover:underline">Back to inbox</Link>
       </div>
 

@@ -8,7 +8,7 @@ export default function NotFound() {
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="text-center max-w-sm">
         <Target size={48} className="mx-auto text-[var(--brass)] mb-4" />
-        <h1 className="text-2xl font-semibold tracking-wide text-secondary">
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
           Target not found
         </h1>
         <p className="mt-2 text-sm text-muted">

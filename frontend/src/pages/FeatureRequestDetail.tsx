@@ -55,7 +55,7 @@ export default function FeatureRequestDetail() {
   return (
     <div className="mx-auto max-w-3xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Feature request</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feature request</h1>
         <Link to="/feature-requests" className="text-sm text-[var(--brass)] hover:underline">Back to board</Link>
       </div>
 

@@ -173,7 +173,7 @@ export default function AdminLeagueDetail() {
 
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-medium text-primary">{league.name}</h1>
+          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">{league.name}</h1>
           <span className={`text-[9px] tracking-widest uppercase px-1.5 py-0.5 rounded ${league.type === 'private' ? 'bg-surface text-muted border border-subtle' : 'bg-[var(--brass)]/10 text-[var(--brass)]'}`}>
             {league.type}
           </span>
