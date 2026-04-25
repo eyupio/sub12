@@ -371,6 +371,8 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
 
+      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Dashboard</h1>
+
       {/* ── Profile header ───────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">

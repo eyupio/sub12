@@ -528,7 +528,7 @@ export function StatsStrip({ cells }: { cells: PelletCellData[] }) {
       {cells.map((c, i) => (
         <div key={i} className={`px-4 py-4 ${i >= 2 ? 'border-t lg:border-t-0 border-line' : ''}`}>
           <p className="text-[10px] tracking-[0.18em] uppercase text-muted">{c.label}</p>
-          <p className={`font-serif text-[24px] mt-1 leading-tight ${c.highlight ? 'text-gold' : 'text-ink'}`}>
+          <p className={`font-mono text-[24px] mt-1 leading-tight ${c.highlight ? 'text-gold' : 'text-ink'}`}>
             {c.value}
           </p>
           {c.sub && <p className="text-[11px] text-muted mt-1">{c.sub}</p>}
