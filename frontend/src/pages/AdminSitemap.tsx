@@ -74,7 +74,7 @@ export default function AdminSitemap() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-      <h1 className="text-xl font-semibold text-primary flex items-center gap-2">
+      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
         <Globe size={20} /> Sitemap &amp; SEO
       </h1>
 

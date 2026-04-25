@@ -271,12 +271,12 @@
   gap: 12px;
 }
 .lc-page-title h1 {
-  font-family: var(--serif);
+  font-family: var(--ui);
   font-weight: 500;
-  letter-spacing: 0.22em;
-  font-size: 28px;
+  letter-spacing: 0.1em;
+  font-size: clamp(20px, 3vw, 24px);
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--secondary);
   margin: 0;
 }
 .lc-action-ghost {
@@ -424,11 +424,11 @@
 }
 .lc-detail-titlebar { flex: 1; min-width: 0; }
 .lc-detail-title {
-  font-family: var(--serif);
-  font-size: 26px;
-  letter-spacing: 0.18em;
+  font-family: var(--ui);
+  font-size: 22px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--secondary);
   margin: 0;
   display: inline-flex;
   align-items: center;

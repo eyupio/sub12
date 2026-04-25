@@ -25,7 +25,7 @@ export default function FeatureBoard() {
   return (
     <div className="mx-auto max-w-4xl p-4 md:p-6 space-y-4">
       <div className="rounded-2xl border border-subtle bg-surface p-4">
-        <h1 className="text-2xl font-semibold">Community feature board</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Community feature board</h1>
         <p className="text-sm text-muted mt-1">
           Browse, rank, and upvote scoped feature requests. Need to submit a new request? Open a{' '}
           <Link to="/support" className="text-[var(--brass)] hover:underline">feature ticket in Support</Link>.
