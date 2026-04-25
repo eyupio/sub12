@@ -116,6 +116,7 @@ export interface PelletTestStats {
   total_tests: number
   total_groups: number
   best_group_mm?: number
+  best_group_test_id?: string
   avg_group_mm?: number
   most_tested_pellet?: string
 }

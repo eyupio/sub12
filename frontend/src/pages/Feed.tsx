@@ -664,7 +664,7 @@ function FeedPostArticle({
   })
 
   if (post.kind === 'join') {
-    return <JoinPost post={post} muted={muted} />
+    return <JoinPost post={post} muted={muted} commentsOpen={commentsOpen} onToggleComments={onToggleComments} />
   }
 
   const className = [
@@ -1097,7 +1097,7 @@ function StandingsPost() {
   )
 }
 
-function JoinPost({ post, muted }: { post: FeedPost; muted: boolean }) {
+function JoinPost({ post, muted, commentsOpen, onToggleComments }: { post: FeedPost; muted: boolean; commentsOpen: boolean; onToggleComments: () => void }) {
   const prefs = useRegionalPrefs()
   const item = post.activity
   const target = post.where ?? (post.whereType === 'club' ? 'a club' : 'a league')
@@ -1120,6 +1120,8 @@ function JoinPost({ post, muted }: { post: FeedPost; muted: boolean }) {
         </p>
         <button type="button" className="feed-btn feed-btn-outline">Follow</button>
       </div>
+      <EngagementBar post={post} commentsOpen={commentsOpen} onToggleComments={onToggleComments} />
+      {commentsOpen && <InlineComments post={post} />}
     </article>
   )
 }
@@ -1136,22 +1138,16 @@ function EngagementBar({
   const item = post.activity
   const canScoreInteract = item.target_type === 'score_card' && !!item.target_id
   const canPostInteract = item.type === 'post_created' && !!item.target_id
-  const canInteract = canScoreInteract || canPostInteract
+  const likeTargetId = canScoreInteract ? item.target_id! : canPostInteract ? item.target_id! : item.id
+  const likeTargetType = canScoreInteract ? 'score_card' as const : canPostInteract ? 'post' as const : 'activity' as const
 
   return (
     <div className="post-engagement">
-      {canScoreInteract && (
-        <LikeButton targetId={item.target_id!} targetType="score_card" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
-      )}
-      {canPostInteract && (
-        <LikeButton targetId={item.target_id!} targetType="post" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
-      )}
-      {canInteract && (
-        <button type="button" className={`act ${commentsOpen ? 'active' : ''}`} onClick={onToggleComments}>
-          <MessageSquare size={15} />
-          {item.comment_count || 0}
-        </button>
-      )}
+      <LikeButton targetId={likeTargetId} targetType={likeTargetType} initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
+      <button type="button" className={`act ${commentsOpen ? 'active' : ''}`} onClick={onToggleComments}>
+        <MessageSquare size={15} />
+        {item.comment_count || 0}
+      </button>
       <button type="button" className="act" onClick={() => sharePost(post)} aria-label="Share">
         <Share2 size={15} />
       </button>
@@ -1165,35 +1161,39 @@ function InlineComments({ post }: { post: FeedPost }) {
   const queryClient = useQueryClient()
   const [body, setBody] = useState('')
   const item = post.activity
-  const scoreTarget = item.target_type === 'score_card' ? item.target_id : undefined
-  const postTarget = item.type === 'post_created' ? item.target_id : undefined
-  const targetId = scoreTarget ?? postTarget
-  const targetKind = scoreTarget ? 'score' : postTarget ? 'post' : null
+  const canScoreInteract = item.target_type === 'score_card' && !!item.target_id
+  const canPostInteract = item.type === 'post_created' && !!item.target_id
+  const targetId = canScoreInteract ? item.target_id! : canPostInteract ? item.target_id! : item.id
+  const targetKind = canScoreInteract ? 'score' : canPostInteract ? 'post' : 'activity'
+
+  const queryKey = targetKind === 'score'
+    ? ['score-cards', targetId, 'comments']
+    : targetKind === 'post'
+    ? ['posts', targetId, 'comments']
+    : ['activities', targetId, 'comments']
 
   const { data } = useQuery({
-    queryKey: targetKind === 'score' ? ['score-cards', targetId, 'comments'] : ['posts', targetId, 'comments'],
-    queryFn: () => targetKind === 'score' ? scoreCardApi.listComments(targetId!) : postApi.listComments(targetId!),
-    enabled: !!targetId,
+    queryKey,
+    queryFn: () => targetKind === 'score'
+      ? scoreCardApi.listComments(targetId)
+      : targetKind === 'post'
+      ? postApi.listComments(targetId)
+      : activityApi.listComments(targetId),
   })
 
   const mutation = useMutation({
     mutationFn: () => targetKind === 'score'
-      ? scoreCardApi.createComment(targetId!, body.trim())
-      : postApi.createComment(targetId!, body.trim()),
+      ? scoreCardApi.createComment(targetId, body.trim())
+      : targetKind === 'post'
+      ? postApi.createComment(targetId, body.trim())
+      : activityApi.createComment(targetId, body.trim()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] })
-      queryClient.invalidateQueries({ queryKey: targetKind === 'score' ? ['score-cards', targetId, 'comments'] : ['posts', targetId, 'comments'] })
+      queryClient.invalidateQueries({ queryKey })
       setBody('')
     },
   })
 
-  if (!targetId || !targetKind) {
-    return (
-      <div className="post-comments">
-        <p className="comment-empty">Comments are not available for this activity yet.</p>
-      </div>
-    )
-  }
 
   const topComment = data?.items?.[0]
 

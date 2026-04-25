@@ -19,11 +19,12 @@ type LikeService struct {
 	scoreCards   *repository.ScoreCardRepository
 	posts        *PostService
 	blocks       *repository.BlockRepository
+	activities   *repository.ActivityRepository
 	achievements *AchievementService // nil disables achievement evaluation
 }
 
-func NewLikeService(likes *repository.LikeRepository, scoreCards *repository.ScoreCardRepository, posts *PostService, blocks *repository.BlockRepository) *LikeService {
-	return &LikeService{likes: likes, scoreCards: scoreCards, posts: posts, blocks: blocks}
+func NewLikeService(likes *repository.LikeRepository, scoreCards *repository.ScoreCardRepository, posts *PostService, blocks *repository.BlockRepository, activities *repository.ActivityRepository) *LikeService {
+	return &LikeService{likes: likes, scoreCards: scoreCards, posts: posts, blocks: blocks, activities: activities}
 }
 
 // SetAchievements wires in the achievement service so likes can trigger award checks.
@@ -75,6 +76,21 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 	case model.LikeTargetComment:
 		// Comments inherit visibility from their parent target; enforcement is
 		// delegated to the parent listing. Block still applies.
+	case model.LikeTargetActivity:
+		act, err := s.activities.GetByID(ctx, targetID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return false, ErrLikeTargetNotFound
+			}
+			return false, err
+		}
+		if act.UserID != userID {
+			blocked, _ := s.blocks.IsBlocked(ctx, act.UserID, userID)
+			if blocked {
+				return false, ErrLikeTargetNotFound
+			}
+		}
+		ownerID = act.UserID
 	default:
 		return false, fmt.Errorf("%w: %s", ErrInvalidLikeTarget, targetType)
 	}
@@ -98,7 +114,7 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 // Unlike removes a like. Returns true if a like was removed.
 func (s *LikeService) Unlike(ctx context.Context, userID, targetID, targetType string) (bool, error) {
 	switch targetType {
-	case model.LikeTargetScoreCard, model.LikeTargetPost, model.LikeTargetComment:
+	case model.LikeTargetScoreCard, model.LikeTargetPost, model.LikeTargetComment, model.LikeTargetActivity:
 		// valid
 	default:
 		return false, fmt.Errorf("%w: %s", ErrInvalidLikeTarget, targetType)

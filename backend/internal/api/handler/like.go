@@ -49,6 +49,16 @@ func (h *LikeHandler) UnlikeComment(w http.ResponseWriter, r *http.Request) {
 	h.unlike(w, r, model.LikeTargetComment)
 }
 
+// LikeActivity handles POST /api/v1/activities/{id}/like
+func (h *LikeHandler) LikeActivity(w http.ResponseWriter, r *http.Request) {
+	h.like(w, r, model.LikeTargetActivity)
+}
+
+// UnlikeActivity handles DELETE /api/v1/activities/{id}/like
+func (h *LikeHandler) UnlikeActivity(w http.ResponseWriter, r *http.Request) {
+	h.unlike(w, r, model.LikeTargetActivity)
+}
+
 func (h *LikeHandler) like(w http.ResponseWriter, r *http.Request, targetType string) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

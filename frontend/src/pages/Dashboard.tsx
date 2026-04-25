@@ -434,7 +434,8 @@ export default function Dashboard() {
           value={stats?.best_score != null ? String(stats.best_score) : '—'}
           sub={stats?.best_score != null ? 'Personal best' : 'No sessions yet'}
           gold
-          to={stats?.best_score != null ? '/scores/trends' : undefined}
+          to={stats?.best_score_card_id ? '/scores/$id' : stats?.best_score != null ? '/scores/trends' : undefined}
+          params={stats?.best_score_card_id ? { id: stats.best_score_card_id } : undefined}
         />
         <StatTile
           label="Best Group"
@@ -442,7 +443,8 @@ export default function Dashboard() {
           unit={pelletTestStats?.best_group_mm != null ? 'mm' : undefined}
           sub={pelletTestStats?.best_group_mm != null ? 'Tightest group measured' : 'No tests yet'}
           gold={pelletTestStats?.best_group_mm != null}
-          to={pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
+          to={pelletTestStats?.best_group_test_id ? '/pellet-testing/$id' : pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
+          params={pelletTestStats?.best_group_test_id ? { id: pelletTestStats.best_group_test_id } : undefined}
         />
         <StatTile
           label="Cards Logged"
@@ -491,7 +493,8 @@ export default function Dashboard() {
           unit={pelletTestStats?.best_group_mm != null ? 'mm' : undefined}
           sub="tightest measured"
           gold={pelletTestStats?.best_group_mm != null}
-          to={pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
+          to={pelletTestStats?.best_group_test_id ? '/pellet-testing/$id' : pelletTestStats?.best_group_mm != null ? '/pellet-testing/leaderboard' : undefined}
+          params={pelletTestStats?.best_group_test_id ? { id: pelletTestStats.best_group_test_id } : undefined}
         />
         <StatTile
           compact

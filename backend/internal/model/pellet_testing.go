@@ -176,6 +176,7 @@ type PelletTestStats struct {
 	TotalTests       int      `json:"total_tests"`
 	TotalGroups      int      `json:"total_groups"`
 	BestGroupMM      *float64 `json:"best_group_mm,omitempty"`
+	BestGroupTestID  *string  `json:"best_group_test_id,omitempty"`
 	AvgGroupMM       *float64 `json:"avg_group_mm,omitempty"`
 	MostTestedPellet *string  `json:"most_tested_pellet,omitempty"`
 }

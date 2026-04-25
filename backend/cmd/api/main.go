@@ -163,9 +163,9 @@ func main() {
 
 	featureRequestRepo := repository.NewFeatureRequestRepository(pool)
 
-	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, featureRequestRepo, achievementSvc)
+	commentSvc := service.NewCommentService(commentRepo, scoreCardRepo, postRepo, postSvc, blockRepo, leagueRepo, clubRepo, featureRequestRepo, activityRepo, achievementSvc)
 
-	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo)
+	likeSvc := service.NewLikeService(likeRepo, scoreCardRepo, postSvc, blockRepo, activityRepo)
 	// Wire achievements into likes so that liking content can trigger award checks.
 	likeSvc.SetAchievements(achievementSvc)
 
