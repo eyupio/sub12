@@ -165,7 +165,7 @@ export default function AdminEmailTemplates() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5">
-        <h1 className="text-xl font-semibold text-primary">Admin • Email Templates</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin • Email Templates</h1>
         <p className="text-sm text-muted mt-1">Edit subject/html/text templates and render previews.</p>
       </div>
 

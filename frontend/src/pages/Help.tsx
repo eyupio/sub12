@@ -55,7 +55,7 @@ export default function Help() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-5 flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-primary">Help &amp; FAQ</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Help &amp; FAQ</h1>
         <HelpIcon content={pageHelp.help} />
       </div>
 

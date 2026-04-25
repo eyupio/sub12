@@ -246,7 +246,7 @@ export default function AdminFaqs() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5 flex items-center gap-2">
-        <h1 className="text-xl font-semibold text-primary">Admin • FAQs</h1>
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin • FAQs</h1>
         <HelpIcon content={pageHelp.adminFaqs} />
       </div>
 

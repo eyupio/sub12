@@ -56,7 +56,7 @@ export default function AdminSupportInbox() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Admin support inbox</h1>
+      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin support inbox</h1>
       <p className="text-sm text-muted">Triage tickets and maintain feature requests in one place.</p>
 
       <section className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
