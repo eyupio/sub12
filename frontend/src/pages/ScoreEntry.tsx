@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, Upload, X, Trophy, HelpCircle, Trash2 } from 'lucide-react'
+import { Camera, Upload, X, Trophy, HelpCircle, Trash2, ChevronLeft } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { useSmartBack } from '../hooks/useSmartBack'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -16,6 +17,7 @@ type Shot = { score: number; x: boolean }
 export default function ScoreEntry() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const smartBack = useSmartBack('/scores')
   const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string; draftId?: string }
   const leagueId = search.leagueId
   const roundIdParam = search.roundId
@@ -103,6 +105,16 @@ export default function ScoreEntry() {
   const shotXs = shots.map(s => s.x)
   const totalScore = shots.reduce((a, s) => a + s.score, 0)
   const xCount = shots.filter(s => s.x).length
+  const avg = totalScore / 25
+  const enteredCount = shots.filter(s => s.score > 0).length
+  const xRingCount = xCount
+  const innerCount = shots.filter((s, i) => s.score >= 9 && !(s.score === 10 && shotXs[i])).length
+  const outerCount = shots.filter(s => s.score > 0 && s.score < 9).length
+
+  const dateParts = shotAt.split('-')
+  const prettyDate = dateParts.length === 3 && dateParts[0].length === 4
+    ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
+    : shotAt
 
   function setScore(i: number, score: number, x: boolean) {
     setShots(prev => {
@@ -298,6 +310,7 @@ export default function ScoreEntry() {
 
   const inputCls =
     'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm focus:outline-none focus:border-[var(--brass)]/50'
+  const sidebarLabelCls = 'text-[11px] tracking-widest uppercase text-muted'
 
   function cellLabel(i: number): string {
     const { score, x } = shots[i]
@@ -307,58 +320,104 @@ export default function ScoreEntry() {
   }
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-              {draftId ? 'Refine Draft' : 'New Score Card'}
-            </h1>
-            <button
-              onClick={() => setShowHelp(true)}
-              className="text-muted hover:text-[var(--brass)] transition-colors"
-              aria-label="How to enter scores"
-              title="How to enter scores"
-            >
-              <HelpCircle size={18} />
-            </button>
-          </div>
+    <div className="p-4 lg:p-8 space-y-5 lg:space-y-6 max-w-6xl mx-auto pb-24">
+      {/* Top action bar */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={smartBack}
+          aria-label="Back"
+          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+        >
+          <ChevronLeft size={16} /> Back
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
+            aria-label="How to enter scores"
+          >
+            <HelpCircle size={13} /> Help
+          </button>
           {draftId && (
             <button
               type="button"
               onClick={() => setConfirmDeleteDraft(true)}
               disabled={deleteDraftMutation.isPending}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Delete draft"
             >
-              <Trash2 size={14} />
-              Delete
+              <Trash2 size={13} /> Delete
             </button>
           )}
         </div>
-        {league ? (
-          <div className="mt-1 space-y-0.5">
-            <p className="text-xs text-[var(--brass)] tracking-wide flex items-center gap-1.5">
-              <Trophy size={12} />
-              {league.name}
-            </p>
-            {requireImage && !imageFile && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 tracking-wide">
-                This league requires a score card photo
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted tracking-wide mt-1">
-            Personal practice card — not linked to any league
-          </p>
-        )}
       </div>
 
-      {/* Desktop: two-column layout */}
-      <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-        {/* Left column: shot grid + input panel */}
-        <div className="space-y-6">
-          {/* Shot grid — 5×5 */}
+      {/* League context banner */}
+      {league && (
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5">
+          <Trophy size={14} className="text-[var(--brass)]" />
+          <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
+          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="text-xs text-secondary">{league.name}</span>
+        </div>
+      )}
+      {requireImage && !imageFile && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
+          <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400 font-medium">Photo required</span>
+          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="text-xs text-secondary">This league requires a score card photo before you can submit</span>
+        </div>
+      )}
+
+      {/* Hero */}
+      <div className="rounded-lg border border-subtle bg-surface px-5 py-5 lg:px-6 lg:py-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+          <div className="space-y-3 min-w-0">
+            <div className="flex items-baseline gap-3 font-mono">
+              <h1 className="text-2xl lg:text-3xl text-primary">{prettyDate}</h1>
+              <span className="text-base text-muted uppercase tracking-widest">
+                {draftId ? 'Refine' : 'New'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-surface-hover text-muted">
+                {leagueId ? 'League' : 'Personal'}
+              </span>
+              {league && (
+                <span className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded">
+                  {league.name}
+                </span>
+              )}
+              <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
+                {enteredCount}/25
+              </span>
+            </div>
+          </div>
+          <div className="flex items-start gap-6 font-mono shrink-0">
+            <div className="text-right">
+              <p className="text-4xl lg:text-5xl font-semibold text-primary leading-none">{totalScore}</p>
+              <p className="mt-2 text-[10px] tracking-widest uppercase text-muted">Running total</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-right">
+              <span className="text-[10px] tracking-widest uppercase text-muted">X</span>
+              <span className="text-xl text-[var(--brass)] font-semibold">{xCount}</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted">Avg</span>
+              <span className="text-xl text-secondary font-semibold">{avg.toFixed(1)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main grid: shot input + sidebar */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-5 space-y-5 lg:space-y-0">
+        {/* Shot grid card */}
+        <div className="lg:col-span-2 rounded-lg border border-subtle bg-surface p-5 space-y-4">
+          <div className="flex items-center gap-2 border-b border-subtle pb-2">
+            <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] border-b-2 border-[var(--brass)] pb-1">Shot grid</span>
+          </div>
+
           <div className="grid grid-cols-5 gap-2 lg:gap-3">
             {shots.map(({ score, x }, i) => {
               const isSelected = selectedShot === i
@@ -392,7 +451,7 @@ export default function ScoreEntry() {
 
           {/* Score input panel — visible when a cell is selected */}
           {selectedShot !== null && (
-            <div className="space-y-3 bg-surface border border-subtle rounded-lg p-3">
+            <div className="space-y-3 border-t border-subtle pt-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs tracking-wide text-muted">
                   Shot {selectedShot + 1}
@@ -437,47 +496,28 @@ export default function ScoreEntry() {
             </div>
           )}
 
-          {/* Running totals */}
-          <div className="flex gap-8 font-mono text-sm border-t border-subtle pt-4">
-            <span className="text-muted tracking-wide text-xs">
-              Total <strong className="text-primary ml-2 text-base">{totalScore}</strong>
+          {/* Ring-legend footer */}
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted border-t border-subtle pt-3">
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--brass)]" />
+              X-ring hit · <span className="font-mono text-secondary ml-1">{xRingCount}</span>
             </span>
-            <span className="text-muted tracking-wide text-xs">
-              X count <strong className="text-[var(--brass)] ml-2 text-base">{xCount}</strong>
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--brass)]/50" />
+              10–9 ring · <span className="font-mono text-secondary ml-1">{innerCount}</span>
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-strong" />
+              8 and below · <span className="font-mono text-secondary ml-1">{outerCount}</span>
             </span>
           </div>
         </div>
 
-        {/* Right column: metadata + photo + submit */}
-        <div className="space-y-3 mt-6 lg:mt-0">
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Rifle</label>
-            {rifles.length > 0 ? (
-              <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
-                <option value="">— none —</option>
-                {rifles.map(r => (
-                  <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
-                ))}
-              </select>
-            ) : (
-              <p className="text-xs text-muted py-2">No rifles yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Pellet</label>
-            {pellets.length > 0 ? (
-              <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
-                <option value="">— none —</option>
-                {pellets.map(p => (
-                  <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
-                ))}
-              </select>
-            ) : (
-              <p className="text-xs text-muted py-2">No pellets yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Date</label>
+        {/* Sidebar */}
+        <div className="space-y-4">
+          {/* Date */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Date</p>
             <input
               type="date"
               value={shotAt}
@@ -485,62 +525,100 @@ export default function ScoreEntry() {
               className={`${inputCls} font-mono`}
             />
           </div>
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder="Range / club"
-              className={`${inputCls} placeholder:text-muted`}
-            />
+
+          {/* Equipment */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Equipment</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Rifle</label>
+              {rifles.length > 0 ? (
+                <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
+                  <option value="">— none —</option>
+                  {rifles.map(r => (
+                    <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-muted py-1">No rifles yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Pellet</label>
+              {pellets.length > 0 ? (
+                <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
+                  <option value="">— none —</option>
+                  {pellets.map(p => (
+                    <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-muted py-1">No pellets yet — <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs tracking-wide text-muted mb-1">Wind (mph)</label>
+
+          {/* Conditions */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Location</label>
               <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={windMph}
-                onChange={e => setWindMph(e.target.value)}
-                placeholder="e.g. 5"
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="Range / club"
                 className={`${inputCls} placeholder:text-muted`}
               />
             </div>
-            <div>
-              <label className="block text-xs tracking-wide text-muted mb-1">Temp (°C)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={tempCelsius}
-                onChange={e => setTempCelsius(e.target.value)}
-                placeholder="e.g. 18"
-                className={`${inputCls} placeholder:text-muted`}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Wind (mph)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={windMph}
+                  onChange={e => setWindMph(e.target.value)}
+                  placeholder="e.g. 5"
+                  className={`${inputCls} placeholder:text-muted font-mono`}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Temp (°C)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={tempCelsius}
+                  onChange={e => setTempCelsius(e.target.value)}
+                  placeholder="e.g. 18"
+                  className={`${inputCls} placeholder:text-muted font-mono`}
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Notes</label>
+
+          {/* Notes */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Notes</p>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Conditions, observations…"
               className={`${inputCls} placeholder:text-muted resize-none`}
             />
           </div>
 
           {/* Visibility */}
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Visibility</label>
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Visibility</p>
             <div className="flex gap-2">
               {(['public', 'followers', 'private'] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setVisibility(v)}
-                  className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                  className={`flex-1 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
                     visibility === v
                       ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
                       : 'border-subtle text-muted hover:text-secondary'
@@ -552,9 +630,9 @@ export default function ScoreEntry() {
             </div>
           </div>
 
-          {/* Photo upload */}
-          <div>
-            <label className="block text-xs tracking-wide text-muted mb-1">Score card photo</label>
+          {/* Score Card Photo */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Score Card Photo</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -602,24 +680,25 @@ export default function ScoreEntry() {
               </div>
             )}
           </div>
-
-          {/* Submit */}
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
-            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
-          >
-            {mutation.isPending
-              ? (leagueId ? 'Submitting…' : 'Saving…')
-              : (leagueId ? 'Submit Score' : 'Save Card')}
-          </button>
-
-          <p className="text-center text-xs text-muted tracking-wide">
-            {selectedShot === null
-              ? 'Tap a shot cell to select it, then use the buttons to set the score'
-              : 'Use number buttons below, or arrow keys to navigate between shots'}
-          </p>
         </div>
+      </div>
+
+      {/* Submit */}
+      <div className="space-y-2">
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
+          className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
+        >
+          {mutation.isPending
+            ? (leagueId ? 'Submitting…' : 'Saving…')
+            : (leagueId ? 'Submit Score' : 'Save Card')}
+        </button>
+        <p className="text-center text-xs text-muted tracking-wide">
+          {selectedShot === null
+            ? 'Tap a shot cell to select it, then use the buttons to set the score'
+            : 'Use number buttons below, or arrow keys to navigate between shots'}
+        </p>
       </div>
 
       {/* Help overlay */}
