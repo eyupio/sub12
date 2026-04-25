@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -15,6 +16,41 @@ type ActivityRepository struct {
 
 func NewActivityRepository(db *pgxpool.Pool) *ActivityRepository {
 	return &ActivityRepository{db: db}
+}
+
+// MarkPostEdited updates feed metadata for an existing post_created activity.
+// It keeps all existing metadata and only patches body preview + edited timestamp.
+func (r *ActivityRepository) MarkPostEdited(ctx context.Context, postID, bodyPreview string, editedAt time.Time) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE activities
+		SET metadata = jsonb_set(
+				jsonb_set(COALESCE(metadata, '{}'::jsonb), '{body_preview}', to_jsonb($1::text), true),
+				'{edited_at}',
+				to_jsonb($2::text),
+				true
+			)
+		WHERE type = $3
+		  AND target_type = 'post'
+		  AND target_id = $4::uuid
+	`, bodyPreview, editedAt.UTC().Format(time.RFC3339Nano), model.ActivityPostCreated, postID)
+	if err != nil {
+		return fmt.Errorf("mark post edited activity: %w", err)
+	}
+	return nil
+}
+
+// DeletePostActivities removes feed rows for a deleted post.
+func (r *ActivityRepository) DeletePostActivities(ctx context.Context, postID string) error {
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM activities
+		WHERE type = $1
+		  AND target_type = 'post'
+		  AND target_id = $2::uuid
+	`, model.ActivityPostCreated, postID)
+	if err != nil {
+		return fmt.Errorf("delete post activities: %w", err)
+	}
+	return nil
 }
 
 // Ingest writes a single activity event. Fire-and-forget — callers should handle or

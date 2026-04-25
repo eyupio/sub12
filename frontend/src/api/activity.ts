@@ -45,6 +45,7 @@ export interface ActivityItem {
     status?: string
     scope_type?: string
     body_preview?: string
+    edited_at?: string
     attachment_type?: 'score_card' | 'pellet_test' | 'image'
     attachment_target_id?: string
     attachment_image_urls?: string[]

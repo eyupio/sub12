@@ -289,6 +289,9 @@ func (s *PostService) Update(ctx context.Context, id, userID, body string) (*mod
 	}
 	// Best-effort flag clear.
 	_ = s.posts.SetPostFlag(ctx, id, nil, nil, nil, nil)
+	if s.activity != nil {
+		s.activity.SyncPostEdit(ctx, post.ID, post.Body, post.UpdatedAt)
+	}
 	return post, nil
 }
 
@@ -385,7 +388,13 @@ func (s *PostService) UnflagPost(ctx context.Context, userID, role, postID strin
 
 // Delete removes a post owned by userID.
 func (s *PostService) Delete(ctx context.Context, id, userID string) error {
-	return s.posts.Delete(ctx, id, userID)
+	if err := s.posts.Delete(ctx, id, userID); err != nil {
+		return err
+	}
+	if s.activity != nil {
+		s.activity.RemovePostFromFeed(ctx, id)
+	}
+	return nil
 }
 
 // Share creates a post with an attachment referencing a target entity.

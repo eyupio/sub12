@@ -119,6 +119,7 @@ type FeatureRequestMeta struct {
 // attachment fields let the feed link directly to the shared target.
 type PostCreatedMeta struct {
 	BodyPreview         string   `json:"body_preview,omitempty"`
+	EditedAt            string   `json:"edited_at,omitempty"`
 	AttachmentType      string   `json:"attachment_type,omitempty"` // "score_card", "pellet_test"
 	AttachmentTargetID  string   `json:"attachment_target_id,omitempty"`
 	AttachmentImageURLs []string `json:"attachment_image_urls,omitempty"`

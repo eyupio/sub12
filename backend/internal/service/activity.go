@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -27,6 +28,27 @@ type ActivityService struct {
 
 func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger, leagueMembers, clubMembers MemberChecker) *ActivityService {
 	return &ActivityService{repo: repo, log: log, leagueMembers: leagueMembers, clubMembers: clubMembers}
+}
+
+// SyncPostEdit patches the feed's post_created metadata after a post edit.
+func (s *ActivityService) SyncPostEdit(ctx context.Context, postID, body string, updatedAt time.Time) {
+	if postID == "" {
+		return
+	}
+	preview := truncateForFeed(body, 100)
+	if err := s.repo.MarkPostEdited(ctx, postID, preview, updatedAt); err != nil {
+		s.log.Warn().Err(err).Str("post_id", postID).Msg("activity: failed to sync post edit")
+	}
+}
+
+// RemovePostFromFeed removes post_created activities tied to a deleted post.
+func (s *ActivityService) RemovePostFromFeed(ctx context.Context, postID string) {
+	if postID == "" {
+		return
+	}
+	if err := s.repo.DeletePostActivities(ctx, postID); err != nil {
+		s.log.Warn().Err(err).Str("post_id", postID).Msg("activity: failed to delete post activity")
+	}
 }
 
 // Ingest writes an activity event. It is intended to be called as a goroutine
@@ -96,4 +118,12 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		nextCursor = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	return &model.FeedResponse{Items: items, Cursor: nextCursor}, nil
+}
+
+func truncateForFeed(s string, maxLen int) string {
+	runes := []rune(strings.TrimSpace(s))
+	if len(runes) <= maxLen {
+		return string(runes)
+	}
+	return string(runes[:maxLen]) + "..."
 }
