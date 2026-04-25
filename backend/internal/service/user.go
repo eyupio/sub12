@@ -29,6 +29,13 @@ var (
 
 const emailChangeTTL = 24 * time.Hour
 
+// SessionInvalidator revokes a user's refresh tokens. Implemented by
+// AuthService; injected into UserService post-construction to avoid a
+// constructor-level cycle.
+type SessionInvalidator interface {
+	InvalidateAllRefreshTokens(ctx context.Context, userID string) error
+}
+
 type UserService struct {
 	users             *repository.UserRepository
 	emailChangeTokens *repository.EmailChangeTokenRepository
@@ -43,6 +50,8 @@ type UserService struct {
 	posts      *repository.PostRepository
 	clubs      *repository.ClubRepository
 	leagues    *repository.LeagueRepository
+
+	sessions SessionInvalidator
 }
 
 func NewUserService(
@@ -68,6 +77,12 @@ func (s *UserService) SetExportRepos(scoreCards *repository.ScoreCardRepository,
 	s.posts = posts
 	s.clubs = clubs
 	s.leagues = leagues
+}
+
+// SetSessionInvalidator wires the auth service so security-sensitive mutations
+// (e.g. email changes) can revoke active refresh tokens.
+func (s *UserService) SetSessionInvalidator(inv SessionInvalidator) {
+	s.sessions = inv
 }
 
 // RequestDeletion performs a GDPR-compliant account deletion. The user row
@@ -256,6 +271,11 @@ func (s *UserService) RequestEmailChange(ctx context.Context, userID, newEmail s
 }
 
 // ConfirmEmailChange validates the token and updates the user's email.
+//
+// Re-checks email ownership immediately before the UPDATE because the token
+// was issued up to 24h ago and another account may have grabbed the address
+// in the meantime. On success, all of the user's refresh tokens are revoked
+// so the change forces a re-authentication on every device.
 func (s *UserService) ConfirmEmailChange(ctx context.Context, token string) (*model.User, error) {
 	tokenHash := hashEmailChangeToken(strings.TrimSpace(token))
 	userID, newEmail, err := s.emailChangeTokens.Consume(ctx, tokenHash)
@@ -266,12 +286,25 @@ func (s *UserService) ConfirmEmailChange(ctx context.Context, token string) (*mo
 		return nil, err
 	}
 
+	if existing, lookupErr := s.users.GetByEmail(ctx, newEmail); lookupErr == nil && existing.ID != userID {
+		s.log.Warn().Str("event", "email_change_conflict").Str("user_id", userID).Str("conflicting_user_id", existing.ID).Str("new_email", newEmail).Msg("audit")
+		return nil, ErrEmailAlreadyInUse
+	} else if lookupErr != nil && !errors.Is(lookupErr, repository.ErrNotFound) {
+		return nil, lookupErr
+	}
+
 	user, err := s.users.UpdateEmail(ctx, userID, newEmail)
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
 			return nil, ErrEmailAlreadyInUse
 		}
 		return nil, err
+	}
+
+	if s.sessions != nil {
+		if invErr := s.sessions.InvalidateAllRefreshTokens(ctx, userID); invErr != nil {
+			s.log.Error().Err(invErr).Str("user_id", userID).Msg("email_change: session invalidation failed")
+		}
 	}
 
 	s.log.Info().Str("event", "email_changed").Str("user_id", userID).Str("new_email", newEmail).Msg("audit")

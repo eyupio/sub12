@@ -180,7 +180,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	if err := s.users.UpdatePasswordHash(ctx, userID, string(hash)); err != nil {
 		return err
 	}
-	if err := s.invalidateAllRefreshTokens(ctx, userID); err != nil {
+	if err := s.InvalidateAllRefreshTokens(ctx, userID); err != nil {
 		return err
 	}
 
@@ -291,7 +291,10 @@ func (s *AuthService) validateRefreshToken(ctx context.Context, token string) (s
 	return userID, nil
 }
 
-func (s *AuthService) invalidateAllRefreshTokens(ctx context.Context, userID string) error {
+// InvalidateAllRefreshTokens revokes every refresh token issued for a user,
+// forcing them to re-authenticate. Used after security-sensitive changes such
+// as password resets and email changes.
+func (s *AuthService) InvalidateAllRefreshTokens(ctx context.Context, userID string) error {
 	tokens, err := s.redis.SMembers(ctx, userTokensPrefix+userID).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return fmt.Errorf("load user refresh tokens: %w", err)

@@ -230,16 +230,20 @@ func (r *UserRepository) UpdateStarLevel(ctx context.Context, userID string) err
 	return nil
 }
 
-// ListAll returns a paginated list of all users for admin use, plus the total count.
+// ListAll returns a paginated list of active (non-soft-deleted) users for
+// admin use, plus the total count. Soft-deleted rows are retained in the
+// database for referential integrity but must not appear in admin listings,
+// where they would surface scrubbed tombstone emails alongside live users.
 func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
 	var total int
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count users: %w", err)
 	}
 
 	rows, err := r.db.Query(ctx, `
 		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
 		FROM users
+		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
 	`, limit, offset)

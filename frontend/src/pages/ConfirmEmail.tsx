@@ -7,13 +7,13 @@ import { useAuthStore } from '../store/auth'
 
 export default function ConfirmEmail() {
   const search = useSearch({ strict: false }) as { token?: string }
-  const { updateUser } = useAuthStore()
+  const { clearAuth } = useAuthStore()
   const [done, setDone] = useState(false)
 
   const mutation = useMutation({
     mutationFn: (token: string) => usersApi.confirmEmailChange(token),
-    onSuccess: (updated) => {
-      updateUser({ email: updated.email })
+    onSuccess: () => {
+      clearAuth()
       setDone(true)
     },
   })
@@ -39,11 +39,12 @@ export default function ConfirmEmail() {
         <div className="flex flex-col items-center gap-3">
           <CheckCircle size={32} className="text-[var(--brass)]" />
           <p className="text-sm text-secondary">Your email has been updated successfully.</p>
+          <p className="text-xs text-muted">Please sign in again with your new email address.</p>
           <Link
-            to="/profile"
+            to="/login"
             className="mt-2 px-4 py-2 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors"
           >
-            Back to Profile
+            Sign In
           </Link>
         </div>
       )}
