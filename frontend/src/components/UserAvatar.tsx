@@ -5,7 +5,7 @@ import { UserHoverCard } from './UserHoverCard'
 interface UserLike {
   id?: string
   display_name?: string
-  avatar_url?: string
+  avatar_url?: string | null
   star_level?: number
 }
 
