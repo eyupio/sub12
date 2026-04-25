@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useMemo, useRef, useState } from 'react'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Copy, Check, Trash2, ImagePlus, Medal, Trophy, Plus, Settings, Shield, ShieldOff, LogOut, Lock, Flag, Share2 } from 'lucide-react'
+import {
+  Users, Copy, Check, Trash2, ImagePlus, Trophy, Plus, Settings,
+  Shield, ShieldOff, LogOut, Lock, Flag, Share2, Activity, Flame,
+  UserPlus,
+} from 'lucide-react'
 import { ApiError } from '../api/client'
-import { clubsApi, type ClubStanding, type ClubMember } from '../api/clubs'
+import { clubsApi, type ClubMember } from '../api/clubs'
 import { postApi } from '../api/posts'
-import type { League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -13,7 +16,23 @@ import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
 import { ShareDialog } from '../components/ShareDialog'
-import { UserAvatar } from '../components/UserAvatar'
+import {
+  PageGrid,
+  EntityDetailHeader,
+  DisciplineThumb,
+  Section,
+  Badge,
+  EmptyState,
+  Avatar,
+  EntityCard,
+  LeagueTable,
+  rankColumn,
+  shooterColumn,
+  bestColumn,
+  cardsColumn,
+  xColumn,
+  type StandingRow,
+} from '../components/leagues'
 
 function PrivateClubSummary({ clubId }: { clubId: string }) {
   const queryClient = useQueryClient()
@@ -35,99 +54,42 @@ function PrivateClubSummary({ clubId }: { clubId: string }) {
     onError: (err) => setJoinError(err instanceof ApiError ? err.message : 'Failed to join club.'),
   })
 
-  if (isLoading) {
-    return (
-      <div className="p-4 lg:p-8 max-w-md mx-auto">
-        <div className="h-48 rounded border border-subtle bg-surface animate-pulse" />
-      </div>
-    )
-  }
-  if (!data) {
-    return (
-      <div className="p-4 lg:p-8 text-center text-muted text-sm">
-        Club not found.
-      </div>
-    )
-  }
+  if (isLoading) return <PageGrid><div style={{ height: 200, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }} /></PageGrid>
+  if (!data) return <PageGrid><p style={{ color: 'var(--muted)', textAlign: 'center', padding: 32 }}>Club not found.</p></PageGrid>
 
   const needsCode = data.join_policy === 'invite_code'
   return (
-    <div className="p-4 lg:p-8 max-w-md mx-auto space-y-4">
-      <MembersOnlyBanner
-        kind="club"
-        name={data.name}
-        description={data.description}
-        memberCount={data.member_count}
-        joinPolicy={data.join_policy}
-        onJoinClick={needsCode ? undefined : () => joinMutation.mutate()}
-      />
-      {needsCode && (
-        <div className="space-y-2">
-          <label className="block text-[10px] tracking-widest uppercase text-muted">Invite code</label>
-          <input
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-secondary focus:outline-none focus:border-[var(--brass)]/50"
-          />
-          <button
-            onClick={() => joinMutation.mutate()}
-            disabled={joinMutation.isPending || !joinCode}
-            className="w-full px-4 py-2 rounded bg-[var(--brass)] text-inverse text-[11px] tracking-widest uppercase font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {joinMutation.isPending ? 'Joining…' : 'Join with code'}
-          </button>
-          {joinError && <p className="text-xs text-[var(--error-text)]">{joinError}</p>}
-        </div>
-      )}
-      <Link to="/clubs" className="block text-center text-[11px] tracking-widest uppercase text-muted hover:text-secondary">&larr; Back to clubs</Link>
-    </div>
-  )
-}
-
-function StandingsTable({ standings }: { standings: ClubStanding[] }) {
-  if (standings.length === 0) {
-    return (
-      <p className="text-sm text-muted text-center py-8">
-        No scores yet — members need to log verified score cards.
-      </p>
-    )
-  }
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left border-b border-subtle">
-            <th className="pb-2 pr-4 text-[10px] tracking-widest uppercase text-muted font-normal w-8">#</th>
-            <th className="pb-2 pr-4 text-[10px] tracking-widest uppercase text-muted font-normal">Shooter</th>
-            <th className="pb-2 pr-4 text-[10px] tracking-widest uppercase text-muted font-normal text-right">Best</th>
-            <th className="pb-2 pr-4 text-[10px] tracking-widest uppercase text-muted font-normal text-right">X</th>
-            <th className="pb-2 text-[10px] tracking-widest uppercase text-muted font-normal text-right">Cards</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-subtle">
-          {standings.map(s => (
-            <tr key={s.user_id} className="hover:bg-surface/50 transition-colors">
-              <td className="py-2.5 pr-4 font-mono text-xs text-muted">{s.rank}</td>
-              <td className="py-2.5 pr-4">
-                <div className="flex items-center gap-2">
-                  <UserAvatar
-                    user={{ id: s.user_id, display_name: s.display_name, avatar_url: s.avatar_url }}
-                    size={24}
-                    variant="brass"
-                    linkToProfile
-                  />
-                  <span className="text-secondary truncate max-w-[140px]">{s.display_name}</span>
-                  {s.rank === 1 && <Medal size={12} className="text-[var(--brass)] shrink-0" />}
-                </div>
-              </td>
-              <td className="py-2.5 pr-4 font-mono text-xs text-right text-secondary">{s.best_score ?? '—'}</td>
-              <td className="py-2.5 pr-4 font-mono text-xs text-right text-muted">{s.best_x ?? '—'}</td>
-              <td className="py-2.5 font-mono text-xs text-right text-muted">{s.card_count}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <PageGrid>
+      <div style={{ maxWidth: 480, margin: '0 auto' }}>
+        <MembersOnlyBanner
+          kind="club"
+          name={data.name}
+          description={data.description}
+          memberCount={data.member_count}
+          joinPolicy={data.join_policy}
+          onJoinClick={needsCode ? undefined : () => joinMutation.mutate()}
+        />
+        {needsCode && (
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              placeholder="Invite code"
+              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '10px 14px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)' }}
+            />
+            <button
+              onClick={() => joinMutation.mutate()}
+              disabled={joinMutation.isPending || !joinCode}
+              className="lc-cta"
+            >
+              {joinMutation.isPending ? 'Joining…' : 'Join with code'}
+            </button>
+            {joinError && <p style={{ fontSize: 12, color: 'var(--red)' }}>{joinError}</p>}
+          </div>
+        )}
+        <Link to="/clubs" style={{ display: 'block', textAlign: 'center', marginTop: 18, color: 'var(--gold)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}>← Back to clubs</Link>
+      </div>
+    </PageGrid>
   )
 }
 
@@ -163,45 +125,34 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
   })
 
   const isSelf = member.user_id === currentUserId
-
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-subtle last:border-0">
-      <UserAvatar
-        user={{ id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url }}
-        size={28}
-        variant="brass"
-        className="shrink-0"
-        linkToProfile
-      />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-secondary truncate">{member.display_name}</p>
-        <p className="text-[10px] text-muted">Joined {member.joined_at.slice(0, 10)}</p>
+    <div className="lc-member-row">
+      <Avatar name={member.display_name} src={member.avatar_url} size="md" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="lc-member-name">{member.display_name}</div>
+        <div className="lc-member-joined">Joined {member.joined_at.slice(0, 10)}</div>
       </div>
-      {member.is_admin && (
-        <span className="text-[9px] tracking-widest uppercase border border-[var(--brass)]/30 text-[var(--brass)] px-1.5 py-0.5 rounded">
-          Admin
-        </span>
-      )}
+      {member.is_admin && <Badge variant="gold">Admin</Badge>}
       {isAdmin && !isSelf && (
         <button
           onClick={() => setConfirmRole(true)}
           disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
-          className="p-1.5 rounded text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-30"
-          title={member.is_admin ? 'Demote from admin' : 'Promote to admin'}
-          aria-label={member.is_admin ? `Demote ${member.display_name} from admin` : `Promote ${member.display_name} to admin`}
+          className="lc-icon-btn"
+          style={{ width: 28, height: 28 }}
+          title={member.is_admin ? 'Demote' : 'Promote'}
         >
-          {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
+          {member.is_admin ? <ShieldOff size={12} /> : <Shield size={12} />}
         </button>
       )}
       {isAdmin && !member.is_admin && !isSelf && (
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
-          className="p-1.5 rounded text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="lc-icon-btn"
+          style={{ width: 28, height: 28 }}
           title="Remove member"
-          aria-label={`Remove ${member.display_name} from club`}
         >
-          <Trash2 size={14} />
+          <Trash2 size={12} />
         </button>
       )}
       <ConfirmDialog
@@ -215,9 +166,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
       <ConfirmDialog
         open={confirmRole}
         title={member.is_admin ? `Demote ${member.display_name}?` : `Promote ${member.display_name}?`}
-        message={member.is_admin
-          ? 'This member will no longer be able to manage club settings and members.'
-          : 'This member will be able to manage club settings and members.'}
+        message={member.is_admin ? 'This member will no longer manage settings.' : 'This member will be able to manage settings.'}
         confirmLabel={member.is_admin ? 'Demote' : 'Promote'}
         onConfirm={() => { setConfirmRole(false); roleMutation.mutate() }}
         onCancel={() => setConfirmRole(false)}
@@ -228,6 +177,7 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
 
 export default function ClubDetail() {
   const { id } = useParams({ from: '/app/clubs/$id' })
+  const navigate = useNavigate()
   const user = useAuthStore(s => s.user)
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -242,10 +192,9 @@ export default function ClubDetail() {
     retry: false,
   })
 
-  const isPrivateOrNotFound =
-    clubError instanceof ApiError && clubError.status === 404
+  const isPrivateOrNotFound = clubError instanceof ApiError && clubError.status === 404
 
-  const { data: standingsData, isLoading: standingsLoading, isError: standingsError, refetch: refetchStandings } = useQuery({
+  const { data: standingsData, isLoading: standingsLoading } = useQuery({
     queryKey: ['club', id, 'standings'],
     queryFn: () => clubsApi.getStandings(id),
     enabled: !!id,
@@ -286,20 +235,10 @@ export default function ClubDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['club', id] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
-      if (data.pending) {
-        toast('Join request submitted — awaiting admin approval', 'success')
-      } else {
-        toast('Joined club', 'success')
-      }
+      toast(data.pending ? 'Join request submitted — awaiting admin approval' : 'Joined club', 'success')
       setJoinCodeInput('')
     },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        setJoinError(err.message || 'Failed to join club.')
-      } else {
-        setJoinError('Failed to join club.')
-      }
-    },
+    onError: (err) => setJoinError(err instanceof ApiError ? (err.message || 'Failed to join club.') : 'Failed to join club.'),
   })
 
   const uploadMutation = useMutation({
@@ -325,352 +264,262 @@ export default function ClubDetail() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const standingsRows: StandingRow[] = useMemo(() => {
+    return (standingsData?.items ?? []).map((s) => ({
+      id: s.user_id,
+      rank: s.rank,
+      name: s.display_name,
+      avatarUrl: s.avatar_url,
+      cards: s.card_count,
+      best: s.best_score ?? null,
+      bestX: s.best_x ?? null,
+      isMe: s.user_id === user?.id,
+    }))
+  }, [standingsData, user])
+
   if (isLoading) {
     return (
-      <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-4xl mx-auto">
-        <div className="h-24 rounded border border-subtle bg-surface animate-pulse" />
-        <div className="h-48 rounded border border-subtle bg-surface animate-pulse" />
-      </div>
+      <PageGrid>
+        <div style={{ height: 96, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', marginBottom: 12 }} />
+        <div style={{ height: 200, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }} />
+      </PageGrid>
     )
   }
 
   if (!club) {
-    if (isPrivateOrNotFound) {
-      return <PrivateClubSummary clubId={id} />
-    }
-    return (
-      <div className="p-4 lg:p-8 text-center text-muted text-sm">
-        Club not found.
-      </div>
-    )
+    if (isPrivateOrNotFound) return <PrivateClubSummary clubId={id} />
+    return <PageGrid><p style={{ color: 'var(--muted)', textAlign: 'center', padding: 32 }}>Club not found.</p></PageGrid>
   }
 
   const needsJoinCode = !club.is_member && club.join_policy === 'invite_code'
   const joinLabel = club.join_policy === 'approval' ? 'Request' : 'Join'
+  const adminCount = (membersData?.items ?? []).filter(m => m.is_admin).length
 
   return (
-    <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <div className="relative shrink-0">
-          {club.image_url ? (
-            <img
-              src={club.image_url}
-              alt={club.name}
-              className="w-16 h-16 rounded-xl object-cover border border-subtle"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-xl bg-[var(--brass)]/10 border border-[var(--brass)]/20 flex items-center justify-center">
-              <Users size={28} className="text-[var(--brass)]/60" />
-            </div>
-          )}
-          {club.is_admin && (
-            <>
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-card border border-subtle flex items-center justify-center text-muted hover:text-secondary transition-colors"
-                title="Upload club image"
-              >
-                <ImagePlus size={11} />
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => {
-                  const file = e.target.files?.[0]
-                  if (file) uploadMutation.mutate(file)
-                  e.target.value = ''
-                }}
-              />
-            </>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary truncate">
-              {club.name}
-            </h1>
-            {club.type === 'private' && (
-              <span
-                className="flex items-center gap-1 text-[9px] tracking-widest uppercase border border-subtle text-muted px-1.5 py-0.5 rounded shrink-0"
-                title="Private club — only members can see content"
-              >
-                <Lock size={10} />
-                Private
-              </span>
-            )}
-          </div>
-          {club.description && (
-            <p className="text-sm text-muted">{club.description}</p>
-          )}
-          <div className="flex items-center gap-1 text-muted">
-            <Users size={13} />
-            <span className="text-xs">{club.member_count} member{club.member_count !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-
-        <div className="shrink-0 flex flex-col items-end gap-2">
-          {!club.is_member && user && (
-            <div className="space-y-1">
-              {needsJoinCode && (
-                <input
-                  type="text"
-                  value={joinCodeInput}
-                  onChange={e => setJoinCodeInput(e.target.value)}
-                  placeholder="Join code"
-                  aria-label="Club join code"
-                  className="w-32 bg-surface border border-subtle rounded px-2 py-1 text-xs text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50"
-                />
-              )}
-              <button
-                onClick={() => { setJoinError(''); joinMutation.mutate() }}
-                disabled={joinMutation.isPending || (needsJoinCode && !joinCodeInput.trim())}
-                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
-              >
-                {joinMutation.isPending ? 'Joining…' : joinLabel}
-              </button>
-              {joinError && <p className="text-[10px] text-[var(--error-text)] text-right">{joinError}</p>}
-              {club.join_policy === 'approval' && !joinError && (
-                <p className="text-[10px] text-muted text-right">Admins approve requests</p>
-              )}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowShare(true)}
-              className="text-muted hover:text-[var(--brass)] transition-colors"
-              title="Share club"
-              aria-label="Share club"
-            >
-              <Share2 size={18} />
-            </button>
-            {club.is_admin && (
-              <Link
-                to="/clubs/$id/reports"
-                params={{ id }}
-                className="text-muted hover:text-secondary transition-colors"
-                title="Club reports"
-              >
-                <Flag size={16} />
-              </Link>
+    <PageGrid>
+      <EntityDetailHeader
+        onBack={() => navigate({ to: '/clubs' })}
+        thumb={
+          <div style={{ position: 'relative' }}>
+            {club.image_url ? (
+              <img src={club.image_url} alt={club.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
+            ) : (
+              <DisciplineThumb size={48} icon={<Users size={20} />} />
             )}
             {club.is_admin && (
-              <Link
-                to="/clubs/$id/settings"
-                params={{ id }}
-                className="text-muted hover:text-secondary transition-colors"
-                title="Club settings"
-              >
-                <Settings size={16} />
-              </Link>
+              <>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  style={{ position: 'absolute', bottom: -4, right: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--lc-surface)', border: '1px solid var(--line)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  title="Upload club image"
+                >
+                  <ImagePlus size={11} />
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate(f); e.target.value = '' }} />
+              </>
+            )}
+          </div>
+        }
+        title={club.name}
+        tag={club.type === 'private' ? <Badge variant="neutral"><Lock size={10} /> Private</Badge> : null}
+        sub={
+          <>
+            {club.description && <span>{club.description}</span>}
+            {club.description && <span className="lc-detail-sub-sep">·</span>}
+            <span><Users size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {club.member_count} member{club.member_count !== 1 ? 's' : ''}</span>
+            {club.league_count != null && (<>
+              <span className="lc-detail-sub-sep">·</span>
+              <span><Trophy size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {club.league_count} league{club.league_count !== 1 ? 's' : ''}</span>
+            </>)}
+          </>
+        }
+        rightActions={
+          <>
+            <button className="lc-icon-btn" onClick={() => setShowShare(true)} aria-label="Share"><Share2 size={14} /></button>
+            {club.is_admin && (
+              <Link to="/clubs/$id/reports" params={{ id }} className="lc-icon-btn" aria-label="Reports"><Flag size={14} /></Link>
+            )}
+            {club.is_admin && (
+              <Link to="/clubs/$id/settings" params={{ id }} className="lc-icon-btn" aria-label="Settings"><Settings size={14} /></Link>
             )}
             {club.is_member && !club.is_admin && (
-              <button
-                onClick={() => setConfirmLeave(true)}
-                disabled={leaveMutation.isPending}
-                className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Leave club"
-              >
-                <LogOut size={12} />
-                Leave
-              </button>
+              <button className="lc-icon-btn" onClick={() => setConfirmLeave(true)} aria-label="Leave"><LogOut size={14} /></button>
             )}
-          </div>
-          {club.is_admin && (
-            <button
-              onClick={copyJoinCode}
-              className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
-              title="Copy join code"
-            >
-              {copied ? <Check size={12} className="text-[var(--success-text)]" /> : <Copy size={12} />}
-              {copied ? 'Copied!' : `Code: ${club.join_code}`}
-            </button>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-6 lg:space-y-0">
-        {/* Standings */}
-        <div className="space-y-1">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">
-            Top Performers
-          </h2>
-          <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
+      {/* Join row for non-members */}
+      {!club.is_member && user && (
+        <div className="lc-section" style={{ padding: 16, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, color: 'var(--muted)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              {club.join_policy === 'open' && 'Open club'}
+              {club.join_policy === 'invite_code' && 'Invite code required'}
+              {club.join_policy === 'approval' && 'Admins approve requests'}
+            </div>
+            {needsJoinCode && (
+              <input
+                type="text"
+                value={joinCodeInput}
+                onChange={e => setJoinCodeInput(e.target.value)}
+                placeholder="Join code"
+                style={{ width: 140, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '6px 10px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 12 }}
+              />
+            )}
+            <button
+              onClick={() => { setJoinError(''); joinMutation.mutate() }}
+              disabled={joinMutation.isPending || (needsJoinCode && !joinCodeInput.trim())}
+              className="lc-action-ghost"
+              style={{ background: 'var(--gold)', color: 'white' }}
+            >
+              {joinMutation.isPending ? 'Joining…' : joinLabel}
+            </button>
+          </div>
+          {joinError && <p style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{joinError}</p>}
+        </div>
+      )}
+
+      {/* Code copy for admin */}
+      {club.is_admin && (
+        <button
+          onClick={copyJoinCode}
+          style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: 0, marginBottom: 14 }}
+        >
+          {copied ? <Check size={12} style={{ color: 'var(--green)' }} /> : <Copy size={12} />}
+          {copied ? 'Copied!' : `Code: ${club.join_code}`}
+        </button>
+      )}
+
+      <div className="lc-stack-lg">
+        {/* Two-column: Top performers + Members */}
+        <div className="lc-grid-2">
+          <Section title="Top Performers" icon={<Trophy size={12} />}>
             {standingsLoading ? (
-              <div className="space-y-px py-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-10 bg-surface-hover rounded animate-pulse" />
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
+            ) : standingsRows.length === 0 ? (
+              <EmptyState icon={<Trophy size={36} />} title="No scores yet" body="Members need verified score cards to appear here." />
+            ) : (
+              <LeagueTable<StandingRow>
+                rows={standingsRows}
+                columns={[
+                  rankColumn(),
+                  shooterColumn(),
+                  bestColumn(),
+                  xColumn(),
+                  cardsColumn(),
+                ]}
+                initialSortKey="rank"
+              />
+            )}
+            {standingsRows.length > 0 && standingsRows[0] && (
+              <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--muted)', fontSize: 11 }}>
+                <Flame size={12} style={{ color: 'var(--gold)' }} /> {standingsRows[0].name} leads
+              </div>
+            )}
+          </Section>
+          <Section
+            title={`Members ${club.member_count}`}
+            icon={<Users size={12} />}
+            actions={club.is_admin ? <button className="lc-action-ghost" onClick={copyJoinCode}><UserPlus size={12} /> Invite</button> : null}
+          >
+            {!club.is_member && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                Join to see the member list.
+              </div>
+            )}
+            {club.is_member && (membersData?.items ?? []).length > 0 && (
+              <div className="lc-members-scroll">
+                {(membersData?.items ?? []).map(m => (
+                  <MemberRow
+                    key={m.user_id}
+                    member={m}
+                    clubId={id}
+                    isAdmin={!!club.is_admin}
+                    currentUserId={user?.id ?? ''}
+                    adminCount={adminCount}
+                    onRemoved={() => {}}
+                  />
                 ))}
               </div>
-            ) : standingsError ? (
-              <div className="py-3 space-y-2">
-                <p className="text-[var(--error-text)] text-sm">Failed to load standings.</p>
-                <button
-                  onClick={() => refetchStandings()}
-                  className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <StandingsTable standings={standingsData?.items ?? []} />
             )}
-          </div>
+            {club.is_member && (membersData?.items ?? []).length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>No members yet.</div>
+            )}
+          </Section>
         </div>
 
-        {/* Members */}
-        <div className="space-y-1">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">
-            Members
-          </h2>
-          {!club.is_member && (
-            <p className="text-sm text-muted py-4 text-center">Join to see the member list.</p>
-          )}
-          {club.is_member && (membersData?.items ?? []).length > 0 && (
-            <div className="border border-subtle rounded bg-surface px-3 lg:px-4 mt-2">
-              {(membersData?.items ?? []).map(member => (
-                <MemberRow
-                  key={member.user_id}
-                  member={member}
-                  clubId={id}
-                  isAdmin={!!club.is_admin}
-                  currentUserId={user?.id ?? ''}
-                  adminCount={(membersData?.items ?? []).filter(m => m.is_admin).length}
-                  onRemoved={() => {}}
-                />
-              ))}
-            </div>
-          )}
-          {club.is_member && (membersData?.items ?? []).length === 0 && (
-            <p className="text-sm text-muted text-center py-4">No members yet.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Leagues (members only) */}
-      {club.is_member && <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">
-            Leagues
-          </h2>
-          {club.is_admin && (
-            <button
-              onClick={() => setShowCreateLeague(!showCreateLeague)}
-              className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              <Plus size={12} />
-              New League
-            </button>
-          )}
-        </div>
-
-        {showCreateLeague && (
-          <form
-            onSubmit={e => { e.preventDefault(); createLeagueMutation.mutate() }}
-            className="p-4 rounded border border-subtle bg-card space-y-3"
+        {/* Leagues (members only) */}
+        {club.is_member && (
+          <Section
+            title="Leagues"
+            icon={<Trophy size={12} />}
+            actions={club.is_admin ? (
+              <button className="lc-action-ghost" onClick={() => setShowCreateLeague((v) => !v)}>
+                <Plus size={12} /> New League
+              </button>
+            ) : null}
           >
-            <div className="space-y-1.5">
-              <label htmlFor="club-new-league-name" className="text-[11px] tracking-widest uppercase text-muted">League Name</label>
-              <input
-                id="club-new-league-name"
-                type="text"
-                placeholder="e.g. Spring Series 2026"
-                value={newLeagueName}
-                onChange={e => setNewLeagueName(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
-                required
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="club-new-league-desc" className="text-[11px] tracking-widest uppercase text-muted">Description <span className="text-muted">(optional)</span></label>
-              <input
-                id="club-new-league-desc"
-                type="text"
-                placeholder="What's this league for?"
-                value={newLeagueDesc}
-                onChange={e => setNewLeagueDesc(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-surface border border-subtle rounded text-secondary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
-                <input
-                  type="radio"
-                  checked={newLeagueType === 'public'}
-                  onChange={() => setNewLeagueType('public')}
-                  className="accent-[var(--brass)]"
-                />
-                Public
-              </label>
-              <label className="flex items-center gap-1.5 text-xs text-secondary cursor-pointer">
-                <input
-                  type="radio"
-                  checked={newLeagueType === 'private'}
-                  onChange={() => setNewLeagueType('private')}
-                  className="accent-[var(--brass)]"
-                />
-                Private
-              </label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCreateLeague(false)}
-                className="px-3 py-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            {showCreateLeague && (
+              <form
+                onSubmit={(e) => { e.preventDefault(); createLeagueMutation.mutate() }}
+                style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid var(--line)' }}
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!newLeagueName.trim() || createLeagueMutation.isPending}
-                className="px-4 py-1.5 bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse text-[11px] tracking-widest uppercase rounded transition-opacity"
-              >
-                {createLeagueMutation.isPending ? 'Creating…' : 'Create'}
-              </button>
-            </div>
-          </form>
+                <input type="text" placeholder="League name" value={newLeagueName} onChange={(e) => setNewLeagueName(e.target.value)} required autoFocus
+                  style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontSize: 13 }} />
+                <input type="text" placeholder="Description (optional)" value={newLeagueDesc} onChange={(e) => setNewLeagueDesc(e.target.value)}
+                  style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontSize: 13 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--ink-2)' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <input type="radio" checked={newLeagueType === 'public'} onChange={() => setNewLeagueType('public')} /> Public
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <input type="radio" checked={newLeagueType === 'private'} onChange={() => setNewLeagueType('private')} /> Private
+                  </label>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button type="button" onClick={() => setShowCreateLeague(false)} className="lc-action-ghost" style={{ color: 'var(--muted)' }}>Cancel</button>
+                  <button type="submit" disabled={!newLeagueName.trim() || createLeagueMutation.isPending} className="lc-action-ghost" style={{ background: 'var(--gold)', color: 'white' }}>
+                    {createLeagueMutation.isPending ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {(leaguesData?.items ?? []).length === 0 && !showCreateLeague && (
+              <EmptyState
+                icon={<Trophy size={36} />}
+                title="No leagues yet"
+                body={club.is_admin ? 'Create one to get started.' : 'Check back later.'}
+                cta={club.is_admin ? <button className="lc-action-ghost" onClick={() => setShowCreateLeague(true)}><Plus size={12} /> New League</button> : null}
+              />
+            )}
+
+            {(leaguesData?.items ?? []).length > 0 && (
+              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(leaguesData?.items ?? []).map((league) => (
+                  <EntityCard
+                    key={league.id}
+                    to="/leagues/$id"
+                    toParams={{ id: league.id }}
+                    thumbImage={league.image_url}
+                    name={league.name}
+                    badges={league.type === 'private' ? <Badge variant="neutral"><Lock size={10} /> Private</Badge> : null}
+                    meta={[
+                      { icon: <Users size={11} />, text: `${league.member_count} member${league.member_count !== 1 ? 's' : ''}` },
+                    ]}
+                    rightRail="chevron"
+                    size="small"
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
         )}
 
-        {(leaguesData?.items ?? []).length === 0 && !showCreateLeague && (
-          <p className="text-sm text-muted text-center py-4">
-            No leagues yet.{club.is_admin ? ' Create one to get started.' : ''}
-          </p>
-        )}
-
-        {(leaguesData?.items ?? []).length > 0 && (
-          <div className="border border-subtle rounded bg-surface p-3 lg:p-4 mt-2">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(leaguesData?.items ?? []).map((league: League) => (
-                <Link
-                  key={league.id}
-                  to="/leagues/$id"
-                  params={{ id: league.id }}
-                  className="flex items-center gap-3 p-3 rounded border border-subtle bg-card hover:border-[var(--brass)]/30 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--brass)]/10 border border-[var(--brass)]/20 flex items-center justify-center shrink-0">
-                    <Trophy size={18} className="text-[var(--brass)]/60" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-secondary truncate">{league.name}</p>
-                    <div className="flex items-center gap-2 text-[10px] text-muted">
-                      <span>{league.type}</span>
-                      <span>&middot;</span>
-                      <span>{league.member_count} member{league.member_count !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>}
-
-      {/* Club Feed */}
-      {club.is_member && <ClubFeed clubId={id} postVisibility={club.post_visibility} />}
+        {/* Feed */}
+        {club.is_member && <ClubFeed clubId={id} postVisibility={club.post_visibility} />}
+      </div>
 
       <ConfirmDialog
         open={confirmLeave}
@@ -691,40 +540,27 @@ export default function ClubDetail() {
           onClose={() => setShowShare(false)}
         />
       )}
-    </div>
+    </PageGrid>
   )
 }
 
-function ClubFeed({
-  clubId,
-  postVisibility,
-}: {
-  clubId: string
-  postVisibility: 'members' | 'public'
-}) {
+function ClubFeed({ clubId, postVisibility }: { clubId: string; postVisibility: 'members' | 'public' }) {
   const { data } = useQuery({
     queryKey: ['club', clubId, 'posts'],
     queryFn: () => postApi.listByClub(clubId),
   })
-
   const posts = data?.items ?? []
-
   return (
-    <div className="space-y-3">
-      <h2 className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">
-        Feed
-      </h2>
-      <PostComposer
-        clubId={clubId}
-        queryKey={['club', clubId, 'posts']}
-        groupPostVisibility={postVisibility}
-      />
-      {posts.length === 0 && (
-        <p className="text-sm text-muted text-center py-4">No posts yet — be the first.</p>
-      )}
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </div>
+    <Section title="Feed" icon={<Activity size={12} />}>
+      <div style={{ padding: 16 }}>
+        <PostComposer clubId={clubId} queryKey={['club', clubId, 'posts']} groupPostVisibility={postVisibility} />
+        {posts.length === 0 && (
+          <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>No posts yet — be the first.</p>
+        )}
+        <div className="lc-stack" style={{ marginTop: 12 }}>
+          {posts.map((post) => <PostCard key={post.id} post={post} />)}
+        </div>
+      </div>
+    </Section>
   )
 }

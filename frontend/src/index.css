@@ -43,6 +43,34 @@
 
     --mobile-nav-height: 76px;
     --mobile-nav-offset: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+
+    /* Leagues/Clubs redesign tokens (light) */
+    --bg: #f5f1e8;
+    --bg-2: #efeadd;
+    --lc-surface: #ffffff;
+    --surface-2: #fbf8f0;
+    --line: #e6dfcb;
+    --line-2: #d9d0b6;
+    --ink: #2a2a28;
+    --ink-2: #4a4a44;
+    --muted: #8a8470;
+    --muted-2: #a8a18b;
+    --gold: #a07b2c;
+    --gold-2: #b88a35;
+    --gold-soft: #d9b878;
+    --gold-tint: #f4e9cc;
+    --green: #4f7a3f;
+    --green-soft: #e3eed9;
+    --red: #a8463a;
+    --red-soft: #f1d9d4;
+    --grid: rgba(160, 123, 44, 0.06);
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: 'Cormorant Garamond', 'Times New Roman', serif;
+    --ui: 'Inter', 'DM Sans', system-ui, sans-serif;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow-sm: 0 1px 2px rgba(40, 30, 10, 0.04);
+    --shadow-md: 0 4px 16px rgba(40, 30, 10, 0.08);
   }
 
   /* ── Dark mode ────────────────────────────────────────── */
@@ -82,6 +110,29 @@
     --success-bg: rgba(34, 197, 94, 0.10);
     --success-border: rgba(34, 197, 94, 0.25);
     --success-text: #4ade80;
+
+    /* Leagues/Clubs redesign tokens (dark) */
+    --bg: #16161a;
+    --bg-2: #1c1c20;
+    --lc-surface: #202024;
+    --surface-2: #26262b;
+    --line: #2f2f35;
+    --line-2: #3a3a42;
+    --ink: #ece6d4;
+    --ink-2: #c4bfae;
+    --muted: #8a8472;
+    --muted-2: #6a6558;
+    --gold: #d4a44a;
+    --gold-2: #e4b75c;
+    --gold-soft: #8a6a25;
+    --gold-tint: #3a2f15;
+    --green: #87b06d;
+    --green-soft: #1f2e18;
+    --red: #d18074;
+    --red-soft: #3a1f1c;
+    --grid: rgba(212, 164, 74, 0.04);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 
   html {
