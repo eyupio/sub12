@@ -143,6 +143,9 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 	if card.TotalScore >= 100 {
 		s.award(ctx, userID, "century")
 	}
+	if card.TotalScore >= 200 {
+		s.award(ctx, userID, "double_century")
+	}
 	if card.TotalScore == 250 {
 		s.award(ctx, userID, "perfect_score")
 	}
@@ -152,11 +155,20 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 	if card.XCount >= 10 {
 		s.award(ctx, userID, "sharpshooter")
 	}
+	if card.XCount >= 15 {
+		s.award(ctx, userID, "x_machine")
+	}
 	if cardCount >= 10 {
 		s.award(ctx, userID, "dedicated")
 	}
 	if cardCount >= 25 {
 		s.award(ctx, userID, "top_shooter")
+	}
+	if cardCount >= 50 {
+		s.award(ctx, userID, "range_regular")
+	}
+	if cardCount >= 100 {
+		s.award(ctx, userID, "century_club")
 	}
 	if card.LeagueRoundID != nil {
 		s.award(ctx, userID, "league_debut")
@@ -164,6 +176,9 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 			leagueCount, err := s.cards.GetLeagueCardCount(ctx, userID)
 			if err == nil && leagueCount >= 5 {
 				s.award(ctx, userID, "league_veteran")
+			}
+			if err == nil && leagueCount >= 10 {
+				s.award(ctx, userID, "league_regular")
 			}
 		}
 	}
@@ -197,6 +212,9 @@ func (s *AchievementService) EvaluateForFollow(ctx context.Context, followerID, 
 	if count, err := s.follows.CountFollowers(ctx, followedID); err == nil && count >= 10 {
 		s.award(ctx, followedID, "social_butterfly")
 	}
+	if count, err := s.follows.CountFollowers(ctx, followedID); err == nil && count >= 25 {
+		s.award(ctx, followedID, "well_known")
+	}
 }
 
 // EvaluateForComment awards conversationalist at 10 authored comments.
@@ -213,6 +231,9 @@ func (s *AchievementService) EvaluateForComment(ctx context.Context, userID stri
 	}
 	if count >= 10 {
 		s.award(ctx, userID, "conversationalist")
+	}
+	if count >= 25 {
+		s.award(ctx, userID, "discussion_leader")
 	}
 }
 
@@ -252,6 +273,9 @@ func (s *AchievementService) EvaluateForPelletTest(ctx context.Context, userID s
 	if count >= 5 {
 		s.award(ctx, userID, "pellet_expert")
 	}
+	if count >= 10 {
+		s.award(ctx, userID, "pellet_master")
+	}
 }
 
 // EvaluateForLikeGiven awards super_liker when the user has given 25 likes.
@@ -268,6 +292,9 @@ func (s *AchievementService) EvaluateForLikeGiven(ctx context.Context, likerID s
 	}
 	if count >= 25 {
 		s.award(ctx, likerID, "super_liker")
+	}
+	if count >= 50 {
+		s.award(ctx, likerID, "tastemaker")
 	}
 }
 
@@ -289,6 +316,9 @@ func (s *AchievementService) EvaluateForLikeReceived(ctx context.Context, ownerI
 	}
 	if count >= 25 {
 		s.award(ctx, ownerID, "community_champion")
+	}
+	if count >= 50 {
+		s.award(ctx, ownerID, "in_the_spotlight")
 	}
 }
 
@@ -317,4 +347,3 @@ func (s *AchievementService) ListDefs(ctx context.Context) ([]*model.Achievement
 	}
 	return items, nil
 }
-

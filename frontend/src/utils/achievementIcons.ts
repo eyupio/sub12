@@ -5,10 +5,14 @@ import {
   Eye,
   Flag,
   FlaskConical,
+  Heart,
+  Medal,
   type LucideIcon,
   MessageCircle,
+  Shield,
   Star,
   Target,
+  ThumbsUp,
   TrendingUp,
   Trophy,
   UserPlus,
@@ -31,7 +35,11 @@ const iconMap: Record<string, LucideIcon> = {
   'message-circle': MessageCircle,
   flag: Flag,
   'flask-conical': FlaskConical,
+  heart: Heart,
+  medal: Medal,
   'trending-up': TrendingUp,
+  shield: Shield,
+  'thumbs-up': ThumbsUp,
 }
 
 export function iconForAchievement(icon?: string | null): LucideIcon {

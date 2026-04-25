@@ -1,5 +1,6 @@
 import { Lock } from 'lucide-react'
 import { Achievement, AchievementDef } from '../api/achievements'
+import { Tooltip } from './Tooltip'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
@@ -40,40 +41,51 @@ export function AchievementsSection({ earned, allDefs }: Props) {
           const Icon = iconForAchievement(def.icon)
           const isEarned = !!userAward
           const baseClass =
-            'flex flex-col items-center justify-center gap-1 p-2 rounded border text-center transition-colors min-h-[78px]'
+            'flex flex-col items-center justify-center gap-1 p-2 rounded border text-center transition-colors min-h-[78px] cursor-help'
           const styleClass = isEarned
             ? 'border-[var(--brass)]/40 bg-[var(--brass-pill-bg)] text-[var(--brass)]'
             : 'border-subtle bg-surface text-muted opacity-60'
+          const titleTooltip = (
+            <div
+              className="rounded-md border px-2 py-1 text-[11px] tracking-wide"
+              style={{
+                background: 'var(--lc-surface)',
+                borderColor: 'var(--line)',
+                color: 'var(--ink)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+              }}
+            >
+              {def.name}
+            </div>
+          )
 
           return (
-            <div
-              key={def.id}
-              title={def.description}
-              className={`${baseClass} ${styleClass}`}
-            >
-              <div className="relative">
-                <Icon size={20} />
-                {!isEarned && (
-                  <Lock
-                    size={10}
-                    className="absolute -bottom-0.5 -right-0.5 text-muted"
-                    aria-hidden="true"
-                  />
+            <Tooltip key={def.id} content={titleTooltip} delay={[300, 100]}>
+              <div className={`${baseClass} ${styleClass}`}>
+                <div className="relative">
+                  <Icon size={20} />
+                  {!isEarned && (
+                    <Lock
+                      size={10}
+                      className="absolute -bottom-0.5 -right-0.5 text-muted"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+                <p className="text-[10px] tracking-widest uppercase font-medium leading-tight">
+                  {def.name}
+                </p>
+                {isEarned ? (
+                  <p className="text-[9px] text-muted uppercase tracking-widest">
+                    {formatDate(userAward.earned_at, prefs)}
+                  </p>
+                ) : (
+                  <p className="text-[9px] text-muted leading-tight line-clamp-2">
+                    {def.description}
+                  </p>
                 )}
               </div>
-              <p className="text-[10px] tracking-widest uppercase font-medium leading-tight">
-                {def.name}
-              </p>
-              {isEarned ? (
-                <p className="text-[9px] text-muted uppercase tracking-widest">
-                  {formatDate(userAward.earned_at, prefs)}
-                </p>
-              ) : (
-                <p className="text-[9px] text-muted leading-tight line-clamp-2">
-                  {def.description}
-                </p>
-              )}
-            </div>
+            </Tooltip>
           )
         })}
       </div>
