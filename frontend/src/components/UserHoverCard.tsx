@@ -11,7 +11,7 @@ type Placement = 'top' | 'bottom' | 'left' | 'right'
 interface UserHoverCardProps {
   userId: string
   displayName?: string
-  avatarUrl?: string
+  avatarUrl?: string | null
   starLevel?: number
   children: ReactElement
   placement?: Placement
