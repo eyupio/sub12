@@ -13,6 +13,7 @@ import { clubsApi } from '../api/clubs'
 import { postApi, type Post, type PostAttachment, type PostVisibility } from '../api/posts'
 import { commentApi } from '../api/scoreCards'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { UserAvatar } from './UserAvatar'
 
 function AttachmentPreview({ attachment }: { attachment: PostAttachment }) {
@@ -152,11 +153,11 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
 
   const updatePostMutation = useMutation({
     mutationFn: () => postApi.update(post.id, editPostBody.trim()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
-      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+    onSuccess: (updated) => {
+      applyPostEditToCaches(queryClient, updated)
       setEditingPost(false)
+      setEditPostBody(updated.body)
+      toast('Post updated', 'success')
     },
     onError: () => toast('Failed to save post', 'error'),
   })
@@ -164,9 +165,10 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
   const deletePostMutation = useMutation({
     mutationFn: () => postApi.delete(post.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      queryClient.invalidateQueries({ queryKey: ['league', post.league_id, 'posts'] })
-      queryClient.invalidateQueries({ queryKey: ['club', post.club_id, 'posts'] })
+      applyPostDeleteToCaches(queryClient, post.id, {
+        leagueID: post.league_id,
+        clubID: post.club_id,
+      })
       toast('Post deleted', 'success')
     },
     onError: () => toast('Failed to delete post', 'error'),
@@ -194,6 +196,8 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
 
   const prefs = useRegionalPrefs()
   const date = formatDate(post.created_at, prefs)
+  const isEdited = new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 5000
+  const editedAt = isEdited ? formatDate(post.updated_at, prefs) : null
 
   const isHidden = !!post.hidden_at
 
@@ -210,12 +214,12 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-secondary truncate">{post.display_name}</p>
           <div className="flex items-center gap-2">
-            <p className="text-[10px] text-muted tracking-widest uppercase">
-              {date}
-              {new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 5000 && (
-                <span className="ml-1 italic normal-case tracking-normal">(edited)</span>
-              )}
-            </p>
+            <p className="text-[10px] text-muted tracking-widest uppercase">{date}</p>
+            {editedAt && (
+              <span className="inline-flex items-center rounded border border-subtle px-1.5 py-0.5 text-[10px] tracking-wide uppercase text-muted">
+                Edited {editedAt}
+              </span>
+            )}
             <VisibilityBadge visibility={post.visibility} />
           </div>
         </div>

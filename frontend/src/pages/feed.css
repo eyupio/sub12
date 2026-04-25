@@ -401,6 +401,17 @@
   font-size: 12px;
 }
 
+.post-edited {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
 .source-pill,
 .join-target {
   display: inline-flex;

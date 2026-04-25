@@ -18,6 +18,7 @@ import ImageMeasurement from '../components/ImageMeasurement'
 import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { useSmartBack } from '../hooks/useSmartBack'
 
 type PendingDelete =
   | { kind: 'test' }
@@ -53,6 +54,7 @@ function sourceLabel(notes: string | undefined): string {
 export default function PelletTestDetail() {
   const { id } = useParams({ strict: false })
   const navigate = useNavigate()
+  const smartBack = useSmartBack('/pellet-testing', ['/feed', '/pellet-testing', '/leagues/', '/clubs/', '/profile'])
   const qc = useQueryClient()
   const authUser = useAuthStore(s => s.user)
 
@@ -465,9 +467,13 @@ export default function PelletTestDetail() {
 
       {/* Header */}
       <div>
-        <Link to="/pellet-testing" className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors mb-3">
+        <button
+          type="button"
+          onClick={smartBack}
+          className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors mb-3"
+        >
           <ChevronLeft size={14} /> Back
-        </Link>
+        </button>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">

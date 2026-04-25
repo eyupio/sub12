@@ -52,6 +52,7 @@ import { MentionPopover } from '../components/MentionPopover'
 import { ReportDialog } from '../components/ReportDialog'
 import { handleToMention } from '../utils/mention'
 import { iconForAchievement } from '../utils/achievementIcons'
+import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -639,8 +640,8 @@ function FeedPostArticle({
 
   const updatePostMutation = useMutation({
     mutationFn: () => postApi.update(item.target_id!, draftBody.trim()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] })
+    onSuccess: (updated) => {
+      applyPostEditToCaches(queryClient, updated)
       setEditingPost(false)
       setMenuOpen(false)
       toast('Post updated', 'success')
@@ -651,7 +652,10 @@ function FeedPostArticle({
   const deletePostMutation = useMutation({
     mutationFn: () => postApi.delete(item.target_id!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      applyPostDeleteToCaches(queryClient, item.target_id!, {
+        leagueID: item.league_id,
+        clubID: item.club_id,
+      })
       setConfirmDelete(false)
       setMenuOpen(false)
       toast('Post deleted', 'success')
@@ -768,6 +772,8 @@ function PostHead({
   const prefs = useRegionalPrefs()
   const item = post.activity
   const date = formatDate(item.created_at, prefs)
+  const editedAt = item.type === 'post_created' ? item.metadata?.edited_at : undefined
+  const editedLabel = editedAt ? formatDate(editedAt, prefs) : null
 
   return (
     <header className="post-head">
@@ -782,6 +788,7 @@ function PostHead({
           <span className="post-handle">{relativeHandle(item.display_name)}</span>
           <span className="post-dot">.</span>
           <span className="post-date">{date}</span>
+          {editedLabel && <span className="post-edited">Edited {editedLabel}</span>}
         </div>
         {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
       </div>
