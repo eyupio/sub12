@@ -20,10 +20,10 @@ type MemberChecker interface {
 }
 
 type ActivityService struct {
-	repo           *repository.ActivityRepository
-	log            zerolog.Logger
-	leagueMembers  MemberChecker // nil disables league feed
-	clubMembers    MemberChecker // nil disables club feed
+	repo          *repository.ActivityRepository
+	log           zerolog.Logger
+	leagueMembers MemberChecker // nil disables league feed
+	clubMembers   MemberChecker // nil disables club feed
 }
 
 func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger, leagueMembers, clubMembers MemberChecker) *ActivityService {

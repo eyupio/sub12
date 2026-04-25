@@ -9,18 +9,18 @@ import (
 type ActivityType = string
 
 const (
-	ActivityScorePosted              ActivityType = "score_posted"
-	ActivityPersonalBest             ActivityType = "personal_best"
-	ActivityJoinedLeague             ActivityType = "joined_league"
-	ActivityCommented                ActivityType = "commented"
-	ActivityJoinedClub               ActivityType = "joined_club"
-	ActivityPelletTestPosted         ActivityType = "pellet_test_posted"
-	ActivityLeagueRoundOpened        ActivityType = "league_round_opened"
-	ActivityLeagueSeasonStarted      ActivityType = "league_season_started"
-	ActivityAchievementEarned        ActivityType = "achievement_earned"
-	ActivityFeatureRequestCreated    ActivityType = "feature_request_created"
+	ActivityScorePosted               ActivityType = "score_posted"
+	ActivityPersonalBest              ActivityType = "personal_best"
+	ActivityJoinedLeague              ActivityType = "joined_league"
+	ActivityCommented                 ActivityType = "commented"
+	ActivityJoinedClub                ActivityType = "joined_club"
+	ActivityPelletTestPosted          ActivityType = "pellet_test_posted"
+	ActivityLeagueRoundOpened         ActivityType = "league_round_opened"
+	ActivityLeagueSeasonStarted       ActivityType = "league_season_started"
+	ActivityAchievementEarned         ActivityType = "achievement_earned"
+	ActivityFeatureRequestCreated     ActivityType = "feature_request_created"
 	ActivityFeatureRequestImplemented ActivityType = "feature_request_implemented"
-	ActivityPostCreated              ActivityType = "post_created"
+	ActivityPostCreated               ActivityType = "post_created"
 )
 
 // FeedFilter controls which slice of the activity feed to return.
