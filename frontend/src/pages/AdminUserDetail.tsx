@@ -5,6 +5,7 @@ import { ChevronLeft, X } from 'lucide-react'
 import { adminUsersApi, type AdminUser } from '../api/adminUsers'
 import { useAuthStore } from '../store/auth'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { UserAvatar } from '../components/UserAvatar'
 
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
@@ -137,13 +138,7 @@ export default function AdminUserDetail() {
       {/* Profile card */}
       <div className={sectionCls}>
         <div className="flex items-center gap-3">
-          {user.avatar_url ? (
-            <img src={user.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
-          ) : (
-            <div className="w-12 h-12 rounded-full bg-[var(--brass)]/10 flex items-center justify-center shrink-0">
-              <span className="text-lg text-[var(--brass)]">{user.display_name[0]?.toUpperCase() ?? '?'}</span>
-            </div>
-          )}
+          <UserAvatar user={user} size={48} variant="brass" className="shrink-0" />
           <div>
             <div className="flex items-center gap-2">
               <span className="text-base font-medium text-primary">{user.display_name}</span>

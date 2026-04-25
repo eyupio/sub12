@@ -11,6 +11,7 @@ import { gearApi } from '../api/gear'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { AchievementsSection } from '../components/AchievementsSection'
 import { StarBadge } from '../components/StarBadge'
+import { UserAvatar } from '../components/UserAvatar'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
 import { HelpIcon } from '../components/Tooltip'
@@ -49,13 +50,6 @@ function AvatarUpload() {
     }
   }
 
-  const initials = user?.display_name
-    ?.split(' ')
-    .map(w => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() ?? '?'
-
   return (
     <div className="relative group">
       <input
@@ -68,21 +62,16 @@ function AvatarUpload() {
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={avatarMutation.isPending}
-        className="relative w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+        className="relative rounded-full overflow-hidden hover:ring-2 hover:ring-[var(--brass)]/50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Change profile picture"
       >
-        {user?.avatar_url ? (
-          <img
-            src={user.avatar_url}
-            alt={user.display_name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-surface-hover flex items-center justify-center text-muted text-xl lg:text-2xl font-medium">
-            {initials}
-          </div>
-        )}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <UserAvatar
+          user={user ?? {}}
+          size={96}
+          className="border-2"
+          showHoverCard={false}
+        />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
           <Camera size={20} className="text-white" />
         </div>
       </button>
@@ -92,9 +81,15 @@ function AvatarUpload() {
       {avatarMutation.isError && (
         <p className="text-[10px] text-[var(--error-text)] mt-1 text-center">Failed</p>
       )}
-      {!!user?.star_level && (
+      {!!user?.star_level && user?.id && (
         <div className="flex justify-center mt-1">
-          <StarBadge level={user.star_level} size={10} />
+          <StarBadge
+            level={user.star_level}
+            size={10}
+            userId={user.id}
+            displayName={user.display_name}
+            avatarUrl={user.avatar_url}
+          />
         </div>
       )}
     </div>
@@ -126,13 +121,11 @@ function FollowRequestsSection() {
         {requests.map((req) => (
           <div key={req.id} className="flex items-center justify-between p-3 bg-surface border border-subtle rounded-lg">
             <div className="flex items-center gap-3">
-              {req.avatar_url ? (
-                <img src={req.avatar_url} alt={req.display_name ?? ''} className="w-8 h-8 rounded-full object-cover" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-muted text-xs font-medium">
-                  {(req.display_name ?? '?')[0]?.toUpperCase()}
-                </div>
-              )}
+              <UserAvatar
+                user={{ id: req.requester_id, display_name: req.display_name, avatar_url: req.avatar_url }}
+                size={32}
+                variant="plain"
+              />
               <span className="text-sm text-secondary">{req.display_name}</span>
             </div>
             <div className="flex gap-2">

@@ -4,6 +4,7 @@ import { Send, Globe, Users as UsersIcon, UserCheck, Lock } from 'lucide-react'
 import { postApi, CreatePostPayload, PostVisibility } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { UserAvatar } from './UserAvatar'
 
 type GroupPostVisibility = 'members' | 'public'
 
@@ -71,23 +72,15 @@ export function PostComposer({ leagueId, clubId, queryKey, groupPostVisibility }
 
   if (!currentUser) return null
 
-  const initials = currentUser.display_name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-
   return (
     <div className="rounded border border-subtle bg-surface p-3 space-y-3">
       <div className="flex gap-3">
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-          {currentUser.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={currentUser.display_name} className="w-full h-full object-cover" />
-          ) : (
-            initials
-          )}
-        </div>
+        <UserAvatar
+          user={currentUser}
+          size={32}
+          className="shrink-0"
+          showHoverCard={false}
+        />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}

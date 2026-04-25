@@ -12,6 +12,7 @@ import { ReportDialog } from '../components/ReportDialog'
 import { ShareDialog } from '../components/ShareDialog'
 import { AchievementsSection } from '../components/AchievementsSection'
 import { StarBadge } from '../components/StarBadge'
+import { UserAvatar } from '../components/UserAvatar'
 import { useRegionalPrefs } from '../utils/date'
 
 function FollowListModal({ title, items, onClose }: { title: string; items: FollowListItem[]; onClose: () => void }) {
@@ -36,13 +37,11 @@ function FollowListModal({ title, items, onClose }: { title: string; items: Foll
                 onClick={onClose}
                 className="flex items-center gap-3 p-2 rounded hover:bg-surface-hover transition-colors"
               >
-                {item.avatar_url ? (
-                  <img src={item.avatar_url} alt={item.display_name} className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-muted text-xs font-medium">
-                    {item.display_name[0]?.toUpperCase() ?? '?'}
-                  </div>
-                )}
+                <UserAvatar
+                  user={{ id: item.user_id, display_name: item.display_name, avatar_url: item.avatar_url }}
+                  size={32}
+                  variant="plain"
+                />
                 <span className="text-sm text-secondary">{item.display_name}</span>
               </Link>
             ))
@@ -136,13 +135,6 @@ export default function UserProfile() {
     onError: () => toast('Failed to update block status', 'error'),
   })
 
-  const initials = profile?.display_name
-    ?.split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() ?? '?'
-
   const isOwnProfile = currentUser?.id === id
 
   // Determine follow button state
@@ -216,21 +208,24 @@ export default function UserProfile() {
             <div className="flex items-start gap-4">
               {/* Avatar */}
               <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-full overflow-hidden border-2 border-subtle">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-surface-hover flex items-center justify-center text-muted text-xl font-medium">
-                      {initials}
-                    </div>
-                  )}
-                </div>
+                <UserAvatar
+                  user={{
+                    id: profile.id,
+                    display_name: profile.display_name,
+                    avatar_url: profile.avatar_url,
+                    star_level: profile.star_level,
+                  }}
+                  size={96}
+                  className="border-2"
+                />
                 {profile.star_level > 0 && (
-                  <StarBadge level={profile.star_level} size={10} />
+                  <StarBadge
+                    level={profile.star_level}
+                    size={10}
+                    userId={profile.id}
+                    displayName={profile.display_name}
+                    avatarUrl={profile.avatar_url}
+                  />
                 )}
               </div>
 

@@ -5,6 +5,7 @@ import { ChevronLeft, Trash2, X } from 'lucide-react'
 import { adminClubsApi } from '../api/adminClubs'
 import type { Club } from '../api/clubs'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { UserAvatar } from '../components/UserAvatar'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
@@ -222,13 +223,12 @@ export default function AdminClubDetail() {
             {members.map(m => (
               <div key={m.user_id} className="flex items-center justify-between py-2.5">
                 <div className="flex items-center gap-2">
-                  {m.avatar_url ? (
-                    <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-[var(--brass)]/10 flex items-center justify-center">
-                      <span className="text-[9px] text-[var(--brass)]">{m.display_name[0]?.toUpperCase()}</span>
-                    </div>
-                  )}
+                  <UserAvatar
+                    user={{ id: m.user_id, display_name: m.display_name, avatar_url: m.avatar_url }}
+                    size={24}
+                    variant="brass"
+                    linkToProfile
+                  />
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm text-primary">{m.display_name}</span>
