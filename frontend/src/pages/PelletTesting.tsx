@@ -117,7 +117,7 @@ function TabBar({
   counts: { tests?: number; combos?: number; batches?: number }
   onChange: (t: Tab) => void
 }) {
-  const items: { key: Tab; label: string; icon: React.ComponentType<{ size?: number }>; count?: number }[] = [
+  const items: { key: Tab; label: string; icon: React.ComponentType<{ size?: number | string }>; count?: number }[] = [
     { key: 'overview', label: 'Overview', icon: LayoutGrid },
     { key: 'tests', label: 'Tests', icon: Crosshair, count: counts.tests },
     { key: 'combos', label: 'Combos', icon: Trophy, count: counts.combos },
@@ -257,7 +257,7 @@ function OverviewTab({
                         fontSize: 11,
                       }}
                       labelStyle={{ color: 'var(--muted)' }}
-                      formatter={(v: number) => `${v.toFixed(2)}mm`}
+                      formatter={(v) => `${Number(v).toFixed(2)}mm`}
                     />
                     {seriesNames.map((name, i) => (
                       <Line

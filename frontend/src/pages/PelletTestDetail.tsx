@@ -813,7 +813,7 @@ export default function PelletTestDetail() {
                     <RTooltip
                       contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 6, fontSize: 11 }}
                       labelStyle={{ color: 'var(--muted)' }}
-                      formatter={(v: number) => `${v.toFixed(2)}mm`}
+                      formatter={(v) => `${Number(v).toFixed(2)}mm`}
                     />
                     <Line type="monotone" dataKey="value" stroke="var(--gold)" strokeWidth={1.5} dot={{ r: 4, fill: 'var(--gold)' }} />
                   </LineChart>
