@@ -15,16 +15,20 @@ import {
   ChevronDown,
   CircleDot,
   Crosshair,
+  Edit3,
+  Flag,
   Flame,
   FlaskConical,
   Globe,
   Image as ImageIcon,
   MessageSquare,
+  MoreHorizontal,
   RefreshCw,
   Send,
   Share2,
   Sparkles,
   Target,
+  Trash2,
   Trophy,
   User,
   Users,
@@ -41,9 +45,11 @@ import { scoreCardApi, type ScoreCardSummary } from '../api/scoreCards'
 import { pelletTestApi, type PelletTestSessionSummary } from '../api/pelletTesting'
 import { UserAvatar } from '../components/UserAvatar'
 import { LikeButton } from '../components/LikeButton'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageModal } from '../components/ImageModal'
 import { PickerModal, type PickerItem } from '../components/PickerModal'
 import { MentionPopover } from '../components/MentionPopover'
+import { ReportDialog } from '../components/ReportDialog'
 import { handleToMention } from '../utils/mention'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
@@ -618,9 +624,45 @@ function FeedPostArticle({
   commentsOpen: boolean
   onToggleComments: () => void
 }) {
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [editingPost, setEditingPost] = useState(false)
+  const [draftBody, setDraftBody] = useState(post.body ?? '')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   if (post.kind === 'join') {
     return <JoinPost post={post} muted={muted} />
   }
+
+  const item = post.activity
+  const isOwnPost = !!currentUser && item.type === 'post_created' && currentUser.id === item.user_id
+  const reportTarget = feedReportTarget(post)
+  const canReport = !!currentUser && !isOwnPost && !!reportTarget
+  const canEdit = isOwnPost && !!item.target_id
+
+  const updatePostMutation = useMutation({
+    mutationFn: () => postApi.update(item.target_id!, draftBody.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      setEditingPost(false)
+      setMenuOpen(false)
+      toast('Post updated', 'success')
+    },
+    onError: () => toast('Failed to update post', 'error'),
+  })
+
+  const deletePostMutation = useMutation({
+    mutationFn: () => postApi.delete(item.target_id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      setConfirmDelete(false)
+      setMenuOpen(false)
+      toast('Post deleted', 'success')
+    },
+    onError: () => toast('Failed to delete post', 'error'),
+  })
 
   const className = [
     'feed-post',
@@ -632,20 +674,98 @@ function FeedPostArticle({
     <article className={className}>
       {post.kind === 'pb' && <PersonalBestStripe post={post} />}
       <div className="post-body">
-        <PostHead post={post} />
+        <PostHead
+          post={post}
+          menuOpen={menuOpen}
+          onToggleMenu={() => setMenuOpen((open) => !open)}
+          onStartEdit={() => {
+            setDraftBody(post.body ?? '')
+            setEditingPost(true)
+            setMenuOpen(false)
+          }}
+          onStartDelete={() => {
+            setConfirmDelete(true)
+            setMenuOpen(false)
+          }}
+          onStartReport={() => {
+            setReportOpen(true)
+            setMenuOpen(false)
+          }}
+          canEdit={canEdit}
+          canReport={canReport}
+          reportTargetType={reportTarget?.targetType}
+        />
         {post.kind === 'pb' && <PersonalBestPost post={post} />}
         {post.kind === 'score' && <ScorePost post={post} />}
         {post.kind === 'achievement' && <AchievementPost post={post} />}
-        {post.kind === 'text' && <TextPost post={post} />}
+        {post.kind === 'text' && (
+          <TextPost
+            post={post}
+            editing={editingPost}
+            draftBody={draftBody}
+            onDraftChange={setDraftBody}
+            onSave={() => updatePostMutation.mutate()}
+            onCancelEdit={() => {
+              setEditingPost(false)
+              setDraftBody(post.body ?? '')
+            }}
+            isSaving={updatePostMutation.isPending}
+          />
+        )}
         {post.kind === 'standings' && <StandingsPost />}
         <EngagementBar post={post} commentsOpen={commentsOpen} onToggleComments={onToggleComments} />
         {commentsOpen && <InlineComments post={post} />}
       </div>
+      {reportTarget && (
+        <ReportDialog
+          open={reportOpen}
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete post?"
+        message="This post will be permanently removed."
+        onConfirm={() => deletePostMutation.mutate()}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </article>
   )
 }
 
-function PostHead({ post }: { post: FeedPost }) {
+function feedReportTarget(post: FeedPost): { targetType: 'post' | 'score_card'; targetId: string } | null {
+  if (post.activity.type === 'post_created' && post.activity.target_id) {
+    return { targetType: 'post', targetId: post.activity.target_id }
+  }
+  if (post.activity.target_type === 'score_card' && post.activity.target_id) {
+    return { targetType: 'score_card', targetId: post.activity.target_id }
+  }
+  return null
+}
+
+function PostHead({
+  post,
+  menuOpen,
+  onToggleMenu,
+  onStartEdit,
+  onStartDelete,
+  onStartReport,
+  canEdit,
+  canReport,
+  reportTargetType,
+}: {
+  post: FeedPost
+  menuOpen: boolean
+  onToggleMenu: () => void
+  onStartEdit: () => void
+  onStartDelete: () => void
+  onStartReport: () => void
+  canEdit: boolean
+  canReport: boolean
+  reportTargetType?: 'post' | 'score_card'
+}) {
   const prefs = useRegionalPrefs()
   const item = post.activity
   const date = formatDate(item.created_at, prefs)
@@ -667,6 +787,57 @@ function PostHead({ post }: { post: FeedPost }) {
         {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
       </div>
       {post.kind === 'pb' && <span className="post-pinned">Pinned</span>}
+      {(canEdit || canReport) && (
+        <div className="post-menu-wrap">
+          <button
+            type="button"
+            className="post-menu-trigger"
+            aria-label="Feed item options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={onToggleMenu}
+          >
+            <MoreHorizontal size={15} />
+          </button>
+          {menuOpen && (
+            <div className="post-menu" role="menu">
+              {canEdit && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="post-menu-item"
+                    onClick={onStartEdit}
+                  >
+                    <Edit3 size={12} />
+                    Edit post
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="post-menu-item post-menu-item-danger"
+                    onClick={onStartDelete}
+                  >
+                    <Trash2 size={12} />
+                    Delete post
+                  </button>
+                </>
+              )}
+              {canReport && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="post-menu-item"
+                  onClick={onStartReport}
+                >
+                  <Flag size={12} />
+                  Report {reportTargetType === 'score_card' ? 'score' : 'post'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </header>
   )
 }
@@ -798,7 +969,23 @@ function AchievementPost({ post }: { post: FeedPost }) {
   )
 }
 
-function TextPost({ post }: { post: FeedPost }) {
+function TextPost({
+  post,
+  editing,
+  draftBody,
+  onDraftChange,
+  onSave,
+  onCancelEdit,
+  isSaving,
+}: {
+  post: FeedPost
+  editing: boolean
+  draftBody: string
+  onDraftChange: (value: string) => void
+  onSave: () => void
+  onCancelEdit: () => void
+  isSaving: boolean
+}) {
   const item = post.activity
   const attachmentType = item.metadata?.attachment_type
   const attachmentId = item.metadata?.attachment_target_id
@@ -809,7 +996,34 @@ function TextPost({ post }: { post: FeedPost }) {
 
   return (
     <div className="text-post-body">
-      {body ? <p>{renderBodyWithMentions(body)}</p> : !hasContent ? <p>{fallbackText(item)}</p> : null}
+      {editing ? (
+        <div className="post-edit-box">
+          <textarea
+            value={draftBody}
+            onChange={(e) => onDraftChange(e.target.value)}
+            rows={3}
+            className="post-edit-input"
+            aria-label="Edit post body"
+          />
+          <div className="post-edit-actions">
+            <button
+              type="button"
+              className="feed-btn"
+              onClick={onSave}
+              disabled={isSaving || !draftBody.trim()}
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              className="feed-btn feed-btn-outline"
+              onClick={onCancelEdit}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : body ? <p>{renderBodyWithMentions(body)}</p> : !hasContent ? <p>{fallbackText(item)}</p> : null}
       {attachmentType === 'score_card' && attachmentId && (
         <Link to="/scores/$id" params={{ id: attachmentId }} className="attachment-link">
           <Target size={13} />

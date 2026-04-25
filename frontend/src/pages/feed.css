@@ -427,6 +427,93 @@
   text-transform: uppercase;
 }
 
+.post-menu-wrap {
+  position: relative;
+}
+
+.post-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+}
+
+.post-menu-trigger:hover {
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+
+.post-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.post-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: left;
+}
+
+.post-menu-item:hover {
+  background: var(--surface-2);
+}
+
+.post-menu-item-danger {
+  color: var(--error-text);
+}
+
+.post-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: -2px 0 8px;
+}
+
+.post-edit-input {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.post-edit-input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.post-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .post-pb {
   border-color: var(--gold-soft);
 }
