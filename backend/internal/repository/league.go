@@ -1124,13 +1124,13 @@ func (r *LeagueRepository) CountAdmins(ctx context.Context, leagueID string) (in
 func (r *LeagueRepository) GetLeagueByScoreCardID(ctx context.Context, scoreCardID string) (*model.ScoreCardLeague, error) {
 	var league model.ScoreCardLeague
 	err := r.db.QueryRow(ctx, `
-		SELECT l.id, l.name
+		SELECT l.id, l.name, rd.id, rd.name
 		FROM leagues l
 		JOIN seasons s  ON s.league_id = l.id
 		JOIN rounds rd  ON rd.season_id = s.id
 		JOIN score_cards sc ON sc.league_round_id = rd.id
 		WHERE sc.id = $1
-	`, scoreCardID).Scan(&league.ID, &league.Name)
+	`, scoreCardID).Scan(&league.ID, &league.Name, &league.RoundID, &league.RoundName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

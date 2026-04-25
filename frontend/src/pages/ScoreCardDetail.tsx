@@ -826,7 +826,7 @@ export default function ScoreCardDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
-  const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '' })
+  const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '', distance_m: '', discipline: '' })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -873,11 +873,25 @@ export default function ScoreCardDetail() {
   const isGlobalAdmin = currentUser?.role === 'admin'
   const canModerateComments = isGlobalAdmin || isCardLeagueAdmin || isCardClubAdmin
 
-  const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles(), enabled: editing })
-  const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets(), enabled: editing })
+  // Always fetch (with all=true so inactive gear still resolves) when viewing
+  // an own card with rifle/pellet IDs, so the EQUIPMENT sidebar can render
+  // without a separate fetch. Fallback handles cross-user cards too — for
+  // viewers, the lookup fails silently and the sidebar falls back to "—".
+  const isOwner = !!currentUser && !!card && currentUser.id === card.user_id
+  const needsGear = (isOwner && (!!card?.rifle_id || !!card?.pellet_id)) || editing
+  const { data: rifleData } = useQuery({ queryKey: ['rifles', 'all'], queryFn: () => gearApi.listRifles(true), enabled: needsGear })
+  const { data: pelletData } = useQuery({ queryKey: ['pellets', 'all'], queryFn: () => gearApi.listPellets(true), enabled: needsGear })
+
+  // Audit trail surfaces verifier identity + timestamp for the LEAGUE sidebar.
+  const { data: cardAuditTrail } = useQuery({
+    queryKey: ['score-cards', id, 'audit-trail'],
+    queryFn: () => leagueApi.getAuditTrail(id),
+    enabled: !!card?.league_round_id,
+  })
 
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const distanceParsed = editMeta.distance_m.trim() === '' ? undefined : Number(editMeta.distance_m)
       const updated = await scoreCardApi.update(id, {
         shot_at: editMeta.shot_at,
         shot_scores: editShots.map(s => s.score),
@@ -886,6 +900,8 @@ export default function ScoreCardDetail() {
         notes: editMeta.notes || undefined,
         rifle_id: editMeta.rifle_id || undefined,
         pellet_id: editMeta.pellet_id || undefined,
+        distance_m: Number.isFinite(distanceParsed) ? (distanceParsed as number) : undefined,
+        discipline: editMeta.discipline.trim() ? editMeta.discipline.trim() : undefined,
       })
       if (imageFile) {
         await scoreCardApi.uploadImage(id, imageFile)
@@ -956,11 +972,12 @@ export default function ScoreCardDetail() {
       notes: card.notes ?? '',
       rifle_id: card.rifle_id ?? '',
       pellet_id: card.pellet_id ?? '',
+      distance_m: card.distance_m != null ? String(card.distance_m) : '',
+      discipline: card.discipline ?? '',
     })
     setEditing(true)
   }
 
-  const isOwner = currentUser && card ? currentUser.id === card.user_id : false
   const editTotalScore = editShots.reduce((a, s) => a + s.score, 0)
   const editXCount = editShots.filter(s => s.x).length
 
@@ -986,53 +1003,69 @@ export default function ScoreCardDetail() {
     )
   }
 
+  // Resolve full rifle / pellet objects when available for the EQUIPMENT card.
+  const rifle = card.rifle_id ? rifleData?.items?.find(r => r.id === card.rifle_id) : undefined
+  const pellet = card.pellet_id ? pelletData?.items?.find(p => p.id === card.pellet_id) : undefined
+
+  // Pull the latest "verified" event from the audit trail (the most recent peer
+  // confirmation when the card is verified). Confirmations come back oldest-first,
+  // so picking the last entry is correct.
+  const verifierConfirmation = card.verification === 'verified'
+    ? cardAuditTrail?.confirmations?.[cardAuditTrail.confirmations.length - 1]
+    : undefined
+
+  const avg = card.total_score / 25
+  const runningAvgDelta = card.running_avg != null ? avg - card.running_avg : null
+
+  // Pretty date: keep YYYY-MM-DD intact for tests/i18n elsewhere; render as DD/MM/YYYY.
+  const dateParts = card.shot_at.split('-')
+  const prettyDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : card.shot_at
+  const createdTime = new Date(card.created_at).toTimeString().slice(0, 5)
+
   return (
-    <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-3xl mx-auto pb-24">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+    <div className="p-4 lg:p-8 space-y-5 lg:space-y-6 max-w-6xl mx-auto pb-24">
+      {/* Top action bar */}
+      <div className="flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={smartBack}
-          aria-label="Back"
-          className="text-muted hover:text-secondary transition-colors"
+          aria-label="Back to cards"
+          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={16} /> Back to cards
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg lg:text-xl font-medium tracking-widest uppercase text-secondary">{card.shot_at}</h1>
-            {card.league_round_id && cardLeague ? (
-              <Link
-                to="/leagues/$id"
-                params={{ id: cardLeague.id }}
-                className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded hover:bg-[var(--brass)]/20 transition-colors"
-              >
-                {cardLeague.name}
-              </Link>
-            ) : (
-              <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
-                {card.league_round_id ? 'League' : 'Personal'}
-              </span>
-            )}
-          </div>
-          {card.location && <p className="text-xs text-muted tracking-wide">{card.location}</p>}
-        </div>
         {isOwner && !editing && (
-          <div className="flex items-center gap-3">
-            <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors">
+          <div className="flex items-center gap-2">
+            <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors">
               <Pencil size={13} /> Edit
+            </button>
+            <button
+              onClick={() => setShowShare(true)}
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
+            >
+              <Share2 size={13} /> Share to Feed
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleteMutation.isPending}
-              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete score card"
             >
-              <Trash2 size={13} /> Delete
+              <XIcon size={13} /> Delete
             </button>
           </div>
         )}
       </div>
+
+      {/* Personal Best banner */}
+      {!editing && card.is_pb && card.pb_delta != null && (
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5">
+          <span className="text-[var(--brass)] text-base">🏆</span>
+          <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">Personal Best</span>
+          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="text-xs text-secondary">improved by +{card.pb_delta} over previous</span>
+        </div>
+      )}
 
       {cardAuthor?.is_blocked && (
         <div className="rounded-lg border border-[var(--error-text)]/30 bg-[var(--error-text)]/5 px-4 py-3 text-xs tracking-wide text-[var(--error-text)]">
@@ -1064,6 +1097,14 @@ export default function ScoreCardDetail() {
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
               <input type="text" value={editMeta.location} onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))} placeholder="Range / club" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
+            </div>
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance (m)</label>
+              <input type="number" min={0} value={editMeta.distance_m} onChange={e => setEditMeta(m => ({ ...m, distance_m: e.target.value }))} placeholder="e.g. 25" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
+            </div>
+            <div>
+              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Discipline</label>
+              <input type="text" value={editMeta.discipline} onChange={e => setEditMeta(m => ({ ...m, discipline: e.target.value }))} placeholder="e.g. Benchrest" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
           </div>
 
@@ -1176,103 +1217,241 @@ export default function ScoreCardDetail() {
         </div>
       )}
 
-      {/* Desktop: two-column layout */}
-      {!editing && <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-        {/* Left column: score grid + totals */}
-        <div className="space-y-6">
-          <div className="grid grid-cols-5 gap-2 lg:gap-3">
-            {card.shot_scores.map((score, i) => {
-              const isX = score === 10 && card.shot_xs[i]
-              return (
-                <div
-                  key={i}
-                  className={[
-                    'aspect-square rounded border font-mono font-medium flex items-center justify-center',
-                    isX
-                      ? 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]'
-                      : score === 10
-                      ? 'bg-[var(--brass)]/10 border-[var(--brass)]/40 text-[var(--brass)]'
-                      : score > 0
-                      ? 'bg-surface-hover border-strong text-secondary'
-                      : 'bg-surface border-subtle text-muted',
-                  ].join(' ')}
-                >
-                  <span className={isX ? 'text-xl font-bold' : score === 10 ? 'text-base' : 'text-lg'}>
-                    {isX ? 'X' : score}
-                  </span>
+      {/* Hero + viz + sidebar */}
+      {!editing && (
+        <>
+          {/* Hero */}
+          <div className="rounded-lg border border-subtle bg-surface px-5 py-5 lg:px-6 lg:py-6">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-baseline gap-3 font-mono">
+                  <h1 className="text-2xl lg:text-3xl text-primary">{prettyDate}</h1>
+                  <span className="text-base text-muted">{createdTime}</span>
                 </div>
-              )
-            })}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-surface-hover text-muted">
+                    {card.league_round_id ? 'League' : 'Personal'}
+                  </span>
+                  {card.league_round_id && <VerificationBadge status={card.verification} />}
+                  {cardLeague && (
+                    <Link
+                      to="/leagues/$id"
+                      params={{ id: cardLeague.id }}
+                      className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded hover:bg-[var(--brass)]/20 transition-colors"
+                    >
+                      {cardLeague.name}
+                    </Link>
+                  )}
+                  {cardLeague?.round_name && (
+                    <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
+                      {cardLeague.round_name}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-start gap-6 font-mono shrink-0">
+                <div className="text-right">
+                  <p className="text-4xl lg:text-5xl font-semibold text-primary leading-none">{card.total_score}</p>
+                  {runningAvgDelta != null && (
+                    <p className={`mt-2 text-xs ${runningAvgDelta >= 0 ? 'text-[var(--success-text)]' : 'text-[var(--error-text)]'}`}>
+                      {runningAvgDelta >= 0 ? '↑' : '↓'}{Math.abs(runningAvgDelta).toFixed(1)}
+                      <span className="text-muted ml-1 normal-case tracking-normal">vs running avg</span>
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-right">
+                  <span className="text-[10px] tracking-widest uppercase text-muted">X</span>
+                  <span className="text-xl text-[var(--brass)] font-semibold">{card.x_count}</span>
+                  <span className="text-[10px] tracking-widest uppercase text-muted">Avg</span>
+                  <span className="text-xl text-secondary font-semibold">{avg.toFixed(1)}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-8 font-mono border-t border-subtle pt-4">
-            <div>
-              <p className="text-[11px] tracking-widest uppercase text-muted">Total</p>
-              <p className="text-3xl font-semibold text-primary">{card.total_score}</p>
+          <div className="lg:grid lg:grid-cols-3 lg:gap-5 space-y-5 lg:space-y-0">
+            {/* Viz panel */}
+            <div className="lg:col-span-2 rounded-lg border border-subtle bg-surface p-5 space-y-4">
+              <div className="flex items-center gap-2 border-b border-subtle pb-2">
+                <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] border-b-2 border-[var(--brass)] pb-1">Shot grid</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2 lg:gap-3">
+                {card.shot_scores.map((score, i) => {
+                  const isX = score === 10 && card.shot_xs[i]
+                  return (
+                    <div
+                      key={i}
+                      className={[
+                        'aspect-square rounded border font-mono font-medium flex items-center justify-center',
+                        isX
+                          ? 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]'
+                          : score === 10
+                          ? 'bg-[var(--brass)]/10 border-[var(--brass)]/40 text-[var(--brass)]'
+                          : score >= 8
+                          ? 'bg-surface-hover border-strong text-secondary'
+                          : score > 0
+                          ? 'bg-surface border-subtle text-muted'
+                          : 'bg-surface border-subtle text-muted',
+                      ].join(' ')}
+                    >
+                      <span className={isX ? 'text-xl font-bold' : score === 10 ? 'text-base' : 'text-lg'}>
+                        {isX ? 'X' : score}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted border-t border-subtle pt-3">
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--brass)]" />
+                  X-ring hit · <span className="font-mono text-secondary ml-1">{card.x_count}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--brass)]/50" />
+                  10–9 ring · <span className="font-mono text-secondary ml-1">{card.shot_scores.filter((s, i) => s >= 9 && !(s === 10 && card.shot_xs[i])).length}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-strong" />
+                  8 and below · <span className="font-mono text-secondary ml-1">{card.shot_scores.filter(s => s < 9).length}</span>
+                </span>
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] tracking-widest uppercase text-muted">X Count</p>
-              <p className="text-3xl font-semibold text-[var(--brass)]">{card.x_count}</p>
-            </div>
-            <div>
-              <p className="text-[11px] tracking-widest uppercase text-muted">Avg</p>
-              <p className="text-3xl font-semibold text-secondary">
-                {(card.total_score / 25).toFixed(1)}
-              </p>
+
+            {/* Sidebar */}
+            <div className="space-y-4">
+              {/* EQUIPMENT */}
+              {(rifle || pellet || card.distance_m != null || card.discipline) && (
+                <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Equipment</p>
+                  {rifle && (
+                    <div className="flex justify-between items-start gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Rifle</span>
+                      <div className="text-right">
+                        <p className="text-sm text-secondary">{rifle.make} {rifle.model}</p>
+                        {(rifle.calibre || rifle.power_ftlb != null) && (
+                          <p className="text-[11px] text-muted font-mono">
+                            {rifle.calibre || ''}
+                            {rifle.calibre && rifle.power_ftlb != null ? ' · ' : ''}
+                            {rifle.power_ftlb != null ? `${rifle.power_ftlb} ft-lb` : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {pellet && (
+                    <div className="flex justify-between items-start gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Pellet</span>
+                      <div className="text-right">
+                        <p className="text-sm text-secondary">
+                          {pellet.brand} {pellet.model}
+                          {pellet.weight_grains != null ? ` ${pellet.weight_grains}gr` : ''}
+                        </p>
+                        {pellet.batch_code && (
+                          <p className="text-[11px] text-muted font-mono">Lot {pellet.batch_code}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {card.distance_m != null && (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Distance</span>
+                      <span className="text-sm font-mono text-secondary">{card.distance_m}m</span>
+                    </div>
+                  )}
+                  {card.discipline && (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Discipline</span>
+                      <span className="text-sm text-secondary">{card.discipline}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* LEAGUE */}
+              {cardLeague && (
+                <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">League</p>
+                  <div className="flex justify-between items-start gap-3">
+                    <span className="text-[11px] tracking-widest uppercase text-muted">Name</span>
+                    <Link to="/leagues/$id" params={{ id: cardLeague.id }} className="text-sm text-[var(--brass)] hover:opacity-80 text-right">
+                      {cardLeague.name}
+                    </Link>
+                  </div>
+                  {cardLeague.round_name && (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Round</span>
+                      <span className="text-sm text-secondary">{cardLeague.round_name}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-[11px] tracking-widest uppercase text-muted">Status</span>
+                    <VerificationBadge status={card.verification} />
+                  </div>
+                  {verifierConfirmation && (
+                    <div className="flex justify-between items-start gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Verifier</span>
+                      <div className="text-right">
+                        <p className="text-sm text-secondary">{verifierConfirmation.display_name}</p>
+                        <p className="text-[11px] text-muted font-mono">{verifierConfirmation.created_at.slice(0, 10)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* CONDITIONS */}
+              {(card.wind_mph != null || card.temp_celsius != null || card.location) && (
+                <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Conditions</p>
+                  {card.wind_mph != null && (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Wind</span>
+                      <span className="text-sm font-mono text-secondary">{card.wind_mph === 0 ? 'Calm' : `${card.wind_mph} mph`}</span>
+                    </div>
+                  )}
+                  {card.temp_celsius != null && (
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Temp</span>
+                      <span className="text-sm font-mono text-secondary">{card.temp_celsius}°C</span>
+                    </div>
+                  )}
+                  {card.location && (
+                    <div className="flex justify-between items-start gap-3">
+                      <span className="text-[11px] tracking-widest uppercase text-muted">Venue</span>
+                      <span className="text-sm text-secondary text-right">{card.location}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* NOTES */}
+              {card.notes && (
+                <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2">
+                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Notes</p>
+                  <p className="text-sm text-secondary leading-relaxed border-l-2 border-[var(--brass)]/40 pl-3 italic">
+                    "{card.notes}"
+                  </p>
+                </div>
+              )}
+
+              {/* SCORE CARD PHOTO */}
+              {card.card_image_url && (
+                <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2">
+                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Score Card Photo</p>
+                  <button onClick={() => setShowLightbox(true)} className="w-full">
+                    <img
+                      src={card.card_image_url}
+                      alt="Score card photo"
+                      className="rounded border border-subtle max-h-48 w-full object-contain bg-surface-hover cursor-zoom-in"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Right column: metadata + photo */}
-        <div className="space-y-4 mt-6 lg:mt-0">
-          <div className="space-y-2 text-sm border-t lg:border-t-0 border-subtle pt-4 lg:pt-0">
-            {card.wind_mph != null && (
-              <div className="flex justify-between">
-                <span className="text-muted tracking-widest uppercase text-[11px]">Wind</span>
-                <span className="font-mono text-secondary">{card.wind_mph} mph</span>
-              </div>
-            )}
-            {card.temp_celsius != null && (
-              <div className="flex justify-between">
-                <span className="text-muted tracking-widest uppercase text-[11px]">Temp</span>
-                <span className="font-mono text-secondary">{card.temp_celsius}&deg;C</span>
-              </div>
-            )}
-            {card.notes && (
-              <div className="pt-1">
-                <p className="text-[11px] tracking-widest uppercase text-muted mb-1">Notes</p>
-                <p className="text-secondary text-sm leading-relaxed">{card.notes}</p>
-              </div>
-            )}
-            {card.league_round_id && (
-              <div className="flex justify-between pt-1">
-                <span className="text-muted tracking-widest uppercase text-[11px]">Verification</span>
-                <VerificationBadge status={card.verification} />
-              </div>
-            )}
-            {card.visibility === 'private' && (
-              <div className="flex justify-between pt-1">
-                <span className="text-muted tracking-widest uppercase text-[11px]">Visibility</span>
-                <span className="text-[11px] tracking-widest uppercase text-muted">Private</span>
-              </div>
-            )}
-          </div>
-
-          {card.card_image_url && (
-            <div className="pt-4 border-t border-subtle">
-              <p className="text-[11px] tracking-widest uppercase text-muted mb-2">Score Card Photo</p>
-              <button onClick={() => setShowLightbox(true)} className="w-full">
-                <img
-                  src={card.card_image_url}
-                  alt="Score card photo"
-                  className="rounded border border-subtle max-h-64 w-full object-contain bg-surface cursor-zoom-in"
-                  loading="lazy"
-                />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>}
+        </>
+      )}
 
       {/* Audit Trail \u2014 only shown for league cards */}
       {card.league_round_id && (

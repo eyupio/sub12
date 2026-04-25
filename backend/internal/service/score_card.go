@@ -30,6 +30,7 @@ type ScoreCardRepo interface {
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	Delete(ctx context.Context, id, userID string) error
 	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
+	GetPriorScoreStats(ctx context.Context, userID, excludeID string) (*repository.PriorScoreStats, error)
 }
 
 // LeagueConfigRepo provides league config lookups needed by ScoreCardService.
@@ -233,6 +234,17 @@ func (s *ScoreCardService) GetForViewerWithAuthor(ctx context.Context, id, viewe
 		return nil, err
 	}
 	out := &model.ScoreCardWithAuthor{ScoreCard: card}
+	if !card.IsDraft {
+		if stats, err := s.cards.GetPriorScoreStats(ctx, card.UserID, card.ID); err == nil && stats != nil && stats.Count > 0 {
+			avg := stats.Mean
+			out.RunningAvg = &avg
+			if card.TotalScore > stats.PreviousMax {
+				delta := card.TotalScore - stats.PreviousMax
+				out.IsPB = true
+				out.PBDelta = &delta
+			}
+		}
+	}
 	if s.users != nil {
 		if owner, err := s.users.GetByID(ctx, card.UserID); err == nil && owner != nil {
 			out.Author = &model.ScoreCardAuthor{

@@ -40,6 +40,8 @@ export interface ScoreCard extends ScoreCardSummary {
   pellet_id?: string
   wind_mph?: number
   temp_celsius?: number
+  distance_m?: number
+  discipline?: string
   notes?: string
   shot_scores: number[]
   shot_xs: boolean[]
@@ -55,6 +57,9 @@ export interface ScoreCard extends ScoreCardSummary {
   updated_at: string
   author?: ScoreCardAuthor
   achievements?: ScoreCardAchievement[]
+  is_pb: boolean
+  pb_delta?: number
+  running_avg?: number
 }
 
 export interface QuickCreateScoreCardPayload {
@@ -64,6 +69,8 @@ export interface QuickCreateScoreCardPayload {
   location?: string
   wind_mph?: number
   temp_celsius?: number
+  distance_m?: number
+  discipline?: string
   notes?: string
   league_round_id?: string
   club_id?: string
@@ -77,6 +84,8 @@ export interface CreateScoreCardPayload {
   location?: string
   wind_mph?: number
   temp_celsius?: number
+  distance_m?: number
+  discipline?: string
   notes?: string
   rifle_id?: string
   pellet_id?: string
