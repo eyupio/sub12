@@ -631,11 +631,6 @@ function FeedPostArticle({
   const [editingPost, setEditingPost] = useState(false)
   const [draftBody, setDraftBody] = useState(post.body ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  if (post.kind === 'join') {
-    return <JoinPost post={post} muted={muted} />
-  }
-
   const item = post.activity
   const isOwnPost = !!currentUser && item.type === 'post_created' && currentUser.id === item.user_id
   const reportTarget = feedReportTarget(post)
@@ -663,6 +658,10 @@ function FeedPostArticle({
     },
     onError: () => toast('Failed to delete post', 'error'),
   })
+
+  if (post.kind === 'join') {
+    return <JoinPost post={post} muted={muted} />
+  }
 
   const className = [
     'feed-post',
