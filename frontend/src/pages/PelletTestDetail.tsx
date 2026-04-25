@@ -592,7 +592,7 @@ export default function PelletTestDetail() {
         </div>
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-serif-display text-3xl lg:text-5xl text-ink leading-tight">
+            <h1 className="font-serif text-3xl lg:text-5xl text-ink leading-tight">
               {session.rifle ? `${session.rifle.make} ${session.rifle.model}` : 'Rifle'}
               <span className="text-muted-2 mx-2">×</span>
               <span className="text-gold">{session.pellet ? `${session.pellet.brand} ${session.pellet.model}` : 'Pellet'}</span>
@@ -609,14 +609,14 @@ export default function PelletTestDetail() {
             <div className="flex items-end gap-8 shrink-0">
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-widest text-muted">Best Group</p>
-                <p className="font-serif-display text-3xl lg:text-4xl text-gold leading-none">
+                <p className="font-serif text-3xl lg:text-4xl text-gold leading-none">
                   {session.best_group_size_mm?.toFixed(2)}
                   <span className="text-xs uppercase tracking-widest text-muted ml-1 font-sans">mm</span>
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-widest text-muted">Avg</p>
-                <p className="font-serif-display text-3xl lg:text-4xl text-ink leading-none">
+                <p className="font-serif text-3xl lg:text-4xl text-ink leading-none">
                   {session.average_group_size_mm?.toFixed(2)}
                   <span className="text-xs uppercase tracking-widest text-muted ml-1 font-sans">mm</span>
                 </p>
@@ -684,7 +684,7 @@ export default function PelletTestDetail() {
           <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-serif-display text-xl text-ink">Groups</h2>
+                <h2 className="font-serif text-xl text-ink">Groups</h2>
                 <p className="text-[11px] text-muted mt-0.5">
                   {groups.length} {groups.length === 1 ? 'group' : 'groups'}
                   {groups.length > 0 && ` · ${groups[0].shot_count} shots each · click to analyze`}
@@ -774,7 +774,7 @@ export default function PelletTestDetail() {
                         )}
                       </div>
                       <div className="px-2 py-2 flex items-baseline justify-between">
-                        <span className="font-serif-display text-xl text-ink">{g.group_size_mm.toFixed(2)}<span className="text-[9px] uppercase tracking-widest text-muted ml-0.5 font-sans">mm</span></span>
+                        <span className="font-serif text-xl text-ink">{g.group_size_mm.toFixed(2)}<span className="text-[9px] uppercase tracking-widest text-muted ml-0.5 font-sans">mm</span></span>
                         {g.group_size_moa != null && (
                           <span className="text-[10px] font-mono text-muted">{g.group_size_moa.toFixed(2)} MOA</span>
                         )}
@@ -801,7 +801,7 @@ export default function PelletTestDetail() {
           {groups.length > 1 && (
             <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
               <div className="mb-3">
-                <h2 className="font-serif-display text-xl text-ink">Group-by-group</h2>
+                <h2 className="font-serif text-xl text-ink">Group-by-group</h2>
                 <p className="text-[11px] text-muted mt-0.5">Spread across this session</p>
               </div>
               <div className="h-44 w-full">
@@ -825,7 +825,7 @@ export default function PelletTestDetail() {
           {/* Notes */}
           {session.notes && (
             <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
-              <h2 className="font-serif-display text-xl text-ink mb-2">Notes</h2>
+              <h2 className="font-serif text-xl text-ink mb-2">Notes</h2>
               <blockquote className="border-l-2 border-gold pl-3 text-sm text-ink-2 italic">
                 "{session.notes}"
               </blockquote>
@@ -836,7 +836,7 @@ export default function PelletTestDetail() {
           {alternates.length > 0 && session.rifle && (
             <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
               <div className="mb-3">
-                <h2 className="font-serif-display text-xl text-ink">
+                <h2 className="font-serif text-xl text-ink">
                   Alternate pellets for {session.rifle.make} {session.rifle.model}
                 </h2>
                 <p className="text-[11px] text-muted mt-0.5">Same rifle, ranked by best group</p>
@@ -850,7 +850,7 @@ export default function PelletTestDetail() {
                       <p className="text-[11px] text-muted">{a.test_count} {a.test_count === 1 ? 'test' : 'tests'} · avg {a.avg_group_mm.toFixed(2)}mm</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="font-serif-display text-lg text-gold">{a.best_group_mm.toFixed(2)}</span>
+                      <span className="font-serif text-lg text-gold">{a.best_group_mm.toFixed(2)}</span>
                       <span className="text-[10px] uppercase tracking-widest text-muted ml-0.5">mm</span>
                     </div>
                   </div>
@@ -865,7 +865,7 @@ export default function PelletTestDetail() {
 
           {/* Setup */}
           <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
-            <h2 className="font-serif-display text-xl text-ink mb-3">Setup</h2>
+            <h2 className="font-serif text-xl text-ink mb-3">Setup</h2>
             <dl className="space-y-2.5 text-sm">
               <Row label="Rifle" value={session.rifle ? `${session.rifle.make} ${session.rifle.model}` : '—'} />
               {session.rifle?.power_ftlb != null && (
@@ -885,7 +885,7 @@ export default function PelletTestDetail() {
           {/* Conditions */}
           {(session.location || session.wind_mph != null || session.temp_celsius != null || session.humidity_pct != null || session.barometric_pressure_mbar != null) && (
             <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
-              <h2 className="font-serif-display text-xl text-ink mb-3">Conditions</h2>
+              <h2 className="font-serif text-xl text-ink mb-3">Conditions</h2>
               <dl className="space-y-2.5 text-sm">
                 {session.wind_mph != null && (
                   <Row label={<><Wind size={11} className="inline -mt-px mr-1" /> Wind</>} value={session.wind_mph === 0 ? 'Calm' : `${session.wind_mph} mph`} mono />
@@ -905,7 +905,7 @@ export default function PelletTestDetail() {
           {/* Chronograph */}
           {(session.velocity_fps != null || session.velocity_sd != null || session.extreme_spread_fps != null) && (
             <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
-              <h2 className="font-serif-display text-xl text-ink mb-3">Chronograph</h2>
+              <h2 className="font-serif text-xl text-ink mb-3">Chronograph</h2>
               <dl className="space-y-2.5 text-sm">
                 {session.velocity_fps != null && <Row label="Avg fps" value={String(session.velocity_fps)} mono />}
                 {session.velocity_sd != null && <Row label="SD" value={String(session.velocity_sd)} mono />}
@@ -916,7 +916,7 @@ export default function PelletTestDetail() {
 
           {/* Photos */}
           <section className="bg-surface border border-line rounded-lg p-4 lg:p-5 shadow-card">
-            <h2 className="font-serif-display text-xl text-ink mb-3">Photos</h2>
+            <h2 className="font-serif text-xl text-ink mb-3">Photos</h2>
             <div className="grid grid-cols-2 gap-3">
               {images.map((img: PelletTestImage) => {
                 const m = measurementsByImage.get(img.id)

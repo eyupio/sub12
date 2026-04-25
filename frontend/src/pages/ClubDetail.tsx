@@ -75,7 +75,8 @@ function PrivateClubSummary({ clubId }: { clubId: string }) {
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               placeholder="Invite code"
-              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '10px 14px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)' }}
+              className="font-mono"
+              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '10px 14px', borderRadius: 6, color: 'var(--ink)' }}
             />
             <button
               onClick={() => joinMutation.mutate()}
@@ -364,7 +365,8 @@ export default function ClubDetail() {
                 value={joinCodeInput}
                 onChange={e => setJoinCodeInput(e.target.value)}
                 placeholder="Join code"
-                style={{ width: 140, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '6px 10px', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 12 }}
+                className="font-mono"
+                style={{ width: 140, background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '6px 10px', borderRadius: 6, color: 'var(--ink)', fontSize: 12 }}
               />
             )}
             <button

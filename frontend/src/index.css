@@ -252,8 +252,6 @@
   .border-line   { border-color: var(--line); }
   .border-line-2 { border-color: var(--line-2); }
   .border-gold   { border-color: var(--gold); }
-  .font-serif-display { font-family: 'Cormorant Garamond', Georgia, serif; }
-  .font-mono-ui       { font-family: var(--mono); }
   .shadow-card       { box-shadow: var(--shadow-sm); }
   .shadow-card-hover { box-shadow: var(--shadow-md); }
 }

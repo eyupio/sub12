@@ -381,7 +381,7 @@ export default function Dashboard() {
             showHoverCard={false}
           />
           <div className="min-w-0">
-            <p className="font-serif-display text-[22px] leading-tight text-ink truncate">
+            <p className="font-serif text-[22px] leading-tight text-ink truncate">
               {user?.display_name}
               <Link to="/profile" className="ml-3 align-middle font-sans text-[10px] tracking-[0.18em] uppercase text-gold hover:text-gold-2 transition-colors">
                 Edit profile →
