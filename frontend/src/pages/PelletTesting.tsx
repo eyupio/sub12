@@ -880,7 +880,7 @@ function BatchCard({ batch }: { batch: BatchReportEntry }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function PelletTesting() {
   const navigate = useNavigate()
-  const search = useSearch({ from: '/pellet-testing' as never }) as { tab?: Tab }
+  const search = useSearch({ strict: false }) as { tab?: Tab }
   const tab: Tab = TAB_ORDER.includes(search.tab as Tab) ? (search.tab as Tab) : 'overview'
 
   const setTab = (t: Tab) => {
