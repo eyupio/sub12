@@ -5,6 +5,7 @@ import AuthLayout from './components/AuthLayout'
 import IndexPage from './pages/IndexPage'
 import ScoreEntry from './pages/ScoreEntry'
 import ScoreHistory from './pages/ScoreHistory'
+import ScoreCompare from './pages/ScoreCompare'
 import ScoreCardDetail from './pages/ScoreCardDetail'
 import Gear from './pages/Gear'
 import Leagues from './pages/Leagues'
@@ -114,6 +115,16 @@ const scoreEntryRoute = createRoute({
     leagueId: (search.leagueId as string) || undefined,
     roundId: (search.roundId as string) || undefined,
     draftId: (search.draftId as string) || undefined,
+  }),
+})
+
+const scoreCompareRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/scores/compare',
+  component: ScoreCompare,
+  validateSearch: (search: Record<string, unknown>): { a?: string; b?: string } => ({
+    a: (search.a as string) || undefined,
+    b: (search.b as string) || undefined,
   }),
 })
 
@@ -508,6 +519,7 @@ export const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     scoreHistoryRoute,
     scoreEntryRoute,
+    scoreCompareRoute,
     quickCaptureRoute,
     draftsRoute,
     scoreCardDetailRoute,

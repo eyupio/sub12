@@ -7,6 +7,7 @@ export interface ScoreCardSummary {
   x_count: number
   location?: string
   rifle_id?: string
+  pellet_id?: string
   verification: string
   league_round_id?: string
   league_id?: string
