@@ -37,9 +37,14 @@ import { achievementApi } from '../api/achievements'
 import { clubsApi } from '../api/clubs'
 import { leagueApi } from '../api/leagues'
 import { postApi } from '../api/posts'
-import { scoreCardApi } from '../api/scoreCards'
+import { scoreCardApi, type ScoreCardSummary } from '../api/scoreCards'
+import { pelletTestApi, type PelletTestSessionSummary } from '../api/pelletTesting'
 import { UserAvatar } from '../components/UserAvatar'
 import { LikeButton } from '../components/LikeButton'
+import { ImageModal } from '../components/ImageModal'
+import { PickerModal, type PickerItem } from '../components/PickerModal'
+import { MentionPopover } from '../components/MentionPopover'
+import { handleToMention } from '../utils/mention'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { useAuthStore } from '../store/auth'
@@ -275,6 +280,10 @@ function FilterBar({
   )
 }
 
+type LinkedAttachment =
+  | { kind: 'card'; id: string; label: string; sub: string; thumb?: string }
+  | { kind: 'pellet'; id: string; label: string; sub: string; thumb?: string }
+
 function FeedComposer() {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
@@ -285,6 +294,9 @@ function FeedComposer() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [attachments, setAttachments] = useState<{ image_url: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState<null | 'card' | 'pellet'>(null)
+  const [linked, setLinked] = useState<LinkedAttachment | null>(null)
+  const [mentionState, setMentionState] = useState<{ start: number; query: string } | null>(null)
 
   const { data: myLeagues } = useQuery({
     queryKey: ['my-leagues'],
@@ -297,18 +309,36 @@ function FeedComposer() {
     enabled: !!currentUser,
   })
 
+  const { data: cardsList, isLoading: cardsLoading } = useQuery({
+    queryKey: ['my-cards-picker'],
+    queryFn: () => scoreCardApi.list(20, 0, 'personal'),
+    enabled: pickerOpen === 'card',
+  })
+  const { data: pelletsList, isLoading: pelletsLoading } = useQuery({
+    queryKey: ['my-pellets-picker'],
+    queryFn: () => pelletTestApi.list(20, 0, 'all'),
+    enabled: pickerOpen === 'pellet',
+  })
+
   const mutation = useMutation({
-    mutationFn: () => postApi.create({
-      body: body.trim(),
-      league_id: destination.type === 'league' ? destination.id : undefined,
-      club_id: destination.type === 'club' ? destination.id : undefined,
-      visibility: destination.type === 'public' ? 'public' : undefined,
-      attachments: attachments.map((a) => ({ type: 'image', image_url: a.image_url })),
-    }),
+    mutationFn: () => {
+      const payloadAttachments: { type: string; target_id?: string; image_url?: string }[] = []
+      if (linked?.kind === 'card') payloadAttachments.push({ type: 'score_card', target_id: linked.id })
+      if (linked?.kind === 'pellet') payloadAttachments.push({ type: 'pellet_test', target_id: linked.id })
+      payloadAttachments.push(...attachments.map((a) => ({ type: 'image', image_url: a.image_url })))
+      return postApi.create({
+        body: body.trim(),
+        league_id: destination.type === 'league' ? destination.id : undefined,
+        club_id: destination.type === 'club' ? destination.id : undefined,
+        visibility: destination.type === 'public' ? 'public' : undefined,
+        attachments: payloadAttachments,
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] })
       setBody('')
       setAttachments([])
+      setLinked(null)
       toast('Posted', 'success')
     },
     onError: () => toast('Failed to create post', 'error'),
@@ -318,7 +348,7 @@ function FeedComposer() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (body.trim() || attachments.length > 0) mutation.mutate()
+    if (body.trim() || attachments.length > 0 || linked) mutation.mutate()
   }
 
   const handleImagePick = () => fileInputRef.current?.click()
@@ -344,12 +374,14 @@ function FeedComposer() {
     const ta = textareaRef.current
     if (!ta) {
       setBody((b) => b + '@')
+      setMentionState({ start: body.length, query: '' })
       return
     }
     const start = ta.selectionStart ?? body.length
     const end = ta.selectionEnd ?? body.length
     const next = body.slice(0, start) + '@' + body.slice(end)
     setBody(next)
+    setMentionState({ start, query: '' })
     requestAnimationFrame(() => {
       ta.focus()
       const pos = start + 1
@@ -357,22 +389,131 @@ function FeedComposer() {
     })
   }
 
+  const handleBodyChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value
+    setBody(value)
+    const caret = e.target.selectionStart ?? value.length
+    const before = value.slice(0, caret)
+    const at = before.lastIndexOf('@')
+    if (at < 0) {
+      setMentionState(null)
+      return
+    }
+    const prevChar = at > 0 ? before[at - 1] : ' '
+    if (!/\s|^/.test(prevChar) && at !== 0) {
+      setMentionState(null)
+      return
+    }
+    const fragment = before.slice(at + 1)
+    if (/\s/.test(fragment)) {
+      setMentionState(null)
+      return
+    }
+    setMentionState({ start: at, query: fragment })
+  }
+
+  const completeMention = (handle: string) => {
+    if (!mentionState) return
+    const before = body.slice(0, mentionState.start)
+    const afterStart = mentionState.start + 1 + mentionState.query.length
+    const after = body.slice(afterStart)
+    const insert = `@${handle} `
+    const next = before + insert + after
+    setBody(next)
+    setMentionState(null)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      const pos = before.length + insert.length
+      ta.setSelectionRange(pos, pos)
+    })
+  }
+
   const removeAttachment = (idx: number) =>
     setAttachments((prev) => prev.filter((_, i) => i !== idx))
 
+  const cardItems: PickerItem[] = (cardsList?.items ?? []).map((c: ScoreCardSummary) => ({
+    id: c.id,
+    primary: `${c.total_score} (${c.x_count}X)`,
+    secondary: new Date(c.shot_at).toLocaleDateString(),
+    thumbUrl: c.card_image_url,
+    thumbFallback: <Target size={16} />,
+  }))
+  const pelletItems: PickerItem[] = (pelletsList?.items ?? []).map((p: PelletTestSessionSummary) => ({
+    id: p.id,
+    primary: `${p.pellet_brand} ${p.pellet_model}`,
+    secondary: p.best_group_size_mm != null
+      ? `Best ${p.best_group_size_mm.toFixed(2)}mm · ${new Date(p.test_date).toLocaleDateString()}`
+      : new Date(p.test_date).toLocaleDateString(),
+    thumbUrl: p.first_image_url,
+    thumbFallback: <FlaskConical size={16} />,
+  }))
+
+  const handleCardSelect = (id: string) => {
+    const c = cardsList?.items.find((x) => x.id === id)
+    if (!c) return
+    setLinked({
+      kind: 'card',
+      id: c.id,
+      label: `${c.total_score} (${c.x_count}X)`,
+      sub: new Date(c.shot_at).toLocaleDateString(),
+      thumb: c.card_image_url,
+    })
+    setPickerOpen(null)
+  }
+  const handlePelletSelect = (id: string) => {
+    const p = pelletsList?.items.find((x) => x.id === id)
+    if (!p) return
+    setLinked({
+      kind: 'pellet',
+      id: p.id,
+      label: `${p.pellet_brand} ${p.pellet_model}`,
+      sub: p.best_group_size_mm != null ? `Best ${p.best_group_size_mm.toFixed(2)}mm` : new Date(p.test_date).toLocaleDateString(),
+      thumb: p.first_image_url,
+    })
+    setPickerOpen(null)
+  }
+
   return (
     <form className="feed-composer" onSubmit={submit}>
-      <div className="composer-row">
+      <div className="composer-row" style={{ position: 'relative' }}>
         <UserAvatar user={currentUser} size={28} showHoverCard={false} />
         <textarea
           ref={textareaRef}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={handleBodyChange}
           rows={1}
           placeholder="Share an update, log a card, ask a question..."
           aria-label="Post body"
         />
+        {mentionState && (
+          <MentionPopover
+            query={mentionState.query}
+            onSelect={(u) => completeMention(handleToMention(u.display_name))}
+            onClose={() => setMentionState(null)}
+          />
+        )}
       </div>
+      {linked && (
+        <div className="composer-attachments">
+          <div className="composer-attachment composer-attachment-link">
+            {linked.thumb ? (
+              <img src={linked.thumb} alt="" />
+            ) : (
+              <span style={{ display: 'inline-flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                {linked.kind === 'card' ? <Target size={16} /> : <FlaskConical size={16} />}
+              </span>
+            )}
+            <span style={{ marginLeft: 8, fontSize: 12 }}>
+              {linked.kind === 'card' ? 'Card' : 'Pellet test'}: {linked.label}
+            </span>
+            <button type="button" aria-label="Remove link" onClick={() => setLinked(null)}>
+              <X size={12} />
+            </button>
+          </div>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="composer-attachments">
           {attachments.map((a, idx) => (
@@ -394,12 +535,12 @@ function FeedComposer() {
       />
       <div className="composer-actions">
         <div className="composer-tools">
-          <Link to="/scores/new" className="composer-tool-link">
+          <button type="button" onClick={() => setPickerOpen('card')}>
             <CircleDot size={13} />Card
-          </Link>
-          <Link to="/pellet-testing/new" className="composer-tool-link">
+          </button>
+          <button type="button" onClick={() => setPickerOpen('pellet')}>
             <FlaskConical size={13} />Pellet test
-          </Link>
+          </button>
           <button type="button" onClick={handleImagePick} disabled={uploading}>
             <ImageIcon size={13} />{uploading ? 'Uploading...' : 'Image'}
           </button>
@@ -434,12 +575,34 @@ function FeedComposer() {
               </div>
             )}
           </div>
-          <button type="submit" className="feed-btn feed-btn-gold" disabled={!body.trim() || mutation.isPending}>
+          <button
+            type="submit"
+            className="feed-btn feed-btn-gold"
+            disabled={(!body.trim() && attachments.length === 0 && !linked) || mutation.isPending}
+          >
             <Send size={13} />
             Post
           </button>
         </div>
       </div>
+      <PickerModal
+        open={pickerOpen === 'card'}
+        title="Select a score card"
+        items={cardItems}
+        loading={cardsLoading}
+        emptyMessage="You haven't logged any score cards yet."
+        onSelect={handleCardSelect}
+        onClose={() => setPickerOpen(null)}
+      />
+      <PickerModal
+        open={pickerOpen === 'pellet'}
+        title="Select a pellet test"
+        items={pelletItems}
+        loading={pelletsLoading}
+        emptyMessage="You haven't logged any pellet tests yet."
+        onSelect={handlePelletSelect}
+        onClose={() => setPickerOpen(null)}
+      />
     </form>
   )
 }
@@ -539,10 +702,24 @@ function PersonalBestStripe({ post }: { post: FeedPost }) {
 function PersonalBestPost({ post }: { post: FeedPost }) {
   const previous = numericMeta(post.activity, 'previous_best')
   const delta = numericMeta(post.activity, 'pb_delta')
+  const [zoom, setZoom] = useState(false)
 
   return (
     <div className="pb-grid">
-      <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={96} />
+      {post.cardImageUrl ? (
+        <>
+          <img
+            className="score-thumb"
+            src={post.cardImageUrl}
+            alt="Score card"
+            style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in' }}
+            onClick={() => setZoom(true)}
+          />
+          {zoom && <ImageModal src={post.cardImageUrl} alt="Score card" onClose={() => setZoom(false)} />}
+        </>
+      ) : (
+        <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={96} />
+      )}
       <div className="pb-stack">
         <div className="pb-score">
           <span className="num">{post.score ?? '--'}</span>
@@ -559,9 +736,23 @@ function PersonalBestPost({ post }: { post: FeedPost }) {
 }
 
 function ScorePost({ post }: { post: FeedPost }) {
+  const [zoom, setZoom] = useState(false)
   return (
     <div className="score-grid">
-      <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={78} />
+      {post.cardImageUrl ? (
+        <>
+          <img
+            className="score-thumb"
+            src={post.cardImageUrl}
+            alt="Score card"
+            style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in' }}
+            onClick={() => setZoom(true)}
+          />
+          {zoom && <ImageModal src={post.cardImageUrl} alt="Score card" onClose={() => setZoom(false)} />}
+        </>
+      ) : (
+        <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={78} />
+      )}
       <div className="score-stack">
         <div className="score-line">
           <span className="num">{post.score ?? '--'}</span>
@@ -611,11 +802,14 @@ function TextPost({ post }: { post: FeedPost }) {
   const item = post.activity
   const attachmentType = item.metadata?.attachment_type
   const attachmentId = item.metadata?.attachment_target_id
+  const images = post.attachmentImageUrls ?? []
   const body = post.body?.trim()
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null)
+  const hasContent = !!body || images.length > 0 || (attachmentType && attachmentId)
 
   return (
     <div className="text-post-body">
-      {body ? <p>{body}</p> : <p>{fallbackText(item)}</p>}
+      {body ? <p>{renderBodyWithMentions(body)}</p> : !hasContent ? <p>{fallbackText(item)}</p> : null}
       {attachmentType === 'score_card' && attachmentId && (
         <Link to="/scores/$id" params={{ id: attachmentId }} className="attachment-link">
           <Target size={13} />
@@ -628,8 +822,43 @@ function TextPost({ post }: { post: FeedPost }) {
           View pellet test
         </Link>
       )}
+      {images.length > 0 && (
+        <div
+          style={{
+            marginTop: 8,
+            display: 'grid',
+            gap: 6,
+            gridTemplateColumns: images.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+          }}
+        >
+          {images.map((src, idx) => (
+            <img
+              key={idx}
+              src={src}
+              alt=""
+              style={{ width: '100%', maxHeight: 320, objectFit: 'cover', borderRadius: 8, cursor: 'zoom-in' }}
+              onClick={() => setZoomSrc(src)}
+            />
+          ))}
+        </div>
+      )}
+      {zoomSrc && <ImageModal src={zoomSrc} onClose={() => setZoomSrc(null)} />}
     </div>
   )
+}
+
+function renderBodyWithMentions(body: string): ReactNode {
+  const parts = body.split(/(@[a-z0-9_]+)/gi)
+  return parts.map((part, idx) => {
+    if (/^@[a-z0-9_]+$/i.test(part)) {
+      return (
+        <span key={idx} style={{ color: 'var(--gold, #b08a3a)', fontWeight: 500 }}>
+          {part}
+        </span>
+      )
+    }
+    return <span key={idx}>{part}</span>
+  })
 }
 
 function StandingsPost() {

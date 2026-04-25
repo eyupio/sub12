@@ -65,10 +65,11 @@ type Activity struct {
 
 // ScorePostedMeta is the JSONB metadata for ActivityScorePosted / ActivityPersonalBest events.
 type ScorePostedMeta struct {
-	TotalScore int16  `json:"total_score"`
-	XCount     int16  `json:"x_count"`
-	IsPB       bool   `json:"is_pb,omitempty"`
-	LeagueName string `json:"league_name,omitempty"`
+	TotalScore   int16  `json:"total_score"`
+	XCount       int16  `json:"x_count"`
+	IsPB         bool   `json:"is_pb,omitempty"`
+	LeagueName   string `json:"league_name,omitempty"`
+	CardImageURL string `json:"card_image_url,omitempty"`
 }
 
 // JoinedClubMeta is the JSONB metadata for ActivityJoinedClub events.
@@ -117,11 +118,12 @@ type FeatureRequestMeta struct {
 // share posts (attachments pointing to a score card or pellet test) the
 // attachment fields let the feed link directly to the shared target.
 type PostCreatedMeta struct {
-	BodyPreview      string `json:"body_preview,omitempty"`
-	AttachmentType   string `json:"attachment_type,omitempty"` // "score_card", "pellet_test", "image"
-	AttachmentTargetID string `json:"attachment_target_id,omitempty"`
-	LeagueName       string `json:"league_name,omitempty"`
-	ClubName         string `json:"club_name,omitempty"`
+	BodyPreview         string   `json:"body_preview,omitempty"`
+	AttachmentType      string   `json:"attachment_type,omitempty"` // "score_card", "pellet_test"
+	AttachmentTargetID  string   `json:"attachment_target_id,omitempty"`
+	AttachmentImageURLs []string `json:"attachment_image_urls,omitempty"`
+	LeagueName          string   `json:"league_name,omitempty"`
+	ClubName            string   `json:"club_name,omitempty"`
 }
 
 // FeedResponse is the paginated response for GET /api/v1/feed.

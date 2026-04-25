@@ -23,6 +23,8 @@ export interface FeedPost {
   whereId?: string
   body?: string
   targetSeed: number
+  cardImageUrl?: string
+  attachmentImageUrls?: string[]
 }
 
 export interface TargetShot {
@@ -71,11 +73,12 @@ export function normalizeActivity(item: ActivityItem): FeedPost {
   const x = item.metadata?.x_count
   const targetSeed = hashSeed(item.target_id ?? item.id)
 
+  const cardImageUrl = item.metadata?.card_image_url || undefined
   if (item.type === 'personal_best' || item.metadata?.is_pb) {
-    return { id: item.id, kind: 'pb', activity: item, score, x, where, whereType, whereId, targetSeed }
+    return { id: item.id, kind: 'pb', activity: item, score, x, where, whereType, whereId, targetSeed, cardImageUrl }
   }
   if (item.type === 'score_posted') {
-    return { id: item.id, kind: 'score', activity: item, score, x, where, whereType, whereId, targetSeed }
+    return { id: item.id, kind: 'score', activity: item, score, x, where, whereType, whereId, targetSeed, cardImageUrl }
   }
   if (item.type === 'achievement_earned') {
     return { id: item.id, kind: 'achievement', activity: item, targetSeed }
@@ -103,6 +106,7 @@ export function normalizeActivity(item: ActivityItem): FeedPost {
       whereId,
       body: item.metadata?.body_preview,
       targetSeed,
+      attachmentImageUrls: item.metadata?.attachment_image_urls,
     }
   }
   return {
