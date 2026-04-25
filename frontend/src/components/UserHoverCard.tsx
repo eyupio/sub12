@@ -54,7 +54,15 @@ export function UserHoverCard({
   const nextThreshold = level < MAX_LEVEL ? (level + 1) * STAR_STEP : null
 
   const content = (
-    <div className="w-72 text-left">
+    <div
+      className="w-72 text-left rounded-md p-3 border"
+      style={{
+        background: 'var(--lc-surface)',
+        borderColor: 'var(--line)',
+        color: 'var(--ink)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-subtle">
         <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted shrink-0">
