@@ -42,6 +42,8 @@ export interface PelletTestSessionSummary {
   distance_m: number
   distance_unit: string
   location?: string
+  wind_mph?: number
+  temp_celsius?: number
   average_group_size_mm?: number
   best_group_size_mm?: number
   group_count: number

@@ -141,6 +141,8 @@ type PelletTestSessionSummary struct {
 	DistanceM          float64  `json:"distance_m"`
 	DistanceUnit       string   `json:"distance_unit"`
 	Location           *string  `json:"location,omitempty"`
+	WindMPH            *float64 `json:"wind_mph,omitempty"`
+	TempCelsius        *float64 `json:"temp_celsius,omitempty"`
 	AverageGroupSizeMM *float64 `json:"average_group_size_mm,omitempty"`
 	BestGroupSizeMM    *float64 `json:"best_group_size_mm,omitempty"`
 	GroupCount         int      `json:"group_count"`

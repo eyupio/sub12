@@ -1,13 +1,27 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronDown, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
 import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const today = () => new Date().toISOString().slice(0, 10)
+
+function relative(iso: string): string {
+  const d = new Date(iso)
+  const secs = (Date.now() - d.getTime()) / 1000
+  if (secs < 60) return 'JUST NOW'
+  if (secs < 3600) return `${Math.floor(secs / 60)}M AGO`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}H AGO`
+  return `${Math.floor(secs / 86400)}D AGO`
+}
+
+function captureDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })
+}
 
 function calcMOA(groupSizeMM: number, distanceM: number): number {
   if (distanceM <= 0) return 0
@@ -280,27 +294,88 @@ export default function NewPelletTest() {
     },
   })
 
-  return (
-    <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-          {draftId ? 'Refine Draft' : 'New Pellet Test'}
-        </h1>
-        {draftId && (
-          <button
-            type="button"
-            onClick={() => setConfirmDeleteDraft(true)}
-            disabled={deleteDraftMutation.isPending}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
-          >
-            <Trash2 size={14} />
-            Delete
-          </button>
-        )}
-      </div>
+  // Field-completion progress for the "X/7 fields filled" hint on refine.
+  const filledChecks = [
+    !!rifleId,
+    !!pelletId,
+    !!testDate,
+    hasDistance,
+    !!location,
+    windMph !== '' || tempCelsius !== '',
+    validGroups.length > 0 || imageFiles.length > 0 || existingImages.length > 0,
+  ]
+  const filledCount = filledChecks.filter(Boolean).length
+  const totalCount = filledChecks.length
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-        <div className="space-y-4">
+  const reasonText = !rifleId
+    ? 'select a rifle'
+    : !pelletId
+      ? 'select or add a pellet'
+      : !testDate
+        ? 'pick a test date'
+        : !hasGroupOrImage
+          ? 'add a group size or upload a target photo'
+          : !hasDistance && imageFiles.length === 0 && existingImages.length === 0
+            ? 'enter a distance'
+            : 'complete the highlighted fields'
+
+  return (
+    <div className={`p-4 lg:p-8 space-y-6 mx-auto ${draftId ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-3xl'}`}>
+      {draftId ? (
+        <div className="space-y-3">
+          <Link to="/drafts" className="inline-flex items-center gap-1.5 text-xs tracking-wide text-muted hover:text-secondary transition-colors">
+            <ArrowLeft size={14} /> All drafts
+          </Link>
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-2 text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                Draft{draft?.created_at ? ` · ${relative(draft.created_at)}` : ''}
+              </span>
+              <h1 className="text-2xl lg:text-3xl font-medium tracking-wide text-secondary">Refine draft</h1>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                {draft?.created_at && (
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarDays size={12} className="opacity-70" />
+                    Captured {captureDate(draft.created_at)}
+                  </span>
+                )}
+                {draft?.location && (
+                  <>
+                    <span aria-hidden className="opacity-60">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin size={12} className="opacity-70" />
+                      {draft.location}
+                    </span>
+                  </>
+                )}
+                <span aria-hidden className="opacity-60">·</span>
+                <span>{filledCount}/{totalCount} fields filled</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteDraft(true)}
+              disabled={deleteDraftMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+            New Pellet Test
+          </h1>
+        </div>
+      )}
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-6">
+        <div className={`space-y-4 ${draftId ? 'rounded-lg border border-subtle bg-surface p-5' : ''}`}>
+          {draftId && (
+            <h2 className="text-[11px] tracking-widest uppercase text-muted">Test Details</h2>
+          )}
           <Field label="Rifle">
             {rifles.length > 0 ? (
               <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
@@ -438,8 +513,8 @@ export default function NewPelletTest() {
         </div>
 
         <div className="space-y-4 mt-6 lg:mt-0">
-          <div>
-            <div className="flex items-center justify-between mb-2">
+          <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
+            <div className="flex items-center justify-between">
               <label className="text-[11px] tracking-widest uppercase text-muted">Groups</label>
               <button onClick={addGroup} className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
                 <Plus size={12} /> Add
@@ -450,9 +525,14 @@ export default function NewPelletTest() {
                 const sizeMM = Number(g.groupSizeMM)
                 const moa = sizeMM > 0 && distM > 0 ? calcMOA(sizeMM, distM) : null
                 return (
-                  <div key={g.key} className="p-3 rounded border border-subtle bg-surface space-y-2">
+                  <div key={g.key} className="p-3 rounded border border-subtle bg-surface-hover space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Group {i + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--brass-pill-bg)] text-[var(--brass)]">
+                          <Target size={13} />
+                        </span>
+                        <span className="text-[11px] tracking-widest uppercase text-muted">Group {i + 1}</span>
+                      </div>
                       {groups.length > 1 && (
                         <button onClick={() => removeGroup(g.key)} className="text-muted hover:text-[var(--error-text)] transition-colors" aria-label="Remove group">
                           <Trash2 size={13} />
@@ -482,7 +562,7 @@ export default function NewPelletTest() {
             </div>
           </div>
 
-          <div>
+          <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
             <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Target Photos</label>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
@@ -531,14 +611,30 @@ export default function NewPelletTest() {
             <p className="text-[var(--error-text)] text-sm">Failed to save test. Please try again.</p>
           )}
 
+          {draftId && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-[var(--brass-pill-bg)] border-l-2 border-[var(--brass)] text-sm text-secondary">
+              {canSubmit ? (
+                <>
+                  <CheckCircle2 size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
+                  <span>Ready to publish — review and save changes.</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
+                  <span>Almost done — <strong className="font-medium">{reasonText}</strong> to publish as a test.</span>
+                </>
+              )}
+            </div>
+          )}
+
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !canSubmit}
-            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
+            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90 inline-flex items-center justify-center gap-2"
           >
-            {mutation.isPending ? 'Saving…' : 'Save Test'}
+            {mutation.isPending ? 'Saving…' : draftId ? <><CheckCircle2 size={15} /> Save Changes</> : 'Save Test'}
           </button>
-          {!mutation.isPending && !canSubmit && (
+          {!draftId && !mutation.isPending && !canSubmit && (
             <p className="text-xs text-muted text-center">
               {!rifleId ? 'Select a rifle to continue.'
                 : !pelletId ? 'Select or add a pellet.'
