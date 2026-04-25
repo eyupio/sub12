@@ -26,7 +26,11 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 			MAX(x_count),
 			ROUND(AVG(total_score)::numeric, 2),
 			(SELECT ROUND(AVG(total_score)::numeric, 2)
-			 FROM (SELECT total_score FROM score_cards WHERE user_id = $1 AND is_draft = FALSE ORDER BY shot_at DESC, created_at DESC LIMIT 10) sub)
+			 FROM (SELECT total_score FROM score_cards WHERE user_id = $1 AND is_draft = FALSE ORDER BY shot_at DESC, created_at DESC LIMIT 10) sub),
+			(SELECT id::text FROM score_cards
+			 WHERE user_id = $1 AND is_draft = FALSE
+			 ORDER BY total_score DESC, x_count DESC, shot_at DESC
+			 LIMIT 1)
 		FROM score_cards
 		WHERE user_id = $1 AND is_draft = FALSE
 	`, userID).Scan(
@@ -35,6 +39,7 @@ func (r *StatsRepository) GetUserStats(ctx context.Context, userID string) (*mod
 		&stats.BestXCount,
 		&stats.AvgScore,
 		&stats.Rolling10Avg,
+		&stats.BestScoreCardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get user stats: %w", err)

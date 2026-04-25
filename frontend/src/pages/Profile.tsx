@@ -17,13 +17,26 @@ import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type T
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 
-function StatCard({ label, value, gold }: { label: string; value: string; gold?: boolean }) {
-  return (
-    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5">
+function StatCard({ label, value, gold, to, params }: { label: string; value: string; gold?: boolean; to?: string; params?: Record<string, string> }) {
+  const inner = (
+    <>
       <p className="text-[10px] tracking-widest uppercase text-muted">{label}</p>
       <p className={`text-2xl lg:text-3xl font-mono font-normal mt-1 ${gold ? 'text-[var(--brass)]' : 'text-secondary'}`}>
         {value}
       </p>
+    </>
+  )
+  if (to) {
+    return (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      <Link to={to as any} params={params as any} className="bg-surface border border-subtle rounded-lg p-4 lg:p-5 block hover:border-line-2 transition-colors">
+        {inner}
+      </Link>
+    )
+  }
+  return (
+    <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-5">
+      {inner}
     </div>
   )
 }
@@ -831,6 +844,8 @@ export default function Profile() {
             label="Best Score"
             value={stats?.best_score != null ? String(stats.best_score) : '—'}
             gold
+            to={stats?.best_score_card_id ? '/scores/$id' : undefined}
+            params={stats?.best_score_card_id ? { id: stats.best_score_card_id } : undefined}
           />
           <StatCard
             label="Best X Count"
