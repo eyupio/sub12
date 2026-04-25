@@ -8,6 +8,7 @@ import { usersApi } from '../api/users'
 import { privacyApi } from '../api/privacy'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { UserAvatar } from '../components/UserAvatar'
 
 type VisibilityOption = 'public' | 'followers' | 'private'
 
@@ -235,11 +236,11 @@ export default function PrivacyCenter() {
                   params={{ id: m.muted_id }}
                   className="flex items-center gap-2 text-sm text-secondary truncate hover:text-[var(--brass)]"
                 >
-                  {m.avatar_url ? (
-                    <img src={m.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                  ) : (
-                    <span className="w-6 h-6 rounded-full bg-surface-hover" />
-                  )}
+                  <UserAvatar
+                    user={{ id: m.muted_id, display_name: m.display_name, avatar_url: m.avatar_url }}
+                    size={24}
+                    variant="plain"
+                  />
                   <span className="truncate">{m.display_name || m.muted_id}</span>
                 </Link>
                 <button

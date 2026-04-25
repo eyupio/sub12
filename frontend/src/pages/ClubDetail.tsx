@@ -13,6 +13,7 @@ import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
 import { ShareDialog } from '../components/ShareDialog'
+import { UserAvatar } from '../components/UserAvatar'
 
 function PrivateClubSummary({ clubId }: { clubId: string }) {
   const queryClient = useQueryClient()
@@ -109,13 +110,12 @@ function StandingsTable({ standings }: { standings: ClubStanding[] }) {
               <td className="py-2.5 pr-4 font-mono text-xs text-muted">{s.rank}</td>
               <td className="py-2.5 pr-4">
                 <div className="flex items-center gap-2">
-                  {s.avatar_url ? (
-                    <img src={s.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-[var(--brass)]/10 flex items-center justify-center">
-                      <span className="text-[9px] text-[var(--brass)]">{s.display_name[0]?.toUpperCase()}</span>
-                    </div>
-                  )}
+                  <UserAvatar
+                    user={{ id: s.user_id, display_name: s.display_name, avatar_url: s.avatar_url }}
+                    size={24}
+                    variant="brass"
+                    linkToProfile
+                  />
                   <span className="text-secondary truncate max-w-[140px]">{s.display_name}</span>
                   {s.rank === 1 && <Medal size={12} className="text-[var(--brass)] shrink-0" />}
                 </div>
@@ -166,13 +166,13 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
 
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-subtle last:border-0">
-      {member.avatar_url ? (
-        <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
-      ) : (
-        <div className="w-7 h-7 rounded-full bg-[var(--brass)]/10 flex items-center justify-center shrink-0">
-          <span className="text-[10px] text-[var(--brass)]">{member.display_name[0]?.toUpperCase()}</span>
-        </div>
-      )}
+      <UserAvatar
+        user={{ id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url }}
+        size={28}
+        variant="brass"
+        className="shrink-0"
+        linkToProfile
+      />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-secondary truncate">{member.display_name}</p>
         <p className="text-[10px] text-muted">Joined {member.joined_at.slice(0, 10)}</p>

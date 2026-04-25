@@ -6,6 +6,7 @@ import { clubsApi, type Club, type ClubMember } from '../api/clubs'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { UserAvatar } from '../components/UserAvatar'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 
 const TIMEZONES: string[] = (() => {
@@ -408,15 +409,13 @@ function JoinRequestsSection({ clubId }: { clubId: string }) {
       {requests.map(req => (
         <div key={req.id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
           <div className="flex items-center gap-2 min-w-0">
-            {req.avatar_url ? (
-              <img src={req.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-[var(--brass)]/10 flex items-center justify-center shrink-0">
-                <span className="text-[9px] text-[var(--brass)]">
-                  {(req.display_name?.[0] ?? '?').toUpperCase()}
-                </span>
-              </div>
-            )}
+            <UserAvatar
+              user={{ id: req.user_id, display_name: req.display_name ?? undefined, avatar_url: req.avatar_url }}
+              size={24}
+              variant="brass"
+              className="shrink-0"
+              linkToProfile
+            />
             <div className="min-w-0">
               <p className="text-sm text-secondary truncate">{req.display_name ?? 'Member'}</p>
               <p className="text-[10px] text-muted font-mono">
@@ -500,13 +499,12 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
       {members.map((member: ClubMember) => (
         <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
           <div className="flex items-center gap-2">
-            {member.avatar_url ? (
-              <img src={member.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-[var(--brass)]/10 flex items-center justify-center">
-                <span className="text-[9px] text-[var(--brass)]">{member.display_name[0]?.toUpperCase()}</span>
-              </div>
-            )}
+            <UserAvatar
+              user={{ id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url }}
+              size={24}
+              variant="brass"
+              linkToProfile
+            />
             <span className="text-sm text-secondary">{member.display_name}</span>
             {member.is_admin && (
               <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-1.5 py-0.5 rounded">

@@ -14,6 +14,7 @@ import { useAuthStore } from '../store/auth'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { StarBadge } from '../components/StarBadge'
+import { UserAvatar } from '../components/UserAvatar'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { LikeButton } from '../components/LikeButton'
@@ -121,13 +122,6 @@ function ActivityCard({ item }: { item: ActivityItem }) {
       setNewComment('')
     },
   })
-
-  const initials = item.display_name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
 
   function renderContent() {
     switch (item.type) {
@@ -467,15 +461,25 @@ function ActivityCard({ item }: { item: ActivityItem }) {
     >
       {/* Avatar with star badge */}
       <div className="flex-shrink-0">
-        <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-          {item.avatar_url
-            ? <img src={item.avatar_url} alt={item.display_name} className="w-full h-full object-cover" />
-            : initials
-          }
-        </div>
+        <UserAvatar
+          user={{
+            id: item.user_id,
+            display_name: item.display_name,
+            avatar_url: item.avatar_url,
+            star_level: item.star_level,
+          }}
+          size={36}
+          linkToProfile
+        />
         {item.star_level > 0 && (
           <div className="flex justify-center mt-0.5">
-            <StarBadge level={item.star_level} size={8} />
+            <StarBadge
+              level={item.star_level}
+              size={8}
+              userId={item.user_id}
+              displayName={item.display_name}
+              avatarUrl={item.avatar_url}
+            />
           </div>
         )}
       </div>
@@ -513,12 +517,12 @@ function ActivityCard({ item }: { item: ActivityItem }) {
           <div className="mt-3 space-y-2" data-no-card-nav>
             {comments.map((c) => (
               <div key={c.id} className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
-                  {c.avatar_url
-                    ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
-                    : c.display_name.slice(0, 2).toUpperCase()
-                  }
-                </div>
+                <UserAvatar
+                  user={{ id: c.user_id, display_name: c.display_name, avatar_url: c.avatar_url }}
+                  size={24}
+                  className="shrink-0"
+                  linkToProfile
+                />
                 <div className="flex-1 rounded bg-surface-hover px-2 py-1 flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <span className="text-[11px] font-medium text-primary">{c.display_name} </span>

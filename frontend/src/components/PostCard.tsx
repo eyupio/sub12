@@ -13,6 +13,7 @@ import { clubsApi } from '../api/clubs'
 import { postApi, type Post, type PostAttachment, type PostVisibility } from '../api/posts'
 import { commentApi } from '../api/scoreCards'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { UserAvatar } from './UserAvatar'
 
 function AttachmentPreview({ attachment }: { attachment: PostAttachment }) {
   switch (attachment.type) {
@@ -191,13 +192,6 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
     onError: () => toast('Failed to delete comment', 'error'),
   })
 
-  const initials = post.display_name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-
   const prefs = useRegionalPrefs()
   const date = formatDate(post.created_at, prefs)
 
@@ -207,13 +201,12 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
     <article className="rounded border border-subtle bg-surface p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-          {post.avatar_url ? (
-            <img src={post.avatar_url} alt={post.display_name} className="w-full h-full object-cover" />
-          ) : (
-            initials
-          )}
-        </div>
+        <UserAvatar
+          user={{ id: post.user_id, display_name: post.display_name, avatar_url: post.avatar_url }}
+          size={36}
+          className="shrink-0"
+          linkToProfile
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-secondary truncate">{post.display_name}</p>
           <div className="flex items-center gap-2">
@@ -396,12 +389,12 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
             const isOwnComment = currentUser?.id === c.user_id
             return (
               <div key={c.id} className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-surface-hover border border-subtle flex-shrink-0 flex items-center justify-center text-[9px] font-medium text-muted overflow-hidden">
-                  {c.avatar_url
-                    ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
-                    : c.display_name.slice(0, 2).toUpperCase()
-                  }
-                </div>
+                <UserAvatar
+                  user={{ id: c.user_id, display_name: c.display_name, avatar_url: c.avatar_url }}
+                  size={24}
+                  className="shrink-0"
+                  linkToProfile
+                />
                 <div className="flex-1 min-w-0 rounded bg-surface-hover px-2 py-1">
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="min-w-0">

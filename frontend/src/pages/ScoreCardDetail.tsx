@@ -20,6 +20,7 @@ import { ShareDialog } from '../components/ShareDialog'
 import { ReportDialog } from '../components/ReportDialog'
 import { Flag } from 'lucide-react'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { UserAvatar } from '../components/UserAvatar'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -386,8 +387,6 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
   })
 
   const replies: Comment[] = data?.items ?? []
-  const initials = (name: string) =>
-    name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   return (
     <div className="ml-8 mt-2 space-y-2 border-l-2 border-subtle pl-3">
@@ -395,12 +394,12 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
         const isOwnReply = currentUser?.id === r.user_id
         return (
         <div key={r.id} className="flex gap-2">
-          <div className="w-6 h-6 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[9px] font-medium text-muted">
-            {r.avatar_url
-              ? <img src={r.avatar_url} alt={r.display_name} className="w-full h-full object-cover" />
-              : initials(r.display_name)
-            }
-          </div>
+          <UserAvatar
+            user={{ id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url }}
+            size={24}
+            className="shrink-0"
+            linkToProfile
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2 mb-0.5">
               <span className="text-[11px] font-medium text-secondary">{r.display_name}</span>
@@ -601,9 +600,6 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
     })
   }
 
-  const initials = (name: string) =>
-    name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-
   return (
     <div className="pt-6 border-t border-subtle space-y-4">
       <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
@@ -620,12 +616,12 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
           <div key={c.id}>
             <div className="flex gap-3">
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-                {c.avatar_url
-                  ? <img src={c.avatar_url} alt={c.display_name} className="w-full h-full object-cover" />
-                  : initials(c.display_name)
-                }
-              </div>
+              <UserAvatar
+                user={{ id: c.user_id, display_name: c.display_name, avatar_url: c.avatar_url }}
+                size={32}
+                className="shrink-0"
+                linkToProfile
+              />
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 mb-0.5">
@@ -758,12 +754,12 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
 
       {/* New comment input */}
       <div className="flex gap-3 pt-2">
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle flex-shrink-0 bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted">
-          {currentUser?.avatar_url
-            ? <img src={currentUser.avatar_url} alt={currentUser.display_name} className="w-full h-full object-cover" />
-            : initials(currentUser?.display_name ?? '?')
-          }
-        </div>
+        <UserAvatar
+          user={currentUser ?? {}}
+          size={32}
+          className="shrink-0"
+          showHoverCard={false}
+        />
         <div className="flex-1 flex gap-2">
           <textarea
             value={newBody}

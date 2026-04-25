@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { adminUsersApi } from '../api/adminUsers'
+import { UserAvatar } from '../components/UserAvatar'
 
 const PAGE_SIZE = 50
 
@@ -62,15 +63,12 @@ export default function AdminUsers() {
               params={{ id: u.id }}
               className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface hover:border-[var(--brass)]/30 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-[var(--brass)]/10 flex items-center justify-center shrink-0">
-                {u.avatar_url ? (
-                  <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <span className="text-[10px] text-[var(--brass)] font-medium">
-                    {u.display_name[0]?.toUpperCase() ?? '?'}
-                  </span>
-                )}
-              </div>
+              <UserAvatar
+                user={u}
+                size={32}
+                variant="brass"
+                className="shrink-0"
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-primary truncate">{u.display_name}</span>

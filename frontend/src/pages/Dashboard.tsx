@@ -12,6 +12,7 @@ import { leagueApi, MyLeagueSummary } from '../api/leagues'
 import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
 import { useAuthStore } from '../store/auth'
 import { RifleProfileCard } from '../components/RifleProfileCard'
+import { UserAvatar } from '../components/UserAvatar'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -504,13 +505,6 @@ export default function Dashboard() {
     })
     .sort((a, b) => b.best_score - a.best_score)
 
-  const initials = user?.display_name
-    ?.split(' ')
-    .map((w: string) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) ?? ''
-
   // Trend: compare most recent card vs oldest in recent set
   const trendDelta: number | null =
     recentCards.length >= 2
@@ -607,15 +601,12 @@ export default function Dashboard() {
       {/* ── Page header ────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 py-1 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-full overflow-hidden border border-subtle shrink-0 bg-surface-hover">
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted text-sm font-medium">
-                {initials}
-              </div>
-            )}
-          </div>
+          <UserAvatar
+            user={user ?? {}}
+            size={44}
+            className="shrink-0"
+            showHoverCard={false}
+          />
           <div className="min-w-0">
             <p className="text-base lg:text-lg font-medium text-primary truncate">{user?.display_name}</p>
             <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted tracking-wide mt-0.5">
