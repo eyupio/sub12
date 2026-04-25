@@ -446,6 +446,19 @@
   background: var(--surface-2);
 }
 
+.scores-mini-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.scores-mini-thumb.is-selected {
+  border-color: var(--gold);
+}
+
 .scores-mini-target circle {
   fill: none;
   stroke: var(--line);

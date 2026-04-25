@@ -112,6 +112,17 @@ function MiniTarget({ card, selected = false }: { card: ScoreCardSummary; select
     })
   }, [card.id, card.total_score, card.x_count])
 
+  if (card.card_image_url) {
+    return (
+      <img
+        src={card.card_image_url}
+        alt=""
+        className={`scores-mini-thumb ${selected ? 'is-selected' : ''}`}
+        loading="lazy"
+      />
+    )
+  }
+
   return (
     <svg className={`scores-mini-target ${selected ? 'is-selected' : ''}`} viewBox="0 0 56 56" aria-hidden="true">
       <circle cx="28" cy="28" r="24" />
