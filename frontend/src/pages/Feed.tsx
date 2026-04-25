@@ -1,9 +1,9 @@
 import {
-  forwardRef,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type ReactNode,
 } from 'react'
@@ -12,16 +12,14 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   AtSign,
   Award,
-  Bookmark,
   ChevronDown,
   CircleDot,
   Crosshair,
   Flame,
+  FlaskConical,
   Globe,
-  Heart,
-  Image,
+  Image as ImageIcon,
   MessageSquare,
-  MoreHorizontal,
   RefreshCw,
   Send,
   Share2,
@@ -30,8 +28,10 @@ import {
   Trophy,
   User,
   Users,
+  X,
   Zap,
 } from 'lucide-react'
+import { api } from '../api/client'
 import { activityApi, type ActivityItem, type FeedFilter } from '../api/activity'
 import { achievementApi } from '../api/achievements'
 import { clubsApi } from '../api/clubs'
@@ -44,14 +44,12 @@ import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
-import { useThemeStore } from '../store/theme'
 import {
   feedCounts,
   filterFeedPosts,
   normalizeActivity,
   sortFeedPosts,
   targetShots,
-  type FeedDensity,
   type FeedPost,
   type FeedScope,
   type FeedSort,
@@ -74,10 +72,6 @@ const FILTERS: Array<{ key: FeedScope; label: string; icon: typeof Sparkles }> =
 const STORAGE = {
   filter: 'sub12.feed.filter',
   sort: 'sub12.feed.sort',
-  rail: 'sub12.feed.showRail',
-  composer: 'sub12.feed.showComposer',
-  milestones: 'sub12.feed.highlightMilestones',
-  density: 'sub12.feed.density',
 }
 
 function useStoredState<T>(key: string, initial: T) {
@@ -122,12 +116,7 @@ export default function Feed() {
   const currentUser = useAuthStore((s) => s.user)
   const [activeFilter, setActiveFilter] = useStoredState<FeedScope>(STORAGE.filter, 'for_you')
   const [sort, setSort] = useStoredState<FeedSort>(STORAGE.sort, 'latest')
-  const [showRail, setShowRail] = useStoredState<boolean>(STORAGE.rail, true)
-  const [showComposer, setShowComposer] = useStoredState<boolean>(STORAGE.composer, true)
-  const [highlightMilestones, setHighlightMilestones] = useStoredState<boolean>(STORAGE.milestones, true)
-  const [density, setDensity] = useStoredState<FeedDensity>(STORAGE.density, 'comfortable')
   const [expandedComments, setExpandedComments] = useState<string | null>(null)
-  const composerRef = useRef<HTMLTextAreaElement | null>(null)
 
   const queryFilter = feedApiFilter(activeFilter)
   const {
@@ -155,16 +144,11 @@ export default function Feed() {
     [activeFilter, allPosts, currentUser?.id, sort],
   )
 
-  const focusComposer = () => {
-    setShowComposer(true)
-    window.setTimeout(() => composerRef.current?.focus(), 0)
-  }
-
   return (
-    <div className={`feed-shell ${density === 'compact' ? 'is-compact' : ''}`}>
-      <div className={`feed-page ${showRail ? 'with-rail' : ''}`}>
+    <div className="feed-shell">
+      <div className="feed-page with-rail">
         <main className="feed-main" aria-label="Social feed">
-          <FeedHeader onNewPost={focusComposer} />
+          <FeedHeader />
           <FilterBar
             active={activeFilter}
             counts={counts}
@@ -172,17 +156,7 @@ export default function Feed() {
             onFilter={setActiveFilter}
             onSort={setSort}
           />
-          <FeedTweaks
-            showRail={showRail}
-            showComposer={showComposer}
-            highlightMilestones={highlightMilestones}
-            density={density}
-            onShowRail={setShowRail}
-            onShowComposer={setShowComposer}
-            onHighlightMilestones={setHighlightMilestones}
-            onDensity={setDensity}
-          />
-          {showComposer && <FeedComposer ref={composerRef} />}
+          <FeedComposer />
 
           {isLoading && <FeedSkeleton />}
           {isError && (
@@ -212,7 +186,7 @@ export default function Feed() {
               <FeedPostArticle
                 key={post.id}
                 post={post}
-                muted={!highlightMilestones && (post.kind === 'achievement' || post.kind === 'join')}
+                muted={false}
                 commentsOpen={expandedComments === post.id}
                 onToggleComments={() => setExpandedComments((open) => open === post.id ? null : post.id)}
               />
@@ -236,13 +210,13 @@ export default function Feed() {
           {!hasNextPage && visiblePosts.length > 0 && <FeedEnd />}
         </main>
 
-        {showRail && <FeedRail posts={allPosts} />}
+        <FeedRail posts={allPosts} />
       </div>
     </div>
   )
 }
 
-function FeedHeader({ onNewPost }: { onNewPost: () => void }) {
+function FeedHeader() {
   return (
     <header className="feed-header">
       <div>
@@ -254,9 +228,6 @@ function FeedHeader({ onNewPost }: { onNewPost: () => void }) {
           <Zap size={13} />
           Notifications
         </Link>
-        <button type="button" className="feed-btn feed-btn-gold" onClick={onNewPost}>
-          + New post
-        </button>
       </div>
     </header>
   )
@@ -304,58 +275,16 @@ function FilterBar({
   )
 }
 
-function FeedTweaks({
-  showRail,
-  showComposer,
-  highlightMilestones,
-  density,
-  onShowRail,
-  onShowComposer,
-  onHighlightMilestones,
-  onDensity,
-}: {
-  showRail: boolean
-  showComposer: boolean
-  highlightMilestones: boolean
-  density: FeedDensity
-  onShowRail: (value: boolean) => void
-  onShowComposer: (value: boolean) => void
-  onHighlightMilestones: (value: boolean) => void
-  onDensity: (value: FeedDensity) => void
-}) {
-  const theme = useThemeStore((s) => s.theme)
-  const setTheme = useThemeStore((s) => s.setTheme)
-
-  return (
-    <div className="feed-tweaks" aria-label="Feed display controls">
-      <label><input type="checkbox" checked={showRail} onChange={(e) => onShowRail(e.target.checked)} /> Rail</label>
-      <label><input type="checkbox" checked={showComposer} onChange={(e) => onShowComposer(e.target.checked)} /> Composer</label>
-      <label><input type="checkbox" checked={highlightMilestones} onChange={(e) => onHighlightMilestones(e.target.checked)} /> Highlights</label>
-      <label>
-        Density
-        <select value={density} onChange={(e) => onDensity(e.target.value as FeedDensity)}>
-          <option value="comfortable">Comfortable</option>
-          <option value="compact">Compact</option>
-        </select>
-      </label>
-      <label>
-        Theme
-        <select value={theme} onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="system">System</option>
-        </select>
-      </label>
-    </div>
-  )
-}
-
-const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
+function FeedComposer() {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [body, setBody] = useState('')
   const [destination, setDestination] = useState<Destination>({ type: 'public', id: '', name: 'Public' })
   const [menuOpen, setMenuOpen] = useState(false)
+  const [attachments, setAttachments] = useState<{ image_url: string }[]>([])
+  const [uploading, setUploading] = useState(false)
 
   const { data: myLeagues } = useQuery({
     queryKey: ['my-leagues'],
@@ -374,10 +303,12 @@ const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
       league_id: destination.type === 'league' ? destination.id : undefined,
       club_id: destination.type === 'club' ? destination.id : undefined,
       visibility: destination.type === 'public' ? 'public' : undefined,
+      attachments: attachments.map((a) => ({ type: 'image', image_url: a.image_url })),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] })
       setBody('')
+      setAttachments([])
       toast('Posted', 'success')
     },
     onError: () => toast('Failed to create post', 'error'),
@@ -387,15 +318,54 @@ const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (body.trim()) mutation.mutate()
+    if (body.trim() || attachments.length > 0) mutation.mutate()
   }
+
+  const handleImagePick = () => fileInputRef.current?.click()
+
+  const handleFileSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const res = await api.upload<{ id: string; url: string }>('/images', fd)
+      setAttachments((prev) => [...prev, { image_url: res.url }])
+    } catch {
+      toast('Failed to upload image', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const insertMention = () => {
+    const ta = textareaRef.current
+    if (!ta) {
+      setBody((b) => b + '@')
+      return
+    }
+    const start = ta.selectionStart ?? body.length
+    const end = ta.selectionEnd ?? body.length
+    const next = body.slice(0, start) + '@' + body.slice(end)
+    setBody(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      const pos = start + 1
+      ta.setSelectionRange(pos, pos)
+    })
+  }
+
+  const removeAttachment = (idx: number) =>
+    setAttachments((prev) => prev.filter((_, i) => i !== idx))
 
   return (
     <form className="feed-composer" onSubmit={submit}>
       <div className="composer-row">
         <UserAvatar user={currentUser} size={28} showHoverCard={false} />
         <textarea
-          ref={ref}
+          ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={1}
@@ -403,11 +373,39 @@ const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
           aria-label="Post body"
         />
       </div>
+      {attachments.length > 0 && (
+        <div className="composer-attachments">
+          {attachments.map((a, idx) => (
+            <div key={idx} className="composer-attachment">
+              <img src={a.image_url} alt="" />
+              <button type="button" aria-label="Remove attachment" onClick={() => removeAttachment(idx)}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
       <div className="composer-actions">
         <div className="composer-tools">
-          <button type="button"><CircleDot size={13} />Card</button>
-          <button type="button"><Image size={13} />Image</button>
-          <button type="button" aria-label="Mention"><AtSign size={13} /></button>
+          <Link to="/scores/new" className="composer-tool-link">
+            <CircleDot size={13} />Card
+          </Link>
+          <Link to="/pellet-testing/new" className="composer-tool-link">
+            <FlaskConical size={13} />Pellet test
+          </Link>
+          <button type="button" onClick={handleImagePick} disabled={uploading}>
+            <ImageIcon size={13} />{uploading ? 'Uploading...' : 'Image'}
+          </button>
+          <button type="button" aria-label="Mention" onClick={insertMention}>
+            <AtSign size={13} />
+          </button>
         </div>
         <div className="composer-right">
           <div className="dest-picker">
@@ -444,8 +442,7 @@ const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
       </div>
     </form>
   )
-})
-FeedComposer.displayName = 'FeedComposer'
+}
 
 function FeedPostArticle({
   post,
@@ -688,35 +685,26 @@ function EngagementBar({
   onToggleComments: () => void
 }) {
   const item = post.activity
-  const [bookmarked, setBookmarked] = useState(false)
   const canScoreInteract = item.target_type === 'score_card' && !!item.target_id
   const canPostInteract = item.type === 'post_created' && !!item.target_id
+  const canInteract = canScoreInteract || canPostInteract
 
   return (
     <div className="post-engagement">
-      {canScoreInteract ? (
+      {canScoreInteract && (
         <LikeButton targetId={item.target_id!} targetType="score_card" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
-      ) : canPostInteract ? (
+      )}
+      {canPostInteract && (
         <LikeButton targetId={item.target_id!} targetType="post" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
-      ) : (
-        <button type="button" className="act" disabled>
-          <Heart size={15} />
-          {item.like_count || 0}
+      )}
+      {canInteract && (
+        <button type="button" className={`act ${commentsOpen ? 'active' : ''}`} onClick={onToggleComments}>
+          <MessageSquare size={15} />
+          {item.comment_count || 0}
         </button>
       )}
-      <button type="button" className={`act ${commentsOpen ? 'active' : ''}`} onClick={onToggleComments}>
-        <MessageSquare size={15} />
-        {item.comment_count || 0}
-      </button>
-      <button type="button" className={`act ${bookmarked ? 'active' : ''}`} onClick={() => setBookmarked((v) => !v)} aria-label="Bookmark">
-        <Bookmark size={15} />
-      </button>
       <button type="button" className="act" onClick={() => sharePost(post)} aria-label="Share">
         <Share2 size={15} />
-      </button>
-      <span className="post-engagement-spacer" />
-      <button type="button" className="act subtle" aria-label="More">
-        <MoreHorizontal size={15} />
       </button>
     </div>
   )
