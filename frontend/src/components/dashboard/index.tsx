@@ -203,7 +203,7 @@ export function StatTile({
       : 'text-muted'
   const valueClass = compact
     ? 'text-[18px] leading-tight font-medium'
-    : 'font-serif-display text-[32px] leading-none font-medium tracking-tight'
+    : 'text-[32px] leading-none font-semibold tracking-tight'
   const valueColor = gold ? 'text-gold' : 'text-ink'
 
   const inner = (
