@@ -40,7 +40,7 @@ func (s *PostService) SetNotifications(n *NotificationService) {
 // Create validates and persists a new post.
 func (s *PostService) Create(ctx context.Context, userID string, input *model.CreatePostInput) (*model.Post, error) {
 	body := strings.TrimSpace(input.Body)
-	if body == "" {
+	if body == "" && len(input.Attachments) == 0 {
 		return nil, ErrPostBodyEmpty
 	}
 	if len([]rune(body)) > 5000 {
@@ -105,10 +105,13 @@ func (s *PostService) Create(ctx context.Context, userID string, input *model.Cr
 		ClubName:    clubName,
 	}
 	for _, a := range post.Attachments {
-		if a.TargetID != nil && (a.Type == "score_card" || a.Type == "pellet_test") {
+		if a.TargetID != nil && meta.AttachmentType == "" && (a.Type == "score_card" || a.Type == "pellet_test") {
 			meta.AttachmentType = a.Type
 			meta.AttachmentTargetID = *a.TargetID
-			break
+			continue
+		}
+		if a.Type == "image" && a.ImageURL != nil && *a.ImageURL != "" {
+			meta.AttachmentImageURLs = append(meta.AttachmentImageURLs, *a.ImageURL)
 		}
 	}
 	go s.activity.Ingest(context.Background(), userID, model.ActivityPostCreated, &post.ID, &targetType,

@@ -47,6 +47,8 @@ export interface ActivityItem {
     body_preview?: string
     attachment_type?: 'score_card' | 'pellet_test' | 'image'
     attachment_target_id?: string
+    attachment_image_urls?: string[]
+    card_image_url?: string
   }
   league_id?: string
   club_id?: string

@@ -139,6 +139,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		targetID := card.ID
 		targetType := "score_card"
 		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount, IsPB: isPB}
+		if card.CardImageURL != nil {
+			meta.CardImageURL = *card.CardImageURL
+		}
 
 		// Resolve league_id from round if this is a league submission
 		var leagueID *string
@@ -346,6 +349,9 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		targetID := updated.ID
 		targetType := "score_card"
 		meta := model.ScorePostedMeta{TotalScore: updated.TotalScore, XCount: updated.XCount, IsPB: isPB}
+		if updated.CardImageURL != nil {
+			meta.CardImageURL = *updated.CardImageURL
+		}
 		var leagueID *string
 		if updated.LeagueRoundID != nil && *updated.LeagueRoundID != "" && s.leagueRepo != nil {
 			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *updated.LeagueRoundID); err == nil {
