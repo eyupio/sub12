@@ -185,6 +185,11 @@ const pelletTestingRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing',
   component: PelletTesting,
+  validateSearch: (search: Record<string, unknown>): { tab?: 'overview' | 'tests' | 'combos' | 'batches' } => {
+    const t = search.tab
+    if (t === 'tests' || t === 'combos' || t === 'batches' || t === 'overview') return { tab: t }
+    return {}
+  },
 })
 
 const newPelletTestRoute = createRoute({
@@ -206,6 +211,9 @@ const pelletTestLeaderboardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/leaderboard',
   component: PelletTestLeaderboard,
+  beforeLoad: () => {
+    throw redirect({ to: '/pellet-testing', search: { tab: 'combos' } })
+  },
 })
 
 const pelletComparisonRoute = createRoute({
@@ -218,6 +226,9 @@ const batchReportRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/batch-report',
   component: BatchReport,
+  beforeLoad: () => {
+    throw redirect({ to: '/pellet-testing', search: { tab: 'batches' } })
+  },
 })
 
 const publicPelletLeaderboardRoute = createRoute({
@@ -335,6 +346,9 @@ const comboAnalyticsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/combo-analytics',
   component: ComboAnalytics,
+  beforeLoad: () => {
+    throw redirect({ to: '/pellet-testing', search: { tab: 'combos' } })
+  },
 })
 
 
