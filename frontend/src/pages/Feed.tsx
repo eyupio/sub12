@@ -1,668 +1,135 @@
-import { useState, type KeyboardEvent, type MouseEvent } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Target, Trophy, MessageSquare, Star, RefreshCw,
-  Building2, TestTube2, PlayCircle, CalendarPlus, Award, Globe, UserCheck, Send,
-  Lightbulb, CheckCircle, PenSquare, Share2, AlertTriangle,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
+import { Link } from '@tanstack/react-router'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  AtSign,
+  Award,
+  Bookmark,
+  ChevronDown,
+  CircleDot,
+  Crosshair,
+  Flame,
+  Globe,
+  Heart,
+  Image,
+  MessageSquare,
+  MoreHorizontal,
+  RefreshCw,
+  Send,
+  Share2,
+  Sparkles,
+  Target,
+  Trophy,
+  User,
+  Users,
+  Zap,
 } from 'lucide-react'
-import { activityApi, ActivityItem, FeedFilter } from '../api/activity'
-import { leagueApi } from '../api/leagues'
+import { activityApi, type ActivityItem, type FeedFilter } from '../api/activity'
+import { achievementApi } from '../api/achievements'
 import { clubsApi } from '../api/clubs'
+import { leagueApi } from '../api/leagues'
+import { postApi } from '../api/posts'
 import { scoreCardApi } from '../api/scoreCards'
-import { useAuthStore } from '../store/auth'
+import { UserAvatar } from '../components/UserAvatar'
+import { LikeButton } from '../components/LikeButton'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { formatDate, useRegionalPrefs } from '../utils/date'
-import { StarBadge } from '../components/StarBadge'
-import { UserAvatar } from '../components/UserAvatar'
-import { HelpIcon } from '../components/Tooltip'
-import { pageHelp } from '../components/tooltips'
-import { LikeButton } from '../components/LikeButton'
-import { ReportDialog } from '../components/ReportDialog'
+import { useAuthStore } from '../store/auth'
+import { toast } from '../store/toast'
+import { useThemeStore } from '../store/theme'
+import {
+  feedCounts,
+  filterFeedPosts,
+  normalizeActivity,
+  sortFeedPosts,
+  targetShots,
+  type FeedDensity,
+  type FeedPost,
+  type FeedScope,
+  type FeedSort,
+} from './feedUtils'
+import './feed.css'
 
-const FILTER_TABS: { key: FeedFilter; label: string; icon: typeof Globe }[] = [
+type Destination =
+  | { type: 'public'; id: ''; name: 'Public' }
+  | { type: 'league'; id: string; name: string }
+  | { type: 'club'; id: string; name: string }
+
+const FILTERS: Array<{ key: FeedScope; label: string; icon: typeof Sparkles }> = [
+  { key: 'for_you', label: 'For You', icon: Sparkles },
   { key: 'public', label: 'Public', icon: Globe },
-  { key: 'for_you', label: 'For You', icon: UserCheck },
-  { key: 'league', label: 'League', icon: Trophy },
-  { key: 'club', label: 'Club', icon: Building2 },
+  { key: 'leagues', label: 'Leagues', icon: Trophy },
+  { key: 'clubs', label: 'Clubs', icon: Users },
+  { key: 'following', label: 'Following', icon: User },
 ]
 
-function getCardNavigator(
-  item: ActivityItem,
-  navigate: ReturnType<typeof useNavigate>,
-): (() => void) | null {
-  switch (item.type) {
-    case 'score_posted':
-    case 'personal_best':
-    case 'commented': {
-      const id = item.target_id
-      return id ? () => navigate({ to: '/scores/$id', params: { id } }) : null
-    }
-    case 'pellet_test_posted': {
-      const id = item.target_id
-      return id ? () => navigate({ to: '/pellet-testing/$id', params: { id } }) : null
-    }
-    case 'joined_league': {
-      const id = item.target_id ?? item.league_id
-      return id ? () => navigate({ to: '/leagues/$id', params: { id } }) : null
-    }
-    case 'league_round_opened':
-    case 'league_season_started': {
-      const id = item.league_id
-      return id ? () => navigate({ to: '/leagues/$id', params: { id } }) : null
-    }
-    case 'joined_club': {
-      const id = item.target_id ?? item.club_id
-      return id ? () => navigate({ to: '/clubs/$id', params: { id } }) : null
-    }
-    case 'feature_request_created':
-    case 'feature_request_implemented': {
-      const id = item.target_id
-      return id ? () => navigate({ to: '/feature-requests/$id', params: { id } }) : null
-    }
-    case 'post_created': {
-      const id = item.target_id
-      return id ? () => navigate({ to: '/posts/$id', params: { id } }) : null
-    }
-    case 'achievement_earned': {
-      const id = item.user_id
-      return id ? () => navigate({ to: '/users/$id', params: { id } }) : null
-    }
-    default:
-      return null
-  }
+const STORAGE = {
+  filter: 'sub12.feed.filter',
+  sort: 'sub12.feed.sort',
+  rail: 'sub12.feed.showRail',
+  composer: 'sub12.feed.showComposer',
+  milestones: 'sub12.feed.highlightMilestones',
+  density: 'sub12.feed.density',
 }
 
-function ActivityCard({ item }: { item: ActivityItem }) {
-  const prefs = useRegionalPrefs()
-  const date = formatDate(item.created_at, prefs)
-  const currentUser = useAuthStore((s) => s.user)
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const [showComments, setShowComments] = useState(false)
-  const [newComment, setNewComment] = useState('')
-  const [reportTargetId, setReportTargetId] = useState<string | null>(null)
-
-  const goToCard = getCardNavigator(item, navigate)
-
-  const shouldIgnoreCardClick = (target: EventTarget | null): boolean => {
-    if (!(target instanceof HTMLElement)) return false
-    return !!target.closest('a, button, input, textarea, form, [data-no-card-nav]')
-  }
-
-  const handleCardClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (!goToCard) return
-    if (e.defaultPrevented) return
-    if (shouldIgnoreCardClick(e.target)) return
-    goToCard()
-  }
-
-  const handleCardKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!goToCard) return
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    if (shouldIgnoreCardClick(e.target)) return
-    e.preventDefault()
-    goToCard()
-  }
-
-  const isScoreCard = item.target_type === 'score_card' && !!item.target_id
-  const canInteract = !!currentUser && isScoreCard
-
-  const { data: commentsData } = useQuery({
-    queryKey: ['score-cards', item.target_id, 'comments'],
-    queryFn: () => scoreCardApi.listComments(item.target_id!),
-    enabled: showComments && isScoreCard,
+function useStoredState<T>(key: string, initial: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      return stored == null ? initial : JSON.parse(stored) as T
+    } catch {
+      return initial
+    }
   })
 
-  const commentMutation = useMutation({
-    mutationFn: () => scoreCardApi.createComment(item.target_id!, newComment.trim()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['score-cards', item.target_id, 'comments'] })
-      queryClient.invalidateQueries({ queryKey: ['feed'] })
-      setNewComment('')
-    },
-  })
-
-  function renderContent() {
-    switch (item.type) {
-      case 'score_posted':
-      case 'personal_best': {
-        const score = item.metadata?.total_score
-        const xCount = item.metadata?.x_count
-        const isPB = item.type === 'personal_best' || item.metadata?.is_pb
-        return (
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm text-secondary">
-                <span className="font-medium text-primary">{item.display_name}</span>
-                {isPB ? ' set a personal best' : ' posted a score'}
-              </p>
-              {item.target_id && (
-                <Link
-                  to="/scores/$id"
-                  params={{ id: item.target_id }}
-                  className="text-[11px] text-muted hover:text-secondary transition-colors"
-                >
-                  View card →
-                </Link>
-              )}
-            </div>
-            {score != null && (
-              <div className="text-right flex-shrink-0">
-                <p className="text-xl font-mono font-semibold text-[var(--brass)]">{score}</p>
-                {xCount != null && xCount > 0 && (
-                  <p className="text-[11px] text-muted">{xCount}X</p>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      }
-      case 'joined_league':
-        return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span>
-            {' joined '}
-            {item.target_id ? (
-              <Link
-                to="/leagues/$id"
-                params={{ id: item.target_id }}
-                className="text-[var(--brass)] hover:underline"
-              >
-                {item.metadata?.league_name ?? 'a league'}
-              </Link>
-            ) : (
-              <span>{item.metadata?.league_name ?? 'a league'}</span>
-            )}
-          </p>
-        )
-      case 'joined_club':
-        return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span>
-            {' joined '}
-            {item.target_id ? (
-              <Link
-                to="/clubs/$id"
-                params={{ id: item.target_id }}
-                className="text-[var(--brass)] hover:underline"
-              >
-                {item.metadata?.club_name ?? 'a club'}
-              </Link>
-            ) : (
-              <span>{item.metadata?.club_name ?? 'a club'}</span>
-            )}
-          </p>
-        )
-      case 'commented':
-        return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span>
-            {' commented on a score card'}
-            {item.target_id && (
-              <>
-                {' — '}
-                <Link
-                  to="/scores/$id"
-                  params={{ id: item.target_id }}
-                  className="text-muted hover:text-secondary transition-colors"
-                >
-                  View →
-                </Link>
-              </>
-            )}
-          </p>
-        )
-      case 'pellet_test_posted': {
-        const best = item.metadata?.best_group_mm
-        return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span>
-            {' posted a pellet test'}
-            {best != null && <span className="text-muted"> — {best.toFixed(2)}mm best group</span>}
-            {item.target_id && (
-              <>
-                {' '}
-                <Link
-                  to="/pellet-testing/$id"
-                  params={{ id: item.target_id }}
-                  className="text-[11px] text-muted hover:text-secondary transition-colors"
-                >
-                  View →
-                </Link>
-              </>
-            )}
-          </p>
-        )
-      }
-      case 'league_round_opened':
-        return (
-          <p className="text-sm text-secondary">
-            {'New round in '}
-            {item.league_id ? (
-              <Link
-                to="/leagues/$id"
-                params={{ id: item.league_id }}
-                className="text-[var(--brass)] hover:underline"
-              >
-                {item.metadata?.league_name ?? 'a league'}
-              </Link>
-            ) : (
-              <span>{item.metadata?.league_name ?? 'a league'}</span>
-            )}
-            {item.metadata?.round_name && (
-              <span className="font-medium text-primary">: {item.metadata.round_name}</span>
-            )}
-          </p>
-        )
-      case 'league_season_started':
-        return (
-          <p className="text-sm text-secondary">
-            {'New season in '}
-            {item.league_id ? (
-              <Link
-                to="/leagues/$id"
-                params={{ id: item.league_id }}
-                className="text-[var(--brass)] hover:underline"
-              >
-                {item.metadata?.league_name ?? 'a league'}
-              </Link>
-            ) : (
-              <span>{item.metadata?.league_name ?? 'a league'}</span>
-            )}
-            {item.metadata?.season_name && (
-              <span className="font-medium text-primary">: {item.metadata.season_name}</span>
-            )}
-          </p>
-        )
-      case 'feature_request_created':
-        return (
-          <p className="text-sm text-secondary">
-            {'New feature request: '}
-            {item.target_id ? (
-              <Link
-                to="/feature-requests/$id"
-                params={{ id: item.target_id }}
-                className="text-[var(--brass)] hover:underline font-medium"
-              >
-                {item.metadata?.title ?? 'View details'}
-              </Link>
-            ) : (
-              <span className="font-medium text-primary">{item.metadata?.title ?? 'a feature request'}</span>
-            )}
-            {item.metadata?.scope_type && <span className="text-muted"> · {item.metadata.scope_type}</span>}
-          </p>
-        )
-      case 'feature_request_implemented':
-        return (
-          <p className="text-sm text-secondary">
-            {'Feature implemented: '}
-            {item.target_id ? (
-              <Link
-                to="/feature-requests/$id"
-                params={{ id: item.target_id }}
-                className="text-[var(--brass)] hover:underline font-medium"
-              >
-                {item.metadata?.title ?? 'View details'}
-              </Link>
-            ) : (
-              <span className="font-medium text-primary">{item.metadata?.title ?? 'a feature'}</span>
-            )}
-          </p>
-        )
-      case 'post_created': {
-        const body = item.metadata?.body_preview?.trim()
-        const attType = item.metadata?.attachment_type
-        const attId = item.metadata?.attachment_target_id
-        const scopeName = item.metadata?.league_name ?? item.metadata?.club_name
-        const scopeRoute: 'league' | 'club' | null =
-          item.league_id ? 'league' : item.club_id ? 'club' : null
-        const scopeId = item.league_id ?? item.club_id
-        const isShare = attType === 'score_card' || attType === 'pellet_test'
-
-        let action: string
-        if (isShare && attType === 'score_card') action = ' shared a score card'
-        else if (isShare && attType === 'pellet_test') action = ' shared a pellet test'
-        else action = ' posted'
-
-        return (
-          <div className="space-y-1">
-            <p className="text-sm text-secondary">
-              <Link
-                to="/users/$id"
-                params={{ id: item.user_id }}
-                className="font-medium text-primary hover:underline"
-              >
-                {item.display_name}
-              </Link>
-              {action}
-              {scopeName && scopeRoute === 'league' && scopeId && (
-                <>
-                  {' in '}
-                  <Link
-                    to="/leagues/$id"
-                    params={{ id: scopeId }}
-                    className="text-[var(--brass)] hover:underline"
-                  >
-                    {scopeName}
-                  </Link>
-                </>
-              )}
-              {scopeName && scopeRoute === 'club' && scopeId && (
-                <>
-                  {' in '}
-                  <Link
-                    to="/clubs/$id"
-                    params={{ id: scopeId }}
-                    className="text-[var(--brass)] hover:underline"
-                  >
-                    {scopeName}
-                  </Link>
-                </>
-              )}
-            </p>
-            {body && (
-              <p className="text-xs text-muted line-clamp-2">“{body}”</p>
-            )}
-            {isShare && attId && attType === 'score_card' && (
-              <Link
-                to="/scores/$id"
-                params={{ id: attId }}
-                className="text-[11px] text-muted hover:text-secondary transition-colors"
-              >
-                View card →
-              </Link>
-            )}
-            {isShare && attId && attType === 'pellet_test' && (
-              <Link
-                to="/pellet-testing/$id"
-                params={{ id: attId }}
-                className="text-[11px] text-muted hover:text-secondary transition-colors"
-              >
-                View test →
-              </Link>
-            )}
-          </div>
-        )
-      }
-      case 'achievement_earned': {
-        const AchIcon = iconForAchievement(item.metadata?.achievement_icon)
-        const achName = item.metadata?.achievement_name ?? 'an achievement'
-        const achDesc = item.metadata?.achievement_description
-        return (
-          <div className="space-y-1">
-            <p className="text-sm text-secondary">
-              <Link
-                to="/users/$id"
-                params={{ id: item.user_id }}
-                className="font-medium text-primary hover:underline"
-              >
-                {item.display_name}
-              </Link>
-              {' earned '}
-              <span className="inline-flex items-center gap-1 font-medium text-[var(--brass)]">
-                <AchIcon size={13} />
-                {achName}
-              </span>
-            </p>
-            {achDesc && (
-              <p className="text-[11px] text-muted">{achDesc}</p>
-            )}
-          </div>
-        )
-      }
-      default:
-        return (
-          <p className="text-sm text-secondary">
-            <span className="font-medium text-primary">{item.display_name}</span> did something
-          </p>
-        )
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      // Storage is best-effort UI state.
     }
-  }
+  }, [key, value])
 
-  function TypeIcon() {
-    switch (item.type) {
-      case 'personal_best': return <Star size={14} className="text-[var(--brass)]" />
-      case 'score_posted': return <Target size={14} className="text-muted" />
-      case 'joined_league': return <Trophy size={14} className="text-muted" />
-      case 'joined_club': return <Building2 size={14} className="text-muted" />
-      case 'commented': return <MessageSquare size={14} className="text-muted" />
-      case 'pellet_test_posted': return <TestTube2 size={14} className="text-muted" />
-      case 'league_round_opened': return <PlayCircle size={14} className="text-muted" />
-      case 'league_season_started': return <CalendarPlus size={14} className="text-muted" />
-      case 'achievement_earned': return <Award size={14} className="text-[var(--brass)]" />
-      case 'feature_request_created': return <Lightbulb size={14} className="text-[var(--brass)]" />
-      case 'feature_request_implemented': return <CheckCircle size={14} className="text-[var(--brass)]" />
-      case 'post_created': {
-        const attType = item.metadata?.attachment_type
-        if (attType === 'score_card' || attType === 'pellet_test') {
-          return <Share2 size={14} className="text-muted" />
-        }
-        return <PenSquare size={14} className="text-muted" />
-      }
-      default: return null
-    }
-  }
-
-  const comments = commentsData?.items ?? []
-
-  const cardClasses = goToCard
-    ? 'flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface cursor-pointer hover:border-[var(--brass)]/30 transition-colors'
-    : 'flex gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface'
-
-  return (
-    <div
-      className={cardClasses}
-      onClick={goToCard ? handleCardClick : undefined}
-      onKeyDown={goToCard ? handleCardKeyDown : undefined}
-      role={goToCard ? 'link' : undefined}
-      tabIndex={goToCard ? 0 : undefined}
-      aria-label={goToCard ? `${item.display_name} — ${item.type.replace(/_/g, ' ')}` : undefined}
-    >
-      {/* Avatar with star badge */}
-      <div className="flex-shrink-0">
-        <UserAvatar
-          user={{
-            id: item.user_id,
-            display_name: item.display_name,
-            avatar_url: item.avatar_url,
-            star_level: item.star_level,
-          }}
-          size={36}
-          linkToProfile
-        />
-        {item.star_level > 0 && (
-          <div className="flex justify-center mt-0.5">
-            <StarBadge
-              level={item.star_level}
-              size={8}
-              userId={item.user_id}
-              displayName={item.display_name}
-              avatarUrl={item.avatar_url}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1">
-          <TypeIcon />
-          <span className="text-[10px] tracking-widest uppercase text-muted">{date}</span>
-        </div>
-        {renderContent()}
-
-        {/* Social actions — only for score card activity items */}
-        {canInteract && (
-          <div className="flex items-center gap-4 mt-2 pt-2 border-t border-subtle">
-            <LikeButton
-              targetId={item.target_id!}
-              targetType="score_card"
-              initialLiked={item.is_liked}
-              initialCount={item.like_count}
-              size={14}
-            />
-            <button
-              onClick={() => setShowComments((v) => !v)}
-              aria-label={`${showComments ? 'Hide' : 'View'} comments`}
-              className="flex items-center gap-1.5 text-xs text-muted hover:text-secondary transition-colors"
-            >
-              <MessageSquare size={14} />
-              {item.comment_count > 0 && <span>{item.comment_count}</span>}
-            </button>
-          </div>
-        )}
-
-        {/* Inline comment section */}
-        {showComments && isScoreCard && (
-          <div className="mt-3 space-y-2" data-no-card-nav>
-            {comments.map((c) => (
-              <div key={c.id} className="flex gap-2">
-                <UserAvatar
-                  user={{ id: c.user_id, display_name: c.display_name, avatar_url: c.avatar_url }}
-                  size={24}
-                  className="shrink-0"
-                  linkToProfile
-                />
-                <div className="flex-1 rounded bg-surface-hover px-2 py-1 flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[11px] font-medium text-primary">{c.display_name} </span>
-                    <span className="text-xs text-secondary">{c.body}</span>
-                  </div>
-                  {currentUser && currentUser.id !== c.user_id && (
-                    <button
-                      onClick={() => setReportTargetId(c.id)}
-                      className="p-0.5 text-muted hover:text-[var(--error-text)] transition-colors flex-shrink-0"
-                      aria-label="Report comment"
-                      title="Report inappropriate comment"
-                    >
-                      <AlertTriangle size={11} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {currentUser && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (newComment.trim()) commentMutation.mutate()
-                }}
-                className="flex gap-2 mt-2"
-              >
-                <input
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add a comment…"
-                  className="flex-1 rounded border border-subtle bg-surface px-2 py-1 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
-                  maxLength={500}
-                />
-                <button
-                  type="submit"
-                  disabled={!newComment.trim() || commentMutation.isPending}
-                  aria-label="Post comment"
-                  className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send size={12} />
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-      </div>
-
-      <ReportDialog
-        open={reportTargetId !== null}
-        targetType="comment"
-        targetId={reportTargetId ?? ''}
-        onClose={() => setReportTargetId(null)}
-      />
-    </div>
-  )
+  return [value, setValue] as const
 }
 
-function EntitySelector({
-  filter,
-  entityId,
-  setEntityId,
-}: {
-  filter: FeedFilter
-  entityId: string
-  setEntityId: (id: string) => void
-}) {
-  const { data: leagues } = useQuery({
-    queryKey: ['my-leagues'],
-    queryFn: () => leagueApi.listMine(),
-    enabled: filter === 'league',
-  })
-
-  const { data: clubs } = useQuery({
-    queryKey: ['clubs'],
-    queryFn: () => clubsApi.list(),
-    enabled: filter === 'club',
-  })
-
-  if (filter === 'league') {
-    const items = leagues?.items ?? []
-    if (items.length === 0) {
-      return <p className="text-xs text-muted">You haven't joined any leagues yet.</p>
-    }
-    return (
-      <select
-        value={entityId}
-        onChange={(e) => setEntityId(e.target.value)}
-        className="w-full rounded border border-subtle bg-surface px-3 py-1.5 text-sm text-primary"
-      >
-        <option value="">Select a league...</option>
-        {items.map((l) => (
-          <option key={l.id} value={l.id}>{l.name}</option>
-        ))}
-      </select>
-    )
-  }
-
-  if (filter === 'club') {
-    const items = (clubs?.items ?? []).filter((c) => c.is_member)
-    if (items.length === 0) {
-      return <p className="text-xs text-muted">You haven't joined any clubs yet.</p>
-    }
-    return (
-      <select
-        value={entityId}
-        onChange={(e) => setEntityId(e.target.value)}
-        className="w-full rounded border border-subtle bg-surface px-3 py-1.5 text-sm text-primary"
-      >
-        <option value="">Select a club...</option>
-        {items.map((c) => (
-          <option key={c.id} value={c.id}>{c.name}</option>
-        ))}
-      </select>
-    )
-  }
-
-  return null
+function feedApiFilter(scope: FeedScope): FeedFilter {
+  return scope === 'public' ? 'public' : 'for_you'
 }
 
-const EMPTY_MESSAGES: Record<FeedFilter, { title: string; subtitle: string }> = {
-  public: { title: 'No public activity yet.', subtitle: 'Be the first to post a score.' },
-  for_you: { title: 'Nothing here yet.', subtitle: 'Follow other shooters to see their activity here.' },
-  league: { title: 'No activity in this league yet.', subtitle: 'Submit a score to get things started.' },
-  club: { title: 'No activity in this club yet.', subtitle: 'Invite members to join.' },
+function relativeHandle(name: string): string {
+  return `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 16) || 'shooter'}`
+}
+
+function countByName(posts: FeedPost[], type: 'league' | 'club') {
+  const counts = new Map<string, number>()
+  posts.forEach((post) => {
+    if (post.whereType !== type || !post.where) return
+    counts.set(post.where, (counts.get(post.where) ?? 0) + 1)
+  })
+  return counts
 }
 
 export default function Feed() {
-  const [filter, setFilter] = useState<FeedFilter>('for_you')
-  const [entityId, setEntityId] = useState('')
+  const currentUser = useAuthStore((s) => s.user)
+  const [activeFilter, setActiveFilter] = useStoredState<FeedScope>(STORAGE.filter, 'for_you')
+  const [sort, setSort] = useStoredState<FeedSort>(STORAGE.sort, 'latest')
+  const [showRail, setShowRail] = useStoredState<boolean>(STORAGE.rail, true)
+  const [showComposer, setShowComposer] = useStoredState<boolean>(STORAGE.composer, true)
+  const [highlightMilestones, setHighlightMilestones] = useStoredState<boolean>(STORAGE.milestones, true)
+  const [density, setDensity] = useStoredState<FeedDensity>(STORAGE.density, 'comfortable')
+  const [expandedComments, setExpandedComments] = useState<string | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // Reset entity when switching filters
-  const handleFilterChange = (f: FeedFilter) => {
-    setFilter(f)
-    setEntityId('')
-  }
-
-  const needsEntity = (filter === 'league' || filter === 'club') && !entityId
-
+  const queryFilter = feedApiFilter(activeFilter)
   const {
     data,
     fetchNextPage,
@@ -672,113 +139,822 @@ export default function Feed() {
     isError,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['feed', filter, entityId],
-    queryFn: ({ pageParam }) => activityApi.getFeed(20, pageParam as string | undefined, filter, entityId || undefined),
+    queryKey: ['feed', queryFilter],
+    queryFn: ({ pageParam }) => activityApi.getFeed(30, pageParam as string | undefined, queryFilter),
     getNextPageParam: (lastPage) => lastPage.cursor || undefined,
     initialPageParam: undefined as string | undefined,
-    enabled: !needsEntity,
   })
 
-  const items = data?.pages.flatMap((p) => p.items) ?? []
-  const empty = EMPTY_MESSAGES[filter]
+  const allPosts = useMemo(
+    () => (data?.pages.flatMap((page) => page.items) ?? []).map(normalizeActivity),
+    [data],
+  )
+  const counts = useMemo(() => feedCounts(allPosts, currentUser?.id), [allPosts, currentUser?.id])
+  const visiblePosts = useMemo(
+    () => sortFeedPosts(filterFeedPosts(allPosts, activeFilter, currentUser?.id), sort),
+    [activeFilter, allPosts, currentUser?.id, sort],
+  )
+
+  const focusComposer = () => {
+    setShowComposer(true)
+    window.setTimeout(() => composerRef.current?.focus(), 0)
+  }
 
   return (
-    <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-2xl mx-auto">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feed</h1>
-        <HelpIcon content={pageHelp.feed} />
-      </div>
+    <div className={`feed-shell ${density === 'compact' ? 'is-compact' : ''}`}>
+      <div className={`feed-page ${showRail ? 'with-rail' : ''}`}>
+        <main className="feed-main" aria-label="Social feed">
+          <FeedHeader onNewPost={focusComposer} />
+          <FilterBar
+            active={activeFilter}
+            counts={counts}
+            sort={sort}
+            onFilter={setActiveFilter}
+            onSort={setSort}
+          />
+          <FeedTweaks
+            showRail={showRail}
+            showComposer={showComposer}
+            highlightMilestones={highlightMilestones}
+            density={density}
+            onShowRail={setShowRail}
+            onShowComposer={setShowComposer}
+            onHighlightMilestones={setHighlightMilestones}
+            onDensity={setDensity}
+          />
+          {showComposer && <FeedComposer ref={composerRef} />}
 
-      {/* Filter tabs */}
-      <div role="tablist" aria-label="Feed filter" className="flex gap-1.5 overflow-x-auto pb-1">
-        {FILTER_TABS.map(({ key, label, icon: Icon }) => {
-          const selected = filter === key
-          return (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={selected}
-              aria-controls="feed-panel"
-              onClick={() => handleFilterChange(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] tracking-widest uppercase whitespace-nowrap transition-colors border ${
-                selected
-                  ? 'border-[var(--brass)]/40 text-[var(--brass)] bg-[var(--brass)]/5'
-                  : 'border-subtle text-muted hover:text-secondary hover:border-[var(--brass)]/20'
-              }`}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Entity selector for league/club */}
-      {(filter === 'league' || filter === 'club') && (
-        <EntitySelector filter={filter} entityId={entityId} setEntityId={setEntityId} />
-      )}
-
-      {/* Feed content */}
-      {isLoading && !needsEntity && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 rounded border border-subtle bg-surface animate-pulse" />
-          ))}
-        </div>
-      )}
-
-      {isError && (
-        <div role="alert" className="flex flex-col items-center gap-3 py-8">
-          <p className="text-[var(--error-text)] text-sm">Failed to load feed.</p>
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Try again
-          </button>
-        </div>
-      )}
-
-      {!isLoading && !needsEntity && items.length === 0 && (
-        <div className="text-center py-12 space-y-2">
-          <p className="text-secondary">{empty.title}</p>
-          <p className="text-sm text-muted">{empty.subtitle}</p>
-          {filter === 'for_you' && (
-            <Link
-              to="/users"
-              className="inline-block mt-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/10 transition-colors"
-            >
-              Find people to follow
-            </Link>
+          {isLoading && <FeedSkeleton />}
+          {isError && (
+            <div className="feed-state" role="alert">
+              <p>Failed to load feed.</p>
+              <button className="feed-btn feed-btn-outline" onClick={() => refetch()}>
+                <RefreshCw size={13} />
+                Try again
+              </button>
+            </div>
           )}
-        </div>
-      )}
 
-      {needsEntity && (
-        <div className="text-center py-12 space-y-2">
-          <p className="text-secondary">Select a {filter} above to view its feed.</p>
-        </div>
-      )}
+          {!isLoading && !isError && visiblePosts.length === 0 && (
+            <div className="feed-state">
+              <Sparkles size={22} />
+              <p>No activity in this slice yet.</p>
+              {activeFilter === 'following' && (
+                <Link to="/users" className="feed-btn feed-btn-outline">
+                  Find shooters
+                </Link>
+              )}
+            </div>
+          )}
 
-      <div id="feed-panel" role="tabpanel" className="space-y-3">
-        {items.map((item) => (
-          <ActivityCard key={item.id} item={item} />
-        ))}
+          <div className="feed-stream" id="feed-panel">
+            {visiblePosts.map((post) => (
+              <FeedPostArticle
+                key={post.id}
+                post={post}
+                muted={!highlightMilestones && (post.kind === 'achievement' || post.kind === 'join')}
+                commentsOpen={expandedComments === post.id}
+                onToggleComments={() => setExpandedComments((open) => open === post.id ? null : post.id)}
+              />
+            ))}
+          </div>
+
+          {hasNextPage && (
+            <div className="feed-load-more">
+              <button
+                type="button"
+                className="feed-btn feed-btn-outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                <RefreshCw size={13} className={isFetchingNextPage ? 'feed-spin' : ''} />
+                {isFetchingNextPage ? 'Loading...' : 'Load more'}
+              </button>
+            </div>
+          )}
+
+          {!hasNextPage && visiblePosts.length > 0 && <FeedEnd />}
+        </main>
+
+        {showRail && <FeedRail posts={allPosts} />}
       </div>
+    </div>
+  )
+}
 
-      {hasNextPage && (
-        <div className="flex justify-center pt-2">
-          <button
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-            className="flex items-center gap-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={12} className={isFetchingNextPage ? 'animate-spin' : ''} />
-            {isFetchingNextPage ? 'Loading…' : 'Load more'}
+function FeedHeader({ onNewPost }: { onNewPost: () => void }) {
+  return (
+    <header className="feed-header">
+      <div>
+        <p className="feed-eyebrow">Social</p>
+        <h1>Feed</h1>
+      </div>
+      <div className="feed-header-actions">
+        <Link to="/notifications" className="feed-btn feed-btn-outline">
+          <Zap size={13} />
+          Notifications
+        </Link>
+        <button type="button" className="feed-btn feed-btn-gold" onClick={onNewPost}>
+          + New post
+        </button>
+      </div>
+    </header>
+  )
+}
+
+function FilterBar({
+  active,
+  counts,
+  sort,
+  onFilter,
+  onSort,
+}: {
+  active: FeedScope
+  counts: Record<FeedScope, number>
+  sort: FeedSort
+  onFilter: (scope: FeedScope) => void
+  onSort: (sort: FeedSort) => void
+}) {
+  return (
+    <div className="feed-filterbar" role="tablist" aria-label="Feed filters">
+      {FILTERS.map(({ key, label, icon: Icon }) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={active === key}
+          className={`feed-chip ${active === key ? 'is-active' : ''}`}
+          onClick={() => onFilter(key)}
+        >
+          <Icon size={13} />
+          {label}
+          <span>{counts[key]}</span>
+        </button>
+      ))}
+      <div className="feed-filter-spacer" />
+      <label className="feed-sort">
+        <span>Sort</span>
+        <select value={sort} onChange={(e) => onSort(e.target.value as FeedSort)}>
+          <option value="latest">Latest</option>
+          <option value="top_week">Top this week</option>
+          <option value="top_month">Top this month</option>
+        </select>
+      </label>
+    </div>
+  )
+}
+
+function FeedTweaks({
+  showRail,
+  showComposer,
+  highlightMilestones,
+  density,
+  onShowRail,
+  onShowComposer,
+  onHighlightMilestones,
+  onDensity,
+}: {
+  showRail: boolean
+  showComposer: boolean
+  highlightMilestones: boolean
+  density: FeedDensity
+  onShowRail: (value: boolean) => void
+  onShowComposer: (value: boolean) => void
+  onHighlightMilestones: (value: boolean) => void
+  onDensity: (value: FeedDensity) => void
+}) {
+  const theme = useThemeStore((s) => s.theme)
+  const setTheme = useThemeStore((s) => s.setTheme)
+
+  return (
+    <div className="feed-tweaks" aria-label="Feed display controls">
+      <label><input type="checkbox" checked={showRail} onChange={(e) => onShowRail(e.target.checked)} /> Rail</label>
+      <label><input type="checkbox" checked={showComposer} onChange={(e) => onShowComposer(e.target.checked)} /> Composer</label>
+      <label><input type="checkbox" checked={highlightMilestones} onChange={(e) => onHighlightMilestones(e.target.checked)} /> Highlights</label>
+      <label>
+        Density
+        <select value={density} onChange={(e) => onDensity(e.target.value as FeedDensity)}>
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select>
+      </label>
+      <label>
+        Theme
+        <select value={theme} onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">System</option>
+        </select>
+      </label>
+    </div>
+  )
+}
+
+const FeedComposer = forwardRef<HTMLTextAreaElement>((_, ref) => {
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [body, setBody] = useState('')
+  const [destination, setDestination] = useState<Destination>({ type: 'public', id: '', name: 'Public' })
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const { data: myLeagues } = useQuery({
+    queryKey: ['my-leagues'],
+    queryFn: () => leagueApi.listMine(),
+    enabled: !!currentUser,
+  })
+  const { data: myClubs } = useQuery({
+    queryKey: ['my-clubs'],
+    queryFn: () => clubsApi.listMine(),
+    enabled: !!currentUser,
+  })
+
+  const mutation = useMutation({
+    mutationFn: () => postApi.create({
+      body: body.trim(),
+      league_id: destination.type === 'league' ? destination.id : undefined,
+      club_id: destination.type === 'club' ? destination.id : undefined,
+      visibility: destination.type === 'public' ? 'public' : undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      setBody('')
+      toast('Posted', 'success')
+    },
+    onError: () => toast('Failed to create post', 'error'),
+  })
+
+  if (!currentUser) return null
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (body.trim()) mutation.mutate()
+  }
+
+  return (
+    <form className="feed-composer" onSubmit={submit}>
+      <div className="composer-row">
+        <UserAvatar user={currentUser} size={28} showHoverCard={false} />
+        <textarea
+          ref={ref}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={1}
+          placeholder="Share an update, log a card, ask a question..."
+          aria-label="Post body"
+        />
+      </div>
+      <div className="composer-actions">
+        <div className="composer-tools">
+          <button type="button"><CircleDot size={13} />Card</button>
+          <button type="button"><Image size={13} />Image</button>
+          <button type="button" aria-label="Mention"><AtSign size={13} /></button>
+        </div>
+        <div className="composer-right">
+          <div className="dest-picker">
+            <button type="button" className="dest-btn" onClick={() => setMenuOpen((v) => !v)}>
+              {destination.type === 'club' ? <Users size={13} /> : <Trophy size={13} />}
+              {destination.name}
+              <ChevronDown size={13} />
+            </button>
+            {menuOpen && (
+              <div className="dest-menu">
+                <button type="button" className="dest-item" onClick={() => { setDestination({ type: 'public', id: '', name: 'Public' }); setMenuOpen(false) }}>
+                  <Globe size={13} /> Public
+                </button>
+                <p>Your leagues</p>
+                {(myLeagues?.items ?? []).map((league) => (
+                  <button key={league.id} type="button" className="dest-item" onClick={() => { setDestination({ type: 'league', id: league.id, name: league.name }); setMenuOpen(false) }}>
+                    <Trophy size={13} /> {league.name}
+                  </button>
+                ))}
+                <p>Your clubs</p>
+                {(myClubs?.items ?? []).map((club) => (
+                  <button key={club.id} type="button" className="dest-item" onClick={() => { setDestination({ type: 'club', id: club.id, name: club.name }); setMenuOpen(false) }}>
+                    <Users size={13} /> {club.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button type="submit" className="feed-btn feed-btn-gold" disabled={!body.trim() || mutation.isPending}>
+            <Send size={13} />
+            Post
           </button>
         </div>
+      </div>
+    </form>
+  )
+})
+FeedComposer.displayName = 'FeedComposer'
+
+function FeedPostArticle({
+  post,
+  muted,
+  commentsOpen,
+  onToggleComments,
+}: {
+  post: FeedPost
+  muted: boolean
+  commentsOpen: boolean
+  onToggleComments: () => void
+}) {
+  if (post.kind === 'join') {
+    return <JoinPost post={post} muted={muted} />
+  }
+
+  const className = [
+    'feed-post',
+    `post-${post.kind}`,
+    muted ? 'post-muted' : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <article className={className}>
+      {post.kind === 'pb' && <PersonalBestStripe post={post} />}
+      <div className="post-body">
+        <PostHead post={post} />
+        {post.kind === 'pb' && <PersonalBestPost post={post} />}
+        {post.kind === 'score' && <ScorePost post={post} />}
+        {post.kind === 'achievement' && <AchievementPost post={post} />}
+        {post.kind === 'text' && <TextPost post={post} />}
+        {post.kind === 'standings' && <StandingsPost />}
+        <EngagementBar post={post} commentsOpen={commentsOpen} onToggleComments={onToggleComments} />
+        {commentsOpen && <InlineComments post={post} />}
+      </div>
+    </article>
+  )
+}
+
+function PostHead({ post }: { post: FeedPost }) {
+  const prefs = useRegionalPrefs()
+  const item = post.activity
+  const date = formatDate(item.created_at, prefs)
+
+  return (
+    <header className="post-head">
+      <UserAvatar
+        user={{ id: item.user_id, display_name: item.display_name, avatar_url: item.avatar_url }}
+        size={28}
+        linkToProfile
+      />
+      <div className="post-head-body">
+        <div className="post-head-line">
+          <Link to="/users/$id" params={{ id: item.user_id }} className="post-who">{item.display_name}</Link>
+          <span className="post-handle">{relativeHandle(item.display_name)}</span>
+          <span className="post-dot">.</span>
+          <span className="post-date">{date}</span>
+        </div>
+        {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
+      </div>
+      {post.kind === 'pb' && <span className="post-pinned">Pinned</span>}
+    </header>
+  )
+}
+
+function SourcePill({ post }: { post: FeedPost }) {
+  if (!post.where || !post.whereId || !post.whereType) return null
+  if (post.whereType === 'league') {
+    return (
+      <Link to="/leagues/$id" params={{ id: post.whereId }} className="source-pill">
+        <Trophy size={11} />
+        {post.where}
+      </Link>
+    )
+  }
+  return (
+    <Link to="/clubs/$id" params={{ id: post.whereId }} className="source-pill">
+      <Users size={11} />
+      {post.where}
+    </Link>
+  )
+}
+
+function PersonalBestStripe({ post }: { post: FeedPost }) {
+  const delta = numericMeta(post.activity, 'pb_delta')
+  return (
+    <div className="post-celebrate-stripe">
+      <Trophy size={13} />
+      New personal best{delta != null ? ` - +${delta} over previous` : ''}
+    </div>
+  )
+}
+
+function PersonalBestPost({ post }: { post: FeedPost }) {
+  const previous = numericMeta(post.activity, 'previous_best')
+  const delta = numericMeta(post.activity, 'pb_delta')
+
+  return (
+    <div className="pb-grid">
+      <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={96} />
+      <div className="pb-stack">
+        <div className="pb-score">
+          <span className="num">{post.score ?? '--'}</span>
+          {post.x != null && <span className="x">{post.x}<small>X</small></span>}
+        </div>
+        <p className="pb-was">
+          {previous != null ? <>previous best <span>{previous}</span></> : 'previous best unavailable'}
+          {delta != null && <> <strong>+{delta}</strong></>}
+        </p>
+        <ScoreMeta post={post} />
+      </div>
+    </div>
+  )
+}
+
+function ScorePost({ post }: { post: FeedPost }) {
+  return (
+    <div className="score-grid">
+      <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={78} />
+      <div className="score-stack">
+        <div className="score-line">
+          <span className="num">{post.score ?? '--'}</span>
+          {post.x != null && <span className="x">{post.x}<small>X</small></span>}
+        </div>
+        <ScoreMeta post={post} />
+      </div>
+    </div>
+  )
+}
+
+function ScoreMeta({ post }: { post: FeedPost }) {
+  const rifle = post.activity.metadata?.rifle_name
+  const pellet = post.activity.metadata?.pellet_name
+  return (
+    <div className="score-meta">
+      <span><Crosshair size={11} />{rifle || 'Rifle not set'}</span>
+      <span><CircleDot size={11} />{pellet || 'Pellet not set'}</span>
+      <span><Target size={11} />25m</span>
+    </div>
+  )
+}
+
+function AchievementPost({ post }: { post: FeedPost }) {
+  const item = post.activity
+  const AchIcon = iconForAchievement(item.metadata?.achievement_icon)
+  return (
+    <div className="achievement-block">
+      <div className="badge-medallion">
+        <span className="badge-rays" />
+        <AchIcon size={28} />
+      </div>
+      <div className="achievement-text">
+        <p className="achievement-eyebrow">Earned a badge</p>
+        <h2>{item.metadata?.achievement_name ?? 'Badge earned'}</h2>
+        {item.metadata?.achievement_description && <p>{item.metadata.achievement_description}</p>}
+        <div className="achievement-meta">
+          <span className="rarity rarity-uncommon">Uncommon</span>
+          <span>earned by SUB12 shooters</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TextPost({ post }: { post: FeedPost }) {
+  const item = post.activity
+  const attachmentType = item.metadata?.attachment_type
+  const attachmentId = item.metadata?.attachment_target_id
+  const body = post.body?.trim()
+
+  return (
+    <div className="text-post-body">
+      {body ? <p>{body}</p> : <p>{fallbackText(item)}</p>}
+      {attachmentType === 'score_card' && attachmentId && (
+        <Link to="/scores/$id" params={{ id: attachmentId }} className="attachment-link">
+          <Target size={13} />
+          View score card
+        </Link>
+      )}
+      {attachmentType === 'pellet_test' && attachmentId && (
+        <Link to="/pellet-testing/$id" params={{ id: attachmentId }} className="attachment-link">
+          <CircleDot size={13} />
+          View pellet test
+        </Link>
       )}
     </div>
+  )
+}
+
+function StandingsPost() {
+  return (
+    <div className="standings-block">
+      <div className="rank-arrow">
+        <span className="rank-from">4<small>th</small></span>
+        <Zap size={14} />
+        <span className="rank-to">3<small>rd</small></span>
+      </div>
+      <div className="standings-text">
+        <p className="standings-headline"><strong>Shooter</strong> moved up to <strong>3rd</strong></p>
+        <p className="standings-sub">in league standings</p>
+      </div>
+    </div>
+  )
+}
+
+function JoinPost({ post, muted }: { post: FeedPost; muted: boolean }) {
+  const prefs = useRegionalPrefs()
+  const item = post.activity
+  const target = post.where ?? (post.whereType === 'club' ? 'a club' : 'a league')
+
+  return (
+    <article className={`feed-post post-join ${muted ? 'post-muted' : ''}`}>
+      <div className="join-row">
+        <UserAvatar user={{ id: item.user_id, display_name: item.display_name, avatar_url: item.avatar_url }} size={28} linkToProfile />
+        <p>
+          <Link to="/users/$id" params={{ id: item.user_id }}>{item.display_name}</Link>
+          {' joined '}
+          {post.whereType === 'club' && post.whereId ? (
+            <Link to="/clubs/$id" params={{ id: post.whereId }} className="join-target"><Users size={11} />{target}</Link>
+          ) : post.whereId ? (
+            <Link to="/leagues/$id" params={{ id: post.whereId }} className="join-target"><Trophy size={11} />{target}</Link>
+          ) : (
+            <span>{target}</span>
+          )}
+          <span className="join-date">{formatDate(item.created_at, prefs)}</span>
+        </p>
+        <button type="button" className="feed-btn feed-btn-outline">Follow</button>
+      </div>
+    </article>
+  )
+}
+
+function EngagementBar({
+  post,
+  commentsOpen,
+  onToggleComments,
+}: {
+  post: FeedPost
+  commentsOpen: boolean
+  onToggleComments: () => void
+}) {
+  const item = post.activity
+  const [bookmarked, setBookmarked] = useState(false)
+  const canScoreInteract = item.target_type === 'score_card' && !!item.target_id
+  const canPostInteract = item.type === 'post_created' && !!item.target_id
+
+  return (
+    <div className="post-engagement">
+      {canScoreInteract ? (
+        <LikeButton targetId={item.target_id!} targetType="score_card" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
+      ) : canPostInteract ? (
+        <LikeButton targetId={item.target_id!} targetType="post" initialLiked={item.is_liked} initialCount={item.like_count} size={15} />
+      ) : (
+        <button type="button" className="act" disabled>
+          <Heart size={15} />
+          {item.like_count || 0}
+        </button>
+      )}
+      <button type="button" className={`act ${commentsOpen ? 'active' : ''}`} onClick={onToggleComments}>
+        <MessageSquare size={15} />
+        {item.comment_count || 0}
+      </button>
+      <button type="button" className={`act ${bookmarked ? 'active' : ''}`} onClick={() => setBookmarked((v) => !v)} aria-label="Bookmark">
+        <Bookmark size={15} />
+      </button>
+      <button type="button" className="act" onClick={() => sharePost(post)} aria-label="Share">
+        <Share2 size={15} />
+      </button>
+      <span className="post-engagement-spacer" />
+      <button type="button" className="act subtle" aria-label="More">
+        <MoreHorizontal size={15} />
+      </button>
+    </div>
+  )
+}
+
+function InlineComments({ post }: { post: FeedPost }) {
+  const prefs = useRegionalPrefs()
+  const currentUser = useAuthStore((s) => s.user)
+  const queryClient = useQueryClient()
+  const [body, setBody] = useState('')
+  const item = post.activity
+  const scoreTarget = item.target_type === 'score_card' ? item.target_id : undefined
+  const postTarget = item.type === 'post_created' ? item.target_id : undefined
+  const targetId = scoreTarget ?? postTarget
+  const targetKind = scoreTarget ? 'score' : postTarget ? 'post' : null
+
+  const { data } = useQuery({
+    queryKey: targetKind === 'score' ? ['score-cards', targetId, 'comments'] : ['posts', targetId, 'comments'],
+    queryFn: () => targetKind === 'score' ? scoreCardApi.listComments(targetId!) : postApi.listComments(targetId!),
+    enabled: !!targetId,
+  })
+
+  const mutation = useMutation({
+    mutationFn: () => targetKind === 'score'
+      ? scoreCardApi.createComment(targetId!, body.trim())
+      : postApi.createComment(targetId!, body.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      queryClient.invalidateQueries({ queryKey: targetKind === 'score' ? ['score-cards', targetId, 'comments'] : ['posts', targetId, 'comments'] })
+      setBody('')
+    },
+  })
+
+  if (!targetId || !targetKind) {
+    return (
+      <div className="post-comments">
+        <p className="comment-empty">Comments are not available for this activity yet.</p>
+      </div>
+    )
+  }
+
+  const topComment = data?.items?.[0]
+
+  return (
+    <div className="post-comments">
+      {topComment ? (
+        <div className="comment">
+          <UserAvatar user={{ id: topComment.user_id, display_name: topComment.display_name, avatar_url: topComment.avatar_url }} size={22} linkToProfile />
+          <div className="comment-body">
+            <div className="comment-meta">
+              <span>{topComment.display_name}</span>
+              <time>{formatDate(topComment.created_at, prefs)}</time>
+            </div>
+            <p>{topComment.body}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="comment-empty">No comments yet.</p>
+      )}
+      {currentUser && (
+        <form className="comment-compose" onSubmit={(e) => { e.preventDefault(); if (body.trim()) mutation.mutate() }}>
+          <UserAvatar user={currentUser} size={22} showHoverCard={false} />
+          <input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write a reply..." maxLength={500} />
+          <button type="submit" className="feed-icon-send" disabled={!body.trim() || mutation.isPending} aria-label="Send reply">
+            <Send size={13} />
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
+function TargetPreview({ seed, xCount, size }: { seed: string | number; xCount: number; size: number }) {
+  const shots = targetShots(seed, xCount)
+  return (
+    <svg className="target-preview" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="46" fill="var(--surface-2)" stroke="var(--line)" />
+      {[38, 30, 22].map((r) => <circle key={r} cx="50" cy="50" r={r} fill="none" stroke="var(--line-2)" strokeWidth="0.8" />)}
+      <circle cx="50" cy="50" r="18" fill="var(--gold-tint)" stroke="var(--gold-soft)" strokeWidth="0.8" />
+      <circle cx="50" cy="50" r="8" fill="var(--gold-soft)" opacity="0.6" />
+      <circle cx="50" cy="50" r="2.5" fill="var(--gold)" />
+      {shots.map((shot, index) => (
+        <circle key={index} cx={shot.x} cy={shot.y} r="2.4" fill="var(--ink)" stroke="var(--surface)" strokeWidth="0.5" />
+      ))}
+    </svg>
+  )
+}
+
+function FeedRail({ posts }: { posts: FeedPost[] }) {
+  const leagueCounts = countByName(posts, 'league')
+  const clubCounts = countByName(posts, 'club')
+  const { data: myLeagues } = useQuery({ queryKey: ['my-leagues'], queryFn: () => leagueApi.listMine() })
+  const { data: myClubs } = useQuery({ queryKey: ['my-clubs'], queryFn: () => clubsApi.listMine() })
+  const { data: achievements } = useQuery({ queryKey: ['achievements', 'me'], queryFn: () => achievementApi.listMine() })
+
+  const trending = [
+    ...(myLeagues?.items ?? []).map((l) => ({ id: l.id, name: l.name, type: 'league' as const, count: leagueCounts.get(l.name) ?? 0 })),
+    ...(myClubs?.items ?? []).map((c) => ({ id: c.id, name: c.name, type: 'club' as const, count: clubCounts.get(c.name) ?? 0 })),
+  ].sort((a, b) => b.count - a.count).slice(0, 5)
+
+  const deadlines = (myLeagues?.items ?? [])
+    .filter((league) => league.ends_on)
+    .map((league) => ({ id: league.id, name: league.name, due: league.ends_on! }))
+    .sort((a, b) => Date.parse(a.due) - Date.parse(b.due))
+    .slice(0, 3)
+
+  return (
+    <aside className="feed-rail">
+      <RailCard title="Trending" icon={<Flame size={12} />}>
+        {trending.length === 0 && <RailEmpty>No memberships yet.</RailEmpty>}
+        {trending.map((item, index) => (
+          <RailEntityRow key={`${item.type}-${item.id}`} item={item} hot={index === 0 && item.count > 0} />
+        ))}
+      </RailCard>
+      <RailCard title="Upcoming deadlines" icon={<Target size={12} />}>
+        {deadlines.length === 0 && <RailEmpty>No dated league deadlines.</RailEmpty>}
+        {deadlines.map((deadline) => <DeadlineRow key={deadline.id} deadline={deadline} />)}
+      </RailCard>
+      <RailCard title="Recent achievements" icon={<Award size={12} />}>
+        {(achievements?.items ?? []).slice(0, 4).map((achievement, index) => {
+          const Icon = iconForAchievement(achievement.icon)
+          return (
+            <div className="rail-ach" key={achievement.id}>
+              <span className={`rail-ach-medal ${index === 0 ? 'is-new' : ''}`}><Icon size={14} /></span>
+              <div>
+                <p>{achievement.name}{index === 0 && <span>New</span>}</p>
+                <small>{achievement.description}</small>
+              </div>
+            </div>
+          )
+        })}
+        {(achievements?.items ?? []).length === 0 && <RailEmpty>No achievements yet.</RailEmpty>}
+      </RailCard>
+    </aside>
+  )
+}
+
+function RailCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rail-card">
+      <h2>{icon}{title}</h2>
+      <div className="rail-body">{children}</div>
+    </section>
+  )
+}
+
+function RailEntityRow({
+  item,
+  hot,
+}: {
+  item: { id: string; name: string; type: 'league' | 'club'; count: number }
+  hot: boolean
+}) {
+  const body = (
+    <>
+      <span className={`rail-thumb rail-thumb-${item.type === 'league' ? 'gold' : 'olive'}`}>
+        {item.type === 'league' ? <Trophy size={13} /> : <Users size={13} />}
+      </span>
+      <span className="rail-row-body">
+        <strong>{item.name}{hot && <Flame size={11} />}</strong>
+        <small>{item.count} loaded posts this week</small>
+      </span>
+    </>
+  )
+  return item.type === 'league' ? (
+    <Link to="/leagues/$id" params={{ id: item.id }} className="rail-row">{body}</Link>
+  ) : (
+    <Link to="/clubs/$id" params={{ id: item.id }} className="rail-row">{body}</Link>
+  )
+}
+
+function DeadlineRow({ deadline }: { deadline: { id: string; name: string; due: string } }) {
+  const days = Math.ceil((Date.parse(deadline.due) - Date.now()) / (24 * 60 * 60 * 1000))
+  const urgency = days <= 1 ? 'urgent' : days <= 7 ? 'soon' : 'ok'
+  return (
+    <Link to="/leagues/$id" params={{ id: deadline.id }} className={`rail-deadline ${urgency}`}>
+      <span />
+      <strong>League closes</strong>
+      <small>{deadline.name}</small>
+      <time>{days <= 0 ? 'today' : `${days}d`}</time>
+    </Link>
+  )
+}
+
+function RailEmpty({ children }: { children: ReactNode }) {
+  return <p className="rail-empty">{children}</p>
+}
+
+function FeedSkeleton() {
+  return (
+    <div className="feed-stream" aria-busy>
+      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="feed-skeleton" />)}
+    </div>
+  )
+}
+
+function FeedEnd() {
+  return (
+    <div className="feed-end">
+      <Sparkles size={18} />
+      <span>You are all caught up</span>
+    </div>
+  )
+}
+
+function numericMeta(item: ActivityItem, key: string): number | null {
+  const value = (item.metadata as Record<string, unknown> | undefined)?.[key]
+  return typeof value === 'number' ? value : null
+}
+
+function fallbackText(item: ActivityItem): string {
+  switch (item.type) {
+    case 'commented':
+      return 'Commented on a score card.'
+    case 'pellet_test_posted':
+      return 'Posted a pellet test.'
+    case 'league_round_opened':
+      return item.metadata?.round_name ? `New round in ${item.metadata.league_name ?? 'a league'}: ${item.metadata.round_name}.` : 'Opened a league round.'
+    case 'league_season_started':
+      return item.metadata?.season_name ? `New season in ${item.metadata.league_name ?? 'a league'}: ${item.metadata.season_name}.` : 'Started a league season.'
+    case 'feature_request_created':
+      return item.metadata?.title ? `Feature request: ${item.metadata.title}.` : 'Created a feature request.'
+    case 'feature_request_implemented':
+      return item.metadata?.title ? `Feature implemented: ${item.metadata.title}.` : 'Feature implemented.'
+    default:
+      return 'Posted an update.'
+  }
+}
+
+function sharePost(post: FeedPost) {
+  const url = `${window.location.origin}/feed`
+  const text = `${post.activity.display_name} on SUB12`
+  if (navigator.share) {
+    navigator.share({ title: 'SUB12 Feed', text, url }).catch(() => {})
+    return
+  }
+  navigator.clipboard?.writeText(url).then(
+    () => toast('Feed link copied', 'success'),
+    () => toast('Unable to copy link', 'error'),
   )
 }
