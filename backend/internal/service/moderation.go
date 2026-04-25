@@ -332,28 +332,26 @@ func (s *ModerationService) fanout(report *model.Report) {
 
 		if rep.LeagueID != nil {
 			if ids, err := s.leagues.ListAdminIDs(ctx, *rep.LeagueID); err == nil {
-				for _, id := range ids {
-					recipients[id] = struct{}{}
-				}
+				addReportRecipients(recipients, ids, "", rep.ReporterID)
 			}
 			if l, err := s.leagues.GetByID(ctx, *rep.LeagueID); err == nil {
+				addReportRecipients(recipients, nil, l.CreatedBy, rep.ReporterID)
 				communityName = l.Name
 			}
 			reportPath = fmt.Sprintf("/leagues/%s/reports#%s", *rep.LeagueID, rep.ID)
 		}
 		if rep.ClubID != nil {
 			if ids, err := s.clubs.ListAdminIDs(ctx, *rep.ClubID); err == nil {
-				for _, id := range ids {
-					recipients[id] = struct{}{}
+				addReportRecipients(recipients, ids, "", rep.ReporterID)
+			}
+			if c, err := s.clubs.GetByID(ctx, *rep.ClubID, ""); err == nil {
+				addReportRecipients(recipients, nil, c.CreatedBy, rep.ReporterID)
+				if rep.LeagueID == nil {
+					communityName = c.Name
+					reportPath = fmt.Sprintf("/clubs/%s/reports#%s", *rep.ClubID, rep.ID)
 				}
 			}
-			if c, err := s.clubs.GetByID(ctx, *rep.ClubID, ""); err == nil && rep.LeagueID == nil {
-				communityName = c.Name
-				reportPath = fmt.Sprintf("/clubs/%s/reports#%s", *rep.ClubID, rep.ID)
-			}
 		}
-		// Drop the reporter themselves.
-		delete(recipients, rep.ReporterID)
 
 		if len(recipients) == 0 {
 			return
@@ -409,6 +407,19 @@ func targetLabelFor(t string) string {
 		return "a user"
 	}
 	return "content"
+}
+
+func addReportRecipients(recipients map[string]struct{}, adminIDs []string, ownerID, excludedID string) {
+	for _, id := range adminIDs {
+		if id == "" || id == excludedID {
+			continue
+		}
+		recipients[id] = struct{}{}
+	}
+	if ownerID == "" || ownerID == excludedID {
+		return
+	}
+	recipients[ownerID] = struct{}{}
 }
 
 func strPtr(s string) *string { return &s }
