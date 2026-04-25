@@ -722,7 +722,7 @@ func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limi
 	}
 
 	query := `
-		SELECT sc.id, sc.user_id, u.display_name,
+		SELECT sc.id, sc.user_id, u.display_name, u.avatar_url,
 		       sc.shot_at::text, sc.total_score, sc.x_count,
 		       sc.verification::text, sc.created_at
 		FROM score_cards sc
@@ -751,7 +751,7 @@ func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limi
 	var scores []*model.LeagueScore
 	for rows.Next() {
 		var s model.LeagueScore
-		if err := rows.Scan(&s.ID, &s.UserID, &s.DisplayName,
+		if err := rows.Scan(&s.ID, &s.UserID, &s.DisplayName, &s.AvatarURL,
 			&s.ShotAt, &s.TotalScore, &s.XCount,
 			&s.Verification, &s.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan league score: %w", err)

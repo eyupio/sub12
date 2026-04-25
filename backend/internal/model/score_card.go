@@ -172,6 +172,7 @@ type LeagueScore struct {
 	ID           string    `json:"id"`
 	UserID       string    `json:"user_id"`
 	DisplayName  string    `json:"display_name"`
+	AvatarURL    *string   `json:"avatar_url,omitempty"`
 	ShotAt       string    `json:"shot_at"`
 	TotalScore   int16     `json:"total_score"`
 	XCount       int16     `json:"x_count"`
