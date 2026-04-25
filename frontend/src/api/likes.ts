@@ -28,4 +28,10 @@ export const likeApi = {
 
   unlikePost: (id: string) =>
     api.del<UnlikeResponse>(`/posts/${id}/like`),
+
+  likeActivity: (id: string) =>
+    api.post<LikeResponse>(`/activities/${id}/like`, {}),
+
+  unlikeActivity: (id: string) =>
+    api.del<UnlikeResponse>(`/activities/${id}/like`),
 }

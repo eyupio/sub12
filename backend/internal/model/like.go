@@ -7,6 +7,7 @@ const (
 	LikeTargetScoreCard = "score_card"
 	LikeTargetPost      = "post"
 	LikeTargetComment   = "comment"
+	LikeTargetActivity  = "activity"
 )
 
 // Like represents a single like on a target entity.

@@ -261,6 +261,49 @@ func (h *CommentHandler) ListOnFeatureRequest(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, map[string]any{"items": comments})
 }
 
+// CreateOnActivity handles POST /api/v1/activities/{id}/comments
+func (h *CommentHandler) CreateOnActivity(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	targetID := chi.URLParam(r, "id")
+
+	var input model.CreateCommentInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	comment, err := h.svc.Create(r.Context(), targetID, "activity", userID, input.Body, input.ParentID)
+	if err != nil {
+		h.handleCreateError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, comment)
+}
+
+// ListOnActivity handles GET /api/v1/activities/{id}/comments
+func (h *CommentHandler) ListOnActivity(w http.ResponseWriter, r *http.Request) {
+	targetID := chi.URLParam(r, "id")
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+
+	comments, err := h.svc.ListByTarget(r.Context(), targetID, "activity", viewerID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list comments")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": comments})
+}
+
 // Flag handles POST /api/v1/comments/{id}/flag. League/club admins (or global
 // admins) mark the comment as needing amendment.
 func (h *CommentHandler) Flag(w http.ResponseWriter, r *http.Request) {

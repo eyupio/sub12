@@ -309,6 +309,10 @@ func NewRouter(
 			r.With(rl.Limit("like")).Delete("/comments/{id}/like", lkh.UnlikeComment)
 			r.With(rl.Limit("like")).Post("/posts/{id}/like", lkh.LikePost)
 			r.With(rl.Limit("like")).Delete("/posts/{id}/like", lkh.UnlikePost)
+			r.With(rl.Limit("like")).Post("/activities/{id}/like", lkh.LikeActivity)
+			r.With(rl.Limit("like")).Delete("/activities/{id}/like", lkh.UnlikeActivity)
+			r.With(rl.Limit("comment")).Post("/activities/{id}/comments", commentH.CreateOnActivity)
+			r.Get("/activities/{id}/comments", commentH.ListOnActivity)
 
 			// Posts
 			postH := handler.NewPost(posts)
