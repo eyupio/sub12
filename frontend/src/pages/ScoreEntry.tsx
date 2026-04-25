@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, Upload, X, Trophy, HelpCircle } from 'lucide-react'
+import { Camera, Upload, X, Trophy, HelpCircle, Trash2 } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -38,6 +39,7 @@ export default function ScoreEntry() {
   const [showHelp, setShowHelp] = useState(() => {
     try { return !localStorage.getItem('sub12-score-help-seen') } catch { /* localStorage unavailable */ return true }
   })
+  const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -281,6 +283,19 @@ export default function ScoreEntry() {
     },
   })
 
+  const deleteDraftMutation = useMutation({
+    mutationFn: () => scoreCardApi.remove(draftId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['score-drafts'] })
+      qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
+      toast('Draft deleted', 'success')
+      navigate({ to: '/drafts' })
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to delete draft', 'error')
+    },
+  })
+
   const inputCls =
     'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm focus:outline-none focus:border-[var(--brass)]/50'
 
@@ -294,18 +309,31 @@ export default function ScoreEntry() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
       <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-            {draftId ? 'Refine Draft' : 'New Score Card'}
-          </h1>
-          <button
-            onClick={() => setShowHelp(true)}
-            className="text-muted hover:text-[var(--brass)] transition-colors"
-            aria-label="How to enter scores"
-            title="How to enter scores"
-          >
-            <HelpCircle size={18} />
-          </button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+              {draftId ? 'Refine Draft' : 'New Score Card'}
+            </h1>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="text-muted hover:text-[var(--brass)] transition-colors"
+              aria-label="How to enter scores"
+              title="How to enter scores"
+            >
+              <HelpCircle size={18} />
+            </button>
+          </div>
+          {draftId && (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteDraft(true)}
+              disabled={deleteDraftMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          )}
         </div>
         {league ? (
           <div className="mt-1 space-y-0.5">
@@ -628,6 +656,19 @@ export default function ScoreEntry() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteDraft}
+        title="Delete draft?"
+        message="This score card draft will be permanently deleted. This cannot be undone."
+        confirmLabel={deleteDraftMutation.isPending ? 'Deleting...' : 'Delete'}
+        onConfirm={() => {
+          if (!deleteDraftMutation.isPending) deleteDraftMutation.mutate()
+        }}
+        onCancel={() => {
+          if (!deleteDraftMutation.isPending) setConfirmDeleteDraft(false)
+        }}
+      />
     </div>
   )
 }

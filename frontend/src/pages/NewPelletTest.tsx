@@ -5,6 +5,7 @@ import { Plus, Trash2, Camera, Upload, X, ChevronDown, ChevronRight } from 'luci
 import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -81,6 +82,7 @@ export default function NewPelletTest() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [showAddPellet, setShowAddPellet] = useState(false)
   const [newPellet, setNewPellet] = useState<CreatePelletPayload>({ brand: '', model: '' })
+  const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false)
 
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
@@ -265,11 +267,37 @@ export default function NewPelletTest() {
     },
   })
 
+  const deleteDraftMutation = useMutation({
+    mutationFn: () => pelletTestApi.delete(draftId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pellet-drafts'] })
+      qc.invalidateQueries({ queryKey: ['pellet-drafts-count'] })
+      toast('Draft deleted', 'success')
+      navigate({ to: '/drafts' })
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to delete draft', 'error')
+    },
+  })
+
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
-        {draftId ? 'Refine Draft' : 'New Pellet Test'}
-      </h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+          {draftId ? 'Refine Draft' : 'New Pellet Test'}
+        </h1>
+        {draftId && (
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteDraft(true)}
+            disabled={deleteDraftMutation.isPending}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        )}
+      </div>
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-8">
         <div className="space-y-4">
@@ -522,6 +550,19 @@ export default function NewPelletTest() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteDraft}
+        title="Delete draft?"
+        message="This pellet test draft will be permanently deleted. This cannot be undone."
+        confirmLabel={deleteDraftMutation.isPending ? 'Deleting...' : 'Delete'}
+        onConfirm={() => {
+          if (!deleteDraftMutation.isPending) deleteDraftMutation.mutate()
+        }}
+        onCancel={() => {
+          if (!deleteDraftMutation.isPending) setConfirmDeleteDraft(false)
+        }}
+      />
     </div>
   )
 }
