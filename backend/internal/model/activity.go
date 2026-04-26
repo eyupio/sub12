@@ -21,6 +21,8 @@ const (
 	ActivityFeatureRequestCreated     ActivityType = "feature_request_created"
 	ActivityFeatureRequestImplemented ActivityType = "feature_request_implemented"
 	ActivityPostCreated               ActivityType = "post_created"
+	ActivityCommunityReviewRequested  ActivityType = "community_review_requested"
+	ActivityCommunityReviewVerified   ActivityType = "community_review_verified"
 )
 
 // FeedFilter controls which slice of the activity feed to return.

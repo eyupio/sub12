@@ -13,6 +13,8 @@ export type ActivityType =
   | 'feature_request_created'
   | 'feature_request_implemented'
   | 'post_created'
+  | 'community_review_requested'
+  | 'community_review_verified'
 
 export type FeedFilter = 'public' | 'for_you' | 'league' | 'club'
 
@@ -50,6 +52,7 @@ export interface ActivityItem {
     attachment_target_id?: string
     attachment_image_urls?: string[]
     card_image_url?: string
+    required_confirmations?: number
   }
   league_id?: string
   club_id?: string

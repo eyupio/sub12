@@ -40,6 +40,7 @@ import { activityApi, type ActivityItem, type FeedFilter } from '../api/activity
 import { achievementApi } from '../api/achievements'
 import { clubsApi } from '../api/clubs'
 import { leagueApi } from '../api/leagues'
+import { communityReviewApi } from '../api/communityReview'
 import { postApi } from '../api/posts'
 import { scoreCardApi, type ScoreCardSummary } from '../api/scoreCards'
 import { pelletTestApi, type PelletTestSessionSummary } from '../api/pelletTesting'
@@ -700,6 +701,8 @@ function FeedPostArticle({
         {post.kind === 'pb' && <PersonalBestPost post={post} />}
         {post.kind === 'score' && <ScorePost post={post} />}
         {post.kind === 'achievement' && <AchievementPost post={post} />}
+        {post.kind === 'review_request' && <ReviewRequestPost post={post} />}
+        {post.kind === 'review_verified' && <ReviewVerifiedPost post={post} />}
         {post.kind === 'text' && (
           <TextPost
             post={post}
@@ -968,6 +971,87 @@ function AchievementPost({ post }: { post: FeedPost }) {
         <div className="achievement-meta">
           <span className="rarity rarity-uncommon">Uncommon</span>
           <span>earned by SUB12 shooters</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReviewRequestPost({ post }: { post: FeedPost }) {
+  const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.user)
+  const required = post.activity.metadata?.required_confirmations ?? 3
+  const targetId = post.activity.target_id
+  const isOwner = !!currentUser && post.activity.user_id === currentUser.id
+
+  const confirmMutation = useMutation({
+    mutationFn: () => communityReviewApi.confirm(targetId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', targetId, 'community-review'] })
+      toast('Card confirmed', 'success')
+    },
+    onError: (err) => {
+      const status = err instanceof Error && 'status' in err ? (err as { status?: number }).status : 0
+      if (status === 409) toast('Already confirmed', 'error')
+      else if (status === 403) toast("Can't confirm your own card", 'error')
+      else toast('Failed to confirm card', 'error')
+    },
+  })
+
+  return (
+    <div className="score-grid">
+      {post.cardImageUrl ? (
+        <img
+          className="score-thumb"
+          src={post.cardImageUrl}
+          alt="Score card"
+          style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: 8 }}
+        />
+      ) : (
+        <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={78} />
+      )}
+      <div className="score-stack">
+        <div className="score-line">
+          <span className="num">{post.score ?? '--'}</span>
+          {post.x != null && <span className="x">{post.x}<small>X</small></span>}
+        </div>
+        <div className="score-meta">
+          <span><Sparkles size={11} />Asked for community review · needs {required} confirmations</span>
+        </div>
+        {!isOwner && targetId && (
+          <button
+            onClick={() => confirmMutation.mutate()}
+            disabled={confirmMutation.isPending}
+            style={{ marginTop: 8, alignSelf: 'flex-start', padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-hover)', cursor: 'pointer' }}
+          >
+            {confirmMutation.isPending ? 'Confirming…' : 'Confirm this card'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReviewVerifiedPost({ post }: { post: FeedPost }) {
+  return (
+    <div className="score-grid">
+      {post.cardImageUrl ? (
+        <img
+          className="score-thumb"
+          src={post.cardImageUrl}
+          alt="Score card"
+          style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: 8 }}
+        />
+      ) : (
+        <TargetPreview seed={post.targetSeed} xCount={post.x ?? 0} size={78} />
+      )}
+      <div className="score-stack">
+        <div className="score-line">
+          <span className="num">{post.score ?? '--'}</span>
+          {post.x != null && <span className="x">{post.x}<small>X</small></span>}
+        </div>
+        <div className="score-meta">
+          <span><Award size={11} />Verified by the community</span>
         </div>
       </div>
     </div>

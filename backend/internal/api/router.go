@@ -48,6 +48,7 @@ func NewRouter(
 	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
 	twoFactor *service.TwoFactorService,
+	communityReview *service.CommunityReviewService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -375,6 +376,13 @@ func NewRouter(
 			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
+
+			// Community review for personal practice cards
+			crh := handler.NewCommunityReview(communityReview)
+			r.Get("/score-cards/{id}/review-request", crh.Get)
+			r.Post("/score-cards/{id}/review-request", crh.Request)
+			r.Delete("/score-cards/{id}/review-request", crh.Cancel)
+			r.Post("/score-cards/{id}/review-request/confirm", crh.Confirm)
 
 			// Clubs (auth-required operations)
 			clh := handler.NewClub(clubs, leagues, images)

@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCirc
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
+import { communityReviewApi } from '../api/communityReview'
 import { clubsApi } from '../api/clubs'
 import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
@@ -819,6 +820,127 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
   )
 }
 
+function CommunityReviewSection({ scoreCardId, isOwner }: { scoreCardId: string; isOwner: boolean }) {
+  const queryClient = useQueryClient()
+  const prefs = useRegionalPrefs()
+  const { data, isLoading } = useQuery({
+    queryKey: ['score-cards', scoreCardId, 'community-review'],
+    queryFn: () => communityReviewApi.get(scoreCardId),
+  })
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'community-review'] })
+    queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId] })
+  }
+
+  const requestMutation = useMutation({
+    mutationFn: () => communityReviewApi.request(scoreCardId),
+    onSuccess: () => {
+      invalidate()
+      toast('Community review requested', 'success')
+    },
+    onError: (err) => {
+      const status = err instanceof ApiError ? err.status : 0
+      toast(status === 409 ? 'A review request is already open' : 'Failed to request review', 'error')
+    },
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: () => communityReviewApi.cancel(scoreCardId),
+    onSuccess: () => {
+      invalidate()
+      toast('Review request cancelled', 'success')
+    },
+    onError: () => toast('Failed to cancel review request', 'error'),
+  })
+
+  const confirmMutation = useMutation({
+    mutationFn: () => communityReviewApi.confirm(scoreCardId),
+    onSuccess: () => {
+      invalidate()
+      toast('Card confirmed', 'success')
+    },
+    onError: (err) => {
+      const status = err instanceof ApiError ? err.status : 0
+      if (status === 409) toast('Already confirmed', 'error')
+      else if (status === 403) toast("Can't confirm your own card", 'error')
+      else toast('Failed to confirm card', 'error')
+    },
+  })
+
+  if (isLoading) return null
+  const req = data?.request
+  const count = data?.confirmation_count ?? 0
+  const required = req?.required_confirmations ?? 0
+
+  return (
+    <div className="border-t border-subtle pt-4 mt-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-[11px] tracking-widest uppercase text-muted">Community Review</h3>
+        {req?.status === 'open' && (
+          <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400">
+            {count}/{required} confirmations
+          </span>
+        )}
+        {req?.status === 'verified' && (
+          <span className="inline-flex items-center gap-1 text-[var(--success-text)] text-[11px] tracking-widest uppercase">
+            <CheckCircle size={12} /> Verified by community
+          </span>
+        )}
+      </div>
+
+      {!req && isOwner && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted">
+            Open this card up for community review. Reviewers can confirm your score; once 3 reviewers confirm,
+            the card auto-flips to verified.
+          </p>
+          <button
+            onClick={() => requestMutation.mutate()}
+            disabled={requestMutation.isPending}
+            className="self-start px-3 py-1.5 text-sm rounded border border-subtle bg-surface-hover hover:bg-[var(--brass)] hover:text-black transition-colors disabled:opacity-50"
+          >
+            {requestMutation.isPending ? 'Requesting…' : 'Request community review'}
+          </button>
+        </div>
+      )}
+
+      {req?.status === 'open' && isOwner && (
+        <button
+          onClick={() => cancelMutation.mutate()}
+          disabled={cancelMutation.isPending}
+          className="px-3 py-1.5 text-sm rounded border border-subtle hover:bg-surface-hover transition-colors disabled:opacity-50"
+        >
+          {cancelMutation.isPending ? 'Cancelling…' : 'Cancel review request'}
+        </button>
+      )}
+
+      {req?.status === 'open' && !isOwner && (
+        <button
+          onClick={() => confirmMutation.mutate()}
+          disabled={confirmMutation.isPending || data?.viewer_has_confirmed}
+          className="px-3 py-1.5 text-sm rounded border border-subtle bg-surface-hover hover:bg-[var(--brass)] hover:text-black transition-colors disabled:opacity-50"
+        >
+          {data?.viewer_has_confirmed ? 'You confirmed this card' : confirmMutation.isPending ? 'Confirming…' : 'Confirm this card'}
+        </button>
+      )}
+
+      {data && data.confirmations.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {data.confirmations.map((c) => (
+            <li key={c.id} className="flex items-center gap-2 text-sm text-muted">
+              <UserCheck size={14} className="text-[var(--success-text)]" />
+              <span>
+                <span className="text-[var(--text)]">{c.display_name}</span> confirmed on {formatDate(c.created_at, prefs)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
   const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
@@ -1481,6 +1603,11 @@ export default function ScoreCardDetail() {
       {/* Audit Trail \u2014 only shown for league cards */}
       {card.league_round_id && (
         <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
+      )}
+
+      {/* Community review \u2014 personal practice cards only */}
+      {!card.league_round_id && !card.is_draft && (
+        <CommunityReviewSection scoreCardId={id} isOwner={isOwner} />
       )}
 
       {/* Like / Share */}
