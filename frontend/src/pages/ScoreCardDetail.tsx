@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2, RotateCcw, RotateCw, Trophy } from 'lucide-react'
@@ -26,6 +26,90 @@ import { Flag } from 'lucide-react'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { UserAvatar } from '../components/UserAvatar'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
+
+function RotatedImage({
+  src,
+  alt,
+  rotation,
+  maxHeight,
+  imgClassName,
+  wrapperClassName,
+  loading,
+  onClick,
+}: {
+  src: string
+  alt: string
+  rotation: number
+  maxHeight: number
+  imgClassName?: string
+  wrapperClassName?: string
+  loading?: 'lazy' | 'eager'
+  onClick?: () => void
+}) {
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
+  const [containerW, setContainerW] = useState<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setContainerW(el.getBoundingClientRect().width)
+    const ro = new ResizeObserver((entries) => {
+      setContainerW(entries[0].contentRect.width)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const normalized = ((rotation % 360) + 360) % 360
+  const isQuarter = normalized === 90 || normalized === 270
+
+  let preW: number | null = null
+  let preH: number | null = null
+  if (natural && containerW && containerW > 0) {
+    const ratio = natural.w / natural.h
+    const boxW = isQuarter ? maxHeight : containerW
+    const boxH = isQuarter ? containerW : maxHeight
+    if (ratio > boxW / boxH) {
+      preW = boxW
+      preH = boxW / ratio
+    } else {
+      preH = boxH
+      preW = boxH * ratio
+    }
+  }
+
+  const postW = isQuarter ? preH : preW
+  const postH = isQuarter ? preW : preH
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative w-full ${wrapperClassName ?? ''}`}
+      style={{ height: postH ?? maxHeight }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        loading={loading}
+        onClick={onClick}
+        onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+        className={imgClassName}
+        style={{
+          width: preW ?? undefined,
+          height: preH ?? undefined,
+          maxWidth: preW == null ? '100%' : undefined,
+          maxHeight: preH == null ? maxHeight : undefined,
+          objectFit: 'contain',
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: `translate(-50%, -50%) rotate(${normalized}deg)`,
+        }}
+      />
+    </div>
+  )
+}
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -1653,12 +1737,14 @@ export default function ScoreCardDetail() {
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2">
                   <p className="t-section-title border-b border-subtle pb-2">Score Card Photo</p>
                   <button onClick={() => setShowLightbox(true)} className="w-full">
-                    <img
+                    <RotatedImage
                       src={card.card_image_url}
                       alt="Score card photo"
-                      className="rounded border border-subtle max-h-48 w-full object-contain bg-surface-hover cursor-zoom-in"
+                      rotation={card.card_image_rotation ?? 0}
+                      maxHeight={192}
                       loading="lazy"
-                      style={{ transform: `rotate(${card.card_image_rotation ?? 0}deg)` }}
+                      wrapperClassName="rounded border border-subtle bg-surface-hover overflow-hidden"
+                      imgClassName="cursor-zoom-in rounded"
                     />
                   </button>
                   {isOwner && !editing && (
@@ -1780,7 +1866,7 @@ export default function ScoreCardDetail() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
           onClick={() => setShowLightbox(false)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
+          <div className="relative w-[min(64rem,100vw-2rem)] max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
             <button
               onClick={() => setShowLightbox(false)}
               className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-2 text-muted hover:text-primary transition-colors z-10"
@@ -1788,11 +1874,12 @@ export default function ScoreCardDetail() {
             >
               <XIcon size={20} />
             </button>
-            <img
+            <RotatedImage
               src={card.card_image_url}
               alt="Score card photo"
-              className="max-h-[85vh] max-w-full object-contain rounded"
-              style={{ transform: `rotate(${card.card_image_rotation ?? 0}deg)` }}
+              rotation={card.card_image_rotation ?? 0}
+              maxHeight={Math.max(240, Math.floor(window.innerHeight * 0.85))}
+              imgClassName="rounded"
             />
           </div>
         </div>
