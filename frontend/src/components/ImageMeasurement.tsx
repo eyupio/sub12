@@ -6,6 +6,7 @@ import type { DetectedHole } from '../utils/holeDetection'
 import { CALIBER_MAP } from '../utils/caliber'
 import type { PelletTestMeasurement, PelletTestDetection, CreateMeasurementPayload } from '../api/pelletTesting'
 import { toast } from '../store/toast'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface Props {
   imageUrl: string
@@ -104,6 +105,8 @@ export default function ImageMeasurement({
   const [lineEnd, setLineEnd] = useState<Point | null>(null)
   const [manualShotCount, setManualShotCount] = useState('')
   const [detectStatus, setDetectStatus] = useState<string | null>(null)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const isDrawingLine = useRef(false)
 
   // parseFloat handles edge cases that `Number()` silently coerces:
   // `Number('')` is 0 (|| fallback kicks in, masking an empty field);
@@ -345,6 +348,22 @@ export default function ImageMeasurement({
       ctx.beginPath(); ctx.moveTo(rp.x + d, rp.y - d); ctx.lineTo(rp.x - d, rp.y + d); ctx.stroke()
     }
 
+    const drawStartMarker = (rs: Point) => {
+      ctx.beginPath(); ctx.arc(rs.x, rs.y, 14 / zoom, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(34,197,94,0.25)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(rs.x, rs.y, 9 / zoom, 0, Math.PI * 2)
+      ctx.fillStyle = '#22c55e'; ctx.fill()
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 / zoom; ctx.stroke()
+      ctx.font = `bold ${Math.max(11, 12 / zoom)}px sans-serif`
+      ctx.fillStyle = '#22c55e'; ctx.textAlign = 'center'
+      ctx.fillText('START', rs.x, rs.y - 16 / zoom)
+    }
+
+    if (lineStart && !lineEnd) {
+      const rs = imageToRotated(lineStart)
+      drawStartMarker(rs)
+    }
+
     if (lineStart && lineEnd) {
       const rs = imageToRotated(lineStart)
       const re = imageToRotated(lineEnd)
@@ -355,10 +374,11 @@ export default function ImageMeasurement({
       ctx.lineTo(re.x, re.y)
       ctx.stroke()
 
-      const pointRadius = 5 / zoom
-      ctx.fillStyle = '#22c55e'
-      ctx.beginPath(); ctx.arc(rs.x, rs.y, pointRadius, 0, Math.PI * 2); ctx.fill()
-      ctx.beginPath(); ctx.arc(re.x, re.y, pointRadius, 0, Math.PI * 2); ctx.fill()
+      drawStartMarker(rs)
+
+      ctx.beginPath(); ctx.arc(re.x, re.y, 6 / zoom, 0, Math.PI * 2)
+      ctx.fillStyle = '#22c55e'; ctx.fill()
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 / zoom; ctx.stroke()
 
       if (manualGroupSizeMM !== null) {
         const mx = (rs.x + re.x) / 2
@@ -389,6 +409,7 @@ export default function ImageMeasurement({
       const p2 = points[1]
       isPinching.current = true
       lastPinchDist.current = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+      isDrawingLine.current = false
     }
 
     pointerTypeRef.current = e.pointerType
@@ -397,7 +418,14 @@ export default function ImageMeasurement({
     isPointerDown.current = true
     panStart.current = { x: e.clientX, y: e.clientY }
     panOffset.current = { ...pan }
-  }, [pan])
+
+    if (subMode === 'draw_line_start' && !isPinching.current) {
+      const pt = screenToImage(e.clientX, e.clientY)
+      setLineStart(pt)
+      setLineEnd(null)
+      isDrawingLine.current = true
+    }
+  }, [pan, subMode, screenToImage])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -434,6 +462,18 @@ export default function ImageMeasurement({
     }
 
     if (!isPointerDown.current) return
+
+    if (isDrawingLine.current) {
+      const dx0 = e.clientX - pointerStart.current.x
+      const dy0 = e.clientY - pointerStart.current.y
+      const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
+      if (Math.hypot(dx0, dy0) > threshold) {
+        didDrag.current = true
+        setLineEnd(screenToImage(e.clientX, e.clientY))
+      }
+      return
+    }
+
     const dx = e.clientX - pointerStart.current.x
     const dy = e.clientY - pointerStart.current.y
     const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
@@ -445,7 +485,7 @@ export default function ImageMeasurement({
         y: panOffset.current.y + (e.clientY - panStart.current.y),
       })
     }
-  }, [isPanning])
+  }, [isPanning, screenToImage])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
@@ -460,6 +500,17 @@ export default function ImageMeasurement({
     }
 
     isPointerDown.current = false
+
+    if (isDrawingLine.current) {
+      isDrawingLine.current = false
+      if (didDrag.current) {
+        setLineEnd(screenToImage(e.clientX, e.clientY))
+        setSubMode('idle')
+      }
+      // tap (no drag) — lineStart already set on pointerDown; stay in draw_line_start
+      return
+    }
+
     if (isPanning) { setIsPanning(false); return }
     if (didDrag.current) return
 
@@ -468,7 +519,6 @@ export default function ImageMeasurement({
     if (subMode === 'set_aim') setAimPoint(pt)
     else if (subMode === 'set_point_a') { setPointA(pt); setSubMode('idle') }
     else if (subMode === 'set_point_b') { setPointB(pt); setSubMode('idle') }
-    else if (subMode === 'draw_line_start') { setLineStart(pt); setSubMode('idle') }
     else if (subMode === 'draw_line_end') { setLineEnd(pt); setSubMode('idle') }
     else if (subMode === 'add_impact') setImpacts(prev => [...prev, pt])
     else if (subMode === 'remove_impact' && impacts.length > 0) {
@@ -485,6 +535,7 @@ export default function ImageMeasurement({
       lastPinchDist.current = null
     }
     isPointerDown.current = false
+    isDrawingLine.current = false
     setIsPanning(false)
   }, [])
 
@@ -671,14 +722,12 @@ export default function ImageMeasurement({
         <button onClick={goBack} className="text-primary p-1"><ArrowLeft size={20} /></button>
         <span className="text-primary font-medium text-sm tracking-wide">{stepTitles[step]}</span>
         <div className="flex items-center gap-2">
-          {existingMeasurement && (
-            <button
-              onClick={handleReset}
-              className="text-secondary hover:text-primary text-[11px] tracking-widest uppercase px-2 py-1 rounded border border-subtle"
-            >
-              Reset
-            </button>
-          )}
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="text-[var(--error-text)] hover:opacity-80 text-[11px] tracking-widest uppercase px-2 py-1 rounded border border-subtle"
+          >
+            Reset
+          </button>
           <button onClick={onClose} className="text-primary p-1"><XIcon size={20} /></button>
         </div>
       </div>
@@ -823,9 +872,20 @@ export default function ImageMeasurement({
                     SET END {lineEnd && '\u2713'}
                   </button>
                 </div>
-                <p className="text-xs text-muted text-center">
-                  Group size: {manualGroupSizeMM !== null ? `${fmtLen(manualGroupSizeMM)} ${displayUnit} (${manualGroupSizeMOA ?? '—'} MOA)` : '—'}
-                </p>
+                <p className="text-[11px] text-muted text-center">Tap to mark, or press and drag to draw the line</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted">
+                    Group size: {manualGroupSizeMM !== null ? `${fmtLen(manualGroupSizeMM)} ${displayUnit} (${manualGroupSizeMOA ?? '—'} MOA)` : '—'}
+                  </p>
+                  {(lineStart || lineEnd) && (
+                    <button
+                      onClick={() => { setLineStart(null); setLineEnd(null); setManualShotCount(''); setSubMode('draw_line_start') }}
+                      className="text-[11px] uppercase tracking-wider text-[var(--error-text)] hover:opacity-80"
+                    >
+                      Clear line
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   min="1"
@@ -878,6 +938,14 @@ export default function ImageMeasurement({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset measurement?"
+        message="This clears the aim point, calibration, distance, marker size, and all impact/line points. You'll start over from step 1."
+        confirmLabel="Reset"
+        onConfirm={() => { setConfirmReset(false); handleReset() }}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   )
 }

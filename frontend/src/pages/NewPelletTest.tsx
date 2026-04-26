@@ -25,6 +25,41 @@ function distanceToMeters(value: number, unit: string): number {
   return unit === 'yards' ? value * 0.9144 : value
 }
 
+const LAST_USED_KEY = 'sub12.pelletTest.lastUsed'
+
+interface LastUsedPelletTest {
+  rifleId?: string
+  pelletId?: string
+  distanceValue?: string
+  distanceUnit?: string
+  location?: LocationValue
+}
+
+function readLastUsed(): LastUsedPelletTest {
+  try {
+    const raw = localStorage.getItem(LAST_USED_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeLastUsed(patch: LastUsedPelletTest): void {
+  try {
+    const existing = readLastUsed()
+    const merged = { ...existing }
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined || v === '' || v === null) continue
+      ;(merged as Record<string, unknown>)[k] = v
+    }
+    localStorage.setItem(LAST_USED_KEY, JSON.stringify(merged))
+  } catch {
+    // ignore (privacy mode, quota, etc.)
+  }
+}
+
 interface GroupRow {
   key: number
   shotCount: number
@@ -42,12 +77,13 @@ export default function NewPelletTest() {
   const search = useSearch({ strict: false }) as { draftId?: string }
   const draftId = search.draftId
 
-  const [rifleId, setRifleId] = useState('')
-  const [pelletId, setPelletId] = useState('')
+  const initialLastUsed = useRef<LastUsedPelletTest | null>(draftId ? null : readLastUsed()).current
+  const [rifleId, setRifleId] = useState(initialLastUsed?.rifleId ?? '')
+  const [pelletId, setPelletId] = useState(initialLastUsed?.pelletId ?? '')
   const [testDate, setTestDate] = useState(today())
-  const [distanceValue, setDistanceValue] = useState('')
-  const [distanceUnit, setDistanceUnit] = useState('meters')
-  const [location, setLocation] = useState<LocationValue>({ label: '' })
+  const [distanceValue, setDistanceValue] = useState(initialLastUsed?.distanceValue ?? '')
+  const [distanceUnit, setDistanceUnit] = useState(initialLastUsed?.distanceUnit ?? 'meters')
+  const [location, setLocation] = useState<LocationValue>(initialLastUsed?.location ?? { label: '' })
   const [windMph, setWindMph] = useState('')
   const [tempCelsius, setTempCelsius] = useState('')
   const [humidityPct, setHumidityPct] = useState('')
@@ -258,6 +294,13 @@ export default function NewPelletTest() {
       return { session, groupFailures, imageFailures, wasDraft: !!draftId }
     },
     onSuccess: ({ session, groupFailures, imageFailures, wasDraft }) => {
+      writeLastUsed({
+        rifleId,
+        pelletId,
+        distanceValue,
+        distanceUnit,
+        location: location.label || location.lat != null ? location : undefined,
+      })
       qc.invalidateQueries({ queryKey: ['pellet-tests'] })
       qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
       qc.invalidateQueries({ queryKey: ['pellet-drafts'] })
