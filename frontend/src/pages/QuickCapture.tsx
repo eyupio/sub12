@@ -31,7 +31,7 @@ const TEMP_CHIPS = [
 function Section({ title, required, children }: { title: string; required?: boolean; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+      <h2 className="t-section-title flex items-center gap-2">
         {title}
         {required && <span className="text-[var(--brass)] text-xs">*</span>}
       </h2>
@@ -158,7 +158,7 @@ export default function QuickCapture() {
   return (
     <div className="max-w-2xl mx-auto p-4 pb-24 space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-medium tracking-wide">Quick capture</h1>
+        <h1 className="t-page-title">Quick capture</h1>
         <p className="text-sm text-muted">
           Snap it now, refine later. Only the essentials — no typing unless you want to.
         </p>

@@ -14,10 +14,10 @@ export default function BatchReport() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
       <div>
-        <Link to="/pellet-testing" className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors mb-3">
+        <Link to="/pellet-testing" className="flex items-center gap-1 t-section-title hover:text-secondary transition-colors mb-3">
           <ChevronLeft size={14} /> Back
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Batch / Lot Tracking
         </h1>
         <p className="text-sm text-muted mt-1">

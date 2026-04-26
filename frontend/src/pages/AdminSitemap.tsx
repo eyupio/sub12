@@ -74,13 +74,13 @@ export default function AdminSitemap() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+      <h1 className="t-page-title flex items-center gap-2">
         <Globe size={20} /> Sitemap &amp; SEO
       </h1>
 
       {/* Stats card */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Sitemap Overview</h2>
+        <h2 className="t-section-title">Sitemap Overview</h2>
         {statsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
         {statsQuery.error && (
           <p className="text-sm text-[var(--error-text)]">{parseError(statsQuery.error)}</p>
@@ -113,7 +113,7 @@ export default function AdminSitemap() {
 
       {/* Ping controls */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Submit Sitemap to Search Engines</h2>
+        <h2 className="t-section-title">Submit Sitemap to Search Engines</h2>
         {indexNowKeyQuery.error && (
           <p className="text-sm text-[var(--error-text)]">{parseError(indexNowKeyQuery.error)}</p>
         )}
@@ -180,7 +180,7 @@ export default function AdminSitemap() {
 
       {/* Submission history */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Submission History</h2>
+        <h2 className="t-section-title">Submission History</h2>
         {submissionsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
         {submissionsQuery.error && (
           <p className="text-sm text-[var(--error-text)]">{parseError(submissionsQuery.error)}</p>

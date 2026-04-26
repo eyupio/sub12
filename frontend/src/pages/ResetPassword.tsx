@@ -68,7 +68,7 @@ export default function ResetPassword() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
-          <p className="mt-4 text-sm tracking-widest uppercase text-muted">Set a new password</p>
+          <p className="mt-4 t-section-title">Set a new password</p>
         </div>
 
         {success ? (
@@ -92,7 +92,7 @@ export default function ResetPassword() {
               )}
 
               <div className="space-y-1">
-                <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="password">New Password</label>
+                <label className="t-section-title" htmlFor="password">New Password</label>
                 <input
                   id="password"
                   type="password"
@@ -106,7 +106,7 @@ export default function ResetPassword() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] tracking-widest uppercase text-muted" htmlFor="confirm">Confirm Password</label>
+                <label className="t-section-title" htmlFor="confirm">Confirm Password</label>
                 <input
                   id="confirm"
                   type="password"
@@ -128,7 +128,7 @@ export default function ResetPassword() {
               </button>
             </form>
 
-            <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+            <p className="text-center t-section-title">
               <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
                 Back to Sign In
               </Link>

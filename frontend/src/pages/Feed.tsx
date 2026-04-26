@@ -233,7 +233,7 @@ function FeedHeader() {
     <header className="feed-header">
       <div>
         <p className="feed-eyebrow">Social</p>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feed</h1>
+        <h1 className="t-page-title">Feed</h1>
       </div>
       <div className="feed-header-actions">
         <Link to="/notifications" className="feed-btn feed-btn-outline">

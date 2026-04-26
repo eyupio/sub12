@@ -106,7 +106,7 @@ export function ReportDialog({ open, targetType, targetId, onClose, contextLeagu
             <AlertTriangle size={18} className="text-[var(--error-text)]" />
           </div>
           <div className="flex-1">
-            <h3 id="report-title" className="text-sm font-medium text-primary">Report content</h3>
+            <h3 id="report-title" className="t-subsection-title">Report content</h3>
             <p className="text-xs text-muted mt-1">We review reports regularly. False reports may restrict your account.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary">

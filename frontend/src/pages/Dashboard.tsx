@@ -371,7 +371,7 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
 
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Dashboard</h1>
+      <h1 className="t-page-title">Dashboard</h1>
 
       {/* ── Profile header ───────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -383,7 +383,7 @@ export default function Dashboard() {
             showHoverCard={false}
           />
           <div className="min-w-0">
-            <p className="font-serif text-[22px] leading-tight text-ink truncate">
+            <p className="t-display-num text-[22px] leading-tight text-ink truncate">
               {user?.display_name}
               <Link to="/profile" className="ml-3 align-middle font-sans text-[10px] tracking-[0.18em] uppercase text-gold hover:text-gold-2 transition-colors">
                 Edit profile →

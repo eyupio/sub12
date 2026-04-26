@@ -238,7 +238,7 @@ export default function Drafts() {
   return (
     <div className="max-w-5xl mx-auto p-4 lg:p-6 space-y-5">
       <header className="space-y-1">
-        <h1 className="text-2xl lg:text-3xl font-medium tracking-widest uppercase text-secondary">Drafts</h1>
+        <h1 className="t-page-title">Drafts</h1>
         <p className="text-sm text-muted max-w-2xl">
           Quick-captured entries waiting for shot scores, measurements, or final details. Refine them when you're back from the range.
         </p>
@@ -261,7 +261,7 @@ export default function Drafts() {
               <button
                 type="button"
                 onClick={toggleAll}
-                className="inline-flex items-center gap-2 text-xs tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                className="inline-flex items-center gap-2 t-section-title hover:text-secondary transition-colors"
               >
                 {allSelected ? <CheckSquare size={15} /> : <Square size={15} />}
                 {allSelected ? 'Deselect all' : 'Select all'}
@@ -330,8 +330,8 @@ export default function Drafts() {
             {grouped.map(group => (
               <section key={group.key} className="space-y-2">
                 <div className="flex items-baseline justify-between border-b border-subtle pb-1">
-                  <h2 className="text-[11px] tracking-widest uppercase text-muted">{group.label}</h2>
-                  <span className="text-[11px] tracking-widest uppercase text-muted">
+                  <h2 className="t-section-title">{group.label}</h2>
+                  <span className="t-section-title">
                     {group.rows.length} draft{group.rows.length === 1 ? '' : 's'}
                   </span>
                 </div>

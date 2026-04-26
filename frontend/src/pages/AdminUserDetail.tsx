@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/auth'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { UserAvatar } from '../components/UserAvatar'
 
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnDanger = 'border border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-bg)] text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
@@ -36,7 +36,7 @@ function ConfirmDeleteModal({ user, onConfirm, onCancel, isPending }: {
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full sm:max-w-sm bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm tracking-widest uppercase text-secondary">Delete User</h2>
+          <h2 className="t-section-title">Delete User</h2>
           <button onClick={onCancel} className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
@@ -129,7 +129,7 @@ export default function AdminUserDetail() {
     <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-6">
       <Link
         to="/admin/users"
-        className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+        className="flex items-center gap-1 t-section-title hover:text-secondary transition-colors"
       >
         <ChevronLeft size={14} />
         All Users
@@ -179,7 +179,7 @@ export default function AdminUserDetail() {
 
       {/* Role management */}
       <div className={sectionCls}>
-        <h2 className="text-xs tracking-widest uppercase text-secondary">Role</h2>
+        <h2 className="t-section-title">Role</h2>
         <div className="flex items-center gap-3">
           <select
             value={selectedRole}
@@ -205,7 +205,7 @@ export default function AdminUserDetail() {
 
       {/* Danger zone */}
       <div className={sectionCls}>
-        <h2 className="text-xs tracking-widest uppercase text-[var(--error-text)]">Danger Zone</h2>
+        <h2 className="t-section-title text-[var(--error-text)]">Danger Zone</h2>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-secondary">Delete this user</p>

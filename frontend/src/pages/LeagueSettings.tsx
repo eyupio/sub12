@@ -15,7 +15,7 @@ const TIMEZONES: string[] = (() => {
 })()
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 
@@ -38,7 +38,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">League Image</h2>
+      <h2 className="t-section-title">League Image</h2>
       <input
         ref={fileInputRef}
         type="file"
@@ -104,7 +104,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy</h2>
+      <h2 className="t-section-title">Privacy</h2>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Visibility</label>
@@ -183,7 +183,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Defaults</h2>
+      <h2 className="t-section-title">Regional Defaults</h2>
       <p className="text-[10px] text-muted -mt-2">
         Applied on public pages for this league. Logged-in users see their own preference.
       </p>
@@ -291,7 +291,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Rules</h2>
+      <h2 className="t-section-title">Rules</h2>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Scoring Rule</label>
@@ -413,7 +413,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Join Policy</h2>
+      <h2 className="t-section-title">Join Policy</h2>
 
       <div className="space-y-2">
         {(['open', 'invite_code', 'approval'] as const).map(policy => (
@@ -436,7 +436,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
 
       {joinPolicy === 'invite_code' && (
         <div className="flex items-center gap-2 bg-surface rounded p-3">
-          <span className="text-[11px] tracking-widest uppercase text-muted">Code:</span>
+          <span className="t-section-title">Code:</span>
           <code className="font-mono text-sm text-[var(--brass)] flex-1">{joinCode || '—'}</code>
           <button
             onClick={() => regenMutation.mutate()}
@@ -486,7 +486,7 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] tracking-widest uppercase text-muted">Pending Requests</p>
+      <p className="t-section-title">Pending Requests</p>
       {requests.map(jr => {
         const busy = pendingId === jr.id
         return (
@@ -552,7 +552,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
   return (
     <div className={sectionCls}>
       <div className="flex items-center justify-between">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Members</h2>
+        <h2 className="t-section-title">Members</h2>
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
 
@@ -667,7 +667,7 @@ export default function LeagueSettings() {
         <Link to="/leagues/$id" params={{ id }} className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-lg font-medium tracking-widest uppercase text-secondary">Settings</h1>
+        <h1 className="t-page-title">Settings</h1>
       </div>
 
       <p className="text-xs text-muted">{league.name}</p>

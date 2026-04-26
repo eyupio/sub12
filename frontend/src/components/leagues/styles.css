@@ -25,14 +25,6 @@
 .lc-page > * { position: relative; z-index: 1; }
 .lc-container { max-width: 1100px; margin: 0 auto; }
 
-.lc-display {
-  font-family: var(--serif);
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
-
 .lc-mono { font-family: var(--mono); }
 
 .lc-section {
@@ -271,12 +263,6 @@
   gap: 12px;
 }
 .lc-page-title h1 {
-  font-family: var(--ui);
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  font-size: clamp(20px, 3vw, 24px);
-  text-transform: uppercase;
-  color: var(--secondary);
   margin: 0;
 }
 .lc-action-ghost {
@@ -424,11 +410,6 @@
 }
 .lc-detail-titlebar { flex: 1; min-width: 0; }
 .lc-detail-title {
-  font-family: var(--ui);
-  font-size: 22px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--secondary);
   margin: 0;
   display: inline-flex;
   align-items: center;

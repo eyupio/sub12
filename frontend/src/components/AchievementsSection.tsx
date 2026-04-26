@@ -30,7 +30,7 @@ export function AchievementsSection({ earned, allDefs }: Props) {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Achievements</h2>
+        <h2 className="t-section-title">Achievements</h2>
         <span className="text-[10px] tracking-widest uppercase text-muted">
           {earnedCount} of {totalCount} earned
         </span>

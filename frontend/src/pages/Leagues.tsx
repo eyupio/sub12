@@ -64,7 +64,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
         <div className="flex items-center justify-between">
-          <h2 id="new-league-modal-title" className="text-sm tracking-widest uppercase text-secondary">New League</h2>
+          <h2 id="new-league-modal-title" className="t-section-title">New League</h2>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
@@ -72,7 +72,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">Name</label>
+            <label className="t-section-title">Name</label>
             <input
               type="text"
               value={name}
@@ -84,7 +84,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">Description <span className="text-muted">(optional)</span></label>
+            <label className="t-section-title">Description <span className="text-muted">(optional)</span></label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -95,7 +95,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">Visibility</label>
+            <label className="t-section-title">Visibility</label>
             <div className="flex gap-3">
               {(['public', 'private'] as const).map((opt) => (
                 <button key={opt} type="button" onClick={() => setType(opt)} className={toggleCls(type === opt)}>
@@ -109,7 +109,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">Standings</label>
+            <label className="t-section-title">Standings</label>
             <div className="flex gap-3">
               {(['highest', 'average'] as const).map((opt) => (
                 <button key={opt} type="button" onClick={() => setScoringRule(opt)} className={toggleCls(scoringRule === opt)}>
@@ -120,7 +120,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] tracking-widest uppercase text-muted">How members join</label>
+            <label className="t-section-title">How members join</label>
             <div className="space-y-1.5">
               {([
                 { value: 'open' as const, label: 'Open', desc: 'Anyone can join' },

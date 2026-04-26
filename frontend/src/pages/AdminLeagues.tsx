@@ -27,7 +27,7 @@ export default function AdminLeagues() {
   return (
     <div className="max-w-3xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-6">
       <div>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Admin · Leagues
         </h1>
         <p className="text-xs text-muted mt-1 tracking-wide">

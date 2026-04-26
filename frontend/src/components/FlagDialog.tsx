@@ -92,7 +92,7 @@ export function FlagDialog({ open, targetLabel, onClose, onSubmit }: FlagDialogP
             <Flag size={18} className="text-[var(--warning-text,#b45309)]" />
           </div>
           <div className="flex-1">
-            <h3 id="flag-title" className="text-sm font-medium text-primary">Flag for amendment</h3>
+            <h3 id="flag-title" className="t-subsection-title">Flag for amendment</h3>
             <p className="text-xs text-muted mt-1">
               The author will see a banner asking them to reflect and amend. Editing the {targetLabel} clears the flag.
             </p>

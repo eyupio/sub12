@@ -51,7 +51,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   const childId = isValidElement(children) ? ((children.props as { id?: string }).id ?? id) : undefined
   return (
     <div>
-      <label htmlFor={childId} className="block text-[11px] tracking-widest uppercase text-muted mb-1">{label}</label>
+      <label htmlFor={childId} className="block t-section-title mb-1">{label}</label>
       {child}
     </div>
   )
@@ -342,7 +342,7 @@ export default function NewPelletTest() {
               <span className="inline-flex items-center gap-2 text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                 Draft{draft?.created_at ? ` · ${relative(draft.created_at)}` : ''}
               </span>
-              <h1 className="text-2xl lg:text-3xl font-medium tracking-wide text-secondary">Refine draft</h1>
+              <h1 className="t-page-title">Refine draft</h1>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                 {draft?.created_at && (
                   <span className="inline-flex items-center gap-1">
@@ -376,7 +376,7 @@ export default function NewPelletTest() {
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+          <h1 className="t-page-title">
             New Pellet Test
           </h1>
         </div>
@@ -385,7 +385,7 @@ export default function NewPelletTest() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-6">
         <div className={`space-y-4 ${draftId ? 'rounded-lg border border-subtle bg-surface p-5' : ''}`}>
           {draftId && (
-            <h2 className="text-[11px] tracking-widest uppercase text-muted">Test Details</h2>
+            <h2 className="t-section-title">Test Details</h2>
           )}
           <Field label="Rifle">
             {rifles.length > 0 ? (
@@ -490,7 +490,7 @@ export default function NewPelletTest() {
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Conditions, observations…" className={`${inputCls} placeholder:text-muted resize-none`} />
           </Field>
 
-          <button type="button" onClick={() => setShowChrono(v => !v)} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+          <button type="button" onClick={() => setShowChrono(v => !v)} className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors">
             {showChrono ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Chronograph Data
           </button>
@@ -508,7 +508,7 @@ export default function NewPelletTest() {
             </div>
           )}
 
-          <button type="button" onClick={() => setShowAdvanced(v => !v)} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+          <button type="button" onClick={() => setShowAdvanced(v => !v)} className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors">
             {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Advanced Conditions
           </button>
@@ -530,7 +530,7 @@ export default function NewPelletTest() {
         <div className="space-y-4 mt-6 lg:mt-0">
           <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
             <div className="flex items-center justify-between">
-              <label className="text-[11px] tracking-widest uppercase text-muted">Groups</label>
+              <label className="t-section-title">Groups</label>
               <button onClick={addGroup} className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
                 <Plus size={12} /> Add
               </button>
@@ -546,7 +546,7 @@ export default function NewPelletTest() {
                         <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--brass-pill-bg)] text-[var(--brass)]">
                           <Target size={13} />
                         </span>
-                        <span className="text-[11px] tracking-widest uppercase text-muted">Group {i + 1}</span>
+                        <span className="t-section-title">Group {i + 1}</span>
                       </div>
                       {groups.length > 1 && (
                         <button onClick={() => removeGroup(g.key)} className="text-muted hover:text-[var(--error-text)] transition-colors" aria-label="Remove group">
@@ -578,7 +578,7 @@ export default function NewPelletTest() {
           </div>
 
           <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Target Photos</label>
+            <label className="block t-section-title mb-1">Target Photos</label>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
 

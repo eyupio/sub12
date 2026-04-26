@@ -161,7 +161,7 @@ function AddRifleForm({ onDone }: { onDone: () => void }) {
           <button
             type="button"
             onClick={() => setShowFields(true)}
-            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="t-section-title hover:text-secondary transition-colors"
           >
             or enter manually →
           </button>
@@ -253,7 +253,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
           <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.make || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
           </button>
-          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors">
             <X size={13} /> Cancel
           </button>
         </div>
@@ -416,7 +416,7 @@ function AddPelletForm({ onDone }: { onDone: () => void }) {
           <button
             type="button"
             onClick={() => setShowFields(true)}
-            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="t-section-title hover:text-secondary transition-colors"
           >
             or enter manually →
           </button>
@@ -515,7 +515,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
           <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !form.brand || !form.model} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             <Check size={13} /> {updateMutation.isPending ? 'Saving…' : 'Save'}
           </button>
-          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors">
+          <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors">
             <X size={13} /> Cancel
           </button>
         </div>
@@ -594,7 +594,7 @@ export default function Gear() {
   return (
     <div className="p-4 lg:p-8 space-y-5 lg:space-y-6 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Gear</h1>
+        <h1 className="t-page-title">Gear</h1>
         <HelpIcon content={pageHelp.gear} />
       </div>
 

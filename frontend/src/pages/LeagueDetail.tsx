@@ -256,7 +256,7 @@ export default function LeagueDetail() {
       <PageGrid>
         <div style={{ maxWidth: 420, margin: '40px auto', textAlign: 'center' }}>
           <Lock size={32} style={{ color: 'var(--muted)' }} />
-          <h1 className="lc-display" style={{ fontSize: 22, marginTop: 12 }}>
+          <h1 className="t-page-title" style={{ marginTop: 12 }}>
             {leagueSummary?.name ?? 'Private League'}
           </h1>
           {leagueSummary?.description && <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>{leagueSummary.description}</p>}

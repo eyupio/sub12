@@ -30,7 +30,7 @@ function ReportTargetLink({ report }: { report: Report }) {
       )
     case 'comment':
       return (
-        <span className="text-[11px] tracking-widest uppercase text-muted" title={`Comment ID: ${report.target_id}`}>
+        <span className="t-section-title" title={`Comment ID: ${report.target_id}`}>
           Comment · {report.target_id.slice(0, 8)}…
         </span>
       )
@@ -82,7 +82,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
           <button
             onClick={() => onDecide('no_action')}
             disabled={disabled}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Dismiss
           </button>
@@ -115,7 +115,7 @@ export default function AdminReportsQueue() {
 
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+      <h1 className="t-page-title flex items-center gap-2">
         <Inbox size={18} className="text-[var(--brass)]" /> Admin Reports Queue
       </h1>
       <p className="text-sm text-muted">Short-term destination for moderation and ticket-related notifications until the unified support inbox is live.</p>

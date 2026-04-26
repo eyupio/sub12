@@ -82,7 +82,7 @@ export default function ScoreTrends() {
         >
           <ChevronLeft size={18} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Score Trends
         </h1>
       </div>
@@ -176,7 +176,7 @@ export default function ScoreTrends() {
 
       {/* Chart */}
       <div className="bg-surface border border-subtle rounded p-4 space-y-3">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Average Score</h2>
+        <h2 className="t-section-title">Average Score</h2>
 
         {isLoading && (
           <div className="h-64 animate-pulse bg-card rounded" />
@@ -275,7 +275,7 @@ export default function ScoreTrends() {
       {/* X-Count chart */}
       {!isLoading && points.length > 0 && (
         <div className="bg-surface border border-subtle rounded p-4 space-y-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">X-Count per Period</h2>
+          <h2 className="t-section-title">X-Count per Period</h2>
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>

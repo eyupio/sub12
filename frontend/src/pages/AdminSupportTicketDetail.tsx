@@ -152,7 +152,7 @@ export default function AdminSupportTicketDetail() {
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin ticket detail</h1>
+        <h1 className="t-page-title">Admin ticket detail</h1>
         <Link to="/admin/support" className="text-sm text-[var(--brass)] hover:underline">Back to inbox</Link>
       </div>
 
@@ -162,7 +162,7 @@ export default function AdminSupportTicketDetail() {
       {detail && (
         <>
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-2">
-            <h2 className="text-xl font-medium">{detail.ticket.title ?? 'Untitled ticket'}</h2>
+            <h2 className="t-subsection-title">{detail.ticket.title ?? 'Untitled ticket'}</h2>
             <p className="text-xs text-muted">
               {detail.ticket.category ?? 'issue'} · {detail.ticket.priority ?? 'normal'} · {detail.ticket.scope_type ?? 'platform'}
             </p>
@@ -267,7 +267,7 @@ export default function AdminSupportTicketDetail() {
 
           <section className="grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-              <h3 className="font-medium">Message thread</h3>
+              <h3 className="t-subsection-title">Message thread</h3>
               <div className="mt-3 space-y-2">
                 {detail.messages.length === 0 && <p className="text-sm text-muted">No messages yet.</p>}
                 {detail.messages.map((message) => (
@@ -281,7 +281,7 @@ export default function AdminSupportTicketDetail() {
             </div>
 
             <div className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-              <h3 className="font-medium">Timeline / participants</h3>
+              <h3 className="t-subsection-title">Timeline / participants</h3>
               <div className="mt-3 space-y-2">
                 {timelineEntries.map((entry) => (
                   <div key={entry.id} className="rounded-md border border-subtle px-3 py-2 text-sm">
@@ -304,7 +304,7 @@ export default function AdminSupportTicketDetail() {
           </section>
 
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-            <h3 className="font-medium">Reply composer</h3>
+            <h3 className="t-subsection-title">Reply composer</h3>
             <form className="mt-3 space-y-3" onSubmit={onSubmitReply}>
               <textarea
                 className="min-h-28 w-full rounded-md border border-subtle bg-transparent p-2"

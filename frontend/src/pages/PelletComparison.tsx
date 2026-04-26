@@ -58,10 +58,10 @@ export default function PelletComparison() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-4xl mx-auto">
       <div>
-        <Link to="/pellet-testing" className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors mb-3">
+        <Link to="/pellet-testing" className="flex items-center gap-1 t-section-title hover:text-secondary transition-colors mb-3">
           <ChevronLeft size={14} /> Back
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+        <h1 className="t-page-title flex items-center gap-2">
           <ArrowLeftRight size={20} /> Compare Pellets
         </h1>
       </div>
@@ -69,7 +69,7 @@ export default function PelletComparison() {
       {/* Selectors */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div>
-          <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+          <label className="block t-section-title mb-1">Rifle</label>
           <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={selectCls}>
             <option value="">Select rifle…</option>
             {rifles.map(r => (
@@ -78,7 +78,7 @@ export default function PelletComparison() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet A</label>
+          <label className="block t-section-title mb-1">Pellet A</label>
           <select value={pelletA} onChange={e => setPelletA(e.target.value)} className={selectCls}>
             <option value="">Select pellet…</option>
             {pellets.filter(p => p.id !== pelletB).map(p => (
@@ -87,7 +87,7 @@ export default function PelletComparison() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet B</label>
+          <label className="block t-section-title mb-1">Pellet B</label>
           <select value={pelletB} onChange={e => setPelletB(e.target.value)} className={selectCls}>
             <option value="">Select pellet…</option>
             {pellets.filter(p => p.id !== pelletA).map(p => (

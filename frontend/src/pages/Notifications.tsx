@@ -57,19 +57,19 @@ export default function Notifications() {
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Notifications</h1>
+        <h1 className="t-page-title">Notifications</h1>
         <div className="flex items-center gap-4">
           {hasUnread && (
             <button
               type="button"
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
-              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="t-section-title hover:text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Mark all read
             </button>
           )}
-          <Link to="/settings/notifications" className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary">
+          <Link to="/settings/notifications" className="t-section-title hover:text-secondary">
             Settings
           </Link>
         </div>
@@ -154,7 +154,7 @@ export default function Notifications() {
           <button
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
-            className="px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded border border-subtle t-section-title hover:text-secondary hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isFetchingNextPage ? 'Loading…' : 'Load more'}
           </button>

@@ -151,7 +151,7 @@ export function MapLocationPicker({
         aria-label="Pick location on map"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-subtle">
-          <h3 className="text-sm font-medium text-primary flex items-center gap-2">
+          <h3 className="t-subsection-title flex items-center gap-2">
             <MapPin size={14} /> Pick location on map
           </h3>
           <button

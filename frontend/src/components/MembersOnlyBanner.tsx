@@ -17,7 +17,7 @@ export function MembersOnlyBanner({ kind, name, description, memberCount, joinPo
       <div className="w-10 h-10 rounded-full bg-[var(--brass)]/10 text-[var(--brass)] flex items-center justify-center mx-auto">
         <Lock size={18} />
       </div>
-      <h2 className="text-lg font-medium text-secondary">{name ?? `This ${kind} is private`}</h2>
+      <h2 className="t-subsection-title">{name ?? `This ${kind} is private`}</h2>
       {description && <p className="text-sm text-muted max-w-md mx-auto whitespace-pre-wrap">{description}</p>}
       {typeof memberCount === 'number' && (
         <p className="text-[11px] tracking-widest uppercase text-muted">{memberCount} {memberCount === 1 ? 'member' : 'members'}</p>

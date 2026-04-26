@@ -67,7 +67,7 @@ export default function GroupSizeTimeline() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] tracking-widest uppercase text-muted">Group Size Over Time</h3>
+        <h3 className="t-section-title">Group Size Over Time</h3>
         <div className="flex gap-1">
           <button
             onClick={() => setUnit('mm')}

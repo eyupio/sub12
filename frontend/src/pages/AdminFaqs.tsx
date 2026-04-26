@@ -17,7 +17,7 @@ import { pageHelp } from '../components/tooltips'
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const textareaCls = `${inputCls} min-h-[260px] font-mono`
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const btnPrimary =
   'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary =
@@ -246,7 +246,7 @@ export default function AdminFaqs() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5 flex items-center gap-2">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin • FAQs</h1>
+        <h1 className="t-page-title">Admin • FAQs</h1>
         <HelpIcon content={pageHelp.adminFaqs} />
       </div>
 
@@ -259,7 +259,7 @@ export default function AdminFaqs() {
           {itemsByCategory.map(([category, bucket], sectionIdx) => (
             <div key={category} className="space-y-1">
               <div className="flex items-center gap-1 px-2 pt-2">
-                <h2 className="text-xs uppercase tracking-widest text-muted flex-1 truncate">{category}</h2>
+                <h2 className="t-section-title flex-1 truncate">{category}</h2>
                 <button
                   type="button"
                   className={iconBtn}

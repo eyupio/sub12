@@ -319,7 +319,7 @@ export default function ScoreEntry() {
 
   const inputCls =
     'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm focus:outline-none focus:border-[var(--brass)]/50'
-  const sidebarLabelCls = 'text-[11px] tracking-widest uppercase text-muted'
+  const sidebarLabelCls = 't-section-title'
 
   function cellLabel(i: number): string {
     const { score, x } = shots[i]
@@ -336,7 +336,7 @@ export default function ScoreEntry() {
           type="button"
           onClick={smartBack}
           aria-label="Back"
-          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors"
         >
           <ChevronLeft size={16} /> Back
         </button>
@@ -344,7 +344,7 @@ export default function ScoreEntry() {
           <button
             type="button"
             onClick={() => setShowHelp(true)}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 t-section-title hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
             aria-label="How to enter scores"
           >
             <HelpCircle size={13} /> Help
@@ -354,7 +354,7 @@ export default function ScoreEntry() {
               type="button"
               onClick={() => setConfirmDeleteDraft(true)}
               disabled={deleteDraftMutation.isPending}
-              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 t-section-title hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete draft"
             >
               <Trash2 size={13} /> Delete
@@ -368,14 +368,14 @@ export default function ScoreEntry() {
         <div className="flex items-center gap-2 rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5">
           <Trophy size={14} className="text-[var(--brass)]" />
           <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
-          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="t-section-title">·</span>
           <span className="text-xs text-secondary">{league.name}</span>
         </div>
       )}
       {requireImage && !imageFile && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
           <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400 font-medium">Photo required</span>
-          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="t-section-title">·</span>
           <span className="text-xs text-secondary">This league requires a score card photo before you can submit</span>
         </div>
       )}
@@ -385,7 +385,7 @@ export default function ScoreEntry() {
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
           <div className="space-y-3 min-w-0">
             <div className="flex items-baseline gap-3 font-mono">
-              <h1 className="text-2xl lg:text-3xl text-primary">{prettyDate}</h1>
+              <h1 className="t-page-title">{prettyDate}</h1>
               <span className="text-base text-muted uppercase tracking-widest">
                 {draftId ? 'Refine' : 'New'}
               </span>
@@ -713,7 +713,7 @@ export default function ScoreEntry() {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setShowHelp(false); try { localStorage.setItem('sub12-score-help-seen', '1') } catch { /* localStorage unavailable */ } }} />
           <div className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4">
-            <h3 className="text-sm font-medium text-primary">How to enter scores</h3>
+            <h3 className="t-subsection-title">How to enter scores</h3>
             <div className="space-y-3 text-sm text-secondary">
               <div className="flex items-start gap-3">
                 <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--brass)]/15 text-[var(--brass)] flex items-center justify-center text-xs font-semibold">1</span>

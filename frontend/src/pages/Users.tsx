@@ -24,7 +24,7 @@ export default function Users() {
 
   return (
     <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-2xl mx-auto pb-24">
-      <h1 className="text-lg font-medium tracking-widest uppercase text-secondary">Find People</h1>
+      <h1 className="t-page-title">Find People</h1>
 
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />

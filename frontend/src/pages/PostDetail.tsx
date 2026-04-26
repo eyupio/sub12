@@ -18,7 +18,7 @@ export default function PostDetail() {
 
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted">
+      <div className="flex items-center gap-2 t-section-title">
         <button
           onClick={goBack}
           className="hover:text-secondary inline-flex items-center gap-1"

@@ -56,7 +56,7 @@ export default function NotificationSettings() {
         <Link to="/profile" className="text-muted hover:text-secondary" aria-label="Back to profile">
           <ChevronLeft size={18} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Notifications</h1>
+        <h1 className="t-page-title">Notifications</h1>
         <HelpIcon content={pageHelp.notificationSettings} />
       </div>
 
@@ -116,7 +116,7 @@ export default function NotificationSettings() {
           </ul>
 
           <div className="pt-2">
-            <h2 className="text-[11px] tracking-[0.18em] uppercase text-muted mb-2">Moderation</h2>
+            <h2 className="t-section-title mb-2">Moderation</h2>
             <ul className="space-y-2">
               <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
                 <div className="flex-1 min-w-0">
@@ -137,7 +137,7 @@ export default function NotificationSettings() {
           </div>
 
           <div className="pt-2">
-            <h2 className="text-[11px] tracking-[0.18em] uppercase text-muted mb-2">Email digests</h2>
+            <h2 className="t-section-title mb-2">Email digests</h2>
             <ul className="space-y-2">
               <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
                 <div className="flex-1 min-w-0">

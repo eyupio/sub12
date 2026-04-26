@@ -12,7 +12,7 @@ export default function PublicPelletLeaderboard() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-4xl mx-auto">
       <div>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Pellet Leaderboard
         </h1>
         <p className="text-sm text-muted mt-1">
