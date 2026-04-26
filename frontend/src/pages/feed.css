@@ -686,9 +686,9 @@
 .achievement-text h2 {
   margin: 0;
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 500;
+  font-family: var(--ui);
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .achievement-text p:not(.achievement-eyebrow) {
