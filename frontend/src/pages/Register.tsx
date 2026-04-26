@@ -4,16 +4,12 @@ import { useNavigate, Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../store/auth'
-import { useThemeStore } from '../store/theme'
 import { clearClientSession } from '../utils/clearSession'
 
 export default function Register() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const setAuth = useAuthStore((s) => s.setAuth)
-  const theme = useThemeStore((s) => s.theme)
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-primary-dark.svg' : 'logo-primary-light.svg'}`
 
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -45,7 +41,10 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
+          <div className="inline-flex items-baseline justify-center">
+            <span style={{ fontFamily: 'var(--serif)', fontSize: '4rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--ink)' }}>SUB</span>
+            <span style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'var(--gold)' }}>12</span>
+          </div>
           <p className="mt-4 t-section-title">Create your account</p>
         </div>
 
