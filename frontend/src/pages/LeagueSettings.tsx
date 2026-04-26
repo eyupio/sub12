@@ -85,6 +85,72 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
 }
 
 // ---------------------------------------------------------------------------
+// General Info Section
+// ---------------------------------------------------------------------------
+
+function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: League }) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState(league.name)
+  const [description, setDescription] = useState(league.description ?? '')
+
+  const mutation = useMutation({
+    mutationFn: (input: { name?: string; description?: string }) =>
+      leagueApi.update(leagueId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      queryClient.invalidateQueries({ queryKey: ['leagues'] })
+      toast('League saved', 'success')
+    },
+    onError: () => toast('Failed to save league', 'error'),
+  })
+
+  function handleSave() {
+    mutation.mutate({
+      name: name.trim() || undefined,
+      description: description.trim() || undefined,
+    })
+  }
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="t-section-title">General</h2>
+
+      <div className="space-y-1.5">
+        <label htmlFor="league-name" className={labelCls}>Name</label>
+        <input
+          id="league-name"
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className={inputCls}
+          placeholder="League name"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="league-description" className={labelCls}>Description</label>
+        <textarea
+          id="league-description"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          rows={3}
+          className={inputCls + ' resize-none'}
+          placeholder="Describe this league (optional)"
+        />
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={!name.trim() || mutation.isPending}
+        className={btnPrimary}
+      >
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Privacy Section
 // ---------------------------------------------------------------------------
 
@@ -673,6 +739,7 @@ export default function LeagueSettings() {
       <p className="text-xs text-muted">{league.name}</p>
 
       <LeagueImageSection leagueId={id} league={league} />
+      <GeneralInfoSection leagueId={id} league={league} />
       <PrivacySection leagueId={id} league={league} />
       <RulesSection leagueId={id} config={config} />
       <RegionalSection leagueId={id} league={league} />

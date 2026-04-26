@@ -1387,7 +1387,7 @@ export default function Profile() {
 
   function setTab(tab: ProfileTab) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    navigate({ to: '/profile' as any, search: { tab }, replace: true })
+    navigate({ to: '/profile' as any, search: { tab } as any, replace: true })
   }
 
   return (

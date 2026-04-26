@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, CheckCircle2, ChevronDown, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
@@ -42,6 +42,15 @@ interface GroupRow {
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs tracking-wide text-muted mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
 
 export default function NewPelletTest() {
   const navigate = useNavigate()
