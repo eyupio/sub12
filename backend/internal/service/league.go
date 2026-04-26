@@ -448,8 +448,9 @@ func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*mod
 }
 
 // EnsureDefaultRound guarantees that the league has at least one round,
-// creating a default season+round if necessary. Returns the round ID.
-// Only league admins may trigger creation of league structure.
+// lazily creating a default season+round if none exists. Any league member
+// may call this so that submitting a score does not require admin help to
+// bootstrap an empty league.
 func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID string) (string, error) {
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -458,8 +459,12 @@ func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID
 	if err != nil {
 		return "", err
 	}
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
+	if err != nil {
 		return "", err
+	}
+	if !isMember {
+		return "", ErrNotMember
 	}
 	return s.leagues.GetOrCreateDefaultRound(ctx, leagueID)
 }
