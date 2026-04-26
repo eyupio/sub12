@@ -266,37 +266,17 @@ export default function Layout({ children }: PropsWithChildren) {
         {moreOpen && (
           <div className="lg:hidden fixed inset-0 z-50" onClick={() => setMoreOpen(false)}>
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-            <div className="absolute bottom-[var(--mobile-nav-offset)] left-0 right-0 bg-surface border-t border-subtle rounded-t-xl p-4 space-y-1" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-2">
+            <div className="absolute bottom-[var(--mobile-nav-offset)] left-0 right-0 bg-surface border-t border-subtle rounded-t-xl flex flex-col max-h-[calc(100dvh-var(--mobile-nav-offset)-1rem)]" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
                 <span className="text-xs tracking-widest uppercase text-muted">More</span>
                 <button onClick={() => setMoreOpen(false)} className="text-muted hover:text-secondary transition-colors" aria-label="Close menu">
                   <X size={18} />
                 </button>
               </div>
-              {moreMenuItems.map(({ to, icon: Icon, label }) => {
-                const showBadge = to === '/drafts' && draftCount > 0
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    onClick={() => setMoreOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
-                  >
-                    <Icon size={18} className="text-muted" />
-                    <span className="flex-1">{label}</span>
-                    {showBadge && (
-                      <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                        {draftCount}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-              {isAdmin && (
-                <>
-                  <div className="border-t border-subtle my-2" />
-                  <span className="text-[10px] tracking-widest uppercase text-muted px-3">Admin</span>
-                  {adminNavItems.map(({ to, icon: Icon, label }) => (
+              <div className="overflow-y-auto px-4 pb-4 space-y-1">
+                {moreMenuItems.map(({ to, icon: Icon, label }) => {
+                  const showBadge = to === '/drafts' && draftCount > 0
+                  return (
                     <Link
                       key={to}
                       to={to}
@@ -304,11 +284,33 @@ export default function Layout({ children }: PropsWithChildren) {
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
                     >
                       <Icon size={18} className="text-muted" />
-                      <span>{label}</span>
+                      <span className="flex-1">{label}</span>
+                      {showBadge && (
+                        <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                          {draftCount}
+                        </span>
+                      )}
                     </Link>
-                  ))}
-                </>
-              )}
+                  )
+                })}
+                {isAdmin && (
+                  <>
+                    <div className="border-t border-subtle my-2" />
+                    <span className="block text-[10px] tracking-widest uppercase text-muted px-3 py-1">Admin</span>
+                    {adminNavItems.map(({ to, icon: Icon, label }) => (
+                      <Link
+                        key={to}
+                        to={to}
+                        onClick={() => setMoreOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                      >
+                        <Icon size={18} className="text-muted" />
+                        <span>{label}</span>
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
