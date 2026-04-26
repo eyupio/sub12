@@ -825,6 +825,10 @@ export default function Profile() {
           → Notification preferences
         </Link>
         <span className="text-muted">·</span>
+        <Link to="/settings/security" className="text-[var(--brass)] hover:opacity-80">
+          → Security &amp; 2FA
+        </Link>
+        <span className="text-muted">·</span>
         <Link to="/profile/follows" className="text-[var(--brass)] hover:opacity-80">
           → Manage follows
         </Link>

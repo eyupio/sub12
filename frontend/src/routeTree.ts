@@ -54,6 +54,8 @@ import ComboAnalytics from './pages/ComboAnalytics'
 import Notifications from './pages/Notifications'
 import PrivacyCenter from './pages/PrivacyCenter'
 import NotificationSettings from './pages/NotificationSettings'
+import SecuritySettings from './pages/SecuritySettings'
+import TwoFactorChallenge from './pages/TwoFactorChallenge'
 import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
 import FeatureBoard from './pages/FeatureBoard'
@@ -436,6 +438,12 @@ const settingsNotificationsRoute = createRoute({
   component: NotificationSettings,
 })
 
+const settingsSecurityRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings/security',
+  component: SecuritySettings,
+})
+
 const featureBoardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feature-requests',
@@ -522,6 +530,12 @@ const resetPasswordRoute = createRoute({
   }),
 })
 
+const twoFactorChallengeRoute = createRoute({
+  getParentRoute: () => authRoute,
+  path: '/login/2fa',
+  component: TwoFactorChallenge,
+})
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   publicPelletLeaderboardRoute,
@@ -579,9 +593,10 @@ export const routeTree = rootRoute.addChildren([
     featureRequestDetailRoute,
     settingsPrivacyRoute,
     settingsNotificationsRoute,
+    settingsSecurityRoute,
     helpRoute,
     adminFaqsRoute,
     confirmEmailRoute,
   ]),
-  authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
+  authRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute, twoFactorChallengeRoute]),
 ])

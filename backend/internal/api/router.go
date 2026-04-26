@@ -47,6 +47,7 @@ func NewRouter(
 	mutes *repository.MuteRepository,
 	rl *middleware.RateLimiter,
 	images *repository.ImageRepository,
+	twoFactor *service.TwoFactorService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -110,6 +111,7 @@ func NewRouter(
 		authHandler := handler.NewAuth(auth)
 		r.With(rl.Limit("auth")).Post("/auth/register", authHandler.Register)
 		r.With(rl.Limit("auth")).Post("/auth/login", authHandler.Login)
+		r.With(rl.Limit("auth")).Post("/auth/login/2fa", authHandler.LoginVerify2FA)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/auth/logout", authHandler.Logout)
 		r.With(rl.Limit("auth")).Post("/auth/forgot-password", authHandler.ForgotPassword)
@@ -210,6 +212,14 @@ func NewRouter(
 			r.Post("/users/me/export", uh.RequestExport)
 			r.Get("/users/me/export/{id}", uh.GetExport)
 			r.Get("/users", uh.SearchUsers)
+
+			// Two-factor authentication management
+			tfH := handler.NewTwoFactor(twoFactor)
+			r.Get("/users/me/2fa/status", tfH.Status)
+			r.With(rl.Limit("auth")).Post("/users/me/2fa/enroll/begin", tfH.EnrollBegin)
+			r.With(rl.Limit("auth")).Post("/users/me/2fa/enroll/confirm", tfH.EnrollConfirm)
+			r.With(rl.Limit("auth")).Post("/users/me/2fa/disable", tfH.Disable)
+			r.With(rl.Limit("auth")).Post("/users/me/2fa/backup-codes/regenerate", tfH.RegenerateBackupCodes)
 
 			// Social follows
 			socialH := handler.NewSocial(social)
