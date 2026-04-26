@@ -96,6 +96,14 @@ export default function ForgotPassword() {
                 ← Back to Home
               </Link>
             </p>
+
+            <p className="text-center text-xs text-muted space-x-3 pt-2">
+              <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
+              <span aria-hidden>·</span>
+              <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
+              <span aria-hidden>·</span>
+              <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
+            </p>
           </>
         )}
       </div>

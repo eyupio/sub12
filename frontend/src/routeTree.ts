@@ -69,6 +69,9 @@ import AdminFaqs from './pages/AdminFaqs'
 import PostDetail from './pages/PostDetail'
 import QuickCapture from './pages/QuickCapture'
 import Drafts from './pages/Drafts'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfUse from './pages/TermsOfUse'
+import CookiePolicy from './pages/CookiePolicy'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -102,6 +105,24 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: IndexPage,
+})
+
+const privacyPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy',
+  component: PrivacyPolicy,
+})
+
+const termsOfUseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terms',
+  component: TermsOfUse,
+})
+
+const cookiePolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/cookies',
+  component: CookiePolicy,
 })
 
 const scoreHistoryRoute = createRoute({
@@ -545,6 +566,9 @@ const twoFactorChallengeRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  privacyPolicyRoute,
+  termsOfUseRoute,
+  cookiePolicyRoute,
   publicPelletLeaderboardRoute,
   sharedScoreCardRoute,
   sharedPelletTestRoute,
