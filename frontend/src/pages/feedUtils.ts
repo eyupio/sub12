@@ -11,6 +11,8 @@ export type FeedPostKind =
   | 'join'
   | 'text'
   | 'standings'
+  | 'review_request'
+  | 'review_verified'
 
 export interface FeedPost {
   id: string
@@ -95,6 +97,12 @@ export function normalizeActivity(item: ActivityItem): FeedPost {
       whereId: item.target_id ?? item.league_id ?? item.club_id,
       targetSeed,
     }
+  }
+  if (item.type === 'community_review_requested') {
+    return { id: item.id, kind: 'review_request', activity: item, score, x, targetSeed, cardImageUrl }
+  }
+  if (item.type === 'community_review_verified') {
+    return { id: item.id, kind: 'review_verified', activity: item, score, x, targetSeed, cardImageUrl }
   }
   if (item.type === 'post_created') {
     return {

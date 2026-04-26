@@ -90,6 +90,8 @@ func main() {
 	pelletTestRepo := repository.NewPelletTestRepository(pool)
 	likeRepo := repository.NewLikeRepository(pool)
 
+	communityReviewRepo := repository.NewCommunityReviewRepository(pool)
+
 	// AchievementService is constructed up front with all count-repo
 	// dependencies. Services that trigger achievement evaluation (social,
 	// comment, club, pellet testing, score card) receive this instance.
@@ -101,6 +103,7 @@ func main() {
 		clubRepo,
 		pelletTestRepo,
 		likeRepo,
+		communityReviewRepo,
 		userRepo,
 		activitySvc,
 	)
@@ -218,7 +221,9 @@ func main() {
 	moderationSweeper := service.NewModerationSweeper(pool, log.Logger, cfg.ModerationFlagGrace, cfg.ModerationSweepInterval)
 	go moderationSweeper.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc)
+	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

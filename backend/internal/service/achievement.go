@@ -47,22 +47,29 @@ type LikeCountRepo interface {
 	CountReceivedByOwner(ctx context.Context, userID string) (int, error)
 }
 
+// CommunityReviewCountRepo exposes the per-user count of confirmations given
+// against community review requests, used to gate reviewer achievements.
+type CommunityReviewCountRepo interface {
+	CountConfirmationsByUser(ctx context.Context, userID string) (int, error)
+}
+
 // StarLevelRepo updates a user's computed star_level.
 type StarLevelRepo interface {
 	UpdateStarLevel(ctx context.Context, userID string) error
 }
 
 type AchievementService struct {
-	achievements AchievementRepo
-	cards        CardCountRepo
-	follows      FollowCountRepo
-	comments     CommentCountRepo
-	clubs        ClubMembershipCountRepo
-	pelletTests  PelletTestCountRepo
-	likes        LikeCountRepo
-	starLevel    StarLevelRepo
-	activity     *ActivityService // nil disables feed ingestion
-	social       *SocialService   // nil disables privacy enforcement
+	achievements    AchievementRepo
+	cards           CardCountRepo
+	follows         FollowCountRepo
+	comments        CommentCountRepo
+	clubs           ClubMembershipCountRepo
+	pelletTests     PelletTestCountRepo
+	likes           LikeCountRepo
+	communityReview CommunityReviewCountRepo
+	starLevel       StarLevelRepo
+	activity        *ActivityService // nil disables feed ingestion
+	social          *SocialService   // nil disables privacy enforcement
 }
 
 func NewAchievementService(
@@ -73,19 +80,21 @@ func NewAchievementService(
 	clubs ClubMembershipCountRepo,
 	pelletTests PelletTestCountRepo,
 	likes LikeCountRepo,
+	communityReview CommunityReviewCountRepo,
 	starLevel StarLevelRepo,
 	activity *ActivityService,
 ) *AchievementService {
 	return &AchievementService{
-		achievements: achievements,
-		cards:        cards,
-		follows:      follows,
-		comments:     comments,
-		clubs:        clubs,
-		pelletTests:  pelletTests,
-		likes:        likes,
-		starLevel:    starLevel,
-		activity:     activity,
+		achievements:    achievements,
+		cards:           cards,
+		follows:         follows,
+		comments:        comments,
+		clubs:           clubs,
+		pelletTests:     pelletTests,
+		likes:           likes,
+		communityReview: communityReview,
+		starLevel:       starLevel,
+		activity:        activity,
 	}
 }
 
@@ -319,6 +328,34 @@ func (s *AchievementService) EvaluateForLikeReceived(ctx context.Context, ownerI
 	}
 	if count >= 50 {
 		s.award(ctx, ownerID, "in_the_spotlight")
+	}
+}
+
+// EvaluateForCommunityReview awards reviewer achievements after a user
+// confirms a community review request. Tiered (1/10/25) and a "fast
+// responder" tier when the confirmation lands within 24h of the request.
+func (s *AchievementService) EvaluateForCommunityReview(ctx context.Context, reviewerID string, requestCreatedAt time.Time) {
+	if s.communityReview == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	count, err := s.communityReview.CountConfirmationsByUser(ctx, reviewerID)
+	if err != nil {
+		return
+	}
+	if count >= 1 {
+		s.award(ctx, reviewerID, "first_review")
+	}
+	if count >= 10 {
+		s.award(ctx, reviewerID, "community_reviewer")
+	}
+	if count >= 25 {
+		s.award(ctx, reviewerID, "peer_judge")
+	}
+	if !requestCreatedAt.IsZero() && time.Since(requestCreatedAt) <= 24*time.Hour {
+		s.award(ctx, reviewerID, "helpful_reviewer")
 	}
 }
 

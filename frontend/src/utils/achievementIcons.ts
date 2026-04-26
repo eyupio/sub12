@@ -5,11 +5,14 @@ import {
   Eye,
   Flag,
   FlaskConical,
+  Gavel,
   Heart,
   Medal,
   type LucideIcon,
   MessageCircle,
+  Scale,
   Shield,
+  ShieldCheck,
   Star,
   Target,
   ThumbsUp,
@@ -17,6 +20,7 @@ import {
   Trophy,
   UserPlus,
   Users,
+  Zap,
 } from 'lucide-react'
 
 // Keys match the `icon` column in backend achievement_defs rows (see
@@ -40,6 +44,10 @@ const iconMap: Record<string, LucideIcon> = {
   'trending-up': TrendingUp,
   shield: Shield,
   'thumbs-up': ThumbsUp,
+  'shield-check': ShieldCheck,
+  gavel: Gavel,
+  scale: Scale,
+  zap: Zap,
 }
 
 export function iconForAchievement(icon?: string | null): LucideIcon {
