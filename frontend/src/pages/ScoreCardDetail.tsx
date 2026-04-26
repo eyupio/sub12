@@ -12,6 +12,7 @@ import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { SubmitToLeagueDialog } from '../components/SubmitToLeagueDialog'
 import { FlagDialog } from '../components/FlagDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { LikeButton } from '../components/LikeButton'
@@ -956,7 +957,6 @@ export default function ScoreCardDetail() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showSubmitLeague, setShowSubmitLeague] = useState(false)
-  const [submitLeagueRoundId, setSubmitLeagueRoundId] = useState('')
   const [editingFile, setEditingFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -1080,23 +1080,6 @@ export default function ScoreCardDetail() {
       scoreCardApi.update(id, { card_image_rotation: rotation }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['score-cards', id] }),
     onError: () => toast('Failed to rotate image', 'error'),
-  })
-
-  const submitToLeagueMutation = useMutation({
-    mutationFn: (roundId: string) => scoreCardApi.submitToLeague(id, roundId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['score-cards', id] })
-      setShowSubmitLeague(false)
-      setSubmitLeagueRoundId('')
-      toast('Score card submitted to league', 'success')
-    },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        toast(err.message, 'error')
-      } else {
-        toast('Failed to submit to league', 'error')
-      }
-    },
   })
 
   function handleRotate(dir: 'cw' | 'ccw') {
@@ -1781,41 +1764,13 @@ export default function ScoreCardDetail() {
         communityName={cardLeague?.name ?? cardClub?.name ?? undefined}
       />
 
-      {/* Submit to League modal */}
-      {showSubmitLeague && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-teal-500" /> Submit to League
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter the league round ID to submit this score card. You can find the round ID on the league page.
-            </p>
-            <input
-              type="text"
-              value={submitLeagueRoundId}
-              onChange={e => setSubmitLeagueRoundId(e.target.value)}
-              placeholder="League round ID"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setShowSubmitLeague(false); setSubmitLeagueRoundId('') }}
-                className="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => submitLeagueRoundId && submitToLeagueMutation.mutate(submitLeagueRoundId)}
-                disabled={!submitLeagueRoundId || submitToLeagueMutation.isPending}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-              >
-                {submitToLeagueMutation.isPending ? 'Submitting…' : 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SubmitToLeagueDialog
+        open={showSubmitLeague}
+        scoreCardId={id}
+        onClose={() => setShowSubmitLeague(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['score-cards', id] })}
+      />
+
 
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
