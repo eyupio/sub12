@@ -20,6 +20,8 @@ interface User {
   date_format?: string
   time_format?: string
   timezone?: string
+  totp_enabled?: boolean
+  totp_enrolled_at?: string
 }
 
 interface AuthState {

@@ -23,8 +23,16 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      const { user, tokens } = await authApi.login(email, password)
-      setAuth(user, tokens.access_token, tokens.refresh_token)
+      const result = await authApi.login(email, password)
+      if (result.kind === 'challenge') {
+        // Carry the challenge token via sessionStorage so it never appears in
+        // the URL and never persists past the tab. The TwoFactorChallenge
+        // page bounces back to /login if it isn't found (e.g. on reload).
+        sessionStorage.setItem('sub12-2fa-challenge', result.challengeToken)
+        navigate({ to: '/login/2fa' })
+        return
+      }
+      setAuth(result.user, result.tokens.access_token, result.tokens.refresh_token)
       navigate({ to: '/' })
     } catch (err) {
       if (err instanceof ApiError && err.status >= 400 && err.status < 500) {

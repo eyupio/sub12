@@ -82,10 +82,55 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, tokens, err := h.auth.Login(r.Context(), body.Email, body.Password)
+	user, tokens, challenge, err := h.auth.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
 			writeError(w, http.StatusUnauthorized, "invalid email or password")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "login failed")
+		return
+	}
+
+	if challenge != "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"requires_2fa":    true,
+			"challenge_token": challenge,
+			"user_id":         user.ID,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"user":   user,
+		"tokens": tokens,
+	})
+}
+
+// POST /api/v1/auth/login/2fa
+// Exchanges a challenge token + TOTP/backup code for a full token pair.
+func (h *AuthHandler) LoginVerify2FA(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ChallengeToken string `json:"challenge_token"`
+		Code           string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.ChallengeToken == "" || body.Code == "" {
+		writeError(w, http.StatusBadRequest, "challenge_token and code are required")
+		return
+	}
+
+	user, tokens, err := h.auth.CompleteLoginWith2FA(r.Context(), body.ChallengeToken, body.Code)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			writeError(w, http.StatusUnauthorized, "challenge expired, please sign in again")
+			return
+		}
+		if errors.Is(err, service.ErrInvalidTOTP) || errors.Is(err, service.ErrInvalidCredentials) {
+			writeError(w, http.StatusUnauthorized, "invalid verification code")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "login failed")

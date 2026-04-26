@@ -146,6 +146,10 @@ func main() {
 	)
 	userSvc.SetSessionInvalidator(authSvc)
 
+	twoFactorRepo := repository.NewTwoFactorRepository(pool)
+	twoFactorSvc := service.NewTwoFactorService(userRepo, twoFactorRepo, rdb, log.Logger, "SUB12")
+	authSvc.SetTwoFactor(twoFactorSvc)
+
 	imageRepo := repository.NewImageRepository(pool)
 
 	socialSvc := service.NewSocialService(socialRepo, blockRepo)
@@ -214,7 +218,7 @@ func main() {
 	moderationSweeper := service.NewModerationSweeper(pool, log.Logger, cfg.ModerationFlagGrace, cfg.ModerationSweepInterval)
 	go moderationSweeper.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

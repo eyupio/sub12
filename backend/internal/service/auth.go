@@ -24,12 +24,16 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrInvalidResetToken  = errors.New("invalid or expired reset token")
+	ErrTOTPRequired       = errors.New("totp verification required")
 )
 
 const (
-	refreshTokenTTL  = 30 * 24 * time.Hour
-	refreshKeyPrefix = "refresh:"
-	userTokensPrefix = "user_refresh:"
+	refreshTokenTTL          = 30 * 24 * time.Hour
+	refreshKeyPrefix         = "refresh:"
+	userTokensPrefix         = "user_refresh:"
+	challengeTokenTTL        = 5 * time.Minute
+	challengeTokenPurpose    = "2fa_challenge"
+	purposeClaim             = "purpose"
 )
 
 type AuthService struct {
@@ -42,6 +46,14 @@ type AuthService struct {
 	jwtExpiry           time.Duration
 	passwordResetTTL    time.Duration
 	passwordResetURL    string
+	twoFactor           *TwoFactorService
+}
+
+// SetTwoFactor wires the 2FA service after construction. Done post-init to
+// avoid a circular dependency between AuthService and TwoFactorService at
+// instantiation time.
+func (s *AuthService) SetTwoFactor(tf *TwoFactorService) {
+	s.twoFactor = tf
 }
 
 func NewAuthService(
@@ -99,33 +111,72 @@ func (s *AuthService) Register(ctx context.Context, email, displayName, password
 	return user, tokens, nil
 }
 
-// Login authenticates and returns a token pair.
-func (s *AuthService) Login(ctx context.Context, email, password string) (*model.User, *TokenPair, error) {
+// Login authenticates the user. When 2FA is enabled on the account, the
+// returned TokenPair is nil and a non-empty challengeToken is returned
+// instead — the caller must exchange it via CompleteLoginWith2FA after
+// presenting a valid TOTP or backup code.
+func (s *AuthService) Login(ctx context.Context, email, password string) (*model.User, *TokenPair, string, error) {
 	user, err := s.users.GetByEmail(ctx, strings.ToLower(email))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, nil, ErrInvalidCredentials
+			return nil, nil, "", ErrInvalidCredentials
 		}
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	if user.PasswordHash == nil {
-		return nil, nil, ErrInvalidCredentials // OAuth-only account
+		return nil, nil, "", ErrInvalidCredentials // OAuth-only account
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, "", ErrInvalidCredentials
 	}
 
 	if deleted, err := s.users.IsDeleted(ctx, user.ID); err == nil && deleted {
-		return nil, nil, ErrInvalidCredentials
+		return nil, nil, "", ErrInvalidCredentials
+	}
+
+	if user.TOTPEnabled {
+		challenge, err := s.issueChallengeToken(user.ID)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return user, nil, challenge, nil
 	}
 
 	tokens, err := s.issueTokens(ctx, user.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
+	return user, tokens, "", nil
+}
+
+// CompleteLoginWith2FA exchanges a valid challenge token + TOTP/backup code
+// for a full token pair. The challenge token alone cannot authenticate API
+// calls; ValidateAccessToken rejects any token that carries a purpose claim.
+func (s *AuthService) CompleteLoginWith2FA(ctx context.Context, challengeToken, code string) (*model.User, *TokenPair, error) {
+	if s.twoFactor == nil {
+		return nil, nil, fmt.Errorf("two-factor service not wired")
+	}
+	userID, err := s.ValidateChallengeToken(challengeToken)
+	if err != nil {
+		return nil, nil, ErrInvalidToken
+	}
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+	if !user.TOTPEnabled {
+		return nil, nil, ErrInvalidCredentials
+	}
+	if err := s.twoFactor.VerifyTOTPOrBackup(ctx, userID, code); err != nil {
+		return nil, nil, ErrInvalidTOTP
+	}
+	tokens, err := s.issueTokens(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
 	return user, tokens, nil
 }
 
@@ -222,6 +273,9 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
 }
 
 // ValidateAccessToken parses and validates a JWT, returning the user ID.
+// Tokens carrying a non-empty `purpose` claim (e.g. 2FA challenge tokens) are
+// rejected — only true access tokens, which omit the claim, may authenticate
+// API calls.
 func (s *AuthService) ValidateAccessToken(tokenStr string) (*AuthPrincipal, error) {
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -231,6 +285,10 @@ func (s *AuthService) ValidateAccessToken(tokenStr string) (*AuthPrincipal, erro
 		return s.jwtSecret, nil
 	}, jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
+		return nil, ErrInvalidToken
+	}
+
+	if p, _ := claims[purposeClaim].(string); p != "" {
 		return nil, ErrInvalidToken
 	}
 
@@ -245,6 +303,49 @@ func (s *AuthService) ValidateAccessToken(tokenStr string) (*AuthPrincipal, erro
 	}
 
 	return &AuthPrincipal{UserID: sub, Role: role}, nil
+}
+
+// issueChallengeToken mints a short-lived JWT carrying purpose=2fa_challenge.
+// It uses the same HMAC secret as access tokens; the purpose claim is the
+// only thing that distinguishes them, and ValidateAccessToken rejects any
+// token where the claim is set.
+func (s *AuthService) issueChallengeToken(userID string) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":        userID,
+		purposeClaim: challengeTokenPurpose,
+		"iat":        now.Unix(),
+		"exp":        now.Add(challengeTokenTTL).Unix(),
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("sign challenge token: %w", err)
+	}
+	return token, nil
+}
+
+// ValidateChallengeToken parses a 2FA challenge token and returns the user
+// ID it was issued for. Any token without purpose=2fa_challenge is rejected,
+// so an access token cannot be replayed against the verify-2fa endpoint.
+func (s *AuthService) ValidateChallengeToken(tokenStr string) (string, error) {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return s.jwtSecret, nil
+	}, jwt.WithExpirationRequired())
+	if err != nil || !token.Valid {
+		return "", ErrInvalidToken
+	}
+	if p, _ := claims[purposeClaim].(string); p != challengeTokenPurpose {
+		return "", ErrInvalidToken
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", ErrInvalidToken
+	}
+	return sub, nil
 }
 
 func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPair, error) {
