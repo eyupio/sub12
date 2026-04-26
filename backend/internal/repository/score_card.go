@@ -521,3 +521,31 @@ func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL s
 	}
 	return nil
 }
+
+// GetGearLabels returns "make model" for the rifle and "brand model" for the
+// pellet referenced by the given card. Empty strings come back when the IDs
+// are unset, deleted, or otherwise unresolvable so feed callers can fall back
+// to the "not set" UI without treating that as an error.
+func (r *ScoreCardRepository) GetGearLabels(ctx context.Context, cardID string) (string, string, error) {
+	var rifleName, pelletName *string
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			CASE WHEN ri.id IS NOT NULL THEN ri.make || ' ' || ri.model END AS rifle_name,
+			CASE WHEN p.id  IS NOT NULL THEN p.brand  || ' ' || p.model  END AS pellet_name
+		FROM score_cards sc
+		LEFT JOIN rifles  ri ON ri.id = sc.rifle_id
+		LEFT JOIN pellets p  ON p.id  = sc.pellet_id
+		WHERE sc.id = $1
+	`, cardID).Scan(&rifleName, &pelletName)
+	if err != nil {
+		return "", "", fmt.Errorf("get gear labels: %w", err)
+	}
+	rn, pn := "", ""
+	if rifleName != nil {
+		rn = *rifleName
+	}
+	if pelletName != nil {
+		pn = *pelletName
+	}
+	return rn, pn, nil
+}

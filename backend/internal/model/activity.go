@@ -76,6 +76,8 @@ type ScorePostedMeta struct {
 	IsPB         bool   `json:"is_pb,omitempty"`
 	LeagueName   string `json:"league_name,omitempty"`
 	CardImageURL string `json:"card_image_url,omitempty"`
+	RifleName    string `json:"rifle_name,omitempty"`
+	PelletName   string `json:"pellet_name,omitempty"`
 }
 
 // JoinedClubMeta is the JSONB metadata for ActivityJoinedClub events.
