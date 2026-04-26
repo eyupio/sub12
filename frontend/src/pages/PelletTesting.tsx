@@ -359,10 +359,7 @@ function RecentSessionRow({ test }: { test: PelletTestSessionSummary }) {
       </div>
       <div className="text-right shrink-0 ml-2">
         {test.best_group_size_mm != null ? (
-          <>
-            <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" />
-            <p className="text-[10px] tracking-widest uppercase text-muted">mm best</p>
-          </>
+          <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" suffix="mm" />
         ) : (
           <span className="text-sm text-muted">—</span>
         )}
@@ -402,10 +399,7 @@ function TopComboRow({
       </div>
       <div className="text-right shrink-0 ml-2">
         {combo.best_group_mm != null ? (
-          <>
-            <SerifNumber value={combo.best_group_mm.toFixed(2)} size="md" />
-            <p className="text-[10px] tracking-widest uppercase text-muted">mm best</p>
-          </>
+          <SerifNumber value={combo.best_group_mm.toFixed(2)} size="md" suffix="mm" />
         ) : (
           <span className="text-sm text-muted">—</span>
         )}
@@ -630,9 +624,7 @@ function TestRow({
         <div>
           <p className="text-[10px] uppercase tracking-widest text-muted">Best group</p>
           {test.best_group_size_mm != null ? (
-            <>
-              <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" />
-            </>
+            <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" suffix="mm" />
           ) : (
             <span className="text-sm text-muted">—</span>
           )}
@@ -640,7 +632,7 @@ function TestRow({
         <div>
           <p className="text-[10px] uppercase tracking-widest text-muted">Avg</p>
           {test.average_group_size_mm != null ? (
-            <SerifNumber value={test.average_group_size_mm.toFixed(2)} size="md" />
+            <SerifNumber value={test.average_group_size_mm.toFixed(2)} size="md" suffix="mm" />
           ) : (
             <span className="text-sm text-muted">—</span>
           )}
@@ -649,11 +641,10 @@ function TestRow({
       </div>
       <div className="sm:hidden text-right shrink-0">
         {test.best_group_size_mm != null ? (
-          <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" />
+          <SerifNumber value={test.best_group_size_mm.toFixed(2)} size="md" suffix="mm" />
         ) : (
           <span className="text-sm text-muted">—</span>
         )}
-        <p className="text-[10px] uppercase tracking-widest text-muted">mm</p>
       </div>
     </Link>
   )
@@ -789,10 +780,7 @@ function ComboCardMobile({ combo, rank }: { combo: ComboPerformanceSummary; rank
       </div>
       <div className="text-right shrink-0">
         {combo.best_group_mm != null ? (
-          <>
-            <SerifNumber value={combo.best_group_mm.toFixed(2)} size="md" />
-            <p className="text-[10px] tracking-widest uppercase text-muted">mm best</p>
-          </>
+          <SerifNumber value={combo.best_group_mm.toFixed(2)} size="md" suffix="mm" />
         ) : (
           <span className="text-sm text-muted">—</span>
         )}

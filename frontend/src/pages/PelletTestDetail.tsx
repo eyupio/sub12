@@ -620,14 +620,14 @@ export default function PelletTestDetail() {
                 <p className="text-[10px] uppercase tracking-widest text-muted">Best Group</p>
                 <p className="t-display-num text-3xl lg:text-4xl text-gold leading-none">
                   {session.best_group_size_mm?.toFixed(2)}
-                  <span className="t-section-title ml-1 font-sans">mm</span>
+                  <span className="text-[10px] uppercase tracking-widest text-muted ml-1 align-baseline">mm</span>
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-widest text-muted">Avg</p>
                 <p className="t-display-num text-3xl lg:text-4xl text-ink leading-none">
                   {session.average_group_size_mm?.toFixed(2)}
-                  <span className="t-section-title ml-1 font-sans">mm</span>
+                  <span className="text-[10px] uppercase tracking-widest text-muted ml-1 align-baseline">mm</span>
                 </p>
               </div>
             </div>

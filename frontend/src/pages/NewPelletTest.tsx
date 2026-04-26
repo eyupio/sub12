@@ -1,12 +1,13 @@
-import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react'
-import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronDown, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
+import { Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
 import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LocationField, type LocationValue } from '../components/LocationField'
+import { useSmartBack } from '../hooks/useSmartBack'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -43,23 +44,10 @@ interface GroupRow {
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  const id = useId()
-  const child = isValidElement(children)
-    ? cloneElement(children as React.ReactElement<{ id?: string }>, { id: (children.props as { id?: string }).id ?? id })
-    : children
-  const childId = isValidElement(children) ? ((children.props as { id?: string }).id ?? id) : undefined
-  return (
-    <div>
-      <label htmlFor={childId} className="block t-section-title mb-1">{label}</label>
-      {child}
-    </div>
-  )
-}
-
 export default function NewPelletTest() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const smartBack = useSmartBack('/pellet-testing')
   const search = useSearch({ strict: false }) as { draftId?: string }
   const draftId = search.draftId
 
