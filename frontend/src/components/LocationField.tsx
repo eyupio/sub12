@@ -89,7 +89,7 @@ export function LocationField({
         toast("Couldn't get location — skip or type it in", 'error')
         setLocating(false)
       },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60_000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
     )
   }
 

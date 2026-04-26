@@ -96,6 +96,17 @@ export default function AdminUserDetail() {
   const deleteMutation = useMutation({
     mutationFn: () => adminUsersApi.delete(id),
     onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ['admin-user', id] })
+      queryClient.setQueriesData<{ items: AdminUser[], total: number, limit: number, offset: number }>(
+        { queryKey: ['admin-users'] },
+        (current) => current
+          ? {
+              ...current,
+              items: current.items.filter((item) => item.id !== id),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      )
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
       navigate({ to: '/admin/users' })
     },

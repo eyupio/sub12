@@ -22,6 +22,7 @@ import { ReportDialog } from '../components/ReportDialog'
 import { Flag } from 'lucide-react'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { UserAvatar } from '../components/UserAvatar'
+import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 
 function VerificationBadge({ status }: { status: string }) {
   if (status === 'verified') {
@@ -1429,10 +1430,21 @@ export default function ScoreCardDetail() {
                     </div>
                   )}
                   {card.location && (
-                    <div className="flex justify-between items-start gap-3">
-                      <span className="t-section-title">Venue</span>
-                      <span className="text-sm text-secondary text-right">{card.location}</span>
-                    </div>
+                    typeof card.location_lat === 'number' && typeof card.location_lng === 'number' ? (
+                      <div className="space-y-2">
+                        <span className="t-section-title">Venue</span>
+                        <LocationMapThumbnail
+                          label={card.location}
+                          lat={card.location_lat}
+                          lng={card.location_lng}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-start gap-3">
+                        <span className="t-section-title">Venue</span>
+                        <span className="text-sm text-secondary text-right">{card.location}</span>
+                      </div>
+                    )
                   )}
                 </div>
               )}

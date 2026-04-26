@@ -11,6 +11,7 @@ import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { ShareDialog, ShareTargetType } from '../components/ShareDialog'
+import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { Share2 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -244,7 +245,15 @@ function PublicScoreCard({ id }: { id: string }) {
           </button>
         </div>
         {card.location && (
-          <p className="text-sm text-muted">{card.location}</p>
+          typeof card.location_lat === 'number' && typeof card.location_lng === 'number' ? (
+            <LocationMapThumbnail
+              label={card.location}
+              lat={card.location_lat}
+              lng={card.location_lng}
+            />
+          ) : (
+            <p className="text-sm text-muted">{card.location}</p>
+          )
         )}
         <p className="text-xs text-muted">{formatDate(card.shot_at, prefs)}</p>
         {card.card_image_url && (
@@ -412,6 +421,18 @@ function PublicPelletTest({ id }: { id: string }) {
         </div>
 
         <p className="text-xs text-muted">{formatDate(session.test_date, prefs)}</p>
+
+        {session.location && (
+          typeof session.location_lat === 'number' && typeof session.location_lng === 'number' ? (
+            <LocationMapThumbnail
+              label={session.location}
+              lat={session.location_lat}
+              lng={session.location_lng}
+            />
+          ) : (
+            <p className="text-sm text-muted">{session.location}</p>
+          )
+        )}
 
         {session.images && session.images.length > 0 && (
           <div className="grid grid-cols-2 gap-2">

@@ -336,12 +336,21 @@ func (s *UserService) AdminUpdateRole(ctx context.Context, callerID, targetID, r
 	return u, err
 }
 
-// AdminDeleteUser permanently deletes a user. The caller may not delete their own account.
+// AdminDeleteUser deletes a user. The caller may not delete their own account.
 func (s *UserService) AdminDeleteUser(ctx context.Context, callerID, targetID string) error {
 	if callerID == targetID {
 		return ErrCannotTargetSelf
 	}
-	return s.users.Delete(ctx, targetID)
+	if err := s.users.SoftDelete(ctx, targetID); err != nil {
+		return err
+	}
+	if s.sessions != nil {
+		if err := s.sessions.InvalidateAllRefreshTokens(ctx, targetID); err != nil {
+			s.log.Error().Err(err).Str("user_id", targetID).Msg("admin_delete_user: session invalidation failed")
+		}
+	}
+	s.log.Info().Str("event", "admin_user_deleted").Str("admin_user_id", callerID).Str("target_user_id", targetID).Msg("audit")
+	return nil
 }
 
 func (s *UserService) buildConfirmLink(token string) string {

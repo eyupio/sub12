@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Crosshair, Loader2, MapPin, X } from 'lucide-react'
-import { MapContainer, TileLayer, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -50,6 +50,15 @@ function MapHandle({ onReady }: { onReady: (m: LeafletMap) => void }) {
   useEffect(() => {
     onReady(map)
   }, [map, onReady])
+  return null
+}
+
+function ClickPicker({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onPick(e.latlng.lat, e.latlng.lng)
+    },
+  })
   return null
 }
 
@@ -125,16 +134,19 @@ export function MapLocationPicker({
         toast("Couldn't get location — pan the map instead", 'error')
         setLocating(false)
       },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60_000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
     )
   }
 
   function handleSave() {
+    const currentCenter = mapRef.current?.getCenter()
+    const lat = currentCenter?.lat ?? center[0]
+    const lng = currentCenter?.lng ?? center[1]
     const trimmed = label.trim()
     onPick({
-      label: trimmed.length > 0 ? trimmed : `${formatCoord(center[0])}, ${formatCoord(center[1])}`,
-      lat: center[0],
-      lng: center[1],
+      label: trimmed.length > 0 ? trimmed : `${formatCoord(lat)}, ${formatCoord(lng)}`,
+      lat,
+      lng,
     })
   }
 
@@ -177,6 +189,13 @@ export function MapLocationPicker({
             />
             <CenterTracker onCenter={(lat, lng) => setCenter([lat, lng])} />
             <MapHandle onReady={(m) => { mapRef.current = m }} />
+            <ClickPicker
+              onPick={(lat, lng) => {
+                const next: [number, number] = [lat, lng]
+                setCenter(next)
+                mapRef.current?.setView(next, FOCUSED_ZOOM)
+              }}
+            />
           </MapContainer>
           {/* Fixed crosshair at the center of the map; selection = whatever the
               center sits over after a pan. */}

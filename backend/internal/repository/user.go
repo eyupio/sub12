@@ -270,7 +270,7 @@ func (r *UserRepository) GetAdminByID(ctx context.Context, id string) (*model.Ad
 	var u model.AdminUser
 	err := r.db.QueryRow(ctx, `
 		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
-		FROM users WHERE id = $1
+		FROM users WHERE id = $1 AND deleted_at IS NULL
 	`, id).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
 		&u.CreatedAt, &u.UpdatedAt)
@@ -288,7 +288,7 @@ func (r *UserRepository) UpdateRole(ctx context.Context, id, role string) (*mode
 	var u model.AdminUser
 	err := r.db.QueryRow(ctx, `
 		UPDATE users SET role = $2, updated_at = NOW()
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 		RETURNING id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
 	`, id, role).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,

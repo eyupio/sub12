@@ -76,6 +76,11 @@ describe('LocationField', () => {
     const { onChange } = renderField()
     fireEvent.click(screen.getByRole('button', { name: /use my location/i }))
     await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
+    )
     const last = onChange.mock.calls[onChange.mock.calls.length - 1][0]
     expect(last.lat).toBeCloseTo(51.5, 5)
     expect(last.lng).toBeCloseTo(-0.12, 5)

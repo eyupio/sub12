@@ -28,6 +28,7 @@ import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LocationField, type LocationValue } from '../components/LocationField'
+import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { useSmartBack } from '../hooks/useSmartBack'
 
 type PendingDelete =
@@ -905,7 +906,22 @@ export default function PelletTestDetail() {
                 {session.humidity_pct != null && <Row label="Humidity" value={`${session.humidity_pct}%`} mono />}
                 {session.barometric_pressure_mbar != null && <Row label="Pressure" value={`${session.barometric_pressure_mbar} mbar`} mono />}
                 {session.location && (
-                  <Row label={<><MapPin size={11} className="inline -mt-px mr-1" /> Location</>} value={session.location} />
+                  typeof session.location_lat === 'number' && typeof session.location_lng === 'number' ? (
+                    <div className="space-y-2">
+                      <dt className="t-section-title">
+                        <MapPin size={11} className="inline -mt-px mr-1" /> Location
+                      </dt>
+                      <dd>
+                        <LocationMapThumbnail
+                          label={session.location}
+                          lat={session.location_lat}
+                          lng={session.location_lng}
+                        />
+                      </dd>
+                    </div>
+                  ) : (
+                    <Row label={<><MapPin size={11} className="inline -mt-px mr-1" /> Location</>} value={session.location} />
+                  )
                 )}
               </dl>
             </section>
