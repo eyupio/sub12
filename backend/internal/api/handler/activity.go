@@ -23,6 +23,7 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
 
 	limit, _ := parsePagination(r, 20, 100)
 
@@ -34,12 +35,13 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := model.FeedRequest{
-		ViewerID: userID,
-		Filter:   filter,
-		LeagueID: r.URL.Query().Get("league_id"),
-		ClubID:   r.URL.Query().Get("club_id"),
-		Limit:    limit,
-		Cursor:   cursor,
+		ViewerID:   userID,
+		ViewerRole: role,
+		Filter:     filter,
+		LeagueID:   r.URL.Query().Get("league_id"),
+		ClubID:     r.URL.Query().Get("club_id"),
+		Limit:      limit,
+		Cursor:     cursor,
 	}
 
 	feed, err := h.svc.GetFeed(r.Context(), req)

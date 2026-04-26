@@ -82,4 +82,16 @@ export const activityApi = {
 
   createComment: (id: string, body: string) =>
     api.post<import('./scoreCards').Comment>(`/activities/${id}/comments`, { body }),
+
+  // Site-admin moderation: soft-hide a feed item for everyone. The optional
+  // reason is captured server-side for the audit log.
+  adminHide: (id: string, reason?: string) => {
+    const url = reason
+      ? `/admin/activities/${id}?reason=${encodeURIComponent(reason)}`
+      : `/admin/activities/${id}`
+    return api.del<void>(url)
+  },
+
+  adminUnhide: (id: string) =>
+    api.post<void>(`/admin/activities/${id}/unhide`, {}),
 }

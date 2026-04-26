@@ -78,12 +78,14 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		req.Filter = model.FeedForYou
 	}
 
+	isAdmin := req.ViewerRole == "admin"
+
 	switch req.Filter {
 	case model.FeedLeague:
 		if req.LeagueID == "" {
 			return nil, fmt.Errorf("league_id is required for league feed")
 		}
-		if s.leagueMembers != nil {
+		if s.leagueMembers != nil && !isAdmin {
 			ok, err := s.leagueMembers.IsMember(ctx, req.LeagueID, req.ViewerID)
 			if err != nil && !errors.Is(err, repository.ErrNotFound) {
 				return nil, fmt.Errorf("check league membership: %w", err)
@@ -97,7 +99,7 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		if req.ClubID == "" {
 			return nil, fmt.Errorf("club_id is required for club feed")
 		}
-		if s.clubMembers != nil {
+		if s.clubMembers != nil && !isAdmin {
 			ok, err := s.clubMembers.IsMember(ctx, req.ClubID, req.ViewerID)
 			if err != nil && !errors.Is(err, repository.ErrNotFound) {
 				return nil, fmt.Errorf("check club membership: %w", err)
@@ -118,6 +120,43 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		nextCursor = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	return &model.FeedResponse{Items: items, Cursor: nextCursor}, nil
+}
+
+var ErrActivityNotFound = errors.New("activity not found")
+
+// AdminHide soft-deletes an activity from the feed. Site admin only.
+func (s *ActivityService) AdminHide(ctx context.Context, activityID, adminID, reason string) error {
+	if err := s.repo.AdminHide(ctx, activityID, adminID, reason); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrActivityNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// AdminUnhide restores a previously hidden activity to the feed.
+func (s *ActivityService) AdminUnhide(ctx context.Context, activityID string) error {
+	if err := s.repo.AdminUnhide(ctx, activityID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrActivityNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// GetByID exposes the underlying repository lookup so other services (e.g.
+// moderation scope resolution) can locate an activity's league/club.
+func (s *ActivityService) GetByID(ctx context.Context, activityID string) (*model.Activity, error) {
+	a, err := s.repo.GetByID(ctx, activityID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrActivityNotFound
+		}
+		return nil, err
+	}
+	return a, nil
 }
 
 func truncateForFeed(s string, maxLen int) string {

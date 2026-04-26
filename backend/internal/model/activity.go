@@ -37,12 +37,13 @@ const (
 
 // FeedRequest holds validated parameters for a feed query.
 type FeedRequest struct {
-	ViewerID string
-	Filter   FeedFilter
-	LeagueID string // required when Filter == FeedLeague
-	ClubID   string // required when Filter == FeedClub
-	Limit    int
-	Cursor   string
+	ViewerID   string
+	ViewerRole string // empty for normal users; "admin" bypasses league/club membership gates
+	Filter     FeedFilter
+	LeagueID   string // required when Filter == FeedLeague
+	ClubID     string // required when Filter == FeedClub
+	Limit      int
+	Cursor     string
 }
 
 // Activity is a single event in the social feed.
@@ -63,6 +64,9 @@ type Activity struct {
 	IsLiked      bool            `json:"is_liked"`
 	CommentCount int             `json:"comment_count"`
 	CreatedAt    time.Time       `json:"created_at"`
+	HiddenAt     *time.Time      `json:"hidden_at,omitempty"`
+	HiddenBy     *string         `json:"hidden_by,omitempty"`
+	HideReason   *string         `json:"hide_reason,omitempty"`
 }
 
 // ScorePostedMeta is the JSONB metadata for ActivityScorePosted / ActivityPersonalBest events.

@@ -1,6 +1,6 @@
 import { api } from './client'
 
-export type ReportTargetType = 'post' | 'comment' | 'user' | 'score_card'
+export type ReportTargetType = 'post' | 'comment' | 'user' | 'score_card' | 'activity'
 export type ReportStatus = 'open' | 'dismissed' | 'actioned'
 export type ModerationAction = 'hide' | 'warn_user' | 'no_action'
 

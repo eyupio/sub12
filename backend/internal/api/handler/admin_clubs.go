@@ -31,7 +31,7 @@ func (h *AdminClubsHandler) List(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/admin/clubs/{id}
 func (h *AdminClubsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	club, err := h.svc.GetByID(r.Context(), id, "")
+	club, err := h.svc.GetByID(r.Context(), id, "", "admin")
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotFound) {
 			writeError(w, http.StatusNotFound, "club not found")

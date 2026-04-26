@@ -182,7 +182,7 @@ func main() {
 
 	reportRepo := repository.NewReportRepository(pool)
 	moderationSvc := service.NewModerationService(
-		reportRepo, postRepo, commentRepo, leagueRepo, clubRepo, userRepo,
+		reportRepo, postRepo, commentRepo, activityRepo, leagueRepo, clubRepo, userRepo,
 		notificationSvc, emailSenderSvc, cfg.CORSOrigin, log.Logger,
 	)
 	supportTicketRepo := repository.NewSupportTicketRepository(pool)
