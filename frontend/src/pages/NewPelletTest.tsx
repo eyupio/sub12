@@ -11,15 +11,6 @@ import { LocationField, type LocationValue } from '../components/LocationField'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-function relative(iso: string): string {
-  const d = new Date(iso)
-  const secs = (Date.now() - d.getTime()) / 1000
-  if (secs < 60) return 'JUST NOW'
-  if (secs < 3600) return `${Math.floor(secs / 60)}M AGO`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}H AGO`
-  return `${Math.floor(secs / 86400)}D AGO`
-}
-
 function captureDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })
@@ -178,7 +169,14 @@ export default function NewPelletTest() {
   const validGroups = groups.filter(g => g.groupSizeMM && Number(g.groupSizeMM) > 0)
   const hasDistance = !!distanceValue && Number(distanceValue) > 0
   const hasGroupOrImage = validGroups.length > 0 || imageFiles.length > 0 || existingImages.length > 0
-  const canSubmit = rifleId && pelletId && testDate && hasGroupOrImage && (hasDistance || imageFiles.length > 0 || existingImages.length > 0)
+  const canSubmit = Boolean(rifleId && pelletId && testDate && hasGroupOrImage && (hasDistance || imageFiles.length > 0 || existingImages.length > 0))
+  const reasonText =
+    !rifleId ? 'select a rifle'
+      : !pelletId ? 'select a pellet'
+        : !testDate ? 'pick a test date'
+          : !hasGroupOrImage ? 'add at least one group or upload a target photo'
+            : !hasDistance && imageFiles.length === 0 && existingImages.length === 0 ? 'enter a distance'
+              : 'complete required fields'
 
   const mutation = useMutation({
     mutationFn: async () => {
