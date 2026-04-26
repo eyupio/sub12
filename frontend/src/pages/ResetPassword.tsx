@@ -1,11 +1,37 @@
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, FormEvent } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
 import { authApi } from '../api/auth'
 import { useThemeStore } from '../store/theme'
 import { CheckCircle, XCircle } from 'lucide-react'
 
+// Reads the reset token from the URL fragment (#token=...). Fragments
+// aren't sent to servers or in Referer headers, unlike query strings.
+// Falls back to ?token=... for backward compatibility with reset emails
+// already in flight when the fragment-based delivery shipped.
+function readResetToken(searchToken: string | undefined): string | undefined {
+  if (typeof window !== 'undefined' && window.location.hash) {
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash
+    const params = new URLSearchParams(hash)
+    const t = params.get('token')
+    if (t) return t
+  }
+  return searchToken
+}
+
 export default function ResetPassword() {
   const search = useSearch({ strict: false }) as { token?: string }
+  const [token] = useState<string | undefined>(() => readResetToken(search.token))
+
+  // Clear the fragment from the address bar once we've captured it so the
+  // token doesn't sit visibly in the URL while the user types.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash && token) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [token])
+
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-primary-dark.svg' : 'logo-primary-light.svg'}`
@@ -28,14 +54,14 @@ export default function ResetPassword() {
       setError('Passwords do not match.')
       return
     }
-    if (!search.token) {
+    if (!token) {
       setError('Missing reset token.')
       return
     }
 
     setLoading(true)
     try {
-      await authApi.resetPassword(search.token, password)
+      await authApi.resetPassword(token, password)
       setSuccess(true)
     } catch {
       setError('Invalid or expired reset link. Please request a new one.')
@@ -46,7 +72,7 @@ export default function ResetPassword() {
 
   const inputCls = 'w-full bg-surface border border-subtle rounded px-4 py-3 text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)] focus:bg-[var(--brass)]/[0.04] transition-colors text-sm tracking-wider'
 
-  if (!search.token && !success) {
+  if (!token && !success) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-sm space-y-6 text-center">

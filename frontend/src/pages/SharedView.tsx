@@ -29,7 +29,7 @@ interface SharedViewProps {
 }
 
 function useIsAuthed(): boolean {
-  return useAuthStore((s) => !!(s.accessToken || s.refreshToken))
+  return useAuthStore((s) => !!(s.accessToken || s.user))
 }
 
 const inAppPath: Record<ShareTargetType, (id: string) => string> = {

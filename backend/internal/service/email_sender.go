@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/smtp"
 	"strings"
@@ -283,7 +284,11 @@ func buildMultipartMsg(from, to, subject, textBody, htmlBody string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	boundary := fmt.Sprintf("=_sub12_%x", rand.Int63())
+	var boundaryBytes [16]byte
+	if _, err := rand.Read(boundaryBytes[:]); err != nil {
+		return nil, fmt.Errorf("generate multipart boundary: %w", err)
+	}
+	boundary := "=_sub12_" + hex.EncodeToString(boundaryBytes[:])
 	msg := strings.Builder{}
 	msg.WriteString("From: " + from + "\r\n")
 	msg.WriteString("To: " + to + "\r\n")

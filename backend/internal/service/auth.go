@@ -417,11 +417,14 @@ func (s *AuthService) buildResetLink(token string) string {
 	if base == "" {
 		base = "http://localhost:5173/reset-password"
 	}
-	sep := "?"
-	if strings.Contains(base, "?") {
-		sep = "&"
+	// Token is delivered in the URL fragment so it isn't sent to the server
+	// in access logs / Referer headers, and isn't recorded in the browser
+	// history bar the way a query string is. The frontend reads it from
+	// window.location.hash and clears it after use.
+	if i := strings.Index(base, "#"); i >= 0 {
+		base = base[:i]
 	}
-	return base + sep + "token=" + url.QueryEscape(token)
+	return base + "#token=" + url.QueryEscape(token)
 }
 
 func hashToken(token string) string {

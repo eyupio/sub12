@@ -48,12 +48,14 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sub12-auth',
-      // Persist only the refresh token and user. The access token stays in
-      // memory so an XSS payload that reads localStorage cannot exfiltrate it;
-      // the API client auto-refreshes on 401 after a page reload.
+      // Persist only the user record. Both tokens stay out of localStorage:
+      // the access token is in-memory only, and the refresh token now lives
+      // exclusively in an httpOnly cookie set by the backend (Path=/api/v1/auth).
+      // Persisting the user lets us rehydrate identity on reload and trigger a
+      // cookie-based refresh; an XSS payload reading localStorage gets nothing
+      // it can replay against the API.
       partialize: (s) => ({
         user: s.user,
-        refreshToken: s.refreshToken,
       }),
     },
   ),

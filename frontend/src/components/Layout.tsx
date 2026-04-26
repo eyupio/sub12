@@ -65,7 +65,7 @@ const moreMenuItems = [
 
 export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
-  const { user, refreshToken, clearAuth } = useAuthStore()
+  const { user, clearAuth } = useAuthStore()
   const queryClient = useQueryClient()
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
@@ -125,9 +125,7 @@ export default function Layout({ children }: PropsWithChildren) {
   }, [])
 
   async function handleLogout() {
-    if (refreshToken) {
-      try { await authApi.logout(refreshToken) } catch { /* best effort */ }
-    }
+    try { await authApi.logout() } catch { /* best effort */ }
     clearAuth()
     await clearClientSession(queryClient)
     navigate({ to: '/' })

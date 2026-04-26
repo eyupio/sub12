@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
 import { Search, ChevronDown, ChevronRight } from 'lucide-react'
 import { faqApi, type FAQ } from '../api/faq'
 import { HelpIcon } from '../components/Tooltip'
@@ -120,7 +121,7 @@ export default function Help() {
                       </button>
                       {open && (
                         <div className="px-4 pb-4 prose prose-sm dark:prose-invert max-w-none text-secondary">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{faq.answer_md}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{faq.answer_md}</ReactMarkdown>
                         </div>
                       )}
                     </div>

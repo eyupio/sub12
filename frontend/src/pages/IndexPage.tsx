@@ -4,11 +4,12 @@ import Dashboard from './Dashboard'
 import LandingPage from './LandingPage'
 
 export default function IndexPage() {
-  // A returning user has a persisted refresh token but no in-memory access
-  // token yet (access tokens are not persisted to localStorage). Treat either
-  // as "logged in" so the Dashboard renders and the API client transparently
-  // refreshes on the first 401.
-  const hasSession = useAuthStore((s) => !!(s.accessToken || s.refreshToken))
+  // The persisted `user` is the returning-user signal: tokens are no longer
+  // in localStorage (access stays in memory, refresh lives in an httpOnly
+  // cookie). If the user record is present we render the app; the API client
+  // will swap a fresh access token via the cookie on the first 401, or punt
+  // to /login if the cookie is gone.
+  const hasSession = useAuthStore((s) => !!(s.accessToken || s.user))
 
   if (hasSession) {
     return (
