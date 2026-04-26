@@ -13,6 +13,8 @@ type PelletTestSession struct {
 	DistanceM              float64   `json:"distance_m"`
 	DistanceUnit           string    `json:"distance_unit"`
 	Location               *string   `json:"location,omitempty"`
+	LocationLat            *float64  `json:"location_lat,omitempty"`
+	LocationLng            *float64  `json:"location_lng,omitempty"`
 	WindMPH                *float64  `json:"wind_mph,omitempty"`
 	TempCelsius            *float64  `json:"temp_celsius,omitempty"`
 	HumidityPct            *float64  `json:"humidity_pct,omitempty"`
@@ -48,6 +50,8 @@ type QuickCreatePelletTestInput struct {
 	DistanceValue *float64 `json:"distance_value"`
 	DistanceUnit *string  `json:"distance_unit"`
 	Location     *string  `json:"location"`
+	LocationLat  *float64 `json:"location_lat"`
+	LocationLng  *float64 `json:"location_lng"`
 	WindMPH      *float64 `json:"wind_mph"`
 	TempCelsius  *float64 `json:"temp_celsius"`
 	HumidityPct  *float64 `json:"humidity_pct"`
@@ -61,6 +65,8 @@ type CreatePelletTestSessionInput struct {
 	DistanceValue          float64  `json:"distance_value"`
 	DistanceUnit           string   `json:"distance_unit"`
 	Location               *string  `json:"location"`
+	LocationLat            *float64 `json:"location_lat"`
+	LocationLng            *float64 `json:"location_lng"`
 	WindMPH                *float64 `json:"wind_mph"`
 	TempCelsius            *float64 `json:"temp_celsius"`
 	HumidityPct            *float64 `json:"humidity_pct"`
@@ -80,6 +86,8 @@ type UpdatePelletTestSessionInput struct {
 	DistanceValue          *float64 `json:"distance_value"`
 	DistanceUnit           *string  `json:"distance_unit"`
 	Location               *string  `json:"location"`
+	LocationLat            *float64 `json:"location_lat"`
+	LocationLng            *float64 `json:"location_lng"`
 	WindMPH                *float64 `json:"wind_mph"`
 	TempCelsius            *float64 `json:"temp_celsius"`
 	HumidityPct            *float64 `json:"humidity_pct"`
@@ -141,6 +149,8 @@ type PelletTestSessionSummary struct {
 	DistanceM          float64  `json:"distance_m"`
 	DistanceUnit       string   `json:"distance_unit"`
 	Location           *string  `json:"location,omitempty"`
+	LocationLat        *float64 `json:"location_lat,omitempty"`
+	LocationLng        *float64 `json:"location_lng,omitempty"`
 	WindMPH            *float64 `json:"wind_mph,omitempty"`
 	TempCelsius        *float64 `json:"temp_celsius,omitempty"`
 	AverageGroupSizeMM *float64 `json:"average_group_size_mm,omitempty"`

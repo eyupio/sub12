@@ -6,6 +6,7 @@ import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { LocationField, type LocationValue } from '../components/LocationField'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -67,7 +68,7 @@ export default function NewPelletTest() {
   const [testDate, setTestDate] = useState(today())
   const [distanceValue, setDistanceValue] = useState('')
   const [distanceUnit, setDistanceUnit] = useState('meters')
-  const [location, setLocation] = useState('')
+  const [location, setLocation] = useState<LocationValue>({ label: '' })
   const [windMph, setWindMph] = useState('')
   const [tempCelsius, setTempCelsius] = useState('')
   const [humidityPct, setHumidityPct] = useState('')
@@ -120,7 +121,13 @@ export default function NewPelletTest() {
       const value = unit === 'yards' ? draft.distance_m / 0.9144 : draft.distance_m
       setDistanceValue(String(Number(value.toFixed(2))))
     }
-    if (draft.location) setLocation(draft.location)
+    if (draft.location || draft.location_lat != null || draft.location_lng != null) {
+      setLocation({
+        label: draft.location ?? '',
+        lat: draft.location_lat ?? undefined,
+        lng: draft.location_lng ?? undefined,
+      })
+    }
     if (draft.wind_mph != null) setWindMph(String(draft.wind_mph))
     if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
     if (draft.humidity_pct != null) setHumidityPct(String(draft.humidity_pct))
@@ -199,7 +206,9 @@ export default function NewPelletTest() {
           test_date: testDate,
           distance_value: hasDistance ? Number(distanceValue) : undefined,
           distance_unit: hasDistance ? distanceUnit : undefined,
-          location: location || undefined,
+          location: location.label || undefined,
+          location_lat: location.lat,
+          location_lng: location.lng,
           wind_mph: windMph ? Number(windMph) : undefined,
           temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
           humidity_pct: humidityPct ? Number(humidityPct) : undefined,
@@ -218,7 +227,9 @@ export default function NewPelletTest() {
           test_date: testDate,
           distance_value: hasDistance ? Number(distanceValue) : undefined,
           distance_unit: hasDistance ? distanceUnit : undefined,
-          location: location || undefined,
+          location: location.label || undefined,
+          location_lat: location.lat,
+          location_lng: location.lng,
           wind_mph: windMph ? Number(windMph) : undefined,
           temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
           humidity_pct: humidityPct ? Number(humidityPct) : undefined,
@@ -456,7 +467,11 @@ export default function NewPelletTest() {
           </div>
 
           <Field label="Location">
-            <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Range / club" className={`${inputCls} placeholder:text-muted`} />
+            <LocationField
+              value={location}
+              onChange={setLocation}
+              inputClassName={`${inputCls} placeholder:text-muted`}
+            />
           </Field>
 
           <div className="grid grid-cols-3 gap-3">

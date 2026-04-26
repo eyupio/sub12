@@ -13,6 +13,8 @@ export interface PelletTestSession {
   distance_m: number
   distance_unit: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   humidity_pct?: number
@@ -42,6 +44,8 @@ export interface PelletTestSessionSummary {
   distance_m: number
   distance_unit: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   average_group_size_mm?: number
@@ -63,6 +67,8 @@ export interface QuickCreatePelletTestPayload {
   distance_value?: number
   distance_unit?: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   humidity_pct?: number
@@ -132,6 +138,8 @@ export interface CreatePelletTestPayload {
   distance_value?: number
   distance_unit?: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   humidity_pct?: number
@@ -151,6 +159,8 @@ export interface UpdatePelletTestPayload {
   distance_value?: number
   distance_unit?: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   humidity_pct?: number

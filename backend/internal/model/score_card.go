@@ -9,6 +9,8 @@ type ScoreCard struct {
 	PelletID      *string   `json:"pellet_id,omitempty"`
 	ShotAt        string    `json:"shot_at"` // YYYY-MM-DD
 	Location      *string   `json:"location,omitempty"`
+	LocationLat   *float64  `json:"location_lat,omitempty"`
+	LocationLng   *float64  `json:"location_lng,omitempty"`
 	WindMPH       *float64  `json:"wind_mph,omitempty"`
 	TempCelsius   *float64  `json:"temp_celsius,omitempty"`
 	DistanceM     *int      `json:"distance_m,omitempty"`
@@ -39,6 +41,8 @@ type QuickCreateScoreCardInput struct {
 	PelletID      *string  `json:"pellet_id"`
 	ShotAt        *string  `json:"shot_at"` // YYYY-MM-DD, defaults to today
 	Location      *string  `json:"location"`
+	LocationLat   *float64 `json:"location_lat"`
+	LocationLng   *float64 `json:"location_lng"`
 	WindMPH       *float64 `json:"wind_mph"`
 	TempCelsius   *float64 `json:"temp_celsius"`
 	DistanceM     *int     `json:"distance_m"`
@@ -93,6 +97,8 @@ type CreateScoreCardInput struct {
 	PelletID      *string  `json:"pellet_id"`
 	ShotAt        string   `json:"shot_at"`
 	Location      *string  `json:"location"`
+	LocationLat   *float64 `json:"location_lat"`
+	LocationLng   *float64 `json:"location_lng"`
 	WindMPH       *float64 `json:"wind_mph"`
 	TempCelsius   *float64 `json:"temp_celsius"`
 	DistanceM     *int     `json:"distance_m"`
@@ -111,6 +117,8 @@ type UpdateScoreCardInput struct {
 	PelletID    *string  `json:"pellet_id"`
 	ShotAt      string   `json:"shot_at"`
 	Location    *string  `json:"location"`
+	LocationLat *float64 `json:"location_lat"`
+	LocationLng *float64 `json:"location_lng"`
 	WindMPH     *float64 `json:"wind_mph"`
 	TempCelsius *float64 `json:"temp_celsius"`
 	DistanceM   *int     `json:"distance_m"`
@@ -156,6 +164,8 @@ type ScoreCardSummary struct {
 	TotalScore    int16     `json:"total_score"`
 	XCount        int16     `json:"x_count"`
 	Location      *string   `json:"location,omitempty"`
+	LocationLat   *float64  `json:"location_lat,omitempty"`
+	LocationLng   *float64  `json:"location_lng,omitempty"`
 	Verification  string    `json:"verification"`
 	LeagueRoundID *string   `json:"league_round_id,omitempty"`
 	LeagueID      *string   `json:"league_id,omitempty"`

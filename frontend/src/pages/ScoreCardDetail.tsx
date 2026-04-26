@@ -13,6 +13,7 @@ import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FlagDialog } from '../components/FlagDialog'
 import { LikeButton } from '../components/LikeButton'
+import { LocationField, type LocationValue } from '../components/LocationField'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { Tooltip } from '../components/Tooltip'
 import { tips } from '../components/tooltips'
@@ -827,6 +828,7 @@ export default function ScoreCardDetail() {
   const [editing, setEditing] = useState(false)
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '', distance_m: '', discipline: '' })
+  const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -896,7 +898,9 @@ export default function ScoreCardDetail() {
         shot_at: editMeta.shot_at,
         shot_scores: editShots.map(s => s.score),
         shot_xs: editShots.map(s => s.x),
-        location: editMeta.location || undefined,
+        location: editLocation.label || undefined,
+        location_lat: editLocation.lat,
+        location_lng: editLocation.lng,
         notes: editMeta.notes || undefined,
         rifle_id: editMeta.rifle_id || undefined,
         pellet_id: editMeta.pellet_id || undefined,
@@ -974,6 +978,11 @@ export default function ScoreCardDetail() {
       pellet_id: card.pellet_id ?? '',
       distance_m: card.distance_m != null ? String(card.distance_m) : '',
       discipline: card.discipline ?? '',
+    })
+    setEditLocation({
+      label: card.location ?? '',
+      lat: card.location_lat ?? undefined,
+      lng: card.location_lng ?? undefined,
     })
     setEditing(true)
   }
@@ -1096,7 +1105,11 @@ export default function ScoreCardDetail() {
             </div>
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
-              <input type="text" value={editMeta.location} onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))} placeholder="Range / club" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
+              <LocationField
+                value={editLocation}
+                onChange={setEditLocation}
+                inputClassName="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+              />
             </div>
             <div>
               <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance (m)</label>

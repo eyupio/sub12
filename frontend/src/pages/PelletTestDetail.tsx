@@ -27,6 +27,7 @@ import ImageMeasurement from '../components/ImageMeasurement'
 import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { LocationField, type LocationValue } from '../components/LocationField'
 import { useSmartBack } from '../hooks/useSmartBack'
 
 type PendingDelete =
@@ -105,6 +106,7 @@ export default function PelletTestDetail() {
     notes: '',
     is_public: false,
   })
+  const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -180,7 +182,9 @@ export default function PelletTestDetail() {
         test_date: editMeta.test_date || undefined,
         distance_value: distance,
         distance_unit: editMeta.distance_unit || undefined,
-        location: editMeta.location || undefined,
+        location: editLocation.label || undefined,
+        location_lat: editLocation.lat,
+        location_lng: editLocation.lng,
         notes: editMeta.notes || undefined,
         is_public: editMeta.is_public,
       })
@@ -209,6 +213,11 @@ export default function PelletTestDetail() {
       location: session.location ?? '',
       notes: session.notes ?? '',
       is_public: session.is_public,
+    })
+    setEditLocation({
+      label: session.location ?? '',
+      lat: session.location_lat ?? undefined,
+      lng: session.location_lng ?? undefined,
     })
     setEditing(true)
   }
@@ -641,7 +650,7 @@ export default function PelletTestDetail() {
             </div>
             <div>
               <label htmlFor="pellet-edit-location" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
-              <input id="pellet-edit-location" type="text" value={editMeta.location} onChange={e => setEditMeta(m => ({ ...m, location: e.target.value }))} placeholder="Range / club" className={inputCls} />
+              <LocationField value={editLocation} onChange={setEditLocation} inputClassName={inputCls} />
             </div>
             <div>
               <label htmlFor="pellet-edit-distance" className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance</label>

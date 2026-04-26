@@ -517,7 +517,7 @@ func securityHeadersMiddleware(env string) func(http.Handler) http.Handler {
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "no-referrer")
-			h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			h.Set("Permissions-Policy", "geolocation=(self), microphone=(), camera=()")
 			h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 			if env == "production" {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")

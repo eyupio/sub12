@@ -1,13 +1,14 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Camera, Loader2, MapPin, Target, Crosshair, CheckCircle2 } from 'lucide-react'
+import { Camera, Loader2, Target, Crosshair, CheckCircle2 } from 'lucide-react'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { ChipSelector } from '../components/ChipSelector'
+import { LocationField, type LocationValue } from '../components/LocationField'
 import { toast } from '../store/toast'
 
 type CaptureType = 'score' | 'pellet'
@@ -58,8 +59,7 @@ export default function QuickCapture() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [wind, setWind] = useState<number | null>(null)
   const [temp, setTemp] = useState<number | null>(null)
-  const [location, setLocation] = useState<string>('')
-  const [locating, setLocating] = useState(false)
+  const [location, setLocation] = useState<LocationValue>({ label: '' })
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
@@ -78,24 +78,6 @@ export default function QuickCapture() {
   const rifles = rifleData?.items ?? []
   const pellets = pelletData?.items ?? []
 
-  // Surface recent locations from the user's last few entries so the field
-  // reduces to a tap rather than typing. Pulled from pellet tests and score
-  // cards lists opportunistically.
-  const { data: recentPellet } = useQuery({
-    queryKey: ['pellet-tests-recent'],
-    queryFn: () => pelletTestApi.list(10, 0),
-  })
-  const { data: recentScore } = useQuery({
-    queryKey: ['score-cards-recent'],
-    queryFn: () => scoreCardApi.list(10, 0),
-  })
-  const recentLocations = useMemo(() => {
-    const buckets = new Set<string>()
-    recentPellet?.items.forEach((s) => s.location && buckets.add(s.location))
-    recentScore?.items.forEach((s) => s.location && buckets.add(s.location))
-    return Array.from(buckets).slice(0, 4)
-  }, [recentPellet, recentScore])
-
   function onFile(ev: React.ChangeEvent<HTMLInputElement>) {
     const f = ev.target.files?.[0]
     if (!f) return
@@ -105,27 +87,6 @@ export default function QuickCapture() {
     }
     setPhoto(f)
     setPhotoPreview(URL.createObjectURL(f))
-  }
-
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      toast('Geolocation unavailable on this device', 'error')
-      return
-    }
-    setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // Coarse label — no external reverse geocoder required. The user
-        // can edit this later during refinement.
-        setLocation(`${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)}`)
-        setLocating(false)
-      },
-      () => {
-        toast("Couldn't get location — skip or type it in", 'error')
-        setLocating(false)
-      },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 60_000 },
-    )
   }
 
   const save = useMutation({
@@ -138,7 +99,9 @@ export default function QuickCapture() {
         const session = await pelletTestApi.quickCreate({
           rifle_id: rifleId,
           pellet_id: pelletId,
-          location: location || undefined,
+          location: location.label || undefined,
+          location_lat: location.lat,
+          location_lng: location.lng,
           wind_mph: wind ?? undefined,
           temp_celsius: temp ?? undefined,
         })
@@ -149,7 +112,9 @@ export default function QuickCapture() {
       const card = await scoreCardApi.quickCreate({
         rifle_id: rifleId,
         pellet_id: pelletId,
-        location: location || undefined,
+        location: location.label || undefined,
+        location_lat: location.lat,
+        location_lng: location.lng,
         wind_mph: wind ?? undefined,
         temp_celsius: temp ?? undefined,
         league_round_id: undefined, // round is selected during refinement — reduces friction at capture
@@ -367,34 +332,7 @@ export default function QuickCapture() {
       </Section>
 
       <Section title="Location (optional)">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={useCurrentLocation}
-            disabled={locating}
-            className="px-4 py-2 rounded-full border border-subtle bg-surface text-sm tracking-wide hover:border-[var(--brass)]/40 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {locating ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
-            Use current
-          </button>
-          {recentLocations.map((loc) => (
-            <button
-              key={loc}
-              type="button"
-              onClick={() => setLocation(location === loc ? '' : loc)}
-              className={
-                location === loc
-                  ? 'px-4 py-2 rounded-full border text-sm tracking-wide bg-[var(--brass)]/15 border-[var(--brass)] text-[var(--brass)]'
-                  : 'px-4 py-2 rounded-full border border-subtle bg-surface text-sm tracking-wide hover:border-[var(--brass)]/40 transition-colors'
-              }
-            >
-              {loc}
-            </button>
-          ))}
-        </div>
-        {location && (
-          <p className="text-xs text-muted mt-2">Location: <span className="text-secondary">{location}</span></p>
-        )}
+        <LocationField value={location} onChange={setLocation} showLabelInput={false} />
       </Section>
 
       <div className="sticky bottom-[calc(var(--mobile-nav-offset)+0.5rem)] lg:bottom-4 flex gap-2">
