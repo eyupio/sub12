@@ -8,6 +8,7 @@ import { clubsApi } from '../api/clubs'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { ChipSelector } from '../components/ChipSelector'
+import { ImageEditor } from '../components/ImageEditor'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { toast } from '../store/toast'
 import { useSmartBack } from '../hooks/useSmartBack'
@@ -50,6 +51,7 @@ export default function QuickCapture() {
   const [pelletId, setPelletId] = useState<string | null>(null)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
   const [wind, setWind] = useState<number | null>(null)
   const [temp, setTemp] = useState<number | null>(null)
   const [location, setLocation] = useState<LocationValue>({ label: '' })
@@ -74,7 +76,12 @@ export default function QuickCapture() {
 
   function onFile(ev: React.ChangeEvent<HTMLInputElement>) {
     const f = ev.target.files?.[0]
+    ev.target.value = ''
     if (!f) return
+    setEditingFile(f)
+  }
+
+  function onEdited(f: File) {
     if (f.size > 10 * 1024 * 1024) {
       toast('Photo must be under 10 MB', 'error')
       return
@@ -82,13 +89,17 @@ export default function QuickCapture() {
     setPhoto(f)
     if (photoPreview) URL.revokeObjectURL(photoPreview)
     setPhotoPreview(URL.createObjectURL(f))
-    ev.target.value = ''
+    setEditingFile(null)
   }
 
   function clearPhoto() {
     setPhoto(null)
     if (photoPreview) URL.revokeObjectURL(photoPreview)
     setPhotoPreview(null)
+  }
+
+  function startEditExisting() {
+    if (photo) setEditingFile(photo)
   }
 
   const save = useMutation({
@@ -226,13 +237,22 @@ export default function QuickCapture() {
                 >
                   <X size={16} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => cameraRef.current?.click()}
-                  className="absolute bottom-2 right-2 px-3 py-1.5 rounded-full bg-black/60 text-white text-xs tracking-wide"
-                >
-                  Retake
-                </button>
+                <div className="absolute bottom-2 right-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={startEditExisting}
+                    className="px-3 py-1.5 rounded-full bg-black/60 text-white text-xs tracking-wide"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraRef.current?.click()}
+                    className="px-3 py-1.5 rounded-full bg-black/60 text-white text-xs tracking-wide"
+                  >
+                    Retake
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex gap-2">
@@ -454,6 +474,14 @@ export default function QuickCapture() {
           </p>
         )}
       </div>
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
     </div>
   )
 }

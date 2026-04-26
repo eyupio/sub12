@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize, Scan } from 'lucide-react'
+import { ArrowLeft, X as XIcon, RotateCcw, RotateCw, Maximize, Scan, Crop } from 'lucide-react'
 import { mmToMOA, mmToMRAD, yardsToMeters, metersToYards } from '../utils/ballistics'
 import { detectHoles } from '../utils/holeDetection'
 import type { DetectedHole } from '../utils/holeDetection'
@@ -17,6 +17,7 @@ interface Props {
   existingDetections?: PelletTestDetection[]
   onSave: (payload: CreateMeasurementPayload, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
   onSaveDetections?: (payload: CreateMeasurementPayload, detections: DetectedHole[], annotatedBlob: Blob | null, analysisMeta: { groupSizeMM: number | null; shotCount: number; distanceValue: number; distanceUnit: 'meters' | 'yards' }) => void
+  onRequestCrop?: () => void
   onClose: () => void
   defaultDistanceUnit?: 'meters' | 'yards'
   defaultMeasurementUnit?: 'cm' | 'mm'
@@ -51,6 +52,7 @@ export default function ImageMeasurement({
   existingDetections,
   onSave,
   onSaveDetections,
+  onRequestCrop,
   onClose,
   defaultDistanceUnit,
   defaultMeasurementUnit,
@@ -750,6 +752,11 @@ export default function ImageMeasurement({
                 <RotateCw size={16} /> ROTATE
               </button>
             </div>
+            {onRequestCrop && (
+              <button onClick={onRequestCrop} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-subtle text-secondary text-sm font-medium">
+                <Crop size={16} /> CROP / EDIT PHOTO
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => { setSubMode('set_aim'); fitToView() }} className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--brass)] text-inverse text-sm font-medium">
                 <Maximize size={16} /> SET
