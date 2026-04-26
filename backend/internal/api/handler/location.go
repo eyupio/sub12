@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,11 +14,12 @@ import (
 )
 
 type LocationHandler struct {
-	svc *service.LocationService
+	svc    *service.LocationService
+	images *repository.ImageRepository
 }
 
-func NewLocation(svc *service.LocationService) *LocationHandler {
-	return &LocationHandler{svc: svc}
+func NewLocation(svc *service.LocationService, images *repository.ImageRepository) *LocationHandler {
+	return &LocationHandler{svc: svc, images: images}
 }
 
 // POST /api/v1/locations
@@ -124,4 +126,56 @@ func (h *LocationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /api/v1/locations/{id}/image
+func (h *LocationHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	locationID := chi.URLParam(r, "id")
+
+	data, contentType, err := parseAndValidateImage(r, "image", 5<<20)
+	if err != nil {
+		if errors.Is(err, ErrFileTooLarge) {
+			writeError(w, http.StatusBadRequest, "file too large (max 5MB)")
+			return
+		}
+		if errors.Is(err, ErrMissingFile) {
+			writeError(w, http.StatusBadRequest, "missing image file")
+			return
+		}
+		if errors.Is(err, ErrUnsupportedType) {
+			writeError(w, http.StatusBadRequest, "unsupported image type (use JPEG, PNG, or WebP)")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to read image")
+		return
+	}
+
+	if _, err := h.svc.GetByID(r.Context(), locationID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "location not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify location")
+		return
+	}
+
+	img, err := h.images.Create(r.Context(), userID, data, contentType)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to store image")
+		return
+	}
+
+	imageURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
+	loc, err := h.svc.UpdateImageURL(r.Context(), locationID, userID, imageURL)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update location")
+		return
+	}
+	writeJSON(w, http.StatusOK, loc)
 }
