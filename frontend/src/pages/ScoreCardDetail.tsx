@@ -1076,8 +1076,7 @@ export default function ScoreCardDetail() {
   })
 
   const rotateMutation = useMutation({
-    mutationFn: (rotation: number) =>
-      scoreCardApi.update(id, { card_image_rotation: rotation }),
+    mutationFn: (rotation: number) => scoreCardApi.rotate(id, rotation),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['score-cards', id] }),
     onError: () => toast('Failed to rotate image', 'error'),
   })

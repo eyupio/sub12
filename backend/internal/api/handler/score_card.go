@@ -265,6 +265,41 @@ func (h *ScoreCardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, card)
 }
 
+// POST /api/v1/score-cards/{id}/rotate
+func (h *ScoreCardHandler) Rotate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var input struct {
+		Rotation int16 `json:"rotation"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	card, err := h.svc.Rotate(r.Context(), id, userID, input.Rotation)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to rotate score card image")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, card)
+}
+
 // DELETE /api/v1/score-cards/{id}
 func (h *ScoreCardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

@@ -14,13 +14,15 @@ import (
 // mockScoreCardRepo is a minimal stub that lets us test service-level
 // validation without hitting the database.
 type mockScoreCardRepo struct {
-	createCalled      bool
-	createDraftCalled bool
-	graduateCalled    bool
-	updateCalled      bool
-	deleteCalled      bool
-	lastTotal         int16
-	lastXCount        int16
+	createCalled         bool
+	createDraftCalled    bool
+	graduateCalled       bool
+	updateCalled         bool
+	updateRotationCalled bool
+	deleteCalled         bool
+	lastTotal            int16
+	lastXCount           int16
+	lastRotation         int16
 	// card is returned from GetByID; if nil, a placeholder is returned.
 	card *model.ScoreCard
 	// priorStats overrides the GetPriorScoreStats response when non-nil.
@@ -66,6 +68,11 @@ func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ 
 }
 func (m *mockScoreCardRepo) GetDraftCount(_ context.Context, _ string) (int, error) { return 0, nil }
 func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _ string) error    { return nil }
+func (m *mockScoreCardRepo) UpdateImageRotation(_ context.Context, _, _ string, rotation int16) (*model.ScoreCard, error) {
+	m.updateRotationCalled = true
+	m.lastRotation = rotation
+	return &model.ScoreCard{ID: "test-id", CardImageRotation: int(rotation)}, nil
+}
 func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, _ *model.UpdateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
 	m.updateCalled = true
 	m.lastTotal = total
@@ -337,6 +344,56 @@ func TestGraduate_ClearsDraftOnCompleteCard(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, repo.graduateCalled)
 	assert.False(t, out.IsDraft)
+}
+
+// --- Rotate tests ---
+
+func TestRotate_ValidAngles(t *testing.T) {
+	for _, angle := range []int16{0, 90, 180, 270} {
+		repo := &mockScoreCardRepo{}
+		svc := newTestService(repo)
+
+		card, err := svc.Rotate(context.Background(), "card1", "user1", angle)
+		require.NoError(t, err)
+		assert.True(t, repo.updateRotationCalled)
+		assert.Equal(t, angle, repo.lastRotation)
+		assert.Equal(t, int(angle), card.CardImageRotation)
+	}
+}
+
+func TestRotate_InvalidAngle(t *testing.T) {
+	for _, angle := range []int16{45, 360, -90, 91} {
+		repo := &mockScoreCardRepo{}
+		svc := newTestService(repo)
+
+		_, err := svc.Rotate(context.Background(), "card1", "user1", angle)
+		assert.ErrorIs(t, err, ErrInvalidCard)
+		assert.False(t, repo.updateRotationCalled, "repo should not be called for angle %d", angle)
+	}
+}
+
+// Rotation is a cosmetic display setting that should bypass the
+// lock-edits-after-verification policy applied to score-changing edits.
+func TestRotate_IgnoresLockPolicy(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{
+		card: &model.ScoreCard{
+			ID:            "card1",
+			Verification:  "verified",
+			LeagueRoundID: &roundID,
+		},
+	}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{cfg: &model.LeagueConfig{
+			LockEditsAfterVerification: true,
+		}},
+	}
+
+	_, err := svc.Rotate(context.Background(), "card1", "user1", 90)
+	require.NoError(t, err)
+	assert.True(t, repo.updateRotationCalled)
+	assert.Equal(t, int16(90), repo.lastRotation)
 }
 
 func TestUpdate_LockedLeagueCard(t *testing.T) {
