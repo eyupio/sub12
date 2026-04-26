@@ -1467,6 +1467,8 @@ export default function Profile() {
     </PageGrid>
   )
 }
+
+function FollowRequestsSection() {
   const queryClient = useQueryClient()
   const { data } = useQuery({
     queryKey: ['follow-requests'],
