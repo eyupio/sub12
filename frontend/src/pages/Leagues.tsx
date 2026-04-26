@@ -240,6 +240,7 @@ export default function Leagues() {
       <PageHeader
         title="Leagues"
         info={<HelpIcon content={pageHelp.leagues} />}
+        description="Compete in seasonal contests. Submit scores. Chase the leaderboard."
         action={
           <button className="lc-action-ghost" onClick={() => setShowCreate(true)}>
             <Plus size={14} /> New

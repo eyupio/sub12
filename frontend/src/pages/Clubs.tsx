@@ -148,6 +148,7 @@ export default function Clubs() {
       <PageHeader
         title="Clubs"
         info={<HelpIcon content={pageHelp.clubs} />}
+        description="Find your shooting community. Share scores. Connect with members."
         action={<button className="lc-action-ghost" onClick={() => setShowCreate(true)}><Plus size={14} /> New</button>}
       />
 
