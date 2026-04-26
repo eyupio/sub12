@@ -226,7 +226,19 @@ func main() {
 
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc)
+	backupRepo := repository.NewBackupRepository(pool)
+	backupSvc := service.NewBackupService(backupRepo, service.BackupConfig{
+		DBHost:     cfg.DBHost,
+		DBPort:     cfg.DBPort,
+		DBName:     cfg.DBName,
+		DBUser:     cfg.DBUser,
+		DBPassword: cfg.DBPassword,
+		DBSSLMode:  cfg.DBSSLMode,
+	}, log.Logger)
+	backupScheduler := service.NewBackupScheduler(backupRepo, backupSvc, log.Logger)
+	go backupScheduler.Run(ctx)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

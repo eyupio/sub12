@@ -42,6 +42,7 @@ import AdminLeagueDetail from './pages/AdminLeagueDetail'
 import AdminClubs from './pages/AdminClubs'
 import AdminClubDetail from './pages/AdminClubDetail'
 import AdminSitemap from './pages/AdminSitemap'
+import AdminBackup from './pages/AdminBackup'
 import AdminReportsQueue from './pages/AdminReportsQueue'
 import AdminSupportInbox from './pages/AdminSupportInbox'
 import ConfirmEmail from './pages/ConfirmEmail'
@@ -415,6 +416,12 @@ const adminSitemapRoute = createRoute({
   component: AdminSitemap,
 })
 
+const adminBackupRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/backup',
+  component: AdminBackup,
+})
+
 const adminReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/reports',
@@ -591,6 +598,7 @@ export const routeTree = rootRoute.addChildren([
     adminClubsRoute,
     adminClubDetailRoute,
     adminSitemapRoute,
+    adminBackupRoute,
     adminReportsRoute,
     adminSupportRoute,
     adminSupportTicketDetailRoute,
