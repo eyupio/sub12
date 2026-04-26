@@ -10,17 +10,22 @@ export function PageGrid({ children, className }: { children: ReactNode; classNa
 export function PageHeader({
   title,
   info,
+  description,
   action,
 }: {
   title: string
   info?: ReactNode
+  description?: ReactNode
   action?: ReactNode
 }) {
   return (
     <div className="lc-page-header">
-      <div className="lc-page-title">
-        <h1 className="t-page-title">{title}</h1>
-        {info}
+      <div className="lc-page-titlebar">
+        <div className="lc-page-title">
+          <h1 className="t-page-title">{title}</h1>
+          {info}
+        </div>
+        {description && <p className="lc-page-description">{description}</p>}
       </div>
       {action}
     </div>
