@@ -29,6 +29,8 @@ services:
     image: ghcr.io/jnnngs/sub-12-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - ./data/backups:/var/lib/sub12/backups
     environment:
       DB_HOST: postgres
       REDIS_URL: redis://redis:6379
