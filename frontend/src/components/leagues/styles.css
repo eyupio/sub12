@@ -152,56 +152,6 @@
 .lc-vdot-public { background: var(--green); }
 .lc-vdot-private { background: var(--gold); }
 
-/* Stats strip */
-.lc-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--lc-surface);
-  overflow: hidden;
-}
-.lc-stats-cell {
-  padding: 16px 20px;
-  border-right: 1px solid var(--line);
-}
-.lc-stats-cell:last-child { border-right: 0; }
-.lc-stats-label {
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-.lc-stats-value {
-  font-family: var(--serif);
-  font-size: 26px;
-  font-weight: 500;
-  color: var(--ink);
-  line-height: 1.1;
-}
-.lc-stats-unit {
-  font-family: var(--mono);
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 400;
-  margin-left: 2px;
-}
-.lc-stats-sub {
-  margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-}
-.lc-stats-sub.up { color: var(--green); }
-.lc-stats-sub.down { color: var(--red); }
-
-@media (max-width: 720px) {
-  .lc-stats { grid-template-columns: repeat(2, 1fr); }
-  .lc-stats-cell:nth-child(2) { border-right: 0; }
-  .lc-stats-cell:nth-child(1), .lc-stats-cell:nth-child(2) { border-bottom: 1px solid var(--line); }
-}
-
 /* Filter row */
 .lc-filter-row {
   display: flex;

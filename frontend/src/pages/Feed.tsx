@@ -232,7 +232,6 @@ function FeedHeader() {
   return (
     <header className="feed-header">
       <div>
-        <p className="feed-eyebrow">Social</p>
         <h1 className="t-page-title">Feed</h1>
       </div>
       <div className="feed-header-actions">

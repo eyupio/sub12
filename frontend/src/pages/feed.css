@@ -9,7 +9,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
-  max-width: 1160px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -29,15 +29,6 @@
   padding-bottom: 14px;
   margin-bottom: 14px;
   border-bottom: 1px solid var(--line);
-}
-
-.feed-eyebrow {
-  margin: 0 0 4px;
-  color: var(--gold);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
 }
 
 .feed-header h1 {
