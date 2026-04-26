@@ -1,7 +1,7 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
@@ -15,6 +15,7 @@ import { NavTracker } from './NavTracker'
 import { Tooltip } from './Tooltip'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
+import { clearClientSession } from '../utils/clearSession'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -65,6 +66,7 @@ const moreMenuItems = [
 export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
+  const queryClient = useQueryClient()
   const theme = useThemeStore((s) => s.theme)
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
@@ -132,6 +134,7 @@ export default function Layout({ children }: PropsWithChildren) {
       try { await authApi.logout(refreshToken) } catch { /* best effort */ }
     }
     clearAuth()
+    await clearClientSession(queryClient)
     navigate({ to: '/' })
   }
 

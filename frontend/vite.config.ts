@@ -39,21 +39,14 @@ export default defineConfig({
           /^\/robots\.txt$/,
           /^\/[a-fA-F0-9]+\.txt$/,
         ],
-        // Cache API responses for offline score entry. Auth endpoints are
-        // served NetworkOnly so login/refresh responses (which carry tokens)
-        // are never written to Cache Storage.
+        // All authenticated API responses are served NetworkOnly. Caching them
+        // by URL is unsafe: cache keys don't include the user identity, so a
+        // response fetched by user A could be served to user B on the same
+        // browser. Offline GETs of authenticated data are not worth that risk.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/auth/'),
-            handler: 'NetworkOnly',
-          },
-          {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/v1/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxAgeSeconds: 60 * 60 * 24 },
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },

@@ -1,13 +1,16 @@
 import { useState, FormEvent } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
+import { clearClientSession } from '../utils/clearSession'
 
 export default function Login() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const setAuth = useAuthStore((s) => s.setAuth)
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -32,6 +35,7 @@ export default function Login() {
         navigate({ to: '/login/2fa' })
         return
       }
+      await clearClientSession(queryClient)
       setAuth(result.user, result.tokens.access_token, result.tokens.refresh_token)
       navigate({ to: '/' })
     } catch (err) {

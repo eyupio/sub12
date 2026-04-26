@@ -1,14 +1,17 @@
 import { useEffect, useState, FormEvent } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
 import { twoFactorApi } from '../api/twoFactor'
 import { useAuthStore } from '../store/auth'
 import { useThemeStore } from '../store/theme'
+import { clearClientSession } from '../utils/clearSession'
 
 const CHALLENGE_KEY = 'sub12-2fa-challenge'
 
 export default function TwoFactorChallenge() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const setAuth = useAuthStore((s) => s.setAuth)
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -37,6 +40,7 @@ export default function TwoFactorChallenge() {
     try {
       const { user, tokens } = await twoFactorApi.loginVerify2FA(challengeToken, code.trim())
       sessionStorage.removeItem(CHALLENGE_KEY)
+      await clearClientSession(queryClient)
       setAuth(user, tokens.access_token, tokens.refresh_token)
       navigate({ to: '/' })
     } catch (err) {
