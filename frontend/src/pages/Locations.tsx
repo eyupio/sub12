@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { MapPin, Plus, Pencil, Trash2, LocateFixed, X, Check } from 'lucide-react'
 import { useLocations, useCreateLocation, useUpdateLocation, useDeleteLocation, type Location, type CreateLocationInput } from '../api/locations'
 import { TARGET_PRESETS } from '../config/targetPresets'
-import { useToastStore } from '../store/toast'
+import { toast } from '../store/toast'
 
 const EMPTY_FORM: CreateLocationInput = {
   name: '',
@@ -20,7 +20,6 @@ export default function Locations() {
   const createMutation = useCreateLocation()
   const updateMutation = useUpdateLocation()
   const deleteMutation = useDeleteLocation()
-  const { show } = useToastStore()
 
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Location | null>(null)
@@ -65,14 +64,14 @@ export default function Locations() {
     try {
       if (editing) {
         await updateMutation.mutateAsync({ id: editing.id, input: form })
-        show('Location updated', 'success')
+        toast('Location updated', 'success')
       } else {
         await createMutation.mutateAsync(form)
-        show('Location saved', 'success')
+        toast('Location saved', 'success')
       }
       setShowForm(false)
     } catch {
-      show('Failed to save location', 'error')
+      toast('Failed to save location', 'error')
     }
   }
 
@@ -80,9 +79,9 @@ export default function Locations() {
     if (!confirm('Delete this location?')) return
     try {
       await deleteMutation.mutateAsync(id)
-      show('Location deleted', 'success')
+      toast('Location deleted', 'success')
     } catch {
-      show('Failed to delete location', 'error')
+      toast('Failed to delete location', 'error')
     }
   }
 
