@@ -70,7 +70,7 @@ export function LocationMapThumbnail({ label, lat, lng, className }: LocationMap
         }
         aria-label={`Open map for ${label}`}
       >
-        <div className="relative h-32 bg-surface-hover">
+        <div className="relative isolate h-32 bg-surface-hover">
           <MapContainer
             center={center}
             zoom={THUMB_ZOOM}
