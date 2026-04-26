@@ -233,13 +233,21 @@ export default function Layout({ children }: PropsWithChildren) {
         )}
 
         {/* Page content */}
-        <main className={`flex-1 overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
-          {children ?? <Outlet />}
-          <footer className="border-t border-subtle mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide">
+        <main className={`flex-1 flex flex-col overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
+          <div className="flex-1">
+            {children ?? <Outlet />}
+          </div>
+          <footer className="shrink-0 border-t border-subtle mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide">
             <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
             <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
-            <span className="opacity-70">© sub-12</span>
+            <span className="opacity-70 inline-flex items-baseline">
+              <span>©&nbsp;</span>
+              <span className="inline-flex items-baseline" style={{ fontFamily: 'var(--serif)' }}>
+                <span className="font-bold">SUB</span>
+                <span className="font-bold text-[0.75em]" style={{ color: 'var(--gold)' }}>12</span>
+              </span>
+            </span>
           </footer>
         </main>
 
