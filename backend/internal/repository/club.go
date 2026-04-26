@@ -139,6 +139,67 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 	return &club, nil
 }
 
+// GetByJoinCode returns a single club matched by join_code (case-insensitive),
+// regardless of privacy. When viewerID is non-empty, IsAdmin and IsMember are
+// populated for the viewer; otherwise both are false. Returns ErrNotFound when
+// no row matches.
+func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID string) (*model.Club, error) {
+	var club model.Club
+	if viewerID == "" {
+		err := r.db.QueryRow(ctx, `
+			SELECT
+				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.type::text, c.join_policy::text, c.post_visibility,
+				c.date_format, c.time_format, c.timezone,
+				c.created_by, c.created_at::text, c.updated_at::text,
+				(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count
+			FROM clubs c
+			WHERE UPPER(c.join_code) = UPPER($1)
+			LIMIT 1
+		`, code).Scan(
+			&club.ID, &club.Name, &club.Description, &club.ImageURL,
+			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
+			&club.DateFormat, &club.TimeFormat, &club.Timezone,
+			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+			&club.MemberCount,
+		)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrNotFound
+			}
+			return nil, fmt.Errorf("get club by join code: %w", err)
+		}
+		return &club, nil
+	}
+
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.type::text, c.join_policy::text, c.post_visibility,
+			c.date_format, c.time_format, c.timezone,
+			c.created_by, c.created_at::text, c.updated_at::text,
+			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
+			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false) AS is_admin,
+			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid) AS is_member
+		FROM clubs c
+		WHERE UPPER(c.join_code) = UPPER($1)
+		LIMIT 1
+	`, code, viewerID).Scan(
+		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
+		&club.DateFormat, &club.TimeFormat, &club.Timezone,
+		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.MemberCount, &club.IsAdmin, &club.IsMember,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get club by join code: %w", err)
+	}
+	return &club, nil
+}
+
 func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
 	if viewerID == "" {
 		// Public clubs directory: hide private clubs from unauthenticated viewers.

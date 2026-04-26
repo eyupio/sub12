@@ -199,6 +199,25 @@ func (s *LeagueService) ListPublic(ctx context.Context) ([]*model.League, error)
 	return s.leagues.ListPublic(ctx)
 }
 
+// LookupByJoinCode resolves a league from a join code (case-insensitive,
+// whitespace-trimmed). An empty/blank code returns (nil, nil). When no league
+// matches, returns (nil, nil) so callers can render an empty result without
+// special-casing not-found.
+func (s *LeagueService) LookupByJoinCode(ctx context.Context, code string) (*model.League, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, nil
+	}
+	league, err := s.leagues.GetByJoinCode(ctx, code)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return league, nil
+}
+
 // Join handles joining a league respecting the join policy.
 // Returns (joined, pending, err).
 func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode string) (bool, bool, error) {

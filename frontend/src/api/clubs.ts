@@ -71,8 +71,11 @@ export interface UpdateClubInput {
 }
 
 export const clubsApi = {
-  list: () =>
-    api.get<{ items: Club[] }>('/clubs'),
+  list: (params?: { code?: string }) => {
+    const code = params?.code?.trim()
+    const qs = code ? `?code=${encodeURIComponent(code)}` : ''
+    return api.get<{ items: Club[] }>(`/clubs${qs}`)
+  },
 
   listMine: () =>
     api.get<{ items: Club[] }>('/users/me/clubs'),

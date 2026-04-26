@@ -25,8 +25,26 @@ func NewClub(svc *service.ClubService, leagues *service.LeagueService, images *r
 }
 
 // GET /api/v1/clubs
+// GET /api/v1/clubs
+// Optional ?code=XYZ resolves a single club by join_code (case-insensitive),
+// including private clubs, so codes work as discovery handles.
 func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+
+	if code := r.URL.Query().Get("code"); code != "" {
+		club, err := h.svc.LookupByJoinCode(r.Context(), code, viewerID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to look up club")
+			return
+		}
+		items := []*model.Club{}
+		if club != nil {
+			items = append(items, club)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": items})
+		return
+	}
+
 	clubs, err := h.svc.List(r.Context(), viewerID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list clubs")

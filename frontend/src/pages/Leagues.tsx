@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Lock, Trophy, X, FileText } from 'lucide-react'
+import { Plus, Users, Lock, Trophy, X, FileText, KeyRound } from 'lucide-react'
 import { leagueApi, CreateLeaguePayload, MyLeagueSummary, type League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -168,12 +168,25 @@ export default function Leagues() {
   const [showCreate, setShowCreate] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
+  const [codeInput, setCodeInput] = useState('')
+  const [code, setCode] = useState('')
   const user = useAuthStore((s) => s.user)
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['leagues'],
-    queryFn: () => leagueApi.list(),
+    queryKey: ['leagues', code || null],
+    queryFn: () => leagueApi.list(code ? { code } : undefined),
   })
+
+  function applyCode(e: React.FormEvent) {
+    e.preventDefault()
+    const next = codeInput.trim().toUpperCase()
+    setCode(next)
+  }
+
+  function clearCode() {
+    setCodeInput('')
+    setCode('')
+  }
 
   const { data: myLeagues } = useQuery({
     queryKey: ['my-leagues'],
@@ -188,6 +201,7 @@ export default function Leagues() {
 
   const filtered: League[] = useMemo(() => {
     const all = data?.items ?? []
+    if (code) return all
     const q = search.trim().toLowerCase()
     return all.filter((l) => {
       if (q && !l.name.toLowerCase().includes(q)) return false
@@ -202,7 +216,7 @@ export default function Leagues() {
         default: return true
       }
     })
-  }, [data, filter, search, myLeagueMap, user])
+  }, [data, filter, search, code, myLeagueMap, user])
 
   const stats: StatCell[] = useMemo(() => {
     const joined = myLeagues?.items?.length ?? 0
@@ -253,6 +267,45 @@ export default function Leagues() {
           onChip={setFilter}
         />
 
+        <form onSubmit={applyCode} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <KeyRound size={14} style={{ position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+            <input
+              type="text"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              placeholder="Find league by code"
+              className="font-mono"
+              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--ink)', fontSize: 13, padding: '8px 10px 8px 32px', textTransform: 'uppercase' }}
+              aria-label="Find league by code"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!codeInput.trim() || codeInput.trim().toUpperCase() === code}
+            className="lc-action-ghost"
+          >
+            Find
+          </button>
+        </form>
+
+        {code && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+            <span>Showing match for code</span>
+            <button
+              type="button"
+              onClick={clearCode}
+              className="lc-code-chip"
+              style={{ background: 'transparent', border: '1px solid var(--line)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink)' }}
+              title="Clear code"
+            >
+              <span className="lc-code-label">CODE</span>
+              {code}
+              <X size={11} />
+            </button>
+          </div>
+        )}
+
         {isLoading && (
           <div className="lc-stack" aria-busy>
             {Array.from({ length: 3 }).map((_, i) => (
@@ -266,13 +319,17 @@ export default function Leagues() {
         {data && filtered.length === 0 && (
           <EmptyState
             icon={<Trophy size={42} />}
-            title="No leagues here"
-            body={search || filter !== 'all' ? 'Try a different search or filter.' : 'Create the first league to get started.'}
-            cta={
+            title={code ? 'No league with that code' : 'No leagues here'}
+            body={code ? 'Double-check the code and try again.' : (search || filter !== 'all' ? 'Try a different search or filter.' : 'Create the first league to get started.')}
+            cta={code ? (
+              <button className="lc-action-ghost" onClick={clearCode}>
+                <X size={14} /> Clear code
+              </button>
+            ) : (
               <button className="lc-action-ghost" onClick={() => setShowCreate(true)}>
                 <Plus size={14} /> New league
               </button>
-            }
+            )}
           />
         )}
 

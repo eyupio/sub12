@@ -79,6 +79,28 @@ func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club,
 	return clubs, nil
 }
 
+// LookupByJoinCode resolves a club from a join code (case-insensitive,
+// whitespace-trimmed), bypassing public/private gating so codes work as
+// invite/discovery handles. Returns (nil, nil) for blank codes or no match.
+// JoinCode is stripped from the response for non-members to mirror List/GetByID.
+func (s *ClubService) LookupByJoinCode(ctx context.Context, code, viewerID string) (*model.Club, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, nil
+	}
+	club, err := s.repo.GetByJoinCode(ctx, code, viewerID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !club.IsMember {
+		club.JoinCode = ""
+	}
+	return club, nil
+}
+
 // SummaryByID returns a minimal public summary of any club, including private
 // ones. Used to render a members-only banner with a join CTA without
 // exposing members, standings or posts.
