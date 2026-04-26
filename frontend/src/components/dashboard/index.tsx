@@ -184,8 +184,8 @@ export function StatTile({
   search,
 }: {
   label: string
-  value: string
-  unit?: string
+  value: ReactNode
+  unit?: ReactNode
   sub?: ReactNode
   subVariant?: 'up' | 'down' | 'flat'
   trend?: ReactNode

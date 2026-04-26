@@ -23,7 +23,7 @@ export default function FeatureBoard() {
   }, [data?.items, status])
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-6 space-y-4">
+    <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
       <div className="rounded-2xl border border-subtle bg-surface p-4">
         <h1 className="t-page-title">Community feature board</h1>
         <p className="text-sm text-muted mt-1">

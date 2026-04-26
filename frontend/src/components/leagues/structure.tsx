@@ -27,31 +27,6 @@ export function PageHeader({
   )
 }
 
-export type StatCell = {
-  label: string
-  value: ReactNode
-  unit?: ReactNode
-  sub?: ReactNode
-  trend?: 'up' | 'down' | 'flat'
-}
-
-export function StatsStrip({ cells }: { cells: StatCell[] }) {
-  return (
-    <div className="lc-stats">
-      {cells.map((c, i) => (
-        <div className="lc-stats-cell" key={i}>
-          <div className="lc-stats-label">{c.label}</div>
-          <div className="lc-stats-value">
-            {c.value}
-            {c.unit && <span className="lc-stats-unit">{c.unit}</span>}
-          </div>
-          {c.sub && <div className={`lc-stats-sub ${c.trend ?? ''}`}>{c.sub}</div>}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function FilterRow<T extends string>({
   search,
   onSearch,

@@ -843,26 +843,34 @@ function BatchCard({ batch }: { batch: BatchReportEntry }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 pt-3 border-t border-line">
-        <div>
+      <div className="grid grid-cols-3 gap-4 lg:gap-5 pt-3 border-t border-line">
+        <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-muted">Best</p>
           {batch.best_group_mm != null ? (
-            <SerifNumber value={`${batch.best_group_mm.toFixed(2)}mm`} size="md" />
+            <p className="text-[18px] font-medium leading-tight tabular-nums text-ink mt-1.5 truncate">
+              {batch.best_group_mm.toFixed(2)}
+              <span className="font-mono text-[12px] text-muted ml-0.5">mm</span>
+            </p>
           ) : (
-            <span className="text-sm text-muted">—</span>
+            <p className="text-[18px] font-medium leading-tight text-muted mt-1.5">—</p>
           )}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-muted">Avg</p>
           {batch.avg_group_mm != null ? (
-            <SerifNumber value={`${batch.avg_group_mm.toFixed(2)}mm`} size="md" />
+            <p className="text-[18px] font-medium leading-tight tabular-nums text-ink mt-1.5 truncate">
+              {batch.avg_group_mm.toFixed(2)}
+              <span className="font-mono text-[12px] text-muted ml-0.5">mm</span>
+            </p>
           ) : (
-            <span className="text-sm text-muted">—</span>
+            <p className="text-[18px] font-medium leading-tight text-muted mt-1.5">—</p>
           )}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-widest text-muted">Tests</p>
-          <SerifNumber value={String(batch.test_count)} size="md" />
+          <p className="text-[18px] font-medium leading-tight tabular-nums text-ink mt-1.5 truncate">
+            {batch.test_count}
+          </p>
         </div>
       </div>
 
@@ -920,7 +928,7 @@ export default function PelletTesting() {
 
   return (
     <div className="bg-bg min-h-screen">
-      <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-5xl xl:max-w-6xl mx-auto pb-32">
+      <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6 pb-32">
         {/* Header */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>

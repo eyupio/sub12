@@ -236,7 +236,7 @@ export default function Drafts() {
   ]
 
   return (
-    <div className="max-w-5xl mx-auto p-4 lg:p-6 space-y-5">
+    <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
       <header className="space-y-1">
         <h1 className="t-page-title">Drafts</h1>
         <p className="text-sm text-muted max-w-2xl">

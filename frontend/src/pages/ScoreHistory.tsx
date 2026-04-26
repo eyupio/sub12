@@ -345,9 +345,8 @@ export default function ScoreHistory() {
       <div className="scores-container">
         <header className="scores-header">
           <div>
-            <p className="scores-eyebrow">Your cards</p>
             <div className="scores-title-row">
-              <h1 className="t-page-title">My Cards</h1>
+              <h1 className="t-page-title">Scores</h1>
               <HelpIcon content={pageHelp.scores} />
             </div>
           </div>
