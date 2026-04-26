@@ -155,6 +155,7 @@ func NewRouter(
 			r.Post("/score-cards/{id}/graduate", sc.Graduate)
 			r.Delete("/score-cards/{id}", sc.Delete)
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
+			r.Post("/score-cards/{id}/rotate", sc.Rotate)
 			r.Post("/score-cards/{id}/submit-to-league", sc.SubmitToLeague)
 
 			// Rifles

@@ -26,6 +26,7 @@ type ScoreCardRepo interface {
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
 	GetDraftCount(ctx context.Context, userID string) (int, error)
 	UpdateImageURL(ctx context.Context, id, imageURL string) error
+	UpdateImageRotation(ctx context.Context, id, userID string, rotation int16) (*model.ScoreCard, error)
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	Delete(ctx context.Context, id, userID string) error
 	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
@@ -423,6 +424,18 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	}
 
 	return s.cards.Update(ctx, id, userID, input, totalScore, xCount)
+}
+
+// Rotate updates only the card_image_rotation field. Rotation is a cosmetic
+// display setting, so this path deliberately skips ensureNotLocked and does
+// not reset verification or clear peer confirmations.
+func (s *ScoreCardService) Rotate(ctx context.Context, id, userID string, rotation int16) (*model.ScoreCard, error) {
+	switch rotation {
+	case 0, 90, 180, 270:
+	default:
+		return nil, fmt.Errorf("%w: rotation must be 0, 90, 180, or 270", ErrInvalidCard)
+	}
+	return s.cards.UpdateImageRotation(ctx, id, userID, rotation)
 }
 
 // Delete removes a score card, enforcing the league's lock-edits-after-verification

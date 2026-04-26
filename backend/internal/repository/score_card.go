@@ -524,6 +524,45 @@ func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL s
 	return nil
 }
 
+// UpdateImageRotation sets card_image_rotation without touching any other
+// field. Rotation is a cosmetic display setting, so this path deliberately
+// does not reset verification or clear peer confirmations.
+func (r *ScoreCardRepository) UpdateImageRotation(ctx context.Context, id, userID string, rotation int16) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+
+	err := r.db.QueryRow(ctx, `
+		UPDATE score_cards SET
+			card_image_rotation = $3,
+			updated_at = NOW()
+		WHERE id = $1 AND user_id = $2
+		RETURNING
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
+			like_count, comment_count, is_draft,
+			created_at, updated_at
+	`, id, userID, rotation).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update card image rotation: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+	return &card, nil
+}
+
 // GetGearLabels returns "make model" for the rifle and "brand model" for the
 // pellet referenced by the given card. Empty strings come back when the IDs
 // are unset, deleted, or otherwise unresolvable so feed callers can fall back

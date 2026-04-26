@@ -169,6 +169,9 @@ export const scoreCardApi = {
   update: (id: string, payload: UpdateScoreCardPayload) =>
     api.patch<ScoreCard>(`/score-cards/${id}`, payload),
 
+  rotate: (id: string, rotation: number) =>
+    api.post<ScoreCard>(`/score-cards/${id}/rotate`, { rotation }),
+
   remove: (id: string) =>
     api.del<void>(`/score-cards/${id}`),
 
