@@ -88,6 +88,12 @@ func (m *mockScoreCardRepo) GetPriorScoreStats(_ context.Context, _, _ string) (
 func (m *mockScoreCardRepo) GetGearLabels(_ context.Context, _ string) (string, string, error) {
 	return m.rifleLabel, m.pelletLabel, nil
 }
+func (m *mockScoreCardRepo) SubmitToLeague(_ context.Context, _, _, _ string) (*model.ScoreCard, error) {
+	if m.card != nil {
+		return m.card, nil
+	}
+	return &model.ScoreCard{ID: "test-id"}, nil
+}
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
 type mockLeagueRepo struct {
