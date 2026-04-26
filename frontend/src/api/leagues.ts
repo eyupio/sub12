@@ -182,8 +182,11 @@ export const leagueApi = {
     api.get<{ items: MyLeagueSummary[] }>('/users/me/leagues'),
 
   // Core league CRUD
-  list: () =>
-    api.get<{ items: League[] }>('/leagues'),
+  list: (params?: { code?: string }) => {
+    const code = params?.code?.trim()
+    const qs = code ? `?code=${encodeURIComponent(code)}` : ''
+    return api.get<{ items: League[] }>(`/leagues${qs}`)
+  },
 
   get: (id: string) =>
     api.get<League>(`/leagues/${id}`),

@@ -133,6 +133,28 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 	return leagues, rows.Err()
 }
 
+// GetByJoinCode returns a single league matched by join_code (case-insensitive),
+// regardless of privacy. Returns ErrNotFound when no row matches an empty result.
+func (r *LeagueRepository) GetByJoinCode(ctx context.Context, code string) (*model.League, error) {
+	var l model.League
+	err := r.db.QueryRow(ctx, `
+		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.join_code, l.image_url, l.club_id, l.created_by,
+		       l.date_format, l.time_format, l.timezone, l.created_at,
+		       (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
+		FROM leagues l
+		WHERE l.join_code IS NOT NULL AND UPPER(l.join_code) = UPPER($1)
+		LIMIT 1
+	`, code).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.JoinCode, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get league by join code: %w", err)
+	}
+	return &l, nil
+}
+
 // ListByUser returns leagues the given user is a member of, with member count and config dates.
 func (r *LeagueRepository) ListByUser(ctx context.Context, userID string) ([]*model.MyLeagueSummary, error) {
 	rows, err := r.db.Query(ctx, `

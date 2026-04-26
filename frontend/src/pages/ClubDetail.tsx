@@ -382,8 +382,8 @@ export default function ClubDetail() {
         </div>
       )}
 
-      {/* Code copy for admin */}
-      {club.is_admin && (
+      {/* Code copy for members (admins included) */}
+      {club.is_member && club.join_code && (
         <button
           onClick={copyJoinCode}
           style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: 0, marginBottom: 14 }}

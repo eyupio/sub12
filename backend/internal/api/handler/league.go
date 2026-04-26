@@ -81,7 +81,23 @@ func (h *LeagueHandler) ListMyLeagues(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/leagues
+// Optional ?code=XYZ resolves a single league by join_code (case-insensitive),
+// including private leagues, so codes work as discovery handles.
 func (h *LeagueHandler) List(w http.ResponseWriter, r *http.Request) {
+	if code := r.URL.Query().Get("code"); code != "" {
+		league, err := h.svc.LookupByJoinCode(r.Context(), code)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to look up league")
+			return
+		}
+		items := []*model.League{}
+		if league != nil {
+			items = append(items, league)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": items})
+		return
+	}
+
 	leagues, err := h.svc.ListPublic(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list leagues")

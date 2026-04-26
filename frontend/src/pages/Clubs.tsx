@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, X, Trophy, Lock } from 'lucide-react'
+import { Plus, Users, X, Trophy, Lock, KeyRound } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { ApiError } from '../api/client'
 import { HelpIcon } from '../components/Tooltip'
@@ -111,18 +111,31 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
 export default function Clubs() {
   const [showCreate, setShowCreate] = useState(false)
   const [search, setSearch] = useState('')
+  const [codeInput, setCodeInput] = useState('')
+  const [code, setCode] = useState('')
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['clubs'],
-    queryFn: () => clubsApi.list(),
+    queryKey: ['clubs', code || null],
+    queryFn: () => clubsApi.list(code ? { code } : undefined),
   })
+
+  function applyCode(e: React.FormEvent) {
+    e.preventDefault()
+    setCode(codeInput.trim().toUpperCase())
+  }
+
+  function clearCode() {
+    setCodeInput('')
+    setCode('')
+  }
 
   const filtered: Club[] = useMemo(() => {
     const all = data?.items ?? []
+    if (code) return all
     const q = search.trim().toLowerCase()
     if (!q) return all
     return all.filter((c) => c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q))
-  }, [data, search])
+  }, [data, search, code])
 
   const stats: StatCell[] = useMemo(() => {
     const total = data?.items?.length ?? 0
@@ -148,6 +161,45 @@ export default function Clubs() {
         <StatsStrip cells={stats} />
         <FilterRow search={search} onSearch={setSearch} placeholder="Search clubs…" />
 
+        <form onSubmit={applyCode} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <KeyRound size={14} style={{ position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+            <input
+              type="text"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              placeholder="Find club by code"
+              className="font-mono"
+              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--ink)', fontSize: 13, padding: '8px 10px 8px 32px', textTransform: 'uppercase' }}
+              aria-label="Find club by code"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!codeInput.trim() || codeInput.trim().toUpperCase() === code}
+            className="lc-action-ghost"
+          >
+            Find
+          </button>
+        </form>
+
+        {code && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+            <span>Showing match for code</span>
+            <button
+              type="button"
+              onClick={clearCode}
+              className="lc-code-chip"
+              style={{ background: 'transparent', border: '1px solid var(--line)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink)' }}
+              title="Clear code"
+            >
+              <span className="lc-code-label">CODE</span>
+              {code}
+              <X size={11} />
+            </button>
+          </div>
+        )}
+
         {isLoading && (
           <div className="lc-stack" aria-busy>
             {Array.from({ length: 3 }).map((_, i) => (
@@ -161,9 +213,11 @@ export default function Clubs() {
         {data && filtered.length === 0 && (
           <EmptyState
             icon={<Trophy size={42} />}
-            title="No clubs here"
-            body={search ? 'Try a different search.' : 'Create the first club to get started.'}
-            cta={<button className="lc-action-ghost" onClick={() => setShowCreate(true)}><Plus size={14} /> New club</button>}
+            title={code ? 'No club with that code' : 'No clubs here'}
+            body={code ? 'Double-check the code and try again.' : (search ? 'Try a different search.' : 'Create the first club to get started.')}
+            cta={code
+              ? <button className="lc-action-ghost" onClick={clearCode}><X size={14} /> Clear code</button>
+              : <button className="lc-action-ghost" onClick={() => setShowCreate(true)}><Plus size={14} /> New club</button>}
           />
         )}
 
