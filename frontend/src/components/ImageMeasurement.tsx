@@ -561,12 +561,23 @@ export default function ImageMeasurement({
   }, [])
 
   // ── Actions ────────────────────────────────────────────────────────
-  const handleCalibSet = () => {
-    if (!pointA || !pointB || !calibDistance) return
+  // Auto-recompute pixels/mm whenever both points and the reference
+  // distance are present. Drops the explicit "SET" button on step 2 —
+  // users typically just want to enter the value and tap NEXT. Legacy
+  // measurements that were saved without point B keep their hydrated
+  // pixels/mm value rather than being zeroed out here.
+  useEffect(() => {
+    if (!pointA || !pointB) return
+    const parsed = Number(calibDistance)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setPixelsPerMM(0)
+      return
+    }
     const d = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y)
-    const mm = calibUnit === 'cm' ? Number(calibDistance) * 10 : Number(calibDistance)
+    const mm = calibUnit === 'cm' ? parsed * 10 : parsed
     if (mm > 0 && d > 0) setPixelsPerMM(d / mm)
-  }
+    else setPixelsPerMM(0)
+  }, [pointA, pointB, calibDistance, calibUnit])
 
   const handleAutoDetect = useCallback(() => {
     const img = imgRef.current
@@ -795,10 +806,9 @@ export default function ImageMeasurement({
             <div className="flex gap-2">
               <input type="number" step="0.1" min="0" value={calibDistance} onChange={e => setCalibDistance(e.target.value)} placeholder={calibUnit === 'cm' ? '5.5' : '55'} className={inputCls} />
               <div className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
-                <button onClick={() => { setCalibUnit('cm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>cm</button>
-                <button onClick={() => { setCalibUnit('mm'); setPixelsPerMM(0) }} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>mm</button>
+                <button onClick={() => setCalibUnit('cm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>cm</button>
+                <button onClick={() => setCalibUnit('mm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>mm</button>
               </div>
-              <button onClick={handleCalibSet} disabled={!pointA || !pointB || !calibDistance} className="px-6 py-2 rounded-lg border border-subtle text-secondary text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">SET</button>
             </div>
             <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--brass)] text-inverse text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
               {'>'} NEXT
