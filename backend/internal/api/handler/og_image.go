@@ -263,19 +263,21 @@ func (h *OGImage) User() http.HandlerFunc {
 // ── shared rendering ────────────────────────────────────────────────────────
 
 const (
-	ogWidth       = 1200
-	ogHeight      = 630
-	bgColor       = "#EFE6D2"
-	brassColor    = "#B8741F"
-	textColor     = "#2A1F12"
-	mutedColor    = "#5A4632"
-	targetColor   = "#3F2D1E"
-	borderColor   = "#D9C9AA"
-	maxMetaRunes  = 68
-	wordmarkText  = "SUB12"
-	wordmarkScale = 118
-	taglineText   = "Precision shooting, properly tracked."
-	siteText      = "sub12.io"
+	ogWidth         = 1200
+	ogHeight        = 630
+	bgColor         = "#EFE6D2"
+	brassColor      = "#B8741F"
+	textColor       = "#2A1F12"
+	mutedColor      = "#5A4632"
+	targetColor     = "#3F2D1E"
+	borderColor     = "#D9C9AA"
+	maxMetaRunes    = 68
+	wordmarkSUB     = "SUB"
+	wordmark12      = "12"
+	wordmarkScale   = 118
+	wordmark12Scale = 72
+	taglineText     = "Precision shooting, properly tracked."
+	siteText        = "sub12.io"
 )
 
 // render paints the shared OG layout and returns the PNG bytes.
@@ -344,8 +346,15 @@ func (h *OGImage) render(typeLabel, primary, subprimary string, meta []string) (
 }
 
 func (h *OGImage) drawBrandLockup(dc *gg.Context, x, baseline float64) error {
+	// Draw "SUB" in dark ink
 	dc.SetHexColor(textColor)
-	if err := h.drawText(dc, wordmarkText, x, baseline, wordmarkScale, true); err != nil {
+	if err := h.drawText(dc, wordmarkSUB, x, baseline, wordmarkScale, true); err != nil {
+		return err
+	}
+	// Measure "SUB" width then draw "12" in brass immediately after, baseline-aligned
+	subWidth := textWidth(dc, h.face(wordmarkScale, true), wordmarkSUB)
+	dc.SetHexColor(brassColor)
+	if err := h.drawText(dc, wordmark12, x+subWidth+2, baseline, wordmark12Scale, true); err != nil {
 		return err
 	}
 	dc.SetHexColor(mutedColor)

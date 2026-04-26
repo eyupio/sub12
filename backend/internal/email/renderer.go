@@ -18,7 +18,9 @@ const layout = `<!DOCTYPE html>
     <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#161616;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 45px rgba(0,0,0,0.45);">
       <tr>
         <td style="background:linear-gradient(135deg,#111111,#161616);padding:24px 32px;border-bottom:1px solid rgba(212,164,74,0.35);">
-          <span style="color:#D4A44A;font-size:22px;font-weight:700;letter-spacing:0.03em;">sub12.io</span>
+          <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:700;letter-spacing:-0.01em;line-height:1;">
+            <span style="color:#FFFFFF;">SUB</span><span style="color:#D4A44A;">12</span>
+          </span>
         </td>
       </tr>
       <tr>

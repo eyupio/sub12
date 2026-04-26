@@ -50,11 +50,9 @@ function TargetGrid() {
 export function Sub12BrandLockup({ variant = 'full', className = '' }: Sub12BrandLockupProps) {
   if (variant === 'compact') {
     return (
-      <span
-        className={`inline-block text-3xl font-bold leading-none tracking-normal text-primary ${className}`}
-        style={{ fontFamily: 'var(--serif)' }}
-      >
-        SUB12
+      <span className={`inline-flex items-baseline leading-none ${className}`} style={{ fontFamily: 'var(--serif)' }}>
+        <span className="text-3xl font-bold tracking-normal text-primary">SUB</span>
+        <span className="text-xl font-bold tracking-normal" style={{ color: 'var(--gold)' }}>12</span>
       </span>
     )
   }
@@ -65,10 +63,11 @@ export function Sub12BrandLockup({ variant = 'full', className = '' }: Sub12Bran
     >
       <div className="min-w-0 shrink-0">
         <p
-          className="text-[52px] font-bold leading-none tracking-normal text-[#2A1F12] dark:text-[#ece6d4] sm:text-[64px]"
+          className="flex items-baseline leading-none"
           style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
         >
-          SUB12
+          <span className="text-[52px] font-bold tracking-normal text-[#2A1F12] dark:text-[#ece6d4] sm:text-[64px]">SUB</span>
+          <span className="text-[32px] font-bold tracking-normal text-[#B8741F] dark:text-[#D4A44A] sm:text-[40px]">12</span>
         </p>
         <p className="mt-3 text-sm leading-none text-[#5A4632] dark:text-[rgba(236,230,212,0.65)] sm:text-base">
           Precision shooting, properly tracked.
