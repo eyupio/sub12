@@ -56,6 +56,7 @@ const mobileNavItems = [
 // Everything not in mobileNavItems appears in the "More" overlay.
 const moreMenuItems = [
   { to: '/gear', icon: Package, label: 'Gear' },
+  { to: '/locations', icon: MapPin, label: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
   { to: '/drafts', icon: Zap, label: 'Drafts' },
