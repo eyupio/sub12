@@ -79,7 +79,6 @@ function RotatedImage({
     }
   }
 
-  const postW = isQuarter ? preH : preW
   const postH = isQuarter ? preW : preH
 
   return (
