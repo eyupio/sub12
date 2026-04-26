@@ -148,6 +148,15 @@ func (h *FeatureRequestHandler) AdminUpdate(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, item)
 }
 
+func (h *FeatureRequestHandler) AdminDelete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.svc.AdminDelete(r.Context(), id); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *FeatureRequestHandler) writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrNotAdmin):

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { Trash2 } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { featureRequestsApi } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketStatus } from '../api/supportTickets'
@@ -24,10 +25,12 @@ export default function AdminSupportTicketDetail() {
   const { id } = useParams({ from: '/app/admin/support/tickets/$id' })
   const prefs = useRegionalPrefs()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const currentUserId = useAuthStore((s) => s.user?.id)
   const [replyBody, setReplyBody] = useState('')
   const [internalNote, setInternalNote] = useState(false)
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const ticketQuery = useQuery({
     queryKey: ['support-ticket', 'admin', id],
@@ -107,6 +110,16 @@ export default function AdminSupportTicketDetail() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => supportTicketsApi.adminDelete(id),
+    onSuccess: () => {
+      toast('Ticket deleted', 'success')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] })
+      navigate({ to: '/admin/support' })
+    },
+    onError: () => toast('Failed to delete ticket', 'error'),
+  })
+
   function onSubmitConvert(e: FormEvent) {
     e.preventDefault()
     if (!convertTitle.trim()) {
@@ -153,7 +166,37 @@ export default function AdminSupportTicketDetail() {
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="t-page-title">Admin ticket detail</h1>
-        <Link to="/admin/support" className="text-sm text-[var(--brass)] hover:underline">Back to inbox</Link>
+        <div className="flex items-center gap-3">
+          {confirmingDelete ? (
+            <span className="flex items-center gap-2 text-sm">
+              <span className="text-muted">Delete this ticket?</span>
+              <button
+                type="button"
+                className="rounded-md bg-[var(--error-text)] px-2 py-1 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Confirm delete'}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-subtle px-2 py-1 text-xs"
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md border border-subtle px-2 py-1.5 text-xs text-[var(--error-text)] hover:bg-[color:var(--surface-muted)]"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Trash2 size={12} /> Delete ticket
+            </button>
+          )}
+          <Link to="/admin/support" className="text-sm text-[var(--brass)] hover:underline">Back to inbox</Link>
+        </div>
       </div>
 
       {ticketQuery.isLoading && <p className="text-sm text-muted">Loading ticket…</p>}

@@ -233,6 +233,10 @@ func (s *SupportTicketService) Delete(ctx context.Context, id, actorID string) e
 	return s.repo.Delete(ctx, id)
 }
 
+func (s *SupportTicketService) AdminDelete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}
+
 func (s *SupportTicketService) AddMessage(ctx context.Context, ticketID, authorID string, in *model.AddSupportTicketMessageInput) (*model.SupportTicketMessage, error) {
 	if strings.TrimSpace(in.Body) == "" {
 		return nil, ErrSupportBodyEmpty

@@ -244,6 +244,19 @@ func (h *SupportTicketHandler) AdminGet(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, item)
 }
 
+func (h *SupportTicketHandler) AdminDelete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.svc.AdminDelete(r.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "support ticket not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete support ticket")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *SupportTicketHandler) AdminTransitionStatus(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

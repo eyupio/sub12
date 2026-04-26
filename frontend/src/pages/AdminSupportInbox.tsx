@@ -1,7 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Inbox, Lightbulb, Pencil, X } from 'lucide-react'
+import { Inbox, Lightbulb, Pencil, Trash2, X } from 'lucide-react'
 import { featureRequestsApi, type FeatureRequest, type FeatureRequestStatus } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
 import { toast } from '../store/toast'
@@ -14,6 +14,7 @@ export default function AdminSupportInbox() {
   const [ticketStatus, setTicketStatus] = useState<SupportTicketStatus>('open')
   const [ticketCategory, setTicketCategory] = useState<SupportTicketCategory | 'all'>('all')
   const [editingFeature, setEditingFeature] = useState<FeatureRequest | null>(null)
+  const [deletingFeatureId, setDeletingFeatureId] = useState<string | null>(null)
 
   const ticketsQuery = useQuery({
     queryKey: ['admin', 'tickets', ticketStatus, ticketCategory],
@@ -45,6 +46,16 @@ export default function AdminSupportInbox() {
       qc.invalidateQueries({ queryKey: ['admin', 'feature-requests'] })
     },
     onError: () => toast('Failed to update feature request', 'error'),
+  })
+
+  const deleteFeatureMutation = useMutation({
+    mutationFn: (id: string) => featureRequestsApi.adminDelete(id),
+    onSuccess: () => {
+      toast('Feature request deleted', 'success')
+      setDeletingFeatureId(null)
+      qc.invalidateQueries({ queryKey: ['admin', 'feature-requests'] })
+    },
+    onError: () => toast('Failed to delete feature request', 'error'),
   })
 
   const tickets = ticketsQuery.data?.items ?? []
@@ -144,13 +155,42 @@ export default function AdminSupportInbox() {
                   >
                     {featureStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1.5 text-xs hover:bg-[color:var(--surface-muted)]"
-                    onClick={() => setEditingFeature(feature)}
-                  >
-                    <Pencil size={12} /> Edit
-                  </button>
+                  {deletingFeatureId === feature.id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="rounded-md bg-[var(--error-text)] px-2 py-1.5 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => deleteFeatureMutation.mutate(feature.id)}
+                        disabled={deleteFeatureMutation.isPending}
+                      >
+                        {deleteFeatureMutation.isPending ? 'Deleting…' : 'Confirm'}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-subtle px-2 py-1.5 text-xs"
+                        onClick={() => setDeletingFeatureId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1.5 text-xs hover:bg-[color:var(--surface-muted)]"
+                        onClick={() => setEditingFeature(feature)}
+                      >
+                        <Pencil size={12} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1.5 text-xs text-[var(--error-text)] hover:bg-[color:var(--surface-muted)]"
+                        onClick={() => setDeletingFeatureId(feature.id)}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               {feature.refined_description && <p className="text-sm text-secondary whitespace-pre-wrap">{feature.refined_description}</p>}

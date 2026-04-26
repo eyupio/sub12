@@ -200,6 +200,10 @@ func (s *FeatureRequestService) Vote(ctx context.Context, id, voterID string, up
 	return s.repo.GetByID(ctx, id, voterID)
 }
 
+func (s *FeatureRequestService) AdminDelete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}
+
 func (s *FeatureRequestService) filterByVisibility(ctx context.Context, viewerID string, items []*model.FeatureRequest) ([]*model.FeatureRequest, error) {
 	if viewerID == "" {
 		return items, nil

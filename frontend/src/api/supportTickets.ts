@@ -107,4 +107,5 @@ export const supportTicketsApi = {
     api.post<SupportTicket>(`/admin/tickets/${id}/status`, { status }),
   adminAssign: (id: string, assigneeId: string | null) =>
     api.post<SupportTicket>(`/admin/tickets/${id}/assign`, { assignee_id: assigneeId }),
+  adminDelete: (id: string) => api.del<void>(`/admin/tickets/${id}`),
 }

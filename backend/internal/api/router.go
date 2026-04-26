@@ -277,8 +277,10 @@ func NewRouter(
 			r.Get("/admin/tickets/{id}", supportH.AdminGet)
 			r.Post("/admin/tickets/{id}/status", supportH.AdminTransitionStatus)
 			r.Post("/admin/tickets/{id}/assign", supportH.AdminAssign)
+			r.Delete("/admin/tickets/{id}", supportH.AdminDelete)
 			r.Post("/admin/tickets/{id}/feature-request", featureH.AdminCreateFromTicket)
 			r.Patch("/admin/feature-requests/{id}", featureH.AdminUpdate)
+			r.Delete("/admin/feature-requests/{id}", featureH.AdminDelete)
 
 			r.Get("/feature-requests", featureH.List)
 			r.Get("/feature-requests/ranking", featureH.Rank)

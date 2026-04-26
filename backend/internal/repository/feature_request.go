@@ -250,3 +250,14 @@ func (r *FeatureRequestRepository) RemoveVote(ctx context.Context, featureReques
 	}
 	return nil
 }
+
+func (r *FeatureRequestRepository) Delete(ctx context.Context, id string) error {
+	ct, err := r.db.Exec(ctx, `DELETE FROM feature_requests WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete feature request: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

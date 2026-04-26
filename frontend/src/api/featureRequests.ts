@@ -49,4 +49,5 @@ export const featureRequestsApi = {
     api.post<FeatureRequest>(`/admin/tickets/${ticketID}/feature-request`, payload),
   adminUpdate: (id: string, payload: Partial<Pick<FeatureRequest, 'title' | 'refined_description' | 'status' | 'owner_admin_id'>>) =>
     api.patch<FeatureRequest>(`/admin/feature-requests/${id}`, payload),
+  adminDelete: (id: string) => api.del<void>(`/admin/feature-requests/${id}`),
 }
