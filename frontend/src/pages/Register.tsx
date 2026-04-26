@@ -116,6 +116,13 @@ export default function Register() {
           >
             {loading ? 'Creating account…' : 'Create Account'}
           </button>
+
+          <p className="text-center text-xs text-muted leading-relaxed pt-1">
+            By creating an account, you agree to our{' '}
+            <Link to="/terms" className="text-[var(--brass)] hover:opacity-80 transition-opacity">Terms of Use</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="text-[var(--brass)] hover:opacity-80 transition-opacity">Privacy Policy</Link>.
+          </p>
         </form>
 
         <p className="text-center t-section-title">
