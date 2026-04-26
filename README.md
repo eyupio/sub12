@@ -112,10 +112,14 @@ cd frontend && npm install && npm run dev  # start Vite on :5173
 
 ```bash
 cp .env.example .env
+mkdir -p ./data/backups
+sudo chown 10001:10001 ./data/backups && sudo chmod 750 ./data/backups
 make up        # builds and runs infra + backend + frontend
 make logs      # tail container logs
 make down      # stop everything
 ```
+
+The backend container runs as UID 10001 and writes encrypted backup archives to `/var/lib/sub12/backups`, which is bind-mounted to `./data/backups` on the host. Pre-creating the directory with that ownership lets scheduled and manual admin backups succeed; without it, runs fail with `mkdir /var/lib/sub12: permission denied`.
 
 ## Test Accounts
 
