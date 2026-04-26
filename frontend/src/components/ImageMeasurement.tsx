@@ -106,7 +106,6 @@ export default function ImageMeasurement({
   const [manualShotCount, setManualShotCount] = useState('')
   const [detectStatus, setDetectStatus] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
-  const isDrawingLine = useRef(false)
 
   // parseFloat handles edge cases that `Number()` silently coerces:
   // `Number('')` is 0 (|| fallback kicks in, masking an empty field);
@@ -409,7 +408,6 @@ export default function ImageMeasurement({
       const p2 = points[1]
       isPinching.current = true
       lastPinchDist.current = Math.hypot(p2.x - p1.x, p2.y - p1.y)
-      isDrawingLine.current = false
     }
 
     pointerTypeRef.current = e.pointerType
@@ -418,14 +416,7 @@ export default function ImageMeasurement({
     isPointerDown.current = true
     panStart.current = { x: e.clientX, y: e.clientY }
     panOffset.current = { ...pan }
-
-    if (subMode === 'draw_line_start' && !isPinching.current) {
-      const pt = screenToImage(e.clientX, e.clientY)
-      setLineStart(pt)
-      setLineEnd(null)
-      isDrawingLine.current = true
-    }
-  }, [pan, subMode, screenToImage])
+  }, [pan])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -463,17 +454,6 @@ export default function ImageMeasurement({
 
     if (!isPointerDown.current) return
 
-    if (isDrawingLine.current) {
-      const dx0 = e.clientX - pointerStart.current.x
-      const dy0 = e.clientY - pointerStart.current.y
-      const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
-      if (Math.hypot(dx0, dy0) > threshold) {
-        didDrag.current = true
-        setLineEnd(screenToImage(e.clientX, e.clientY))
-      }
-      return
-    }
-
     const dx = e.clientX - pointerStart.current.x
     const dy = e.clientY - pointerStart.current.y
     const threshold = pointerTypeRef.current === 'touch' ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD
@@ -485,7 +465,7 @@ export default function ImageMeasurement({
         y: panOffset.current.y + (e.clientY - panStart.current.y),
       })
     }
-  }, [isPanning, screenToImage])
+  }, [isPanning])
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current
@@ -501,16 +481,6 @@ export default function ImageMeasurement({
 
     isPointerDown.current = false
 
-    if (isDrawingLine.current) {
-      isDrawingLine.current = false
-      if (didDrag.current) {
-        setLineEnd(screenToImage(e.clientX, e.clientY))
-        setSubMode('idle')
-      }
-      // tap (no drag) — lineStart already set on pointerDown; stay in draw_line_start
-      return
-    }
-
     if (isPanning) { setIsPanning(false); return }
     if (didDrag.current) return
 
@@ -519,6 +489,7 @@ export default function ImageMeasurement({
     if (subMode === 'set_aim') setAimPoint(pt)
     else if (subMode === 'set_point_a') { setPointA(pt); setSubMode('idle') }
     else if (subMode === 'set_point_b') { setPointB(pt); setSubMode('idle') }
+    else if (subMode === 'draw_line_start') { setLineStart(pt); setLineEnd(null); setSubMode('draw_line_end') }
     else if (subMode === 'draw_line_end') { setLineEnd(pt); setSubMode('idle') }
     else if (subMode === 'add_impact') setImpacts(prev => [...prev, pt])
     else if (subMode === 'remove_impact' && impacts.length > 0) {
@@ -535,7 +506,6 @@ export default function ImageMeasurement({
       lastPinchDist.current = null
     }
     isPointerDown.current = false
-    isDrawingLine.current = false
     setIsPanning(false)
   }, [])
 
@@ -882,7 +852,7 @@ export default function ImageMeasurement({
                     SET END {lineEnd && '\u2713'}
                   </button>
                 </div>
-                <p className="text-[11px] text-muted text-center">Tap to mark, or press and drag to draw the line</p>
+                <p className="text-[11px] text-muted text-center">Tap to set start, pan/zoom, then tap to set end</p>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted">
                     Group size: {manualGroupSizeMM !== null ? `${fmtLen(manualGroupSizeMM)} ${displayUnit} (${manualGroupSizeMOA ?? '—'} MOA)` : '—'}
