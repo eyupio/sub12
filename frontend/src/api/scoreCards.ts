@@ -6,6 +6,8 @@ export interface ScoreCardSummary {
   total_score: number
   x_count: number
   location?: string
+  location_lat?: number
+  location_lng?: number
   rifle_id?: string
   pellet_id?: string
   verification: string
@@ -67,6 +69,8 @@ export interface QuickCreateScoreCardPayload {
   pellet_id?: string
   shot_at?: string
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   distance_m?: number
@@ -82,6 +86,8 @@ export interface CreateScoreCardPayload {
   shot_scores: number[]
   shot_xs: boolean[]
   location?: string
+  location_lat?: number
+  location_lng?: number
   wind_mph?: number
   temp_celsius?: number
   distance_m?: number

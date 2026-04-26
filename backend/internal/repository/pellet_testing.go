@@ -28,7 +28,7 @@ func scanSession(row pgx.Row) (*model.PelletTestSession, error) {
 	err := row.Scan(
 		&s.ID, &s.UserID, &s.RifleID, &s.PelletID,
 		&testDate, &s.DistanceM, &s.DistanceUnit,
-		&s.Location, &s.WindMPH, &s.TempCelsius, &s.HumidityPct,
+		&s.Location, &s.LocationLat, &s.LocationLng, &s.WindMPH, &s.TempCelsius, &s.HumidityPct,
 		&s.Notes,
 		&s.VelocityFPS, &s.VelocitySD, &s.ExtremeSpreadFPS,
 		&s.BenchSetup, &s.ScopeDetails, &s.BarometricPressureMbar,
@@ -43,7 +43,7 @@ func scanSession(row pgx.Row) (*model.PelletTestSession, error) {
 }
 
 const sessionCols = `id, user_id, rifle_id, pellet_id, test_date, distance_m, distance_unit,
-	location, wind_mph, temp_celsius, humidity_pct, notes,
+	location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes,
 	velocity_fps, velocity_sd, extreme_spread_fps,
 	bench_setup, scope_details, barometric_pressure_mbar,
 	average_group_size_mm, best_group_size_mm, group_count, is_public, is_draft, created_at, updated_at`
@@ -51,13 +51,13 @@ const sessionCols = `id, user_id, rifle_id, pellet_id, test_date, distance_m, di
 func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput, distanceM float64) (*model.PelletTestSession, error) {
 	session, err := scanSession(r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_sessions (user_id, rifle_id, pellet_id, test_date, distance_m, distance_unit,
-			location, wind_mph, temp_celsius, humidity_pct, notes,
+			location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes,
 			velocity_fps, velocity_sd, extreme_spread_fps,
 			bench_setup, scope_details, barometric_pressure_mbar)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 		RETURNING `+sessionCols+`
 	`, userID, in.RifleID, in.PelletID, in.TestDate, distanceM, in.DistanceUnit,
-		in.Location, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
+		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
 		in.VelocityFPS, in.VelocitySD, in.ExtremeSpreadFPS,
 		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar))
 	if err != nil {
@@ -83,14 +83,14 @@ func (r *PelletTestRepository) CreateDraft(ctx context.Context, userID string, i
 	session, err := scanSession(r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_sessions (user_id, rifle_id, pellet_id,
 			test_date, distance_m, distance_unit,
-			location, wind_mph, temp_celsius, humidity_pct, notes, is_draft)
+			location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes, is_draft)
 		VALUES ($1,$2,$3,
 			COALESCE(NULLIF($4,'')::date, CURRENT_DATE), $5, $6,
-			$7, $8, $9, $10, $11, TRUE)
+			$7, $8, $9, $10, $11, $12, $13, TRUE)
 		RETURNING `+sessionCols+`
 	`, userID, in.RifleID, in.PelletID,
 		testDate, distanceM, unit,
-		in.Location, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes))
+		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes))
 	if err != nil {
 		return nil, fmt.Errorf("create pellet test draft: %w", err)
 	}
@@ -209,7 +209,7 @@ func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, li
 		filter = ""
 	}
 	query := `
-		SELECT s.id, s.test_date, s.distance_m, s.distance_unit, s.location,
+		SELECT s.id, s.test_date, s.distance_m, s.distance_unit, s.location, s.location_lat, s.location_lng,
 			s.wind_mph, s.temp_celsius,
 			s.average_group_size_mm, s.best_group_size_mm, s.group_count,
 			ri.make, ri.model, p.brand, p.model,
@@ -238,7 +238,7 @@ func (r *PelletTestRepository) ListByUser(ctx context.Context, userID string, li
 		var testDate time.Time
 		var createdAt time.Time
 		if err := rows.Scan(
-			&s.ID, &testDate, &s.DistanceM, &s.DistanceUnit, &s.Location,
+			&s.ID, &testDate, &s.DistanceM, &s.DistanceUnit, &s.Location, &s.LocationLat, &s.LocationLng,
 			&s.WindMPH, &s.TempCelsius,
 			&s.AverageGroupSizeMM, &s.BestGroupSizeMM, &s.GroupCount,
 			&s.RifleMake, &s.RifleModel, &s.PelletBrand, &s.PelletModel,
@@ -262,22 +262,24 @@ func (r *PelletTestRepository) Update(ctx context.Context, id, userID string, in
 			distance_m    = COALESCE($6, distance_m),
 			distance_unit = COALESCE($7, distance_unit),
 			location      = COALESCE($8, location),
-			wind_mph      = COALESCE($9, wind_mph),
-			temp_celsius  = COALESCE($10, temp_celsius),
-			humidity_pct  = COALESCE($11, humidity_pct),
-			notes         = COALESCE($12, notes),
-			velocity_fps            = COALESCE($13, velocity_fps),
-			velocity_sd             = COALESCE($14, velocity_sd),
-			extreme_spread_fps      = COALESCE($15, extreme_spread_fps),
-			bench_setup             = COALESCE($16, bench_setup),
-			scope_details           = COALESCE($17, scope_details),
-			barometric_pressure_mbar = COALESCE($18, barometric_pressure_mbar),
-			is_public     = COALESCE($19, is_public),
+			location_lat  = COALESCE($9, location_lat),
+			location_lng  = COALESCE($10, location_lng),
+			wind_mph      = COALESCE($11, wind_mph),
+			temp_celsius  = COALESCE($12, temp_celsius),
+			humidity_pct  = COALESCE($13, humidity_pct),
+			notes         = COALESCE($14, notes),
+			velocity_fps            = COALESCE($15, velocity_fps),
+			velocity_sd             = COALESCE($16, velocity_sd),
+			extreme_spread_fps      = COALESCE($17, extreme_spread_fps),
+			bench_setup             = COALESCE($18, bench_setup),
+			scope_details           = COALESCE($19, scope_details),
+			barometric_pressure_mbar = COALESCE($20, barometric_pressure_mbar),
+			is_public     = COALESCE($21, is_public),
 			updated_at    = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING `+sessionCols+`
 	`, id, userID, in.RifleID, in.PelletID, in.TestDate, distanceM, in.DistanceUnit,
-		in.Location, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
+		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
 		in.VelocityFPS, in.VelocitySD, in.ExtremeSpreadFPS,
 		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar,
 		in.IsPublic))

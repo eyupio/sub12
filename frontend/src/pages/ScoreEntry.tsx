@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { LocationField, type LocationValue } from '../components/LocationField'
 import { useSmartBack } from '../hooks/useSmartBack'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -28,7 +29,7 @@ export default function ScoreEntry() {
   )
   const [selectedShot, setSelectedShot] = useState<number | null>(null)
   const [shotAt, setShotAt] = useState(today())
-  const [location, setLocation] = useState('')
+  const [location, setLocation] = useState<LocationValue>({ label: '' })
   const [windMph, setWindMph] = useState('')
   const [tempCelsius, setTempCelsius] = useState('')
   const [notes, setNotes] = useState('')
@@ -61,7 +62,13 @@ export default function ScoreEntry() {
   useEffect(() => {
     if (!draft) return
     setShotAt(draft.shot_at)
-    if (draft.location) setLocation(draft.location)
+    if (draft.location || draft.location_lat != null || draft.location_lng != null) {
+      setLocation({
+        label: draft.location ?? '',
+        lat: draft.location_lat ?? undefined,
+        lng: draft.location_lng ?? undefined,
+      })
+    }
     if (draft.wind_mph != null) setWindMph(String(draft.wind_mph))
     if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
     if (draft.notes) setNotes(draft.notes)
@@ -241,7 +248,9 @@ export default function ScoreEntry() {
         shot_at: shotAt,
         shot_scores: shotScores,
         shot_xs: shotXs,
-        location: location || undefined,
+        location: location.label || undefined,
+        location_lat: location.lat,
+        location_lng: location.lng,
         wind_mph: windMph ? Number(windMph) : undefined,
         temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
         notes: notes || undefined,
@@ -562,12 +571,10 @@ export default function ScoreEntry() {
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
             <div className="space-y-1.5">
               <label className={sidebarLabelCls}>Location</label>
-              <input
-                type="text"
+              <LocationField
                 value={location}
-                onChange={e => setLocation(e.target.value)}
-                placeholder="Range / club"
-                className={`${inputCls} placeholder:text-muted`}
+                onChange={setLocation}
+                inputClassName={`${inputCls} placeholder:text-muted`}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
