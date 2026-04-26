@@ -47,6 +47,7 @@ import { pelletTestApi, type PelletTestSessionSummary } from '../api/pelletTesti
 import { UserAvatar } from '../components/UserAvatar'
 import { LikeButton } from '../components/LikeButton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { ImageModal } from '../components/ImageModal'
 import { PickerModal, type PickerItem } from '../components/PickerModal'
 import { MentionPopover } from '../components/MentionPopover'
@@ -301,6 +302,7 @@ function FeedComposer() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [attachments, setAttachments] = useState<{ image_url: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
   const [pickerOpen, setPickerOpen] = useState<null | 'card' | 'pellet'>(null)
   const [linked, setLinked] = useState<LinkedAttachment | null>(null)
   const [mentionState, setMentionState] = useState<{ start: number; query: string } | null>(null)
@@ -360,10 +362,14 @@ function FeedComposer() {
 
   const handleImagePick = () => fileInputRef.current?.click()
 
-  const handleFileSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (file) setEditingFile(file)
+  }
+
+  const onEditedAttachment = async (file: File) => {
+    setEditingFile(null)
     setUploading(true)
     try {
       const fd = new FormData()
@@ -540,6 +546,13 @@ function FeedComposer() {
         style={{ display: 'none' }}
         onChange={handleFileSelected}
       />
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEditedAttachment}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
       <div className="composer-actions">
         <div className="composer-tools">
           <button type="button" onClick={() => setPickerOpen('card')}>

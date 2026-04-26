@@ -12,6 +12,7 @@ import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { MembersOnlyBanner } from '../components/MembersOnlyBanner'
 import { PostCard } from '../components/PostCard'
 import { PostComposer } from '../components/PostComposer'
@@ -186,6 +187,7 @@ export default function ClubDetail() {
   const [joinError, setJoinError] = useState('')
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
 
   const { data: club, isLoading, error: clubError } = useQuery({
     queryKey: ['club', id],
@@ -316,7 +318,7 @@ export default function ClubDetail() {
                 >
                   <ImagePlus size={11} />
                 </button>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate(f); e.target.value = '' }} />
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setEditingFile(f) }} />
               </>
             )}
           </div>
@@ -540,6 +542,14 @@ export default function ClubDetail() {
           shareTitle={club.name}
           shareText={`${club.name} on sub-12 — ${club.member_count} member${club.member_count === 1 ? '' : 's'}`}
           onClose={() => setShowShare(false)}
+        />
+      )}
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={(f) => { setEditingFile(null); uploadMutation.mutate(f) }}
+          onCancel={() => setEditingFile(null)}
         />
       )}
     </PageGrid>

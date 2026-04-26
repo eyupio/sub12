@@ -5,6 +5,7 @@ import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from 
 import { statsApi, RifleStats } from '../api/stats'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { CatalogSearch } from '../components/CatalogSearch'
 import { RifleProfileCard } from '../components/RifleProfileCard'
 import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
@@ -32,6 +33,17 @@ const selectCls =
 
 function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpload: (file: File) => void; isPending: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
+
+  function onEdited(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be under 5 MB', 'error')
+      setEditingFile(null)
+      return
+    }
+    setEditingFile(null)
+    onUpload(file)
+  }
 
   return (
     <>
@@ -42,13 +54,7 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0]
-          if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-              toast('Image must be under 5 MB', 'error')
-            } else {
-              onUpload(file)
-            }
-          }
+          if (file) setEditingFile(file)
           e.target.value = ''
         }}
       />
@@ -71,6 +77,13 @@ function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpl
           </div>
         )}
       </button>
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
     </>
   )
 }
