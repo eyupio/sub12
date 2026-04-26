@@ -8,7 +8,7 @@ import { formatDate, useRegionalPrefs } from '../utils/date'
 import { UserAvatar } from '../components/UserAvatar'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
 
@@ -36,7 +36,7 @@ function ConfirmDeleteModal({ club, onConfirm, onCancel, isPending }: {
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full sm:max-w-sm bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm tracking-widest uppercase text-secondary">Delete Club</h2>
+          <h2 className="t-section-title">Delete Club</h2>
           <button onClick={onCancel} className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
@@ -166,20 +166,20 @@ export default function AdminClubDetail() {
     <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-6">
       <Link
         to="/admin/clubs"
-        className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+        className="flex items-center gap-1 t-section-title hover:text-secondary transition-colors"
       >
         <ChevronLeft size={14} />
         All Clubs
       </Link>
 
       <div>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">{club.name}</h1>
+        <h1 className="t-page-title">{club.name}</h1>
         <p className="text-xs text-muted mt-0.5">{club.member_count} members</p>
       </div>
 
       {/* Edit form */}
       <div className={sectionCls}>
-        <h2 className="text-xs tracking-widest uppercase text-secondary">Settings</h2>
+        <h2 className="t-section-title">Settings</h2>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <label className={labelCls}>Name</label>
@@ -215,7 +215,7 @@ export default function AdminClubDetail() {
 
       {/* Members */}
       <div className={sectionCls}>
-        <h2 className="text-xs tracking-widest uppercase text-secondary">Members ({members.length})</h2>
+        <h2 className="t-section-title">Members ({members.length})</h2>
         {members.length === 0 ? (
           <p className="text-sm text-muted">No members.</p>
         ) : (
@@ -257,7 +257,7 @@ export default function AdminClubDetail() {
 
       {/* Danger zone */}
       <div className={`${sectionCls} border-[var(--error-border)]`}>
-        <h2 className="text-xs tracking-widest uppercase text-[var(--error-text)]">Danger Zone</h2>
+        <h2 className="t-section-title text-[var(--error-text)]">Danger Zone</h2>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-secondary">Delete this club</p>

@@ -40,12 +40,7 @@
 
 .scores-title-row h1,
 .scores-compare-header h1 {
-  font-family: var(--serif);
-  font-size: 38px;
-  font-weight: 500;
-  line-height: 1;
   margin: 6px 0 0;
-  color: var(--ink);
 }
 
 .scores-actions {
@@ -635,13 +630,6 @@
   text-align: center;
 }
 
-.scores-empty h2 {
-  color: var(--ink);
-  font-family: var(--serif);
-  font-size: 28px;
-  font-weight: 500;
-}
-
 .scores-empty p,
 .scores-error {
   color: var(--muted);
@@ -771,11 +759,6 @@
   .scores-compare-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .scores-title-row h1,
-  .scores-compare-header h1 {
-    font-size: 34px;
   }
 
   .scores-stat-grid,

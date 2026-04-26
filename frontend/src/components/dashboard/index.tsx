@@ -138,7 +138,7 @@ export function Section({
   return (
     <section className="bg-surface border border-line rounded-[10px] shadow-card overflow-hidden">
       <header className="flex items-center justify-between gap-3 px-[18px] py-[14px] border-b border-line">
-        <h2 className="flex items-center gap-1.5 text-[11px] tracking-[0.18em] uppercase text-muted">
+        <h2 className="flex items-center gap-1.5 t-section-title">
           {icon}
           {title}
         </h2>

@@ -171,11 +171,11 @@ export default function SecuritySettings() {
         >
           <ChevronLeft size={18} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Security</h1>
+        <h1 className="t-page-title">Security</h1>
       </div>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+        <h2 className="t-section-title flex items-center gap-2">
           <ShieldCheck size={12} /> Two-factor authentication
         </h2>
 
@@ -270,7 +270,7 @@ export default function SecuritySettings() {
                 <button
                   type="button"
                   onClick={finishEnrollment}
-                  className="px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted"
+                  className="px-4 py-2 rounded border border-subtle t-section-title"
                 >
                   Cancel
                 </button>
@@ -336,7 +336,7 @@ export default function SecuritySettings() {
 
       {disableFormOpen && (
         <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">Confirm to disable 2FA</h2>
+          <h2 className="t-section-title">Confirm to disable 2FA</h2>
           <div className="flex gap-2 text-[11px] tracking-widest uppercase">
             <button
               type="button"
@@ -378,7 +378,7 @@ export default function SecuritySettings() {
               <button
                 type="button"
                 onClick={() => { setDisableFormOpen(false); setDisableSecret(''); setDisableError(null) }}
-                className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted"
+                className="px-3 py-1.5 rounded border border-subtle t-section-title"
               >
                 Cancel
               </button>
@@ -390,7 +390,7 @@ export default function SecuritySettings() {
       {/* Regenerate backup codes */}
       {regenOpen && (
         <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">Regenerate backup codes</h2>
+          <h2 className="t-section-title">Regenerate backup codes</h2>
           {regenCodes.length === 0 ? (
             <>
               <p className="text-sm text-muted">
@@ -420,7 +420,7 @@ export default function SecuritySettings() {
                   <button
                     type="button"
                     onClick={() => { setRegenOpen(false); setRegenCode(''); setRegenError(null) }}
-                    className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted"
+                    className="px-3 py-1.5 rounded border border-subtle t-section-title"
                   >
                     Cancel
                   </button>

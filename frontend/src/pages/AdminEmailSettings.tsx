@@ -4,7 +4,7 @@ import { adminEmailApi, UpdateSMTPSettingsInput } from '../api/adminEmail'
 import { SMTPSettingsFormState, validateSMTPSettingsForm } from './adminEmailValidation'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
@@ -166,7 +166,7 @@ export default function AdminEmailSettings() {
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-5">
       <div>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin • Email Settings</h1>
+        <h1 className="t-page-title">Admin • Email Settings</h1>
         <p className="text-sm text-muted mt-1">Manage SMTP connection and sender defaults.</p>
       </div>
 

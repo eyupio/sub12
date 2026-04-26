@@ -67,7 +67,7 @@ export default function TwoFactorChallenge() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
-          <p className="mt-4 text-sm tracking-widest uppercase text-muted">Two-factor verification</p>
+          <p className="mt-4 t-section-title">Two-factor verification</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -113,13 +113,13 @@ export default function TwoFactorChallenge() {
           <button
             type="button"
             onClick={() => { setUseBackup((v) => !v); setCode(''); setError(null) }}
-            className="block w-full text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors"
+            className="block w-full t-section-title hover:text-[var(--brass)] transition-colors"
           >
             {useBackup ? 'Use authenticator code instead' : 'Use a backup code instead'}
           </button>
         </form>
 
-        <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+        <p className="text-center t-section-title">
           <Link to="/login" className="text-muted hover:text-[var(--brass)] transition-colors">
             ← Back to sign in
           </Link>

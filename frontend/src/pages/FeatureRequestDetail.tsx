@@ -55,7 +55,7 @@ export default function FeatureRequestDetail() {
   return (
     <div className="mx-auto max-w-3xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Feature request</h1>
+        <h1 className="t-page-title">Feature request</h1>
         <Link to="/feature-requests" className="text-sm text-[var(--brass)] hover:underline">Back to board</Link>
       </div>
 
@@ -67,7 +67,7 @@ export default function FeatureRequestDetail() {
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-medium">{feature.title}</h2>
+                <h2 className="t-subsection-title">{feature.title}</h2>
                 <p className="text-xs text-muted mt-1">
                   Status: {feature.status} · Scope: {feature.scope_type} · Updated {formatDateTime(feature.updated_at, prefs)}
                 </p>
@@ -88,7 +88,7 @@ export default function FeatureRequestDetail() {
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-3">
             <div className="flex items-center gap-2">
               <MessageSquare size={16} className="text-muted" />
-              <h3 className="font-medium">Discussion</h3>
+              <h3 className="t-subsection-title">Discussion</h3>
               <span className="text-xs text-muted">({comments.length})</span>
             </div>
 

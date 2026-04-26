@@ -56,12 +56,12 @@ export default function AdminSupportInbox() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-6">
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin support inbox</h1>
+      <h1 className="t-page-title">Admin support inbox</h1>
       <p className="text-sm text-muted">Triage tickets and maintain feature requests in one place.</p>
 
       <section className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-3 justify-between">
-          <h2 className="font-medium flex items-center gap-2"><Inbox size={16} className="text-[var(--brass)]" /> Submitted tickets</h2>
+          <h2 className="t-subsection-title flex items-center gap-2"><Inbox size={16} className="text-[var(--brass)]" /> Submitted tickets</h2>
           <div className="flex flex-wrap gap-2">
             <select
               className="rounded-md border border-subtle bg-transparent px-2 py-1.5 text-sm"
@@ -92,7 +92,7 @@ export default function AdminSupportInbox() {
             <li key={ticket.id} className="rounded-lg border border-subtle p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium">{ticket.title}</p>
+                  <p className="t-subsection-title">{ticket.title}</p>
                   <p className="text-xs text-muted">
                     {ticket.category} · {ticket.priority} · {ticket.scope_type} · {ticket.status}
                   </p>
@@ -121,7 +121,7 @@ export default function AdminSupportInbox() {
       </section>
 
       <section id="feature-requests" className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
-        <h2 className="font-medium flex items-center gap-2"><Lightbulb size={16} className="text-[var(--brass)]" /> Feature requests</h2>
+        <h2 className="t-subsection-title flex items-center gap-2"><Lightbulb size={16} className="text-[var(--brass)]" /> Feature requests</h2>
 
         {featureRequestsQuery.isLoading && <p className="text-sm text-muted">Loading feature requests…</p>}
         {featureRequestsQuery.isError && <p role="alert" className="text-[var(--error-text)] text-sm">Failed to load feature requests.</p>}
@@ -132,7 +132,7 @@ export default function AdminSupportInbox() {
             <li key={feature.id} id={`feature-${feature.id}`} className="rounded-lg border border-subtle p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium">{feature.title}</p>
+                  <p className="t-subsection-title">{feature.title}</p>
                   <p className="text-xs text-muted">Ticket: {feature.ticket_id} · Votes: {feature.vote_count}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -208,7 +208,7 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Edit feature request">
       <div className="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-medium">Edit feature request</h3>
+          <h3 className="t-subsection-title">Edit feature request</h3>
           <button type="button" className="rounded-md p-1 hover:bg-[color:var(--surface-muted)]" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>

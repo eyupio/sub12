@@ -16,7 +16,7 @@ const TIMEZONES: string[] = (() => {
 })()
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 
@@ -37,7 +37,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Club Image</h2>
+      <h2 className="t-section-title">Club Image</h2>
       <input
         ref={fileInputRef}
         type="file"
@@ -112,7 +112,7 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">General</h2>
+      <h2 className="t-section-title">General</h2>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Club Name</label>
@@ -175,7 +175,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Joining</h2>
+      <h2 className="t-section-title">Privacy & Joining</h2>
 
       <div className="space-y-1.5">
         <label className={labelCls}>Visibility</label>
@@ -300,7 +300,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Defaults</h2>
+      <h2 className="t-section-title">Regional Defaults</h2>
       <p className="text-[10px] text-muted -mt-2">
         Applied on public pages for this club. Logged-in users see their own preference.
       </p>
@@ -398,7 +398,7 @@ function JoinRequestsSection({ clubId }: { clubId: string }) {
   return (
     <div className={sectionCls}>
       <div className="flex items-center justify-between">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Pending Join Requests</h2>
+        <h2 className="t-section-title">Pending Join Requests</h2>
         <span className="text-[11px] text-muted font-mono">{requests.length}</span>
       </div>
 
@@ -492,7 +492,7 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
   return (
     <div className={sectionCls}>
       <div className="flex items-center justify-between">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Members</h2>
+        <h2 className="t-section-title">Members</h2>
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
 
@@ -603,7 +603,7 @@ function LeaveSection({ clubId, members, currentUserId }: { clubId: string; memb
 
   return (
     <div className={sectionCls}>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Danger Zone</h2>
+      <h2 className="t-section-title">Danger Zone</h2>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-secondary">Leave this club</p>
@@ -692,7 +692,7 @@ export default function ClubSettings() {
         <Link to="/clubs/$id" params={{ id }} className="text-muted hover:text-secondary transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Club Settings</h1>
+        <h1 className="t-page-title">Club Settings</h1>
       </div>
 
       <p className="text-xs text-muted">{club.name}</p>

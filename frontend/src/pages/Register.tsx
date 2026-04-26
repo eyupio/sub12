@@ -42,7 +42,7 @@ export default function Register() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
-          <p className="mt-4 text-sm tracking-widest uppercase text-muted">Create your account</p>
+          <p className="mt-4 t-section-title">Create your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -115,14 +115,14 @@ export default function Register() {
           </button>
         </form>
 
-        <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+        <p className="text-center t-section-title">
           Have an account?{' '}
           <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
             Sign in
           </Link>
         </p>
 
-        <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+        <p className="text-center t-section-title">
           <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
             ← Back to Home
           </Link>

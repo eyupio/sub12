@@ -19,7 +19,7 @@ export function PageHeader({
   return (
     <div className="lc-page-header">
       <div className="lc-page-title">
-        <h1>{title}</h1>
+        <h1 className="t-page-title">{title}</h1>
         {info}
       </div>
       {action}
@@ -236,7 +236,7 @@ export function EntityDetailHeader({
       )}
       {thumb}
       <div className="lc-detail-titlebar">
-        <h1 className="lc-detail-title">
+        <h1 className="t-page-title lc-detail-title">
           {title}
           {tag}
         </h1>

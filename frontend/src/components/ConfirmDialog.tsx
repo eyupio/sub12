@@ -68,7 +68,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', o
             <AlertTriangle size={18} className="text-[var(--error-text)]" />
           </div>
           <div>
-            <h3 id="confirm-title" className="text-sm font-medium text-primary">{title}</h3>
+            <h3 id="confirm-title" className="t-subsection-title">{title}</h3>
             <p id="confirm-msg" className="text-sm text-muted mt-1">{message}</p>
           </div>
         </div>

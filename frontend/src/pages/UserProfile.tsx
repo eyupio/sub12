@@ -20,7 +20,7 @@ function FollowListModal({ title, items, onClose }: { title: string; items: Foll
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div className="bg-surface border border-subtle rounded-lg w-full max-w-sm mx-4 max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-subtle">
-          <h3 className="text-sm font-medium text-secondary tracking-widest uppercase">{title}</h3>
+          <h3 className="t-section-title">{title}</h3>
           <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
             <XIcon size={16} />
           </button>
@@ -146,7 +146,7 @@ export default function UserProfile() {
         <button
           onClick={() => setConfirmUnfollow(true)}
           disabled={followMutation.isPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:border-[var(--error-text)]/40 hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:border-[var(--error-text)]/40 hover:text-[var(--error-text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <UserMinus size={12} />
           Unfollow
@@ -158,7 +158,7 @@ export default function UserProfile() {
       return (
         <button
           disabled
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Clock size={12} />
           Requested
@@ -183,7 +183,7 @@ export default function UserProfile() {
       {/* Back */}
       <button
         onClick={smartBack}
-        className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+        className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors"
       >
         <ChevronLeft size={14} />
         Back
@@ -265,7 +265,7 @@ export default function UserProfile() {
                           <div className="absolute right-0 top-full mt-1 bg-surface border border-subtle rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
                             <button
                               onClick={() => { setShowMenu(false); setShowReport(true) }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:bg-surface-hover transition-colors"
+                              className="w-full flex items-center gap-2 px-3 py-2 t-section-title hover:text-secondary hover:bg-surface-hover transition-colors"
                             >
                               <AlertTriangle size={12} />
                               Report

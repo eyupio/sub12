@@ -347,7 +347,7 @@ export default function ScoreHistory() {
           <div>
             <p className="scores-eyebrow">Your cards</p>
             <div className="scores-title-row">
-              <h1>My Cards</h1>
+              <h1 className="t-page-title">My Cards</h1>
               <HelpIcon content={pageHelp.scores} />
             </div>
           </div>
@@ -472,7 +472,7 @@ export default function ScoreHistory() {
         {!isLoading && !isError && filtered.length === 0 && (
           <div className="scores-empty">
             <Target size={36} />
-            <h2>No cards in this scope.</h2>
+            <h2 className="t-subsection-title">No cards in this scope.</h2>
             <p>Try a different filter, or log a new card.</p>
             <Link to="/scores/new" className="scores-btn primary"><Plus size={14} /> Log card</Link>
           </div>

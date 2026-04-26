@@ -41,7 +41,7 @@ export function PickerModal({ open, title, items, loading, emptyMessage, onSelec
         aria-label={title}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-subtle">
-          <h3 className="text-sm font-medium text-primary">{title}</h3>
+          <h3 className="t-subsection-title">{title}</h3>
           <button
             type="button"
             onClick={onClose}

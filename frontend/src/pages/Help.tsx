@@ -55,7 +55,7 @@ export default function Help() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-5 flex items-center gap-2">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Help &amp; FAQ</h1>
+        <h1 className="t-page-title">Help &amp; FAQ</h1>
         <HelpIcon content={pageHelp.help} />
       </div>
 
@@ -71,7 +71,7 @@ export default function Help() {
 
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <aside className="bg-surface border border-subtle rounded-lg p-3 h-fit">
-          <h2 className="text-xs uppercase tracking-widest text-muted px-2 pb-2">Categories</h2>
+          <h2 className="t-section-title px-2 pb-2">Categories</h2>
           <div className="space-y-1">
             <button
               onClick={() => setActiveCategory(null)}
@@ -99,7 +99,7 @@ export default function Help() {
 
           {visibleGrouped.map(([category, list]) => (
             <div key={category} className="bg-surface border border-subtle rounded-lg">
-              <h2 className="text-sm tracking-widest uppercase text-muted px-4 pt-4 pb-2">
+              <h2 className="t-section-title px-4 pt-4 pb-2">
                 {category}
               </h2>
               <div className="divide-y divide-subtle">

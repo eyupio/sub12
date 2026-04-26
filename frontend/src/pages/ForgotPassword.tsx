@@ -34,7 +34,7 @@ export default function ForgotPassword() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <img src={logoSrc} alt="SUB12" className="h-40 w-auto mx-auto" />
-          <p className="mt-4 text-sm tracking-widest uppercase text-muted">Reset your password</p>
+          <p className="mt-4 t-section-title">Reset your password</p>
         </div>
 
         {sent ? (
@@ -48,7 +48,7 @@ export default function ForgotPassword() {
             >
               Back to Sign In
             </Link>
-            <p className="text-[11px] tracking-widest uppercase text-muted">
+            <p className="t-section-title">
               <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
                 ← Back to Home
               </Link>
@@ -86,14 +86,14 @@ export default function ForgotPassword() {
               </button>
             </form>
 
-            <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+            <p className="text-center t-section-title">
               Remember your password?{' '}
               <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
                 Sign In
               </Link>
             </p>
 
-            <p className="text-center text-[11px] tracking-widest uppercase text-muted">
+            <p className="text-center t-section-title">
               <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
                 ← Back to Home
               </Link>

@@ -36,13 +36,13 @@ export default function PelletTestLeaderboard() {
   return (
     <div className="p-4 lg:p-8 space-y-6 lg:space-y-8 max-w-lg lg:max-w-4xl xl:max-w-5xl mx-auto">
 
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+      <h1 className="t-page-title">
         Pellet Leaderboard
       </h1>
 
       {/* Rifle selector */}
       <div className="max-w-xs">
-        <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+        <label className="block t-section-title mb-1">Rifle</label>
         {rifles.length > 0 ? (
           <select
             value={selectedRifleId}

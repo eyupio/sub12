@@ -120,12 +120,12 @@ export default function PrivacyCenter() {
         >
           <ChevronLeft size={18} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Privacy</h1>
+        <h1 className="t-page-title">Privacy</h1>
         <HelpIcon content={pageHelp.privacy} />
       </div>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Profile</h2>
+        <h2 className="t-section-title">Profile</h2>
 
         <label className="flex items-start gap-3 cursor-pointer">
           <input
@@ -155,7 +155,7 @@ export default function PrivacyCenter() {
       </section>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">New score cards</h2>
+        <h2 className="t-section-title">New score cards</h2>
         <div className="flex gap-1.5 flex-wrap">
           {(['public', 'followers', 'private'] as const).map((v) => (
             <button
@@ -175,7 +175,7 @@ export default function PrivacyCenter() {
       </section>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Feed</h2>
+        <h2 className="t-section-title">Feed</h2>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -201,7 +201,7 @@ export default function PrivacyCenter() {
       </div>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+        <h2 className="t-section-title flex items-center gap-2">
           <ShieldOff size={12} /> Blocked users
         </h2>
         {blocks?.items.length === 0 ? (
@@ -224,7 +224,7 @@ export default function PrivacyCenter() {
       </section>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Muted users</h2>
+        <h2 className="t-section-title">Muted users</h2>
         {mutes?.items.length === 0 ? (
           <p className="text-xs text-muted">You haven't muted anyone.</p>
         ) : (
@@ -256,7 +256,7 @@ export default function PrivacyCenter() {
       </section>
 
       <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+        <h2 className="t-section-title flex items-center gap-2">
           <Download size={12} /> Your data
         </h2>
         <p className="text-xs text-muted">
@@ -272,7 +272,7 @@ export default function PrivacyCenter() {
       </section>
 
       <section className="space-y-3 p-4 rounded border border-[var(--error-text)]/30 bg-surface">
-        <h2 className="text-[11px] tracking-widest uppercase text-[var(--error-text)] flex items-center gap-2">
+        <h2 className="t-section-title text-[var(--error-text)] flex items-center gap-2">
           <Trash2 size={12} /> Delete my account
         </h2>
         <p className="text-xs text-muted">

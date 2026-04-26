@@ -26,7 +26,7 @@ export default function ConfirmEmail() {
 
   return (
     <div className="p-6 max-w-md mx-auto space-y-6 text-center">
-      <h1 className="text-xl font-medium tracking-widest uppercase text-secondary">Confirm Email Change</h1>
+      <h1 className="t-page-title">Confirm Email Change</h1>
 
       {mutation.isPending && (
         <div className="flex flex-col items-center gap-3 text-muted">
@@ -57,7 +57,7 @@ export default function ConfirmEmail() {
           </p>
           <Link
             to="/profile"
-            className="mt-2 px-4 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="mt-2 px-4 py-2 rounded border border-subtle t-section-title hover:text-secondary transition-colors"
           >
             Back to Profile
           </Link>

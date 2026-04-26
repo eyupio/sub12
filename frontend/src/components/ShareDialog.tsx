@@ -246,7 +246,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
         {/* Internal: post to sub-12 — only offered for content types the feed understands */}
         {canPostInternal && (
         <section className="space-y-3">
-          <h3 className="text-[11px] tracking-widest uppercase text-muted">Post to sub-12</h3>
+          <h3 className="t-section-title">Post to sub-12</h3>
 
           {/* Destination selector */}
           <div className="flex gap-1.5">
@@ -307,7 +307,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
           <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              className="px-3 py-2 rounded border border-subtle t-section-title hover:text-secondary transition-colors"
             >
               Cancel
             </button>
@@ -328,7 +328,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
 
         {/* External sharing — offered for every target type */}
         <section className={`space-y-3 ${canPostInternal ? 'border-t border-subtle pt-4' : ''}`}>
-          <h3 className="text-[11px] tracking-widest uppercase text-muted">Share externally</h3>
+          <h3 className="t-section-title">Share externally</h3>
 
           {/* Primary: single Share button. Platforms that support the Web
               Share API get the native share sheet (which includes the user's
@@ -346,7 +346,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
             <button
               onClick={copyLink}
               aria-label="Copy link"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/40 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-subtle t-section-title hover:text-secondary hover:border-[var(--brass)]/40 transition-colors"
             >
               <LinkIcon size={14} />
               Copy link
@@ -354,7 +354,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
             {hasWebShare && !showChannels && (
               <button
                 onClick={() => setShowChannels(true)}
-                className="ml-auto text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                className="ml-auto t-section-title hover:text-secondary transition-colors"
               >
                 More options
               </button>
@@ -390,7 +390,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
 
           {manualCopy && (
             <div className="space-y-1">
-              <label htmlFor="share-dialog-manual-copy" className="text-[11px] tracking-widest uppercase text-muted">
+              <label htmlFor="share-dialog-manual-copy" className="t-section-title">
                 Link
               </label>
               <input
@@ -421,7 +421,7 @@ function ExternalButton({ onClick, label, icon }: ExternalButtonProps) {
     <button
       onClick={onClick}
       aria-label={label}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary hover:border-[var(--brass)]/40 transition-colors"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary hover:border-[var(--brass)]/40 transition-colors"
     >
       {icon}
       {label}

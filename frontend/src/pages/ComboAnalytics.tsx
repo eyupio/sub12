@@ -79,7 +79,7 @@ export default function ComboAnalytics() {
         >
           <ChevronLeft size={18} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Combo Analytics
         </h1>
       </div>

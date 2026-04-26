@@ -82,7 +82,7 @@ export default function SupportCenter() {
   return (
     <div className="mx-auto max-w-4xl p-4 md:p-6 space-y-4">
       <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-        <h1 className="text-2xl font-semibold">Support & feature requests</h1>
+        <h1 className="t-page-title">Support & feature requests</h1>
         <p className="text-sm text-muted mt-1">
           Submit support tickets, including new feature requests. You can also browse and upvote ideas on the{' '}
           <Link to="/feature-requests" className="text-[var(--brass)] hover:underline">Feature Board</Link>.
@@ -179,7 +179,7 @@ export default function SupportCenter() {
       </section>
 
       <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-        <h2 className="text-lg font-semibold">My support tickets</h2>
+        <h2 className="t-subsection-title">My support tickets</h2>
         {isLoading && <p className="text-sm text-muted mt-2">Loading tickets…</p>}
         {!isLoading && sortedTickets.length === 0 && <p className="text-sm text-muted mt-2">No tickets yet.</p>}
         <div className="mt-3 space-y-2">
@@ -187,7 +187,7 @@ export default function SupportCenter() {
             <article key={ticket.id} className="rounded-lg border border-subtle p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-medium">{ticket.title ?? 'Untitled ticket'}</h3>
+                  <h3 className="t-subsection-title">{ticket.title ?? 'Untitled ticket'}</h3>
                   <p className="text-xs text-muted mt-1">
                     {ticket.category ?? 'ticket'} · {ticket.status ?? 'open'} · {ticket.scope_type ?? 'platform'}
                   </p>

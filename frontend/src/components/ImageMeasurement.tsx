@@ -853,7 +853,7 @@ export default function ImageMeasurement({
           <div className="space-y-3">
             <div className="bg-surface border border-subtle rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-primary font-semibold text-sm">Group Analysis Results</h2>
+                <h2 className="t-subsection-title">Group Analysis Results</h2>
                 <div className="flex rounded border border-subtle overflow-hidden">
                   <button onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>mm</button>
                   <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>cm</button>

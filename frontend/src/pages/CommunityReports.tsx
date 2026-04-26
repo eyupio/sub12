@@ -101,7 +101,7 @@ function ReportTargetLink({ report }: { report: Report }) {
       )
     case 'comment':
       return (
-        <span className="text-[11px] tracking-widest uppercase text-muted" title={`Comment ID: ${report.target_id}`}>
+        <span className="t-section-title" title={`Comment ID: ${report.target_id}`}>
           Comment · {report.target_id.slice(0, 8)}…
         </span>
       )
@@ -152,7 +152,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
           <button
             onClick={() => onDecide('no_action')}
             disabled={disabled}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Dismiss
           </button>
@@ -166,12 +166,12 @@ export function LeagueReportsPage() {
   const { id } = useParams({ from: '/app/leagues/$id/reports' })
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted">
+      <div className="flex items-center gap-2 t-section-title">
         <Link to="/leagues/$id" params={{ id }} className="hover:text-secondary inline-flex items-center gap-1">
           <ChevronLeft size={13} /> League
         </Link>
       </div>
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+      <h1 className="t-page-title flex items-center gap-2">
         <Shield size={18} className="text-[var(--brass)]" /> Reports
       </h1>
       <p className="text-sm text-muted">Reviews flags filed by league members. Taking action hides content or notes warnings; dismissals close the report without effect.</p>
@@ -184,12 +184,12 @@ export function ClubReportsPage() {
   const { id } = useParams({ from: '/app/clubs/$id/reports' })
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted">
+      <div className="flex items-center gap-2 t-section-title">
         <Link to="/clubs/$id" params={{ id }} className="hover:text-secondary inline-flex items-center gap-1">
           <ChevronLeft size={13} /> Club
         </Link>
       </div>
-      <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary flex items-center gap-2">
+      <h1 className="t-page-title flex items-center gap-2">
         <Shield size={18} className="text-[var(--brass)]" /> Reports
       </h1>
       <p className="text-sm text-muted">Reviews flags filed by club members. Taking action hides content or notes warnings; dismissals close the report without effect.</p>

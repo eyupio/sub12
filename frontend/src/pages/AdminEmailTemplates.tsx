@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const textareaCls = `${inputCls} min-h-[130px] font-mono`
-const labelCls = 'text-[11px] tracking-widest uppercase text-muted'
+const labelCls = 't-section-title'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
@@ -165,13 +165,13 @@ export default function AdminEmailTemplates() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-5">
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Admin • Email Templates</h1>
+        <h1 className="t-page-title">Admin • Email Templates</h1>
         <p className="text-sm text-muted mt-1">Edit subject/html/text templates and render previews.</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="bg-surface border border-subtle rounded-lg p-3 space-y-1 h-fit">
-          <h2 className="text-xs uppercase tracking-widest text-muted px-2 pb-2">Templates</h2>
+          <h2 className="t-section-title px-2 pb-2">Templates</h2>
           {templateItems.map((item) => (
             <button
               key={item.key}
@@ -260,7 +260,7 @@ export default function AdminEmailTemplates() {
 
           {renderedPreview && (
             <div className="border border-subtle rounded p-3 bg-surface-hover space-y-3">
-              <h3 className="text-xs tracking-widest uppercase text-muted">Preview</h3>
+              <h3 className="t-section-title">Preview</h3>
               <div>
                 <p className="text-xs text-muted">Subject</p>
                 <p className="text-sm text-primary">{renderedPreview.subject}</p>

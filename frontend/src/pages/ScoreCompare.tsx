@@ -114,14 +114,14 @@ export default function ScoreCompare() {
           <div>
             <Link to="/scores" className="scores-compare-back"><ArrowLeft size={15} /> Back to cards</Link>
             <p className="scores-eyebrow">Scores</p>
-            <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Compare cards</h1>
+            <h1 className="t-page-title">Compare cards</h1>
           </div>
         </header>
 
         {!aId || !bId ? (
           <div className="scores-empty">
             <Target size={36} />
-            <h2>Select two cards</h2>
+            <h2 className="t-subsection-title">Select two cards</h2>
             <p>Use compare mode from the scores list.</p>
             <Link to="/scores" className="scores-btn primary">Back to scores</Link>
           </div>

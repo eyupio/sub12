@@ -129,7 +129,7 @@ function FollowRequestsSection() {
 
   return (
     <div>
-      <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Follow Requests</h2>
+      <h2 className="t-section-title mb-3">Follow Requests</h2>
       <div className="space-y-2">
         {requests.map((req) => (
           <div key={req.id} className="flex items-center justify-between p-3 bg-surface border border-subtle rounded-lg">
@@ -194,7 +194,7 @@ function PrivacySettings() {
 
   return (
     <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
-      <h2 className="text-[11px] tracking-widest uppercase text-muted">Privacy & Feed</h2>
+      <h2 className="t-section-title">Privacy & Feed</h2>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -313,7 +313,7 @@ function UnitPreferences() {
     <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
       <div className="flex items-center gap-2">
         <Ruler size={14} className="text-muted" />
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Unit Preferences</h2>
+        <h2 className="t-section-title">Unit Preferences</h2>
       </div>
 
       <div className="space-y-4">
@@ -403,7 +403,7 @@ function RegionalPreferences() {
     <div className="bg-surface border border-subtle rounded-lg p-4 lg:p-6 space-y-4">
       <div className="flex items-center gap-2">
         <CalendarDays size={14} className="text-muted" />
-        <h2 className="text-[11px] tracking-widest uppercase text-muted">Regional Preferences</h2>
+        <h2 className="t-section-title">Regional Preferences</h2>
       </div>
 
       <div className="space-y-4">
@@ -607,13 +607,13 @@ export default function Profile() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">Profile</h1>
+          <h1 className="t-page-title">Profile</h1>
           <HelpIcon content={pageHelp.profile} />
         </div>
         {!editing && (
           <button
             onClick={startEdit}
-            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors"
           >
             <Pencil size={13} />
             Edit
@@ -730,7 +730,7 @@ export default function Profile() {
                   <button
                     onClick={cancelEdit}
                     disabled={mutation.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <X size={13} />
                     Cancel
@@ -774,7 +774,7 @@ export default function Profile() {
           {!emailEditing && (
             <button
               onClick={() => { setEmailEditing(true); setNewEmail(''); setEmailMsg(null); setEmailError(null) }}
-              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              className="t-section-title hover:text-secondary transition-colors"
             >
               Change
             </button>
@@ -801,7 +801,7 @@ export default function Profile() {
               </button>
               <button
                 onClick={() => { setEmailEditing(false); setEmailError(null) }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary transition-colors"
               >
                 <X size={13} />
                 Cancel
@@ -842,7 +842,7 @@ export default function Profile() {
 
       {/* Stats */}
       <div>
-        <h2 className="text-[11px] tracking-widest uppercase text-muted mb-3">Stats</h2>
+        <h2 className="t-section-title mb-3">Stats</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <StatCard
             label="Best Score"
@@ -867,10 +867,10 @@ export default function Profile() {
       {/* My Rifles */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">My Rifles</h2>
+          <h2 className="t-section-title">My Rifles</h2>
           <Link
             to="/gear"
-            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="t-section-title hover:text-secondary transition-colors"
           >
             Manage gear →
           </Link>
@@ -903,11 +903,11 @@ export default function Profile() {
       {/* Recent cards */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] tracking-widest uppercase text-muted">Recent Cards</h2>
+          <h2 className="t-section-title">Recent Cards</h2>
           {recentCards.length > 0 && (
             <Link
               to="/scores"
-              className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+              className="t-section-title hover:text-secondary transition-colors"
             >
               See all →
             </Link>

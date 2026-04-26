@@ -127,7 +127,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
   return (
     <div className="space-y-4 border-t border-subtle pt-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] tracking-widest uppercase text-muted">Verification Audit Trail</h3>
+        <h3 className="t-section-title">Verification Audit Trail</h3>
         {league && (
           <Link
             to="/leagues/$id"
@@ -141,7 +141,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
 
       {confirmations.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[11px] tracking-widest uppercase text-muted">Confirmations</p>
+          <p className="t-section-title">Confirmations</p>
           {confirmations.map((conf: ScoreConfirmation) => (
             <div key={conf.id} className="flex items-center gap-2 text-sm">
               <UserCheck size={13} className="text-[var(--success-text)]" />
@@ -156,7 +156,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
 
       {actions.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[11px] tracking-widest uppercase text-muted">Admin Actions</p>
+          <p className="t-section-title">Admin Actions</p>
           {actions.map((action: ScoreCardAction) => (
             <div key={action.id} className="bg-surface rounded p-2.5 space-y-1">
               <div className="flex items-center gap-2">
@@ -321,8 +321,8 @@ function EditScoreGrid({ shots, onUpdate }: { shots: Shot[]; onUpdate: (shots: S
       {selected !== null && (
         <div className="space-y-2 bg-surface border border-subtle rounded-lg p-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] tracking-widest uppercase text-muted">Shot {selected + 1}</span>
-            <button onClick={() => setSelected(null)} className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary">Done</button>
+            <span className="t-section-title">Shot {selected + 1}</span>
+            <button onClick={() => setSelected(null)} className="t-section-title hover:text-secondary">Done</button>
           </div>
           <div className="grid grid-cols-6 gap-1.5">
             {([0,1,2,3,4,5,6,7,8,9,10,'X'] as const).map(val => {
@@ -603,7 +603,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
 
   return (
     <div className="pt-6 border-t border-subtle space-y-4">
-      <h2 className="text-[11px] tracking-widest uppercase text-muted flex items-center gap-2">
+      <h2 className="t-section-title flex items-center gap-2">
         <MessageSquare size={13} />
         Comments {comments.length > 0 && `(${comments.length})`}
       </h2>
@@ -653,7 +653,7 @@ function CommentsSection({ cardId, canModerate, communityName }: { cardId: strin
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
-                        className="px-2.5 py-1 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+                        className="px-2.5 py-1 rounded border border-subtle t-section-title hover:text-secondary transition-colors"
                       >
                         Cancel
                       </button>
@@ -1039,25 +1039,25 @@ export default function ScoreCardDetail() {
           type="button"
           onClick={smartBack}
           aria-label="Back to cards"
-          className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+          className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors"
         >
           <ChevronLeft size={16} /> Back to cards
         </button>
         {isOwner && !editing && (
           <div className="flex items-center gap-2">
-            <button onClick={startEdit} className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors">
+            <button onClick={startEdit} className="flex items-center gap-1.5 t-section-title hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors">
               <Pencil size={13} /> Edit
             </button>
             <button
               onClick={() => setShowShare(true)}
-              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 t-section-title hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
             >
               <Share2 size={13} /> Share to Feed
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleteMutation.isPending}
-              className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 t-section-title hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete score card"
             >
               <XIcon size={13} /> Delete
@@ -1071,7 +1071,7 @@ export default function ScoreCardDetail() {
         <div className="flex items-center gap-2 rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5">
           <span className="text-[var(--brass)] text-base">🏆</span>
           <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">Personal Best</span>
-          <span className="text-[11px] tracking-widest uppercase text-muted">·</span>
+          <span className="t-section-title">·</span>
           <span className="text-xs text-secondary">improved by +{card.pb_delta} over previous</span>
         </div>
       )}
@@ -1100,11 +1100,11 @@ export default function ScoreCardDetail() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Date</label>
+              <label className="block t-section-title mb-1">Date</label>
               <input type="date" value={editMeta.shot_at} onChange={e => setEditMeta(m => ({ ...m, shot_at: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Location</label>
+              <label className="block t-section-title mb-1">Location</label>
               <LocationField
                 value={editLocation}
                 onChange={setEditLocation}
@@ -1112,18 +1112,18 @@ export default function ScoreCardDetail() {
               />
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Distance (m)</label>
+              <label className="block t-section-title mb-1">Distance (m)</label>
               <input type="number" min={0} value={editMeta.distance_m} onChange={e => setEditMeta(m => ({ ...m, distance_m: e.target.value }))} placeholder="e.g. 25" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Discipline</label>
+              <label className="block t-section-title mb-1">Discipline</label>
               <input type="text" value={editMeta.discipline} onChange={e => setEditMeta(m => ({ ...m, discipline: e.target.value }))} placeholder="e.g. Benchrest" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
           </div>
 
           {(rifleData?.items ?? []).length > 0 && (
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Rifle</label>
+              <label className="block t-section-title mb-1">Rifle</label>
               <select value={editMeta.rifle_id} onChange={e => setEditMeta(m => ({ ...m, rifle_id: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-[var(--brass)]/50">
                 <option value="">-- none --</option>
                 {(rifleData?.items ?? []).map(r => <option key={r.id} value={r.id}>{r.make} {r.model}</option>)}
@@ -1133,7 +1133,7 @@ export default function ScoreCardDetail() {
 
           {(pelletData?.items ?? []).length > 0 && (
             <div>
-              <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Pellet</label>
+              <label className="block t-section-title mb-1">Pellet</label>
               <select value={editMeta.pellet_id} onChange={e => setEditMeta(m => ({ ...m, pellet_id: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary focus:outline-none focus:border-[var(--brass)]/50">
                 <option value="">-- none --</option>
                 {(pelletData?.items ?? []).map(p => <option key={p.id} value={p.id}>{p.brand} {p.model}</option>)}
@@ -1142,13 +1142,13 @@ export default function ScoreCardDetail() {
           )}
 
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Notes</label>
+            <label className="block t-section-title mb-1">Notes</label>
             <textarea value={editMeta.notes} onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))} rows={2} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted resize-none focus:outline-none focus:border-[var(--brass)]/50" />
           </div>
 
           {/* Photo upload / replace */}
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Score Card Photo</label>
+            <label className="block t-section-title mb-1">Score Card Photo</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -1238,7 +1238,7 @@ export default function ScoreCardDetail() {
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
               <div className="space-y-3 min-w-0">
                 <div className="flex items-baseline gap-3 font-mono">
-                  <h1 className="text-2xl lg:text-3xl text-primary">{prettyDate}</h1>
+                  <h1 className="t-page-title">{prettyDate}</h1>
                   <span className="text-base text-muted">{createdTime}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1335,10 +1335,10 @@ export default function ScoreCardDetail() {
               {/* EQUIPMENT */}
               {(rifle || pellet || card.distance_m != null || card.discipline) && (
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
-                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Equipment</p>
+                  <p className="t-section-title border-b border-subtle pb-2">Equipment</p>
                   {rifle && (
                     <div className="flex justify-between items-start gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Rifle</span>
+                      <span className="t-section-title">Rifle</span>
                       <div className="text-right">
                         <p className="text-sm text-secondary">{rifle.make} {rifle.model}</p>
                         {(rifle.calibre || rifle.power_ftlb != null) && (
@@ -1353,7 +1353,7 @@ export default function ScoreCardDetail() {
                   )}
                   {pellet && (
                     <div className="flex justify-between items-start gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Pellet</span>
+                      <span className="t-section-title">Pellet</span>
                       <div className="text-right">
                         <p className="text-sm text-secondary">
                           {pellet.brand} {pellet.model}
@@ -1367,13 +1367,13 @@ export default function ScoreCardDetail() {
                   )}
                   {card.distance_m != null && (
                     <div className="flex justify-between items-center gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Distance</span>
+                      <span className="t-section-title">Distance</span>
                       <span className="text-sm font-mono text-secondary">{card.distance_m}m</span>
                     </div>
                   )}
                   {card.discipline && (
                     <div className="flex justify-between items-center gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Discipline</span>
+                      <span className="t-section-title">Discipline</span>
                       <span className="text-sm text-secondary">{card.discipline}</span>
                     </div>
                   )}
@@ -1383,26 +1383,26 @@ export default function ScoreCardDetail() {
               {/* LEAGUE */}
               {cardLeague && (
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
-                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">League</p>
+                  <p className="t-section-title border-b border-subtle pb-2">League</p>
                   <div className="flex justify-between items-start gap-3">
-                    <span className="text-[11px] tracking-widest uppercase text-muted">Name</span>
+                    <span className="t-section-title">Name</span>
                     <Link to="/leagues/$id" params={{ id: cardLeague.id }} className="text-sm text-[var(--brass)] hover:opacity-80 text-right">
                       {cardLeague.name}
                     </Link>
                   </div>
                   {cardLeague.round_name && (
                     <div className="flex justify-between items-center gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Round</span>
+                      <span className="t-section-title">Round</span>
                       <span className="text-sm text-secondary">{cardLeague.round_name}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center gap-3">
-                    <span className="text-[11px] tracking-widest uppercase text-muted">Status</span>
+                    <span className="t-section-title">Status</span>
                     <VerificationBadge status={card.verification} />
                   </div>
                   {verifierConfirmation && (
                     <div className="flex justify-between items-start gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Verifier</span>
+                      <span className="t-section-title">Verifier</span>
                       <div className="text-right">
                         <p className="text-sm text-secondary">{verifierConfirmation.display_name}</p>
                         <p className="text-[11px] text-muted font-mono">{verifierConfirmation.created_at.slice(0, 10)}</p>
@@ -1415,22 +1415,22 @@ export default function ScoreCardDetail() {
               {/* CONDITIONS */}
               {(card.wind_mph != null || card.temp_celsius != null || card.location) && (
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
-                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Conditions</p>
+                  <p className="t-section-title border-b border-subtle pb-2">Conditions</p>
                   {card.wind_mph != null && (
                     <div className="flex justify-between items-center gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Wind</span>
+                      <span className="t-section-title">Wind</span>
                       <span className="text-sm font-mono text-secondary">{card.wind_mph === 0 ? 'Calm' : `${card.wind_mph} mph`}</span>
                     </div>
                   )}
                   {card.temp_celsius != null && (
                     <div className="flex justify-between items-center gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Temp</span>
+                      <span className="t-section-title">Temp</span>
                       <span className="text-sm font-mono text-secondary">{card.temp_celsius}°C</span>
                     </div>
                   )}
                   {card.location && (
                     <div className="flex justify-between items-start gap-3">
-                      <span className="text-[11px] tracking-widest uppercase text-muted">Venue</span>
+                      <span className="t-section-title">Venue</span>
                       <span className="text-sm text-secondary text-right">{card.location}</span>
                     </div>
                   )}
@@ -1440,7 +1440,7 @@ export default function ScoreCardDetail() {
               {/* NOTES */}
               {card.notes && (
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2">
-                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Notes</p>
+                  <p className="t-section-title border-b border-subtle pb-2">Notes</p>
                   <p className="text-sm text-secondary leading-relaxed border-l-2 border-[var(--brass)]/40 pl-3 italic">
                     "{card.notes}"
                   </p>
@@ -1450,7 +1450,7 @@ export default function ScoreCardDetail() {
               {/* SCORE CARD PHOTO */}
               {card.card_image_url && (
                 <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2">
-                  <p className="text-[11px] tracking-widest uppercase text-muted border-b border-subtle pb-2">Score Card Photo</p>
+                  <p className="t-section-title border-b border-subtle pb-2">Score Card Photo</p>
                   <button onClick={() => setShowLightbox(true)} className="w-full">
                     <img
                       src={card.card_image_url}

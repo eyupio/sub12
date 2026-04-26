@@ -136,7 +136,7 @@ export default function FollowManagement() {
         >
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-xl lg:text-2xl font-medium tracking-widest uppercase text-secondary">
+        <h1 className="t-page-title">
           Manage Follows
         </h1>
       </div>
@@ -178,7 +178,7 @@ export default function FollowManagement() {
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={toggleSelectAllVisible}
-            className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-muted hover:text-secondary transition-colors"
+            className="flex items-center gap-2 t-section-title hover:text-secondary transition-colors"
           >
             {allVisibleSelected ? <CheckSquare size={14} /> : <Square size={14} />}
             {allVisibleSelected ? 'Deselect all' : 'Select all'}

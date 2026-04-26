@@ -103,7 +103,7 @@ function Shell({ children, title }: { children: React.ReactNode; title: string }
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link
             to="/"
-            className="text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1"
+            className="t-section-title hover:text-secondary flex items-center gap-1"
           >
             <ChevronLeft size={14} />
             sub-12
@@ -117,7 +117,7 @@ function Shell({ children, title }: { children: React.ReactNode; title: string }
         </div>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        <h1 className="text-sm font-medium tracking-widest uppercase text-secondary">{title}</h1>
+        <h1 className="t-page-title">{title}</h1>
         {children}
       </main>
       <SignInCTA />
@@ -227,7 +227,7 @@ function PublicScoreCard({ id }: { id: string }) {
       <article className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] tracking-widest uppercase text-muted">Total score</p>
+            <p className="t-section-title">Total score</p>
             <p className="text-3xl font-mono font-semibold text-secondary">
               {card.total_score}
               {card.x_count > 0 && (
@@ -237,7 +237,7 @@ function PublicScoreCard({ id }: { id: string }) {
           </div>
           <button
             onClick={() => setShowShare(true)}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary flex items-center gap-1.5"
           >
             <Share2 size={14} />
             Share
@@ -392,7 +392,7 @@ function PublicPelletTest({ id }: { id: string }) {
           </div>
           <button
             onClick={() => setShowShare(true)}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary flex items-center gap-1.5"
           >
             <Share2 size={14} />
             Share
@@ -484,7 +484,7 @@ function PublicLeague({ id }: { id: string }) {
           </div>
           <button
             onClick={() => setShowShare(true)}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary flex items-center gap-1.5"
           >
             <Share2 size={14} />
             Share
@@ -542,7 +542,7 @@ function PublicClub({ id }: { id: string }) {
           </div>
           <button
             onClick={() => setShowShare(true)}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary flex items-center gap-1.5"
           >
             <Share2 size={14} />
             Share
@@ -607,7 +607,7 @@ function PublicUser({ id }: { id: string }) {
           </div>
           <button
             onClick={() => setShowShare(true)}
-            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-secondary flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded border border-subtle t-section-title hover:text-secondary flex items-center gap-1.5"
           >
             <Share2 size={14} />
             Share

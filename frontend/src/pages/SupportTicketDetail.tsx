@@ -130,7 +130,7 @@ export default function SupportTicketDetail() {
   return (
     <div className="mx-auto max-w-5xl p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Support ticket detail</h1>
+        <h1 className="t-page-title">Support ticket detail</h1>
         <Link to="/support" className="text-sm text-[var(--brass)] hover:underline">Back to support center</Link>
       </div>
 
@@ -140,7 +140,7 @@ export default function SupportTicketDetail() {
       {detail && (
         <>
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-2">
-            <h2 className="text-xl font-medium">{detail.ticket.title ?? 'Untitled ticket'}</h2>
+            <h2 className="t-subsection-title">{detail.ticket.title ?? 'Untitled ticket'}</h2>
             <p className="text-xs text-muted">
               {detail.ticket.status ?? 'open'} · {detail.ticket.category ?? 'issue'} · {detail.ticket.priority ?? 'normal'}
             </p>
@@ -151,7 +151,7 @@ export default function SupportTicketDetail() {
           </section>
 
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6 space-y-3">
-            <h3 className="font-medium">Ticket controls</h3>
+            <h3 className="t-subsection-title">Ticket controls</h3>
             <form className="space-y-3" onSubmit={onSaveTicketEdits}>
               <label className="block text-sm space-y-1">
                 <span className="text-muted">Title</span>
@@ -200,7 +200,7 @@ export default function SupportTicketDetail() {
           </section>
 
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-            <h3 className="font-medium">Message thread</h3>
+            <h3 className="t-subsection-title">Message thread</h3>
             <div className="mt-3 space-y-2">
               {detail.messages.length === 0 && <p className="text-sm text-muted">No messages yet.</p>}
               {detail.messages.map((message) => (
@@ -213,7 +213,7 @@ export default function SupportTicketDetail() {
           </section>
 
           <section className="rounded-2xl border border-subtle bg-surface p-4 md:p-6">
-            <h3 className="font-medium">Reply</h3>
+            <h3 className="t-subsection-title">Reply</h3>
             <form className="mt-3 space-y-3" onSubmit={onSubmitReply}>
               <textarea
                 className="min-h-28 w-full rounded-md border border-subtle bg-transparent p-2"
