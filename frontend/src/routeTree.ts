@@ -71,12 +71,12 @@ import Drafts from './pages/Drafts'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
-// a persisted refresh token (returning user after a reload — the access token
-// is no longer persisted to localStorage, so the API client will mint a fresh
-// one on the first 401).
+// a persisted user record (returning user after a reload — the API client
+// will mint a fresh access token via the httpOnly refresh cookie on the
+// first 401, or punt to /login if the cookie is also gone).
 function requireAuth() {
-  const { accessToken, refreshToken } = useAuthStore.getState()
-  if (!accessToken && !refreshToken) throw redirect({ to: '/login' })
+  const { accessToken, user } = useAuthStore.getState()
+  if (!accessToken && !user) throw redirect({ to: '/login' })
 }
 
 // Guard: redirect to / if already authenticated

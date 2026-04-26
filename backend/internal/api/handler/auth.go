@@ -5,18 +5,65 @@ import (
 	"errors"
 	"net/http"
 	"net/mail"
+	"time"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
+// refreshCookieName is the httpOnly cookie that carries the opaque refresh
+// token. It is scoped to /api/v1/auth so it is only sent on auth-bearing
+// endpoints (refresh, logout) — never on the broader API surface.
+const (
+	refreshCookieName = "sub12_refresh"
+	refreshCookiePath = "/api/v1/auth"
+	refreshCookieTTL  = 30 * 24 * time.Hour
+)
+
 type AuthHandler struct {
-	auth *service.AuthService
+	auth   *service.AuthService
+	secure bool
 }
 
-func NewAuth(auth *service.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+// NewAuth builds the handler. `secureCookie` controls the Secure flag on the
+// refresh cookie — true in production (HTTPS), false locally (HTTP).
+func NewAuth(auth *service.AuthService, secureCookie bool) *AuthHandler {
+	return &AuthHandler{auth: auth, secure: secureCookie}
+}
+
+func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    token,
+		Path:     refreshCookiePath,
+		Expires:  time.Now().Add(refreshCookieTTL),
+		MaxAge:   int(refreshCookieTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   h.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (h *AuthHandler) clearRefreshCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     refreshCookiePath,
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func readRefreshCookie(r *http.Request) string {
+	c, err := r.Cookie(refreshCookieName)
+	if err != nil || c == nil {
+		return ""
+	}
+	return c.Value
 }
 
 // POST /api/v1/auth/register
@@ -65,6 +112,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setRefreshCookie(w, tokens.RefreshToken)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"user":   user,
 		"tokens": tokens,
@@ -101,6 +149,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setRefreshCookie(w, tokens.RefreshToken)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":   user,
 		"tokens": tokens,
@@ -137,6 +186,7 @@ func (h *AuthHandler) LoginVerify2FA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.setRefreshCookie(w, tokens.RefreshToken)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":   user,
 		"tokens": tokens,
@@ -155,32 +205,53 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/auth/refresh
+//
+// Reads the refresh token from the httpOnly cookie set by login/register.
+// Falls back to a JSON body for backwards compatibility with clients that
+// have not migrated yet; the body path will be removed once all clients are
+// using the cookie.
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		RefreshToken string `json:"refresh_token"`
+	token := readRefreshCookie(r)
+	if token == "" {
+		var body struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			token = body.RefreshToken
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RefreshToken == "" {
-		writeError(w, http.StatusBadRequest, "refresh_token is required")
+	if token == "" {
+		writeError(w, http.StatusUnauthorized, "missing refresh token")
 		return
 	}
 
-	tokens, err := h.auth.Refresh(r.Context(), body.RefreshToken)
+	tokens, err := h.auth.Refresh(r.Context(), token)
 	if err != nil {
+		// Drop any stale cookie so the browser stops re-presenting it.
+		h.clearRefreshCookie(w)
 		writeError(w, http.StatusUnauthorized, "invalid or expired refresh token")
 		return
 	}
 
+	h.setRefreshCookie(w, tokens.RefreshToken)
 	writeJSON(w, http.StatusOK, tokens)
 }
 
 // POST /api/v1/auth/logout
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		RefreshToken string `json:"refresh_token"`
+	token := readRefreshCookie(r)
+	if token == "" {
+		var body struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			token = body.RefreshToken
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err == nil && body.RefreshToken != "" {
-		h.auth.Logout(r.Context(), body.RefreshToken)
+	if token != "" {
+		h.auth.Logout(r.Context(), token)
 	}
+	h.clearRefreshCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 

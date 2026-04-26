@@ -108,7 +108,7 @@ func NewRouter(
 		// /auth/refresh and /auth/logout are intentionally unbounded here so
 		// that normal token-refresh traffic from returning users isn't
 		// throttled shared with login attempts on the same IP.
-		authHandler := handler.NewAuth(auth)
+		authHandler := handler.NewAuth(auth, cfg.Env == "production")
 		r.With(rl.Limit("auth")).Post("/auth/register", authHandler.Register)
 		r.With(rl.Limit("auth")).Post("/auth/login", authHandler.Login)
 		r.With(rl.Limit("auth")).Post("/auth/login/2fa", authHandler.LoginVerify2FA)
@@ -545,6 +545,11 @@ func corsMiddleware(origin string) func(http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			// Required so browsers attach the httpOnly refresh cookie on
+			// cross-origin /auth/refresh and /auth/logout calls. The Allow-
+			// Origin header above is the configured CORS_ORIGIN, never `*`,
+			// which is the precondition for credentialed requests.
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return

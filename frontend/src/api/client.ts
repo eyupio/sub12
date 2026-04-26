@@ -21,25 +21,26 @@ let refreshPromise: Promise<boolean> | null = null
 const AUTH_PATH_PREFIX = '/auth/'
 
 async function tryRefreshToken(): Promise<boolean> {
-  const { refreshToken, setAuth, clearAuth } = useAuthStore.getState()
-  if (!refreshToken) return false
-
+  // Refresh now uses the httpOnly `sub12_refresh` cookie set by the backend
+  // on login. The browser attaches it automatically because we send the
+  // request with credentials:'include'; we never see or send the value
+  // ourselves, so an XSS payload reading localStorage cannot mint tokens.
+  const { setAuth, clearAuth } = useAuthStore.getState()
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: 'include',
     })
     if (!res.ok) {
-      // The stored refresh token is dead (expired / revoked). Drop it now
-      // so a subsequent rehydrate doesn't try to replay the same 4xx.
+      // No valid refresh cookie (expired / revoked / never set). Drop the
+      // persisted user so a subsequent rehydrate doesn't loop on the same 4xx.
       clearAuth()
       return false
     }
     const tokens = await res.json()
     const user = useAuthStore.getState().user
     if (user) {
-      setAuth(user, tokens.access_token, tokens.refresh_token)
+      setAuth(user, tokens.access_token, tokens.refresh_token ?? '')
     }
     return true
   } catch {
@@ -74,7 +75,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     res.status === 401 &&
     !isRetry &&
     !path.startsWith(AUTH_PATH_PREFIX) &&
-    (token || useAuthStore.getState().refreshToken)
+    (token || useAuthStore.getState().user)
   ) {
     const refreshed = await handleUnauthorized()
     if (refreshed) {
@@ -112,7 +113,7 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
     res.status === 401 &&
     !isRetry &&
     !path.startsWith(AUTH_PATH_PREFIX) &&
-    (token || useAuthStore.getState().refreshToken)
+    (token || useAuthStore.getState().user)
   ) {
     const refreshed = await handleUnauthorized()
     if (refreshed) {

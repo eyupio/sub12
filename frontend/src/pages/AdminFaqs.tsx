@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import {
   adminFaqApi,
@@ -371,7 +372,7 @@ export default function AdminFaqs() {
               <div className="space-y-1">
                 <label className={labelCls}>Preview</label>
                 <div className="min-h-[260px] border border-subtle rounded p-3 bg-surface-hover prose prose-sm dark:prose-invert max-w-none text-secondary">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{form.answer_md || '*Nothing to preview yet.*'}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{form.answer_md || '*Nothing to preview yet.*'}</ReactMarkdown>
                 </div>
               </div>
             </div>

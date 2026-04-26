@@ -57,7 +57,11 @@ describe('useAuthStore', () => {
     expect(s.refreshToken).toBeNull()
   })
 
-  it('persists user and refresh token, but not the access token, to localStorage', () => {
+  it('persists only the user record to localStorage; both tokens stay out', () => {
+    // The refresh token now lives in an httpOnly cookie set by the backend,
+    // and the access token stays in memory only. Persisting the user record
+    // is enough to recognise a returning user on reload — the API client
+    // will mint a fresh access token via the cookie on the first 401.
     useAuthStore.getState().setAuth(freshUser, 'access-1', 'refresh-1')
 
     const raw = window.localStorage.getItem('sub12-auth')
@@ -65,8 +69,8 @@ describe('useAuthStore', () => {
 
     const parsed = JSON.parse(raw as string)
     expect(parsed.state.user).toEqual(freshUser)
-    expect(parsed.state.refreshToken).toBe('refresh-1')
     expect(parsed.state.accessToken).toBeUndefined()
+    expect(parsed.state.refreshToken).toBeUndefined()
   })
 
   it('does not persist actions (setAuth/clearAuth) in localStorage', () => {

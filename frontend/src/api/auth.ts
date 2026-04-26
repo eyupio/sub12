@@ -55,11 +55,14 @@ export const authApi = {
     return { kind: 'complete', user: r.user, tokens: r.tokens }
   },
 
-  refresh: (refreshToken: string) =>
-    api.post<AuthTokens>('/auth/refresh', { refresh_token: refreshToken }),
+  // Refresh and logout rely on the httpOnly `sub12_refresh` cookie that the
+  // backend set on login. The token is never visible to JS; we only need to
+  // tell fetch to attach the cookie via credentials:'include'.
+  refresh: () =>
+    api.post<AuthTokens>('/auth/refresh', undefined, { credentials: 'include' }),
 
-  logout: (refreshToken: string) =>
-    api.post<void>('/auth/logout', { refresh_token: refreshToken }),
+  logout: () =>
+    api.post<void>('/auth/logout', undefined, { credentials: 'include' }),
 
   forgotPassword: (email: string) =>
     api.post<{ message: string }>('/auth/forgot-password', { email }),
