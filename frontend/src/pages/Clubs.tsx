@@ -9,13 +9,12 @@ import { toast } from '../store/toast'
 import {
   PageGrid,
   PageHeader,
-  StatsStrip,
   FilterRow,
   EmptyState,
   EntityCard,
   Badge,
-  type StatCell,
 } from '../components/leagues'
+import { StatTile } from '../components/dashboard'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -137,16 +136,11 @@ export default function Clubs() {
     return all.filter((c) => c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q))
   }, [data, search, code])
 
-  const stats: StatCell[] = useMemo(() => {
+  const stats = useMemo(() => {
     const total = data?.items?.length ?? 0
     const totalMembers = (data?.items ?? []).reduce((s, c) => s + c.member_count, 0)
     const totalLeagues = (data?.items ?? []).reduce((s, c) => s + (c.league_count ?? 0), 0)
-    return [
-      { label: 'Member Of', value: total, sub: total === 0 ? 'no clubs yet' : `${total} club${total !== 1 ? 's' : ''}` },
-      { label: 'Total Shooters', value: totalMembers, sub: 'across your clubs' },
-      { label: 'Active Leagues', value: totalLeagues, sub: 'in your clubs' },
-      { label: 'Top Card', value: '—', sub: 'best across clubs' },
-    ]
+    return { total, totalMembers, totalLeagues }
   }, [data])
 
   return (
@@ -154,11 +148,21 @@ export default function Clubs() {
       <PageHeader
         title="Clubs"
         info={<HelpIcon content={pageHelp.clubs} />}
+        description="Find your shooting community. Share scores. Connect with members."
         action={<button className="lc-action-ghost" onClick={() => setShowCreate(true)}><Plus size={14} /> New</button>}
       />
 
       <div className="lc-stack">
-        <StatsStrip cells={stats} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatTile
+            label="Member Of"
+            value={String(stats.total)}
+            sub={stats.total === 0 ? 'no clubs yet' : `${stats.total} club${stats.total !== 1 ? 's' : ''}`}
+          />
+          <StatTile label="Total Shooters" value={String(stats.totalMembers)} sub="across your clubs" />
+          <StatTile label="Active Leagues" value={String(stats.totalLeagues)} sub="in your clubs" />
+          <StatTile label="Top Card" value="—" sub="best across clubs" />
+        </div>
         <FilterRow search={search} onSearch={setSearch} placeholder="Search clubs…" />
 
         <form onSubmit={applyCode} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

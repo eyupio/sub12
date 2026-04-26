@@ -10,44 +10,24 @@ export function PageGrid({ children, className }: { children: ReactNode; classNa
 export function PageHeader({
   title,
   info,
+  description,
   action,
 }: {
   title: string
   info?: ReactNode
+  description?: ReactNode
   action?: ReactNode
 }) {
   return (
     <div className="lc-page-header">
-      <div className="lc-page-title">
-        <h1 className="t-page-title">{title}</h1>
-        {info}
+      <div className="lc-page-titlebar">
+        <div className="lc-page-title">
+          <h1 className="t-page-title">{title}</h1>
+          {info}
+        </div>
+        {description && <p className="lc-page-description">{description}</p>}
       </div>
       {action}
-    </div>
-  )
-}
-
-export type StatCell = {
-  label: string
-  value: ReactNode
-  unit?: ReactNode
-  sub?: ReactNode
-  trend?: 'up' | 'down' | 'flat'
-}
-
-export function StatsStrip({ cells }: { cells: StatCell[] }) {
-  return (
-    <div className="lc-stats">
-      {cells.map((c, i) => (
-        <div className="lc-stats-cell" key={i}>
-          <div className="lc-stats-label">{c.label}</div>
-          <div className="lc-stats-value">
-            {c.value}
-            {c.unit && <span className="lc-stats-unit">{c.unit}</span>}
-          </div>
-          {c.sub && <div className={`lc-stats-sub ${c.trend ?? ''}`}>{c.sub}</div>}
-        </div>
-      ))}
     </div>
   )
 }

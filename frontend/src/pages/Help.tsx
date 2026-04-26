@@ -53,7 +53,7 @@ export default function Help() {
     : grouped
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20">
       <div className="mb-5 flex items-center gap-2">
         <h1 className="t-page-title">Help &amp; FAQ</h1>
         <HelpIcon content={pageHelp.help} />

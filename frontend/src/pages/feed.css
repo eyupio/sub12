@@ -2,15 +2,18 @@
   min-height: 100%;
   background: var(--bg);
   color: var(--ink);
-  padding: 24px 20px 96px;
 }
 
 .feed-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
-  max-width: 1160px;
+  max-width: 1100px;
   margin: 0 auto;
+  padding: 24px 20px 96px;
+}
+@media (min-width: 1024px) {
+  .feed-page { padding: 28px 48px 80px; }
 }
 
 .feed-page.with-rail {
@@ -26,18 +29,7 @@
   justify-content: space-between;
   align-items: end;
   gap: 16px;
-  padding-bottom: 14px;
   margin-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.feed-eyebrow {
-  margin: 0 0 4px;
-  color: var(--gold);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
 }
 
 .feed-header h1 {
@@ -686,9 +678,9 @@
 .achievement-text h2 {
   margin: 0;
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 500;
+  font-family: var(--ui);
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .achievement-text p:not(.achievement-eyebrow) {

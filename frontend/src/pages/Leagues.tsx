@@ -9,14 +9,13 @@ import { pageHelp } from '../components/tooltips'
 import {
   PageGrid,
   PageHeader,
-  StatsStrip,
   FilterRow,
   EmptyState,
   EntityCard,
   Badge,
   VisibilityDot,
-  type StatCell,
 } from '../components/leagues'
+import { StatTile } from '../components/dashboard'
 
 type Filter = 'all' | 'active' | 'joined' | 'owned' | 'closed'
 
@@ -218,24 +217,22 @@ export default function Leagues() {
     })
   }, [data, filter, search, code, myLeagueMap, user])
 
-  const stats: StatCell[] = useMemo(() => {
+  const stats = useMemo(() => {
     const joined = myLeagues?.items?.length ?? 0
     const bestRank = (myLeagues?.items ?? []).reduce(
       (acc, l) => (l.user_rank > 0 && (acc === 0 || l.user_rank < acc) ? l.user_rank : acc),
       0,
     )
     const bestRankLeague = (myLeagues?.items ?? []).find((l) => l.user_rank === bestRank && bestRank > 0)
-    return [
-      { label: 'Joined', value: joined, sub: joined > 0 ? `across ${joined} league${joined !== 1 ? 's' : ''}` : 'none yet' },
-      {
-        label: 'Best Position',
-        value: bestRank > 0 ? bestRank : '—',
-        unit: bestRank > 0 ? <sup style={{ fontSize: 11 }}>{ordinalSuffix(bestRank)}</sup> : null,
-        sub: bestRankLeague?.name,
-      },
-      { label: 'Available', value: data?.items?.length ?? 0, sub: 'leagues' },
-      { label: 'Owned', value: (data?.items ?? []).filter(l => l.created_by === user?.id).length, sub: 'created by you' },
-    ]
+    const available = data?.items?.length ?? 0
+    const owned = (data?.items ?? []).filter((l) => l.created_by === user?.id).length
+    return {
+      joined,
+      bestRank,
+      bestRankLeague,
+      available,
+      owned,
+    }
   }, [myLeagues, data, user])
 
   return (
@@ -243,6 +240,7 @@ export default function Leagues() {
       <PageHeader
         title="Leagues"
         info={<HelpIcon content={pageHelp.leagues} />}
+        description="Compete in seasonal contests. Submit scores. Chase the leaderboard."
         action={
           <button className="lc-action-ghost" onClick={() => setShowCreate(true)}>
             <Plus size={14} /> New
@@ -251,7 +249,21 @@ export default function Leagues() {
       />
 
       <div className="lc-stack">
-        <StatsStrip cells={stats} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatTile
+            label="Joined"
+            value={String(stats.joined)}
+            sub={stats.joined > 0 ? `across ${stats.joined} league${stats.joined !== 1 ? 's' : ''}` : 'none yet'}
+          />
+          <StatTile
+            label="Best Position"
+            value={stats.bestRank > 0 ? String(stats.bestRank) : '—'}
+            unit={stats.bestRank > 0 ? <sup style={{ fontSize: 11 }}>{ordinalSuffix(stats.bestRank)}</sup> : undefined}
+            sub={stats.bestRankLeague?.name}
+          />
+          <StatTile label="Available" value={String(stats.available)} sub="leagues" />
+          <StatTile label="Owned" value={String(stats.owned)} sub="created by you" />
+        </div>
         <FilterRow<Filter>
           search={search}
           onSearch={setSearch}
