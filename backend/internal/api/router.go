@@ -435,6 +435,14 @@ func NewRouter(
 				r.Get("/admin/reports", reportAdminH.AdminList)
 				r.Post("/admin/reports/{id}/decide", reportAdminH.AdminDecide)
 
+				// Activity feed moderation: site admins can hide/unhide any
+				// feed item. Hidden activities disappear from every feed
+				// query; reports against activities ride the existing
+				// AdminReportsQueue notification fanout.
+				adminActivityH := handler.NewAdminActivity(activity)
+				r.Delete("/admin/activities/{id}", adminActivityH.Hide)
+				r.Post("/admin/activities/{id}/unhide", adminActivityH.Unhide)
+
 				// League management
 				alh := handler.NewAdminLeagues(leagues)
 				r.Get("/admin/leagues", alh.List)

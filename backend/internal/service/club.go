@@ -48,8 +48,10 @@ func (s *ClubService) Create(ctx context.Context, userID string, input *model.Cr
 }
 
 // GetByID returns a club when the viewer is allowed to see it. Private clubs
-// are visible only to members; non-members receive ErrClubNotFound.
-func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*model.Club, error) {
+// are visible only to members; non-members receive ErrClubNotFound. Site
+// admins (viewerRole == "admin") bypass the privacy gate so they can moderate
+// any club.
+func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID, viewerRole string) (*model.Club, error) {
 	club, err := s.repo.GetByID(ctx, clubID, viewerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -57,7 +59,8 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID string) (*mo
 		}
 		return nil, err
 	}
-	if club.Type == "private" && !club.IsMember {
+	isAdmin := viewerRole == "admin"
+	if club.Type == "private" && !club.IsMember && !isAdmin {
 		return nil, ErrClubNotFound
 	}
 	if !club.IsMember {
@@ -195,25 +198,27 @@ func (s *ClubService) IsAdmin(ctx context.Context, clubID, userID string) (bool,
 	return s.repo.IsAdmin(ctx, clubID, userID)
 }
 
-// ListMembers returns club members. Private clubs are gated to members only.
-func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID string) ([]*model.ClubMember, error) {
-	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {
+// ListMembers returns club members. Private clubs are gated to members only;
+// site admins bypass the gate.
+func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID, viewerRole string) ([]*model.ClubMember, error) {
+	if err := s.ensureClubAccess(ctx, clubID, viewerID, viewerRole); err != nil {
 		return nil, err
 	}
 	return s.repo.ListMembers(ctx, clubID)
 }
 
-// GetStandings returns club standings. Private clubs are gated to members only.
-func (s *ClubService) GetStandings(ctx context.Context, clubID, viewerID string) ([]*model.ClubStanding, error) {
-	if err := s.ensureClubAccess(ctx, clubID, viewerID); err != nil {
+// GetStandings returns club standings. Private clubs are gated to members
+// only; site admins bypass the gate.
+func (s *ClubService) GetStandings(ctx context.Context, clubID, viewerID, viewerRole string) ([]*model.ClubStanding, error) {
+	if err := s.ensureClubAccess(ctx, clubID, viewerID, viewerRole); err != nil {
 		return nil, err
 	}
 	return s.repo.GetStandings(ctx, clubID)
 }
 
 // ensureClubAccess enforces that viewers can see content from private clubs
-// only when they are members.
-func (s *ClubService) ensureClubAccess(ctx context.Context, clubID, viewerID string) error {
+// only when they are members. Site admins always have access.
+func (s *ClubService) ensureClubAccess(ctx context.Context, clubID, viewerID, viewerRole string) error {
 	club, err := s.repo.GetByID(ctx, clubID, "")
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -222,6 +227,9 @@ func (s *ClubService) ensureClubAccess(ctx context.Context, clubID, viewerID str
 		return err
 	}
 	if club.Type != "private" {
+		return nil
+	}
+	if viewerRole == "admin" {
 		return nil
 	}
 	if viewerID == "" {

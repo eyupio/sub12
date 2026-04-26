@@ -4,7 +4,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/jnnngs/sub-12/backend/internal/model"
 )
+
+func TestIsValidReportTargetIncludesActivity(t *testing.T) {
+	assert.True(t, model.IsValidReportTarget(model.ReportTargetActivity))
+	assert.True(t, model.IsValidReportTarget(model.ReportTargetPost))
+	assert.True(t, model.IsValidReportTarget(model.ReportTargetComment))
+	assert.True(t, model.IsValidReportTarget(model.ReportTargetUser))
+	assert.True(t, model.IsValidReportTarget(model.ReportTargetScoreCard))
+	assert.False(t, model.IsValidReportTarget("nonsense"))
+}
 
 func TestAddReportRecipientsIncludesOwnerWhenNotAdmin(t *testing.T) {
 	recipients := map[string]struct{}{}

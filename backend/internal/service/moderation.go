@@ -35,6 +35,7 @@ type ModerationService struct {
 	reports       *repository.ReportRepository
 	posts         *repository.PostRepository
 	comments      *repository.CommentRepository
+	activities    *repository.ActivityRepository
 	leagues       *repository.LeagueRepository
 	clubs         *repository.ClubRepository
 	users         *repository.UserRepository
@@ -48,6 +49,7 @@ func NewModerationService(
 	reports *repository.ReportRepository,
 	posts *repository.PostRepository,
 	comments *repository.CommentRepository,
+	activities *repository.ActivityRepository,
 	leagues *repository.LeagueRepository,
 	clubs *repository.ClubRepository,
 	users *repository.UserRepository,
@@ -60,6 +62,7 @@ func NewModerationService(
 		reports:       reports,
 		posts:         posts,
 		comments:      comments,
+		activities:    activities,
 		leagues:       leagues,
 		clubs:         clubs,
 		users:         users,
@@ -72,7 +75,7 @@ func NewModerationService(
 
 // CreateReport persists a user-submitted report, resolves its community
 // scope, and fans out notifications to the relevant admins.
-func (s *ModerationService) CreateReport(ctx context.Context, reporterID string, in *model.CreateReportInput) (*model.Report, error) {
+func (s *ModerationService) CreateReport(ctx context.Context, reporterID, reporterRole string, in *model.CreateReportInput) (*model.Report, error) {
 	if !model.IsValidReportTarget(in.TargetType) {
 		return nil, ErrReportInvalidTarget
 	}
@@ -83,7 +86,7 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 		return nil, ErrReportSelfReport
 	}
 
-	leagueID, clubID, err := s.resolveScope(ctx, reporterID, in)
+	leagueID, clubID, err := s.resolveScope(ctx, reporterID, reporterRole, in)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +236,9 @@ func (s *ModerationService) applyDecision(ctx context.Context, report *model.Rep
 
 // resolveScope derives the league/club the report belongs to based on the
 // target, and (for leagues/clubs) enforces that the reporter is a member.
-func (s *ModerationService) resolveScope(ctx context.Context, reporterID string, in *model.CreateReportInput) (*string, *string, error) {
+// Site admins (reporterRole == "admin") bypass the membership requirement so
+// they can moderate communities they are not part of.
+func (s *ModerationService) resolveScope(ctx context.Context, reporterID, reporterRole string, in *model.CreateReportInput) (*string, *string, error) {
 	var leagueID, clubID *string
 	var err error
 
@@ -244,6 +249,8 @@ func (s *ModerationService) resolveScope(ctx context.Context, reporterID string,
 		leagueID, clubID, err = s.scopeFromComment(ctx, in.TargetID)
 	case model.ReportTargetScoreCard:
 		leagueID, clubID, err = s.leagues.GetScopeByScoreCardID(ctx, in.TargetID)
+	case model.ReportTargetActivity:
+		leagueID, clubID, err = s.scopeFromActivity(ctx, in.TargetID)
 	case model.ReportTargetUser:
 		leagueID, clubID = in.ContextLeagueID, in.ContextClubID
 		if leagueID == nil && clubID == nil {
@@ -265,8 +272,11 @@ func (s *ModerationService) resolveScope(ctx context.Context, reporterID string,
 		}
 	}
 
+	isAdmin := reporterRole == "admin"
+
 	// Enforce reporter membership in the community they're flagging into.
-	if leagueID != nil {
+	// Site admins are exempt — they can moderate any league or club.
+	if leagueID != nil && !isAdmin {
 		ok, err := s.leagues.IsMember(ctx, *leagueID, reporterID)
 		if err != nil {
 			return nil, nil, err
@@ -275,7 +285,7 @@ func (s *ModerationService) resolveScope(ctx context.Context, reporterID string,
 			return nil, nil, ErrReporterNotMember
 		}
 	}
-	if clubID != nil {
+	if clubID != nil && !isAdmin {
 		ok, err := s.clubs.IsMember(ctx, *clubID, reporterID)
 		if err != nil {
 			return nil, nil, err
@@ -301,6 +311,20 @@ func (s *ModerationService) scopeFromPost(ctx context.Context, postID string) (*
 		return nil, nil, err
 	}
 	return p.LeagueID, p.ClubID, nil
+}
+
+// scopeFromActivity resolves the league/club an activity belongs to so reports
+// against feed entries notify the right community admins. Activities created
+// outside any league/club resolve to platform scope (both nil).
+func (s *ModerationService) scopeFromActivity(ctx context.Context, activityID string) (*string, *string, error) {
+	if s.activities == nil {
+		return nil, nil, nil
+	}
+	a, err := s.activities.GetByID(ctx, activityID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return a.LeagueID, a.ClubID, nil
 }
 
 func (s *ModerationService) scopeFromComment(ctx context.Context, commentID string) (*string, *string, error) {

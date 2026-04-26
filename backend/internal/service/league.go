@@ -155,7 +155,7 @@ func (s *LeagueService) ListMyLeagues(ctx context.Context, userID string) ([]*mo
 	return leagues, nil
 }
 
-func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*model.League, error) {
+func (s *LeagueService) GetByID(ctx context.Context, id, viewerID, viewerRole string) (*model.League, error) {
 	league, err := s.leagues.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
@@ -164,8 +164,13 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 		return nil, err
 	}
 
-	// Club-scoped leagues require club membership
+	isAdmin := viewerRole == "admin"
+
+	// Club-scoped leagues require club membership; site admins bypass.
 	if league.ClubID != nil && *league.ClubID != "" {
+		if isAdmin {
+			return league, nil
+		}
 		if viewerID == "" {
 			return nil, ErrUnauthenticated
 		}
@@ -179,8 +184,11 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 		return league, nil
 	}
 
-	// Non-club private leagues require league membership to view
-	if league.Type == "private" && viewerID != "" {
+	// Non-club private leagues require league membership to view; site admins bypass.
+	if league.Type == "private" && !isAdmin {
+		if viewerID == "" {
+			return nil, ErrUnauthenticated
+		}
 		isMember, err := s.leagues.IsMember(ctx, id, viewerID)
 		if err != nil {
 			return nil, err
@@ -188,9 +196,6 @@ func (s *LeagueService) GetByID(ctx context.Context, id, viewerID string) (*mode
 		if !isMember {
 			return nil, ErrLeagueNotFound
 		}
-	}
-	if league.Type == "private" && viewerID == "" {
-		return nil, ErrUnauthenticated
 	}
 	return league, nil
 }

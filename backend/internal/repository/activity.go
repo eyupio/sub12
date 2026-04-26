@@ -152,6 +152,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			`+activityJoins+`
 			WHERE a.visibility = 'public'
+			  AND a.hidden_at IS NULL
 			  AND u.feed_opt_out = FALSE
 			  AND u.profile_visibility <> 'private'
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
@@ -173,6 +174,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			`+activityJoins+`
 			WHERE a.league_id = $1
+			  AND a.hidden_at IS NULL
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND (a.target_type <> 'post' OR p.id IS NOT NULL)
 			  AND a.user_id NOT IN (
@@ -192,6 +194,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			JOIN users u ON u.id = a.user_id
 			`+activityJoins+`
 			WHERE a.club_id = $1
+			  AND a.hidden_at IS NULL
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND (a.target_type <> 'post' OR p.id IS NOT NULL)
 			  AND a.user_id NOT IN (
@@ -214,6 +217,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 				SELECT following_id FROM user_follows WHERE follower_id = $1
 				UNION ALL SELECT $1
 			)
+			AND a.hidden_at IS NULL
 			AND a.user_id NOT IN (
 				SELECT blocker_id FROM user_blocks WHERE blocked_id = $1
 				UNION
@@ -279,6 +283,38 @@ func (r *ActivityRepository) GetByID(ctx context.Context, id string) (*model.Act
 		return nil, fmt.Errorf("get activity by id: %w", err)
 	}
 	return a, nil
+}
+
+// AdminHide marks an activity hidden so feed queries skip it. Idempotent.
+func (r *ActivityRepository) AdminHide(ctx context.Context, activityID, adminID, reason string) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE activities
+		SET hidden_at = NOW(), hidden_by = $2, hide_reason = $3
+		WHERE id = $1
+	`, activityID, adminID, reason)
+	if err != nil {
+		return fmt.Errorf("admin hide activity: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// AdminUnhide clears the hidden state on an activity. Idempotent.
+func (r *ActivityRepository) AdminUnhide(ctx context.Context, activityID string) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE activities
+		SET hidden_at = NULL, hidden_by = NULL, hide_reason = NULL
+		WHERE id = $1
+	`, activityID)
+	if err != nil {
+		return fmt.Errorf("admin unhide activity: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // pgxRows is satisfied by pgx query result types.

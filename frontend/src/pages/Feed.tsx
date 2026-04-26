@@ -629,14 +629,18 @@ function FeedPostArticle({
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [adminFlagOpen, setAdminFlagOpen] = useState(false)
   const [editingPost, setEditingPost] = useState(false)
   const [draftBody, setDraftBody] = useState(post.body ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [adminConfirmHide, setAdminConfirmHide] = useState(false)
   const item = post.activity
   const isOwnPost = !!currentUser && item.type === 'post_created' && currentUser.id === item.user_id
   const reportTarget = feedReportTarget(post)
   const canReport = !!currentUser && !isOwnPost && !!reportTarget
   const canEdit = isOwnPost && !!item.target_id
+  const isAdmin = currentUser?.role === 'admin'
+  const canAdminModerate = isAdmin && !isOwnPost
 
   const updatePostMutation = useMutation({
     mutationFn: () => postApi.update(item.target_id!, draftBody.trim()),
@@ -661,6 +665,17 @@ function FeedPostArticle({
       toast('Post deleted', 'success')
     },
     onError: () => toast('Failed to delete post', 'error'),
+  })
+
+  const adminHideMutation = useMutation({
+    mutationFn: () => activityApi.adminHide(item.id),
+    onSuccess: () => {
+      setAdminConfirmHide(false)
+      setMenuOpen(false)
+      toast('Feed item removed', 'success')
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+    },
+    onError: () => toast('Failed to remove feed item', 'error'),
   })
 
   if (post.kind === 'join') {
@@ -694,8 +709,17 @@ function FeedPostArticle({
             setReportOpen(true)
             setMenuOpen(false)
           }}
+          onStartAdminHide={() => {
+            setAdminConfirmHide(true)
+            setMenuOpen(false)
+          }}
+          onStartAdminFlag={() => {
+            setAdminFlagOpen(true)
+            setMenuOpen(false)
+          }}
           canEdit={canEdit}
           canReport={canReport}
+          canAdminModerate={canAdminModerate}
           reportTargetType={reportTarget?.targetType}
         />
         {post.kind === 'pb' && <PersonalBestPost post={post} />}
@@ -729,12 +753,27 @@ function FeedPostArticle({
           onClose={() => setReportOpen(false)}
         />
       )}
+      {canAdminModerate && (
+        <ReportDialog
+          open={adminFlagOpen}
+          targetType="activity"
+          targetId={item.id}
+          onClose={() => setAdminFlagOpen(false)}
+        />
+      )}
       <ConfirmDialog
         open={confirmDelete}
         title="Delete post?"
         message="This post will be permanently removed."
         onConfirm={() => deletePostMutation.mutate()}
         onCancel={() => setConfirmDelete(false)}
+      />
+      <ConfirmDialog
+        open={adminConfirmHide}
+        title="Remove from feed?"
+        message="This feed item will be hidden for everyone. You can restore it later from the database if needed."
+        onConfirm={() => adminHideMutation.mutate()}
+        onCancel={() => setAdminConfirmHide(false)}
       />
     </article>
   )
@@ -757,8 +796,11 @@ function PostHead({
   onStartEdit,
   onStartDelete,
   onStartReport,
+  onStartAdminHide,
+  onStartAdminFlag,
   canEdit,
   canReport,
+  canAdminModerate,
   reportTargetType,
 }: {
   post: FeedPost
@@ -767,8 +809,11 @@ function PostHead({
   onStartEdit: () => void
   onStartDelete: () => void
   onStartReport: () => void
+  onStartAdminHide: () => void
+  onStartAdminFlag: () => void
   canEdit: boolean
   canReport: boolean
+  canAdminModerate: boolean
   reportTargetType?: 'post' | 'score_card'
 }) {
   const prefs = useRegionalPrefs()
@@ -795,7 +840,7 @@ function PostHead({
         {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
       </div>
       {post.kind === 'pb' && <span className="post-pinned">Pinned</span>}
-      {(canEdit || canReport) && (
+      {(canEdit || canReport || canAdminModerate) && (
         <div className="post-menu-wrap">
           <button
             type="button"
@@ -841,6 +886,28 @@ function PostHead({
                   <Flag size={12} />
                   Report {reportTargetType === 'score_card' ? 'score' : 'post'}
                 </button>
+              )}
+              {canAdminModerate && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="post-menu-item"
+                    onClick={onStartAdminFlag}
+                  >
+                    <Flag size={12} />
+                    Flag as inappropriate
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="post-menu-item post-menu-item-danger"
+                    onClick={onStartAdminHide}
+                  >
+                    <Trash2 size={12} />
+                    Delete (admin)
+                  </button>
+                </>
               )}
             </div>
           )}

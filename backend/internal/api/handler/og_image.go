@@ -165,7 +165,7 @@ func (h *OGImage) League() http.HandlerFunc {
 			h.redirectDefault(w, r)
 			return
 		}
-		league, err := h.leagues.GetByID(r.Context(), id, "")
+		league, err := h.leagues.GetByID(r.Context(), id, "", "")
 		if err != nil || league == nil {
 			h.redirectDefault(w, r)
 			return
@@ -201,7 +201,7 @@ func (h *OGImage) Club() http.HandlerFunc {
 			h.redirectDefault(w, r)
 			return
 		}
-		club, err := h.clubs.GetByID(r.Context(), id, "")
+		club, err := h.clubs.GetByID(r.Context(), id, "", "")
 		if err != nil || club == nil {
 			h.redirectDefault(w, r)
 			return

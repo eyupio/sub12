@@ -78,8 +78,9 @@ func (h *ClubHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 func (h *ClubHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	clubID := chi.URLParam(r, "id")
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
 
-	club, err := h.svc.GetByID(r.Context(), clubID, viewerID)
+	club, err := h.svc.GetByID(r.Context(), clubID, viewerID, viewerRole)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotFound) {
 			writeError(w, http.StatusNotFound, "club not found")
@@ -312,9 +313,10 @@ func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
 
 	clubID := chi.URLParam(r, "id")
-	members, err := h.svc.ListMembers(r.Context(), clubID, viewerID)
+	members, err := h.svc.ListMembers(r.Context(), clubID, viewerID, viewerRole)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotFound) {
 			writeError(w, http.StatusNotFound, "club not found")
@@ -332,8 +334,9 @@ func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/clubs/{id}/standings
 func (h *ClubHandler) GetStandings(w http.ResponseWriter, r *http.Request) {
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
 	clubID := chi.URLParam(r, "id")
-	standings, err := h.svc.GetStandings(r.Context(), clubID, viewerID)
+	standings, err := h.svc.GetStandings(r.Context(), clubID, viewerID, viewerRole)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotFound) {
 			writeError(w, http.StatusNotFound, "club not found")

@@ -28,12 +28,13 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	role, _ := middleware.UserRoleFromContext(r.Context())
 	var in model.CreateReportInput
 	if err := decodeJSON(r, &in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	report, err := h.svc.CreateReport(r.Context(), userID, &in)
+	report, err := h.svc.CreateReport(r.Context(), userID, role, &in)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportInvalidTarget),

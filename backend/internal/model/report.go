@@ -7,6 +7,7 @@ const (
 	ReportTargetComment   = "comment"
 	ReportTargetUser      = "user"
 	ReportTargetScoreCard = "score_card"
+	ReportTargetActivity  = "activity"
 )
 
 const (
@@ -59,7 +60,7 @@ type DecideReportInput struct {
 // IsValidReportTarget returns true for supported target_type values.
 func IsValidReportTarget(t string) bool {
 	switch t {
-	case ReportTargetPost, ReportTargetComment, ReportTargetUser, ReportTargetScoreCard:
+	case ReportTargetPost, ReportTargetComment, ReportTargetUser, ReportTargetScoreCard, ReportTargetActivity:
 		return true
 	}
 	return false

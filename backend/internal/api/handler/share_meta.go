@@ -167,7 +167,7 @@ func (s *ShareMeta) League() http.HandlerFunc {
 		og := s.defaultOG(r)
 		id := chi.URLParam(r, "id")
 		if id != "" && s.leagues != nil {
-			league, err := s.leagues.GetByID(r.Context(), id, "")
+			league, err := s.leagues.GetByID(r.Context(), id, "", "")
 			if err == nil && league != nil {
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
 				og.Description = leagueDescription(league)
@@ -186,7 +186,7 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 		og := s.defaultOG(r)
 		id := chi.URLParam(r, "id")
 		if id != "" && s.clubs != nil {
-			club, err := s.clubs.GetByID(r.Context(), id, "")
+			club, err := s.clubs.GetByID(r.Context(), id, "", "")
 			if err == nil && club != nil {
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
 				og.Description = clubDescription(club)

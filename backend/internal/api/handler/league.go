@@ -119,8 +119,9 @@ func (h *LeagueHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
 
-	league, err := h.svc.GetByID(r.Context(), leagueID, viewerID)
+	league, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole)
 	if err != nil {
 		if errors.Is(err, service.ErrUnauthenticated) {
 			writeError(w, http.StatusUnauthorized, "authentication required")
@@ -220,7 +221,8 @@ func (h *LeagueHandler) Standings(w http.ResponseWriter, r *http.Request) {
 
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
-	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole); err != nil {
 		if errors.Is(err, service.ErrUnauthenticated) {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
@@ -263,7 +265,8 @@ func (h *LeagueHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
-	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole); err != nil {
 		if errors.Is(err, service.ErrUnauthenticated) {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
@@ -494,7 +497,8 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
-	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole); err != nil {
 		if errors.Is(err, service.ErrUnauthenticated) {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
@@ -540,7 +544,8 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 	// Gate: verify access (club membership / private league check)
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
-	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID); err != nil {
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole); err != nil {
 		if errors.Is(err, service.ErrUnauthenticated) {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
