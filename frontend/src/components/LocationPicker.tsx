@@ -1,0 +1,59 @@
+import { MapPin, LocateFixed } from 'lucide-react'
+import { useLocations, type Location } from '../api/locations'
+
+interface LocationPickerProps {
+  value: string | null
+  onChange: (id: string | null) => void
+  onApplyDefaults?: (location: Location | null, lat?: number, lng?: number) => void
+  className?: string
+}
+
+export function LocationPicker({ value, onChange, onApplyDefaults, className = '' }: LocationPickerProps) {
+  const { data: locations = [] } = useLocations()
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value || null
+    onChange(id)
+    if (onApplyDefaults) {
+      const loc = locations.find(l => l.id === id) ?? null
+      onApplyDefaults(loc)
+    }
+  }
+
+  const handleDetect = () => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(pos => {
+      if (onApplyDefaults) {
+        onApplyDefaults(null, pos.coords.latitude, pos.coords.longitude)
+      }
+    })
+  }
+
+  return (
+    <div className={`flex gap-2 ${className}`}>
+      <div className="relative flex-1">
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <select
+          value={value ?? ''}
+          onChange={handleChange}
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+        >
+          <option value="">No saved location</option>
+          {locations.map(loc => (
+            <option key={loc.id} value={loc.id}>{loc.name}</option>
+          ))}
+        </select>
+      </div>
+      {onApplyDefaults && (
+        <button
+          type="button"
+          onClick={handleDetect}
+          title="Detect my location"
+          className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+        >
+          <LocateFixed className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  )
+}

@@ -94,4 +94,7 @@ export const activityApi = {
 
   adminUnhide: (id: string) =>
     api.post<void>(`/admin/activities/${id}/unhide`, {}),
+
+  deleteActivity: (id: string) =>
+    api.del<void>(`/activities/${id}`),
 }

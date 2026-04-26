@@ -9,6 +9,7 @@ import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LocationField, type LocationValue } from '../components/LocationField'
+import { LocationPicker } from '../components/LocationPicker'
 import { useSmartBack } from '../hooks/useSmartBack'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -30,6 +31,7 @@ export default function ScoreEntry() {
   const [selectedShot, setSelectedShot] = useState<number | null>(null)
   const [shotAt, setShotAt] = useState(today())
   const [location, setLocation] = useState<LocationValue>({ label: '' })
+  const [locationId, setLocationId] = useState<string | null>(null)
   const [windMph, setWindMph] = useState('')
   const [tempCelsius, setTempCelsius] = useState('')
   const [notes, setNotes] = useState('')
@@ -258,6 +260,7 @@ export default function ScoreEntry() {
         pellet_id: pelletId || undefined,
         league_round_id: leagueId ? leagueRoundId : undefined,
         visibility,
+        location_id: locationId ?? undefined,
       }
 
       let card
@@ -569,6 +572,23 @@ export default function ScoreEntry() {
           {/* Conditions */}
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Saved location</label>
+              <LocationPicker
+                value={locationId}
+                onChange={setLocationId}
+                onApplyDefaults={(loc, lat, lng) => {
+                  if (loc) {
+                    if (loc.lat != null && loc.lng != null) setLocation(l => ({ ...l, lat: loc.lat!, lng: loc.lng! }))
+                    if (loc.default_distance_m != null) {
+                      // store as distance_m in the score card notes context (no direct field here)
+                    }
+                  } else if (lat != null && lng != null) {
+                    setLocation(l => ({ ...l, lat, lng }))
+                  }
+                }}
+              />
+            </div>
             <div className="space-y-1.5">
               <label className={sidebarLabelCls}>Location</label>
               <LocationField

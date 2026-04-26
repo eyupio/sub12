@@ -16,6 +16,8 @@ export interface ScoreCardSummary {
   league_name?: string
   club_id?: string
   card_image_url?: string
+  card_image_rotation?: number
+  location_id?: string
   is_draft: boolean
   created_at: string
 }
@@ -56,6 +58,8 @@ export interface ScoreCard extends ScoreCardSummary {
   comment_count: number
   is_liked: boolean
   is_draft: boolean
+  card_image_rotation?: number
+  location_id?: string
   updated_at: string
   author?: ScoreCardAuthor
   achievements?: ScoreCardAchievement[]
@@ -152,6 +156,9 @@ export const scoreCardApi = {
     formData.append('image', file)
     return api.upload<{ card_image_url: string }>(`/score-cards/${cardId}/image`, formData)
   },
+
+  submitToLeague: (cardId: string, leagueRoundId: string) =>
+    api.post<ScoreCard>(`/score-cards/${cardId}/submit-to-league`, { league_round_id: leagueRoundId }),
 
   listComments: (cardId: string) =>
     api.get<{ items: Comment[] }>(`/score-cards/${cardId}/comments`),

@@ -33,7 +33,7 @@ func scanSession(row pgx.Row) (*model.PelletTestSession, error) {
 		&s.VelocityFPS, &s.VelocitySD, &s.ExtremeSpreadFPS,
 		&s.BenchSetup, &s.ScopeDetails, &s.BarometricPressureMbar,
 		&s.AverageGroupSizeMM, &s.BestGroupSizeMM,
-		&s.GroupCount, &s.IsPublic, &s.IsDraft, &s.CreatedAt, &s.UpdatedAt,
+		&s.GroupCount, &s.LocationID, &s.IsPublic, &s.IsDraft, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -46,20 +46,20 @@ const sessionCols = `id, user_id, rifle_id, pellet_id, test_date, distance_m, di
 	location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes,
 	velocity_fps, velocity_sd, extreme_spread_fps,
 	bench_setup, scope_details, barometric_pressure_mbar,
-	average_group_size_mm, best_group_size_mm, group_count, is_public, is_draft, created_at, updated_at`
+	average_group_size_mm, best_group_size_mm, group_count, location_id, is_public, is_draft, created_at, updated_at`
 
 func (r *PelletTestRepository) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput, distanceM float64) (*model.PelletTestSession, error) {
 	session, err := scanSession(r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_sessions (user_id, rifle_id, pellet_id, test_date, distance_m, distance_unit,
 			location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes,
 			velocity_fps, velocity_sd, extreme_spread_fps,
-			bench_setup, scope_details, barometric_pressure_mbar)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			bench_setup, scope_details, barometric_pressure_mbar, location_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		RETURNING `+sessionCols+`
 	`, userID, in.RifleID, in.PelletID, in.TestDate, distanceM, in.DistanceUnit,
 		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
 		in.VelocityFPS, in.VelocitySD, in.ExtremeSpreadFPS,
-		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar))
+		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar, in.LocationID))
 	if err != nil {
 		return nil, fmt.Errorf("create pellet test session: %w", err)
 	}
@@ -83,14 +83,14 @@ func (r *PelletTestRepository) CreateDraft(ctx context.Context, userID string, i
 	session, err := scanSession(r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_sessions (user_id, rifle_id, pellet_id,
 			test_date, distance_m, distance_unit,
-			location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes, is_draft)
+			location, location_lat, location_lng, wind_mph, temp_celsius, humidity_pct, notes, location_id, is_draft)
 		VALUES ($1,$2,$3,
 			COALESCE(NULLIF($4,'')::date, CURRENT_DATE), $5, $6,
-			$7, $8, $9, $10, $11, $12, $13, TRUE)
+			$7, $8, $9, $10, $11, $12, $13, $14, TRUE)
 		RETURNING `+sessionCols+`
 	`, userID, in.RifleID, in.PelletID,
 		testDate, distanceM, unit,
-		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes))
+		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes, in.LocationID))
 	if err != nil {
 		return nil, fmt.Errorf("create pellet test draft: %w", err)
 	}
@@ -275,6 +275,7 @@ func (r *PelletTestRepository) Update(ctx context.Context, id, userID string, in
 			scope_details           = COALESCE($19, scope_details),
 			barometric_pressure_mbar = COALESCE($20, barometric_pressure_mbar),
 			is_public     = COALESCE($21, is_public),
+			location_id   = COALESCE($22, location_id),
 			updated_at    = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING `+sessionCols+`
@@ -282,7 +283,7 @@ func (r *PelletTestRepository) Update(ctx context.Context, id, userID string, in
 		in.Location, in.LocationLat, in.LocationLng, in.WindMPH, in.TempCelsius, in.HumidityPct, in.Notes,
 		in.VelocityFPS, in.VelocitySD, in.ExtremeSpreadFPS,
 		in.BenchSetup, in.ScopeDetails, in.BarometricPressureMbar,
-		in.IsPublic))
+		in.IsPublic, in.LocationID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound

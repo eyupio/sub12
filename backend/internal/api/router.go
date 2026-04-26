@@ -49,6 +49,7 @@ func NewRouter(
 	images *repository.ImageRepository,
 	twoFactor *service.TwoFactorService,
 	communityReview *service.CommunityReviewService,
+	locations *service.LocationService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -152,6 +153,7 @@ func NewRouter(
 			r.Post("/score-cards/{id}/graduate", sc.Graduate)
 			r.Delete("/score-cards/{id}", sc.Delete)
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
+			r.Post("/score-cards/{id}/submit-to-league", sc.SubmitToLeague)
 
 			// Rifles
 			rh := handler.NewRifle(rifles, images)
@@ -168,6 +170,14 @@ func NewRouter(
 			r.Patch("/pellets/{id}", ph.Update)
 			r.Delete("/pellets/{id}", ph.Delete)
 			r.Post("/pellets/{id}/image", ph.UploadImage)
+
+			// Locations
+			locH := handler.NewLocation(locations)
+			r.Post("/locations", locH.Create)
+			r.Get("/locations", locH.List)
+			r.Get("/locations/{id}", locH.GetByID)
+			r.Patch("/locations/{id}", locH.Update)
+			r.Delete("/locations/{id}", locH.Delete)
 
 			// Pellet tests (mutations — reads are public via OptionalAuthenticate below)
 			pth := handler.NewPelletTest(pelletTests, images)
@@ -342,6 +352,7 @@ func NewRouter(
 			// Activity feed
 			activityH := handler.NewActivity(activity)
 			r.Get("/feed", activityH.GetFeed)
+			r.Delete("/activities/{id}", activityH.DeleteActivity)
 
 			// Leagues (mutations — reads are public via OptionalAuthenticate below)
 			lh := handler.NewLeague(leagues, images)

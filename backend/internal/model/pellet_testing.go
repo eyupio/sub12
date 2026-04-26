@@ -28,6 +28,7 @@ type PelletTestSession struct {
 	AverageGroupSizeMM     *float64  `json:"average_group_size_mm,omitempty"`
 	BestGroupSizeMM        *float64  `json:"best_group_size_mm,omitempty"`
 	GroupCount             int       `json:"group_count"`
+	LocationID             *string   `json:"location_id,omitempty"`
 	IsPublic               bool      `json:"is_public"`
 	IsDraft                bool      `json:"is_draft"`
 	CreatedAt              time.Time `json:"created_at"`
@@ -44,18 +45,19 @@ type PelletTestSession struct {
 // quick-capture endpoint. Distance, groups, and measurements are filled in
 // later via the refine flow.
 type QuickCreatePelletTestInput struct {
-	RifleID      string   `json:"rifle_id"`
-	PelletID     string   `json:"pellet_id"`
-	TestDate     *string  `json:"test_date"` // YYYY-MM-DD, defaults to today
+	RifleID       string   `json:"rifle_id"`
+	PelletID      string   `json:"pellet_id"`
+	TestDate      *string  `json:"test_date"` // YYYY-MM-DD, defaults to today
 	DistanceValue *float64 `json:"distance_value"`
-	DistanceUnit *string  `json:"distance_unit"`
-	Location     *string  `json:"location"`
-	LocationLat  *float64 `json:"location_lat"`
-	LocationLng  *float64 `json:"location_lng"`
-	WindMPH      *float64 `json:"wind_mph"`
-	TempCelsius  *float64 `json:"temp_celsius"`
-	HumidityPct  *float64 `json:"humidity_pct"`
-	Notes        *string  `json:"notes"`
+	DistanceUnit  *string  `json:"distance_unit"`
+	Location      *string  `json:"location"`
+	LocationLat   *float64 `json:"location_lat"`
+	LocationLng   *float64 `json:"location_lng"`
+	WindMPH       *float64 `json:"wind_mph"`
+	TempCelsius   *float64 `json:"temp_celsius"`
+	HumidityPct   *float64 `json:"humidity_pct"`
+	Notes         *string  `json:"notes"`
+	LocationID    *string  `json:"location_id"`
 }
 
 type CreatePelletTestSessionInput struct {
@@ -77,6 +79,7 @@ type CreatePelletTestSessionInput struct {
 	BenchSetup             *string  `json:"bench_setup"`
 	ScopeDetails           *string  `json:"scope_details"`
 	BarometricPressureMbar *float64 `json:"barometric_pressure_mbar"`
+	LocationID             *string  `json:"location_id"`
 }
 
 type UpdatePelletTestSessionInput struct {
@@ -99,6 +102,7 @@ type UpdatePelletTestSessionInput struct {
 	ScopeDetails           *string  `json:"scope_details"`
 	BarometricPressureMbar *float64 `json:"barometric_pressure_mbar"`
 	IsPublic               *bool    `json:"is_public"`
+	LocationID             *string  `json:"location_id"`
 }
 
 // ── Group ───────────────────────────────────────────────────────────────────────

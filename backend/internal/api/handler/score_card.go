@@ -290,3 +290,50 @@ func (h *ScoreCardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// POST /api/v1/score-cards/{id}/submit-to-league
+func (h *ScoreCardHandler) SubmitToLeague(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		LeagueRoundID string `json:"league_round_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.LeagueRoundID == "" {
+		writeError(w, http.StatusBadRequest, "league_round_id is required")
+		return
+	}
+
+	card, err := h.svc.SubmitToLeague(r.Context(), id, userID, body.LeagueRoundID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrMaxSubmissions) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotLeagueMember) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to submit score card to league")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, card)
+}

@@ -8,6 +8,7 @@ import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { LocationField, type LocationValue } from '../components/LocationField'
+import { LocationPicker } from '../components/LocationPicker'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -84,6 +85,7 @@ export default function NewPelletTest() {
   const [distanceValue, setDistanceValue] = useState(initialLastUsed?.distanceValue ?? '')
   const [distanceUnit, setDistanceUnit] = useState(initialLastUsed?.distanceUnit ?? 'meters')
   const [location, setLocation] = useState<LocationValue>(initialLastUsed?.location ?? { label: '' })
+  const [savedLocationId, setSavedLocationId] = useState<string | null>(null)
   const [windMph, setWindMph] = useState('')
   const [tempCelsius, setTempCelsius] = useState('')
   const [humidityPct, setHumidityPct] = useState('')
@@ -231,6 +233,7 @@ export default function NewPelletTest() {
           location: location.label || undefined,
           location_lat: location.lat,
           location_lng: location.lng,
+          location_id: savedLocationId ?? undefined,
           wind_mph: windMph ? Number(windMph) : undefined,
           temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
           humidity_pct: humidityPct ? Number(humidityPct) : undefined,
@@ -252,6 +255,7 @@ export default function NewPelletTest() {
           location: location.label || undefined,
           location_lat: location.lat,
           location_lng: location.lng,
+          location_id: savedLocationId ?? undefined,
           wind_mph: windMph ? Number(windMph) : undefined,
           temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
           humidity_pct: humidityPct ? Number(humidityPct) : undefined,
@@ -626,6 +630,22 @@ export default function NewPelletTest() {
           {/* Conditions */}
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Saved Location</label>
+              <LocationPicker
+                value={savedLocationId}
+                onChange={setSavedLocationId}
+                onApplyDefaults={(loc, lat, lng) => {
+                  if (loc?.default_distance_m != null) {
+                    setDistanceValue(String(loc.default_distance_m))
+                    if (loc.default_distance_unit) setDistanceUnit(loc.default_distance_unit)
+                  }
+                  if (lat != null && lng != null) {
+                    setLocation(prev => ({ ...prev, lat, lng }))
+                  }
+                }}
+              />
+            </div>
             <div className="space-y-1.5">
               <label className={sidebarLabelCls}>Location</label>
               <LocationField

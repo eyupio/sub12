@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -51,4 +54,24 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, feed)
+}
+
+// DELETE /api/v1/activities/{id}
+// Permanently removes an auto-generated feed item owned by the authenticated user.
+func (h *ActivityHandler) DeleteActivity(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := h.svc.DeleteOwn(r.Context(), id, userID); err != nil {
+		if errors.Is(err, service.ErrActivityNotFound) {
+			writeError(w, http.StatusNotFound, "activity not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete activity")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

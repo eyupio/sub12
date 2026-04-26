@@ -8,6 +8,7 @@ import ScoreHistory from './pages/ScoreHistory'
 import ScoreCompare from './pages/ScoreCompare'
 import ScoreCardDetail from './pages/ScoreCardDetail'
 import Gear from './pages/Gear'
+import Locations from './pages/Locations'
 import Leagues from './pages/Leagues'
 import LeagueDetail from './pages/LeagueDetail'
 import LeagueSettings from './pages/LeagueSettings'
@@ -157,6 +158,12 @@ const gearRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/gear',
   component: Gear,
+})
+
+const locationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/locations',
+  component: Locations,
 })
 
 const leaguesRoute = createRoute({
@@ -560,6 +567,7 @@ export const routeTree = rootRoute.addChildren([
     batchReportRoute,
     comboAnalyticsRoute,
     gearRoute,
+    locationsRoute,
     leaguesRoute,
     leagueDetailRoute,
     leagueSettingsRoute,

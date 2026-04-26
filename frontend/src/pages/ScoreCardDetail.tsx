@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2 } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Send, Trash2, CornerDownRight, Share2, RotateCcw, RotateCw, Trophy } from 'lucide-react'
 import { scoreCardApi, commentApi, Comment } from '../api/scoreCards'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
@@ -954,6 +954,8 @@ export default function ScoreCardDetail() {
   const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [showSubmitLeague, setShowSubmitLeague] = useState(false)
+  const [submitLeagueRoundId, setSubmitLeagueRoundId] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -1071,6 +1073,36 @@ export default function ScoreCardDetail() {
     },
   })
 
+  const rotateMutation = useMutation({
+    mutationFn: (rotation: number) =>
+      scoreCardApi.update(id, { card_image_rotation: rotation } as Parameters<typeof scoreCardApi.update>[1]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['score-cards', id] }),
+    onError: () => toast('Failed to rotate image', 'error'),
+  })
+
+  const submitToLeagueMutation = useMutation({
+    mutationFn: (roundId: string) => scoreCardApi.submitToLeague(id, roundId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', id] })
+      setShowSubmitLeague(false)
+      setSubmitLeagueRoundId('')
+      toast('Score card submitted to league', 'success')
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        toast(err.message, 'error')
+      } else {
+        toast('Failed to submit to league', 'error')
+      }
+    },
+  })
+
+  function handleRotate(dir: 'cw' | 'ccw') {
+    const current = card?.card_image_rotation ?? 0
+    const next = dir === 'cw' ? ((current + 90) % 360) : ((current - 90 + 360) % 360)
+    rotateMutation.mutate(next)
+  }
+
   function handleImageSelect(file: File | undefined) {
     if (!file) return
     if (file.size > 10 * 1024 * 1024) {
@@ -1177,6 +1209,14 @@ export default function ScoreCardDetail() {
             >
               <Share2 size={13} /> Share to Feed
             </button>
+            {!card.is_draft && !card.league_round_id && (
+              <button
+                onClick={() => setShowSubmitLeague(true)}
+                className="flex items-center gap-1.5 t-section-title hover:text-[var(--brass)] border border-subtle hover:border-[var(--brass)]/40 rounded px-3 py-1.5 transition-colors"
+              >
+                <Trophy size={13} /> Submit to League
+              </button>
+            )}
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleteMutation.isPending}
@@ -1591,8 +1631,19 @@ export default function ScoreCardDetail() {
                       alt="Score card photo"
                       className="rounded border border-subtle max-h-48 w-full object-contain bg-surface-hover cursor-zoom-in"
                       loading="lazy"
+                      style={{ transform: `rotate(${card.card_image_rotation ?? 0}deg)` }}
                     />
                   </button>
+                  {isOwner && !editing && (
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => handleRotate('ccw')} title="Rotate left" className="p-1.5 text-gray-400 hover:text-teal-500">
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleRotate('cw')} title="Rotate right" className="p-1.5 text-gray-400 hover:text-teal-500">
+                        <RotateCw className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1688,6 +1739,42 @@ export default function ScoreCardDetail() {
         communityName={cardLeague?.name ?? cardClub?.name ?? undefined}
       />
 
+      {/* Submit to League modal */}
+      {showSubmitLeague && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-teal-500" /> Submit to League
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Enter the league round ID to submit this score card. You can find the round ID on the league page.
+            </p>
+            <input
+              type="text"
+              value={submitLeagueRoundId}
+              onChange={e => setSubmitLeagueRoundId(e.target.value)}
+              placeholder="League round ID"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowSubmitLeague(false); setSubmitLeagueRoundId('') }}
+                className="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => submitLeagueRoundId && submitToLeagueMutation.mutate(submitLeagueRoundId)}
+                disabled={!submitLeagueRoundId || submitToLeagueMutation.isPending}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+              >
+                {submitToLeagueMutation.isPending ? 'Submitting…' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
         <div
@@ -1706,6 +1793,7 @@ export default function ScoreCardDetail() {
               src={card.card_image_url}
               alt="Score card photo"
               className="max-h-[85vh] max-w-full object-contain rounded"
+              style={{ transform: `rotate(${card.card_image_rotation ?? 0}deg)` }}
             />
           </div>
         </div>

@@ -634,13 +634,16 @@ function FeedPostArticle({
   const [draftBody, setDraftBody] = useState(post.body ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [adminConfirmHide, setAdminConfirmHide] = useState(false)
+  const [confirmDeleteActivity, setConfirmDeleteActivity] = useState(false)
   const item = post.activity
   const isOwnPost = !!currentUser && item.type === 'post_created' && currentUser.id === item.user_id
+  const isOwnActivity = !!currentUser && item.type !== 'post_created' && currentUser.id === item.user_id
   const reportTarget = feedReportTarget(post)
-  const canReport = !!currentUser && !isOwnPost && !!reportTarget
+  const canReport = !!currentUser && !isOwnPost && !isOwnActivity && !!reportTarget
   const canEdit = isOwnPost && !!item.target_id
   const isAdmin = currentUser?.role === 'admin'
-  const canAdminModerate = isAdmin && !isOwnPost
+  const canAdminModerate = isAdmin && !isOwnPost && !isOwnActivity
+  const canDeleteOwnActivity = isOwnActivity
 
   const updatePostMutation = useMutation({
     mutationFn: () => postApi.update(item.target_id!, draftBody.trim()),
@@ -676,6 +679,17 @@ function FeedPostArticle({
       queryClient.invalidateQueries({ queryKey: ['feed'] })
     },
     onError: () => toast('Failed to remove feed item', 'error'),
+  })
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: () => activityApi.deleteActivity(item.id),
+    onSuccess: () => {
+      setConfirmDeleteActivity(false)
+      setMenuOpen(false)
+      toast('Removed from feed', 'success')
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+    },
+    onError: () => toast('Failed to remove from feed', 'error'),
   })
 
   if (post.kind === 'join') {
@@ -717,9 +731,14 @@ function FeedPostArticle({
             setAdminFlagOpen(true)
             setMenuOpen(false)
           }}
+          onStartDeleteActivity={() => {
+            setConfirmDeleteActivity(true)
+            setMenuOpen(false)
+          }}
           canEdit={canEdit}
           canReport={canReport}
           canAdminModerate={canAdminModerate}
+          canDeleteOwnActivity={canDeleteOwnActivity}
           reportTargetType={reportTarget?.targetType}
         />
         {post.kind === 'pb' && <PersonalBestPost post={post} />}
@@ -775,6 +794,13 @@ function FeedPostArticle({
         onConfirm={() => adminHideMutation.mutate()}
         onCancel={() => setAdminConfirmHide(false)}
       />
+      <ConfirmDialog
+        open={confirmDeleteActivity}
+        title="Remove from feed?"
+        message="This will permanently remove this item from your feed."
+        onConfirm={() => deleteActivityMutation.mutate()}
+        onCancel={() => setConfirmDeleteActivity(false)}
+      />
     </article>
   )
 }
@@ -798,9 +824,11 @@ function PostHead({
   onStartReport,
   onStartAdminHide,
   onStartAdminFlag,
+  onStartDeleteActivity,
   canEdit,
   canReport,
   canAdminModerate,
+  canDeleteOwnActivity,
   reportTargetType,
 }: {
   post: FeedPost
@@ -811,9 +839,11 @@ function PostHead({
   onStartReport: () => void
   onStartAdminHide: () => void
   onStartAdminFlag: () => void
+  onStartDeleteActivity: () => void
   canEdit: boolean
   canReport: boolean
   canAdminModerate: boolean
+  canDeleteOwnActivity: boolean
   reportTargetType?: 'post' | 'score_card'
 }) {
   const prefs = useRegionalPrefs()
@@ -840,7 +870,7 @@ function PostHead({
         {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
       </div>
       {post.kind === 'pb' && <span className="post-pinned">Pinned</span>}
-      {(canEdit || canReport || canAdminModerate) && (
+      {(canEdit || canReport || canAdminModerate || canDeleteOwnActivity) && (
         <div className="post-menu-wrap">
           <button
             type="button"
@@ -885,6 +915,17 @@ function PostHead({
                 >
                   <Flag size={12} />
                   Report {reportTargetType === 'score_card' ? 'score' : 'post'}
+                </button>
+              )}
+              {canDeleteOwnActivity && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="post-menu-item post-menu-item-danger"
+                  onClick={onStartDeleteActivity}
+                >
+                  <Trash2 size={12} />
+                  Remove from feed
                 </button>
               )}
               {canAdminModerate && (

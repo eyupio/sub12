@@ -3,34 +3,36 @@ package model
 import "time"
 
 type ScoreCard struct {
-	ID            string    `json:"id"`
-	UserID        string    `json:"user_id"`
-	RifleID       *string   `json:"rifle_id,omitempty"`
-	PelletID      *string   `json:"pellet_id,omitempty"`
-	ShotAt        string    `json:"shot_at"` // YYYY-MM-DD
-	Location      *string   `json:"location,omitempty"`
-	LocationLat   *float64  `json:"location_lat,omitempty"`
-	LocationLng   *float64  `json:"location_lng,omitempty"`
-	WindMPH       *float64  `json:"wind_mph,omitempty"`
-	TempCelsius   *float64  `json:"temp_celsius,omitempty"`
-	DistanceM     *int      `json:"distance_m,omitempty"`
-	Discipline    *string   `json:"discipline,omitempty"`
-	Notes         *string   `json:"notes,omitempty"`
-	ShotScores    []int16   `json:"shot_scores"`
-	ShotXs        []bool    `json:"shot_xs"`
-	TotalScore    int16     `json:"total_score"`
-	XCount        int16     `json:"x_count"`
-	CardImageURL  *string   `json:"card_image_url,omitempty"`
-	Verification  string    `json:"verification"`
-	Visibility    string    `json:"visibility"`
-	LeagueRoundID *string   `json:"league_round_id,omitempty"`
-	ClubID        *string   `json:"club_id,omitempty"`
-	LikeCount     int       `json:"like_count"`
-	CommentCount  int       `json:"comment_count"`
-	IsLiked       bool      `json:"is_liked"`
-	IsDraft       bool      `json:"is_draft"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	UserID            string    `json:"user_id"`
+	RifleID           *string   `json:"rifle_id,omitempty"`
+	PelletID          *string   `json:"pellet_id,omitempty"`
+	ShotAt            string    `json:"shot_at"` // YYYY-MM-DD
+	Location          *string   `json:"location,omitempty"`
+	LocationLat       *float64  `json:"location_lat,omitempty"`
+	LocationLng       *float64  `json:"location_lng,omitempty"`
+	WindMPH           *float64  `json:"wind_mph,omitempty"`
+	TempCelsius       *float64  `json:"temp_celsius,omitempty"`
+	DistanceM         *int      `json:"distance_m,omitempty"`
+	Discipline        *string   `json:"discipline,omitempty"`
+	Notes             *string   `json:"notes,omitempty"`
+	ShotScores        []int16   `json:"shot_scores"`
+	ShotXs            []bool    `json:"shot_xs"`
+	TotalScore        int16     `json:"total_score"`
+	XCount            int16     `json:"x_count"`
+	CardImageURL      *string   `json:"card_image_url,omitempty"`
+	CardImageRotation int       `json:"card_image_rotation"`
+	Verification      string    `json:"verification"`
+	Visibility        string    `json:"visibility"`
+	LeagueRoundID     *string   `json:"league_round_id,omitempty"`
+	ClubID            *string   `json:"club_id,omitempty"`
+	LocationID        *string   `json:"location_id,omitempty"`
+	LikeCount         int       `json:"like_count"`
+	CommentCount      int       `json:"comment_count"`
+	IsLiked           bool      `json:"is_liked"`
+	IsDraft           bool      `json:"is_draft"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // QuickCreateScoreCardInput is the minimal payload accepted by the
@@ -50,6 +52,7 @@ type QuickCreateScoreCardInput struct {
 	Notes         *string  `json:"notes"`
 	LeagueRoundID *string  `json:"league_round_id"`
 	ClubID        *string  `json:"club_id"`
+	LocationID    *string  `json:"location_id"`
 	Visibility    *string  `json:"visibility"`
 }
 
@@ -108,25 +111,28 @@ type CreateScoreCardInput struct {
 	ShotXs        []bool   `json:"shot_xs"`
 	LeagueRoundID *string  `json:"league_round_id"`
 	ClubID        *string  `json:"club_id"`
+	LocationID    *string  `json:"location_id"`
 	Visibility    *string  `json:"visibility"`
 }
 
 // UpdateScoreCardInput holds fields a user can change after submission.
 type UpdateScoreCardInput struct {
-	RifleID     *string  `json:"rifle_id"`
-	PelletID    *string  `json:"pellet_id"`
-	ShotAt      string   `json:"shot_at"`
-	Location    *string  `json:"location"`
-	LocationLat *float64 `json:"location_lat"`
-	LocationLng *float64 `json:"location_lng"`
-	WindMPH     *float64 `json:"wind_mph"`
-	TempCelsius *float64 `json:"temp_celsius"`
-	DistanceM   *int     `json:"distance_m"`
-	Discipline  *string  `json:"discipline"`
-	Notes       *string  `json:"notes"`
-	ShotScores  []int16  `json:"shot_scores"`
-	ShotXs      []bool   `json:"shot_xs"`
-	Visibility  *string  `json:"visibility"`
+	RifleID           *string  `json:"rifle_id"`
+	PelletID          *string  `json:"pellet_id"`
+	ShotAt            string   `json:"shot_at"`
+	Location          *string  `json:"location"`
+	LocationLat       *float64 `json:"location_lat"`
+	LocationLng       *float64 `json:"location_lng"`
+	WindMPH           *float64 `json:"wind_mph"`
+	TempCelsius       *float64 `json:"temp_celsius"`
+	DistanceM         *int     `json:"distance_m"`
+	Discipline        *string  `json:"discipline"`
+	Notes             *string  `json:"notes"`
+	ShotScores        []int16  `json:"shot_scores"`
+	ShotXs            []bool   `json:"shot_xs"`
+	LocationID        *string  `json:"location_id"`
+	CardImageRotation *int     `json:"card_image_rotation"`
+	Visibility        *string  `json:"visibility"`
 }
 
 // Comment is a user comment on any content type (score_card, post, etc.).

@@ -19,10 +19,40 @@ func NewCommentRepository(db *pgxpool.Pool) *CommentRepository {
 	return &CommentRepository{db: db}
 }
 
+// commentCountIncrementSQL returns the SQL to increment comment_count for the
+// given targetType, or an empty string if the type has no denormalized counter.
+func commentCountIncrementSQL(targetType string) string {
+	switch targetType {
+	case "score_card":
+		return `UPDATE score_cards SET comment_count = comment_count + 1 WHERE id = $1`
+	case "post":
+		return `UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`
+	}
+	return ""
+}
+
+// commentCountDecrementSQL returns the SQL to decrement comment_count for the
+// given targetType, or an empty string if the type has no denormalized counter.
+func commentCountDecrementSQL(targetType string) string {
+	switch targetType {
+	case "score_card":
+		return `UPDATE score_cards SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1`
+	case "post":
+		return `UPDATE posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1`
+	}
+	return ""
+}
+
 // Create inserts a new comment and returns it with the author's display name.
 func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, userID, body string, parentID *string) (*model.Comment, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("create comment: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
 	var c model.Comment
-	err := r.db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		WITH ins AS (
 			INSERT INTO comments (target_id, target_type, user_id, body, parent_id, updated_at)
 			VALUES ($1, $2, $3, $4, $5, NOW())
@@ -44,6 +74,19 @@ func (r *CommentRepository) Create(ctx context.Context, targetID, targetType, us
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create comment: %w", err)
+	}
+
+	// Only top-level comments (no parent) count toward the parent target's counter.
+	if parentID == nil {
+		if sql := commentCountIncrementSQL(targetType); sql != "" {
+			if _, err = tx.Exec(ctx, sql, targetID); err != nil {
+				return nil, fmt.Errorf("create comment: increment count: %w", err)
+			}
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("create comment: commit: %w", err)
 	}
 	return &c, nil
 }
@@ -222,15 +265,44 @@ func (r *CommentRepository) Update(ctx context.Context, commentID, userID, body 
 
 // Delete removes a comment, enforcing ownership via user_id.
 func (r *CommentRepository) Delete(ctx context.Context, commentID, userID string) error {
-	tag, err := r.db.Exec(ctx,
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("delete comment: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Capture target info before deleting so we can adjust the counter.
+	var targetID, targetType string
+	var parentID *string
+	err = tx.QueryRow(ctx,
+		`SELECT target_id, target_type, parent_id FROM comments WHERE id = $1 AND user_id = $2`,
+		commentID, userID,
+	).Scan(&targetID, &targetType, &parentID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrNotFound
+		}
+		return fmt.Errorf("delete comment: fetch: %w", err)
+	}
+
+	if _, err = tx.Exec(ctx,
 		`DELETE FROM comments WHERE id = $1 AND user_id = $2`,
 		commentID, userID,
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("delete comment: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+
+	// Only top-level comments affect the parent target's counter.
+	if parentID == nil {
+		if sql := commentCountDecrementSQL(targetType); sql != "" {
+			if _, err = tx.Exec(ctx, sql, targetID); err != nil {
+				return fmt.Errorf("delete comment: decrement count: %w", err)
+			}
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("delete comment: commit: %w", err)
 	}
 	return nil
 }

@@ -124,6 +124,18 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 
 var ErrActivityNotFound = errors.New("activity not found")
 
+// DeleteOwn permanently removes an activity that belongs to the calling user.
+// Returns ErrActivityNotFound when the activity does not exist or is owned by someone else.
+func (s *ActivityService) DeleteOwn(ctx context.Context, activityID, userID string) error {
+	if err := s.repo.DeleteOwn(ctx, activityID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrActivityNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 // AdminHide soft-deletes an activity from the feed. Site admin only.
 func (s *ActivityService) AdminHide(ctx context.Context, activityID, adminID, reason string) error {
 	if err := s.repo.AdminHide(ctx, activityID, adminID, reason); err != nil {

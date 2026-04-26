@@ -9,12 +9,11 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
 
-
 var (
-	ErrInvalidCard      = errors.New("invalid score card")
-	ErrMaxSubmissions   = errors.New("maximum submissions per round reached")
-	ErrEditsLocked      = errors.New("score card is locked by league policy")
-	ErrNotLeagueMember  = errors.New("league membership required")
+	ErrInvalidCard     = errors.New("invalid score card")
+	ErrMaxSubmissions  = errors.New("maximum submissions per round reached")
+	ErrEditsLocked     = errors.New("score card is locked by league policy")
+	ErrNotLeagueMember = errors.New("league membership required")
 )
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
@@ -32,6 +31,7 @@ type ScoreCardRepo interface {
 	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
 	GetPriorScoreStats(ctx context.Context, userID, excludeID string) (*repository.PriorScoreStats, error)
 	GetGearLabels(ctx context.Context, cardID string) (string, string, error)
+	SubmitToLeague(ctx context.Context, cardID, userID, roundID string) (*model.ScoreCard, error)
 }
 
 // LeagueConfigRepo provides league config lookups needed by ScoreCardService.
@@ -120,7 +120,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		}
 
 		// Auto-populate club_id from the league if not explicitly provided
-		if (input.ClubID == nil || *input.ClubID == "") {
+		if input.ClubID == nil || *input.ClubID == "" {
 			if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league != nil && league.ClubID != nil {
 				input.ClubID = league.ClubID
 			}
@@ -307,7 +307,7 @@ func (s *ScoreCardService) QuickCreate(ctx context.Context, userID string, input
 	// Auto-populate club_id from the league if a league round was chosen so
 	// refinement lands in the same club context later.
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
-		if (input.ClubID == nil || *input.ClubID == "") {
+		if input.ClubID == nil || *input.ClubID == "" {
 			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID); err == nil {
 				if league, err := s.leagueRepo.GetByID(ctx, lid); err == nil && league.ClubID != nil {
 					input.ClubID = league.ClubID
@@ -473,4 +473,56 @@ func (s *ScoreCardService) UpdateImageURL(ctx context.Context, id, userID, image
 		return err
 	}
 	return s.cards.UpdateImageURL(ctx, id, imageURL)
+}
+
+// SubmitToLeague links an already-graduated score card to a league round.
+// Validates the same rules as Create when a league_round_id is provided:
+// membership, round open/closed, max submissions, and image required.
+// The card must not already be linked to a round.
+func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, roundID string) (*model.ScoreCard, error) {
+	card, err := s.cards.GetByID(ctx, cardID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if card.IsDraft {
+		return nil, fmt.Errorf("%w: card must be graduated before submitting to a league", ErrInvalidCard)
+	}
+	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" {
+		return nil, fmt.Errorf("%w: card is already submitted to a league round", ErrInvalidCard)
+	}
+
+	if s.leagueRepo != nil {
+		lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, roundID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve league for round: %w", err)
+		}
+		isMember, err := s.leagueRepo.IsMember(ctx, lid, userID)
+		if err != nil {
+			return nil, fmt.Errorf("check league membership: %w", err)
+		}
+		if !isMember {
+			return nil, ErrNotLeagueMember
+		}
+
+		cfg, cfgErr := s.leagueRepo.GetConfigByRoundID(ctx, roundID)
+		if cfgErr != nil && !errors.Is(cfgErr, repository.ErrNotFound) {
+			return nil, fmt.Errorf("check league config: %w", cfgErr)
+		}
+		if cfg != nil {
+			if cfg.MaxSubmissionsPerRound > 0 {
+				count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, roundID)
+				if err != nil {
+					return nil, fmt.Errorf("count submissions: %w", err)
+				}
+				if count >= int(cfg.MaxSubmissionsPerRound) {
+					return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
+				}
+			}
+			if cfg.RequireImageUpload && (card.CardImageURL == nil || *card.CardImageURL == "") {
+				return nil, fmt.Errorf("%w: this league requires an image upload", ErrInvalidCard)
+			}
+		}
+	}
+
+	return s.cards.SubmitToLeague(ctx, cardID, userID, roundID)
 }

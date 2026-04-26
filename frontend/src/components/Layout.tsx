@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -23,6 +23,7 @@ const baseNavItems = [
   { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
+  { to: '/locations', icon: MapPin, label: 'Locations', mobileLabel: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
   { to: '/drafts', icon: Zap, label: 'Drafts', mobileLabel: 'Drafts' },

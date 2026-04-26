@@ -55,6 +55,23 @@ func (r *ActivityRepository) DeletePostActivities(ctx context.Context, postID st
 	return nil
 }
 
+// DeleteOwn permanently removes an activity row owned by the given user.
+// Returns ErrNotFound if the activity does not exist or belongs to another user.
+func (r *ActivityRepository) DeleteOwn(ctx context.Context, activityID, userID string) error {
+	tag, err := r.db.Exec(ctx, `
+		DELETE FROM activities
+		WHERE id = $1::uuid
+		  AND user_id = $2::uuid
+	`, activityID, userID)
+	if err != nil {
+		return fmt.Errorf("delete own activity: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Ingest writes a single activity event. Fire-and-forget — callers should handle or
 // log errors rather than surfacing them to users.
 func (r *ActivityRepository) Ingest(ctx context.Context, userID string, actType model.ActivityType, targetID, targetType *string, metadata []byte, leagueID, clubID *string, visibility string) error {

@@ -120,6 +120,9 @@ func main() {
 	pelletRepo := repository.NewPelletRepository(pool)
 	pelletSvc := service.NewPelletService(pelletRepo)
 
+	locationRepo := repository.NewLocationRepository(pool)
+	locationSvc := service.NewLocationService(locationRepo)
+
 	leagueSvc := service.NewLeagueService(leagueRepo, clubRepo, activitySvc)
 
 	pelletTestSvc := service.NewPelletTestService(pelletTestRepo, activitySvc, achievementSvc)
@@ -223,7 +226,7 @@ func main() {
 
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
