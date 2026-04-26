@@ -25,6 +25,10 @@ type mockScoreCardRepo struct {
 	card *model.ScoreCard
 	// priorStats overrides the GetPriorScoreStats response when non-nil.
 	priorStats *repository.PriorScoreStats
+	// gearLabels overrides GetGearLabels when set; the activity ingest path
+	// uses this to label posts with rifle/pellet names.
+	rifleLabel  string
+	pelletLabel string
 }
 
 func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
@@ -80,6 +84,9 @@ func (m *mockScoreCardRepo) GetPriorScoreStats(_ context.Context, _, _ string) (
 		return m.priorStats, nil
 	}
 	return &repository.PriorScoreStats{}, nil
+}
+func (m *mockScoreCardRepo) GetGearLabels(_ context.Context, _ string) (string, string, error) {
+	return m.rifleLabel, m.pelletLabel, nil
 }
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.

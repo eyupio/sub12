@@ -31,6 +31,7 @@ type ScoreCardRepo interface {
 	Delete(ctx context.Context, id, userID string) error
 	IsPersonalBest(ctx context.Context, userID, cardID string, totalScore int16) (bool, error)
 	GetPriorScoreStats(ctx context.Context, userID, excludeID string) (*repository.PriorScoreStats, error)
+	GetGearLabels(ctx context.Context, cardID string) (string, string, error)
 }
 
 // LeagueConfigRepo provides league config lookups needed by ScoreCardService.
@@ -142,6 +143,10 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		meta := model.ScorePostedMeta{TotalScore: card.TotalScore, XCount: card.XCount, IsPB: isPB}
 		if card.CardImageURL != nil {
 			meta.CardImageURL = *card.CardImageURL
+		}
+		if rn, pn, err := s.cards.GetGearLabels(ctx, card.ID); err == nil {
+			meta.RifleName = rn
+			meta.PelletName = pn
 		}
 
 		// Resolve league_id from round if this is a league submission
@@ -363,6 +368,10 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		meta := model.ScorePostedMeta{TotalScore: updated.TotalScore, XCount: updated.XCount, IsPB: isPB}
 		if updated.CardImageURL != nil {
 			meta.CardImageURL = *updated.CardImageURL
+		}
+		if rn, pn, err := s.cards.GetGearLabels(ctx, updated.ID); err == nil {
+			meta.RifleName = rn
+			meta.PelletName = pn
 		}
 		var leagueID *string
 		if updated.LeagueRoundID != nil && *updated.LeagueRoundID != "" && s.leagueRepo != nil {

@@ -111,6 +111,14 @@ export default function QuickCapture() {
         return { id: session.id, kind: 'pellet' as const }
       }
 
+      // Resolve the league round up front: the score_cards Update endpoint
+      // does not accept league_round_id, so binding has to land on the INSERT.
+      let leagueRoundId: string | undefined
+      if (context === 'league' && leagueId) {
+        const round = await leagueApi.ensureDefaultRound(leagueId)
+        leagueRoundId = round.round_id
+      }
+
       const card = await scoreCardApi.quickCreate({
         rifle_id: rifleId,
         pellet_id: pelletId,
@@ -119,26 +127,10 @@ export default function QuickCapture() {
         location_lng: location.lng,
         wind_mph: wind ?? undefined,
         temp_celsius: temp ?? undefined,
-        league_round_id: undefined,
+        league_round_id: leagueRoundId,
         club_id: context === 'club' ? clubId ?? undefined : undefined,
       })
       await scoreCardApi.uploadImage(card.id, photo)
-
-      if (context === 'league' && leagueId) {
-        try {
-          const round = await leagueApi.ensureDefaultRound(leagueId)
-          await scoreCardApi.update(card.id, {
-            shot_at: card.shot_at,
-            shot_scores: card.shot_scores,
-            shot_xs: card.shot_xs,
-            league_round_id: round.round_id,
-            rifle_id: card.rifle_id,
-            pellet_id: card.pellet_id,
-          })
-        } catch {
-          // Non-fatal — draft is saved; user can re-bind at refine time.
-        }
-      }
 
       return { id: card.id, kind: 'score' as const }
     },
