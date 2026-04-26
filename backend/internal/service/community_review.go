@@ -79,9 +79,6 @@ func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID,
 	if card.LeagueRoundID != nil {
 		return nil, ErrCardIsLeague
 	}
-	if card.Verification == "verified" {
-		return nil, ErrCardAlreadyVerified
-	}
 
 	req, err := s.requests.Create(ctx, scoreCardID, ownerID, defaultRequiredConfirmations)
 	if errors.Is(err, repository.ErrConflict) {

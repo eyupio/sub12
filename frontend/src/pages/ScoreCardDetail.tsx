@@ -842,8 +842,11 @@ function CommunityReviewSection({ scoreCardId, isOwner }: { scoreCardId: string;
       toast('Community review requested', 'success')
     },
     onError: (err) => {
-      const status = err instanceof ApiError ? err.status : 0
-      toast(status === 409 ? 'A review request is already open' : 'Failed to request review', 'error')
+      if (err instanceof ApiError && err.status === 409) {
+        toast(err.message || 'A review request is already open', 'error')
+      } else {
+        toast('Failed to request review', 'error')
+      }
     },
   })
 
