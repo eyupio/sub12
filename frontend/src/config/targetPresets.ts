@@ -11,8 +11,12 @@ export interface TargetPreset {
   id: string
   name: string
   description: string
-  rings: TargetRing[]
+  rings?: TargetRing[]
+  width_mm?: number
+  height_mm?: number
 }
+
+export const CUSTOM_PRESET_ID = 'custom'
 
 export const TARGET_PRESETS: TargetPreset[] = [
   {
@@ -47,6 +51,34 @@ export const TARGET_PRESETS: TargetPreset[] = [
       { name: '3 ring', diameter_mm: 40.0 },
       { name: '2 ring', diameter_mm: 45.0 },
     ],
+  },
+  {
+    id: 'plate-14',
+    name: '14 × 14 cm plate',
+    description: 'Plain square plate, 140 × 140 mm',
+    width_mm: 140,
+    height_mm: 140,
+  },
+  {
+    id: 'plate-17',
+    name: '17 × 17 cm plate',
+    description: 'Plain square plate, 170 × 170 mm',
+    width_mm: 170,
+    height_mm: 170,
+  },
+  {
+    id: 'paper-a4',
+    name: 'A4 paper',
+    description: '210 × 297 mm sheet',
+    width_mm: 210,
+    height_mm: 297,
+  },
+  {
+    id: 'paper-a3',
+    name: 'A3 paper',
+    description: '297 × 420 mm sheet',
+    width_mm: 297,
+    height_mm: 420,
   },
 ]
 

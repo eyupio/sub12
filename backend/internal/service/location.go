@@ -42,6 +42,10 @@ func (s *LocationService) Update(ctx context.Context, id, userID string, in *mod
 	return loc, nil
 }
 
+func (s *LocationService) UpdateImageURL(ctx context.Context, id, userID, imageURL string) (*model.Location, error) {
+	return s.locations.UpdateImageURL(ctx, id, userID, imageURL)
+}
+
 func (s *LocationService) Delete(ctx context.Context, id, userID string) error {
 	return s.locations.Delete(ctx, id, userID)
 }
