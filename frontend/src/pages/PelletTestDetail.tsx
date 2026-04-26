@@ -312,12 +312,19 @@ export default function PelletTestDetail() {
     })()
 
     if (targetGroupId) {
-      await syncMeasuredGroupMutation.mutateAsync({
-        groupId: targetGroupId,
-        sizeMM: analyzedSizeMM,
-        shotCount: resolvedShotCount,
-      })
-      return
+      // Fall back to creating a new group when the linked group has been
+      // deleted out from under us — the loaded session data is the source
+      // of truth. Without this, re-saving a measurement whose group was
+      // removed would 404 and surface a "Failed to save" toast.
+      const linkedGroupExists = session?.groups?.some(g => g.id === targetGroupId)
+      if (linkedGroupExists) {
+        await syncMeasuredGroupMutation.mutateAsync({
+          groupId: targetGroupId,
+          sizeMM: analyzedSizeMM,
+          shotCount: resolvedShotCount,
+        })
+        return
+      }
     }
 
     const notes = pendingGroupSync?.mode === 'create' ? pendingGroupSync.notes : undefined
@@ -353,19 +360,26 @@ export default function PelletTestDetail() {
       const measurement = measurementId
         ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
         : await pelletTestApi.createMeasurement(id!, imageId, payload)
+      // Side-effect operations are best-effort: a failure here (e.g. distance
+      // validation or a deleted group) should not roll the whole save back —
+      // the measurement itself is already persisted.
       if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        await pelletTestApi.update(id!, {
-          distance_value: analyzedDistanceValue,
-          distance_unit: analyzedDistanceUnit ?? 'meters',
-        })
+        try {
+          await pelletTestApi.update(id!, {
+            distance_value: analyzedDistanceValue,
+            distance_unit: analyzedDistanceUnit ?? 'meters',
+          })
+        } catch { /* best-effort */ }
       }
-      await syncGroupFromAnalysis({
-        imageId,
-        measurementId: measurement.id,
-        existingGroupId,
-        analyzedSizeMM,
-        analyzedShotCount,
-      })
+      try {
+        await syncGroupFromAnalysis({
+          imageId,
+          measurementId: measurement.id,
+          existingGroupId,
+          analyzedSizeMM,
+          analyzedShotCount,
+        })
+      } catch { /* best-effort */ }
       return measurement
     },
     onSuccess: () => {
@@ -425,23 +439,34 @@ export default function PelletTestDetail() {
         await pelletTestApi.createDetections(id!, imageId, measurement.id, detectionsPayload)
       }
 
+      // Annotated image upload, session distance update, and group sync are
+      // best-effort: e.g. the annotated PNG can exceed the 10 MB upload cap on
+      // re-save of high-res photos, or a linked group may have been deleted.
+      // Those failures shouldn't roll back a measurement+detections save the
+      // user already completed.
       if (annotatedBlob) {
-        await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
+        try {
+          await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
+        } catch { /* best-effort */ }
       }
       if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        await pelletTestApi.update(id!, {
-          distance_value: analyzedDistanceValue,
-          distance_unit: analyzedDistanceUnit ?? 'meters',
-        })
+        try {
+          await pelletTestApi.update(id!, {
+            distance_value: analyzedDistanceValue,
+            distance_unit: analyzedDistanceUnit ?? 'meters',
+          })
+        } catch { /* best-effort */ }
       }
 
-      await syncGroupFromAnalysis({
-        imageId,
-        measurementId: measurement.id,
-        existingGroupId,
-        analyzedSizeMM,
-        analyzedShotCount,
-      })
+      try {
+        await syncGroupFromAnalysis({
+          imageId,
+          measurementId: measurement.id,
+          existingGroupId,
+          analyzedSizeMM,
+          analyzedShotCount,
+        })
+      } catch { /* best-effort */ }
 
       return measurement
     },
