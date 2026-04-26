@@ -472,8 +472,8 @@ func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Reques
 
 	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID, userID)
 	if err != nil {
-		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+		if errors.Is(err, service.ErrNotMember) {
+			writeError(w, http.StatusForbidden, "league membership required")
 			return
 		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
