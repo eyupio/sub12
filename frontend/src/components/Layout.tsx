@@ -3,7 +3,6 @@ import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
-import { useThemeStore } from '../store/theme'
 import { authApi } from '../api/auth'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
@@ -13,6 +12,7 @@ import { ToastContainer } from './Toast'
 import { NotificationBell } from './NotificationBell'
 import { NavTracker } from './NavTracker'
 import { Tooltip } from './Tooltip'
+import { Sub12BrandLockup } from './Sub12BrandLockup'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
 import { clearClientSession } from '../utils/clearSession'
@@ -67,7 +67,6 @@ export default function Layout({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const { user, refreshToken, clearAuth } = useAuthStore()
   const queryClient = useQueryClient()
-  const theme = useThemeStore((s) => s.theme)
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -125,10 +124,6 @@ export default function Layout({ children }: PropsWithChildren) {
     return () => viewport.removeEventListener('resize', updateKeyboardState)
   }, [])
 
-  // Resolve effective theme for logo selection
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const logoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-horizontal-dark.svg' : 'logo-horizontal-light.svg'}`
-
   async function handleLogout() {
     if (refreshToken) {
       try { await authApi.logout(refreshToken) } catch { /* best effort */ }
@@ -156,11 +151,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <div className="px-5 py-4 border-b border-subtle">
           <Tooltip content={tips.homeLogo} placement="right">
             <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
-              <img
-                src={logoSrc}
-                alt="SUB12"
-                className="h-8 w-auto"
-              />
+              <Sub12BrandLockup variant="compact" />
             </Link>
           </Tooltip>
         </div>
@@ -214,11 +205,7 @@ export default function Layout({ children }: PropsWithChildren) {
         {/* Mobile top bar */}
         <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
           <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
-            <img
-              src={logoSrc}
-              alt="SUB12"
-              className="h-8 w-auto"
-            />
+            <Sub12BrandLockup variant="compact" />
           </Link>
           <div className="flex items-center gap-3">
             {user && (

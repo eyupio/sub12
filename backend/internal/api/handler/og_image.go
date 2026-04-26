@@ -265,70 +265,63 @@ func (h *OGImage) User() http.HandlerFunc {
 const (
 	ogWidth       = 1200
 	ogHeight      = 630
-	bgColor       = "#0C0C0C"
-	surfaceColor  = "#161513"
-	brassColor    = "#C9A86A"
-	textColor     = "#E7E4DE"
-	mutedColor    = "#9A948A"
-	dividerColor  = "#2A2824"
+	bgColor       = "#EFE6D2"
+	brassColor    = "#B8741F"
+	textColor     = "#2A1F12"
+	mutedColor    = "#5A4632"
+	targetColor   = "#3F2D1E"
+	borderColor   = "#D9C9AA"
 	maxMetaRunes  = 68
 	wordmarkText  = "SUB12"
-	wordmarkScale = 42
+	wordmarkScale = 118
+	taglineText   = "Precision shooting, properly tracked."
+	siteText      = "sub12.io"
 )
 
 // render paints the shared OG layout and returns the PNG bytes.
 //
-// Layout, top-to-bottom: wordmark + type chip, hairline divider, primary
-// value (big), optional sub-primary (e.g. "(12X)"), meta lines.
+// Layout: brand lockup and target grid at the top, then dynamic entity
+// type, primary value/name, optional sub-primary, and meta lines.
 func (h *OGImage) render(typeLabel, primary, subprimary string, meta []string) ([]byte, error) {
 	dc := gg.NewContext(ogWidth, ogHeight)
 	dc.SetHexColor(bgColor)
 	dc.Clear()
 
-	// Brass hairline at the top — small visual anchor, keeps the brand cue
-	// visible even when the preview is cropped by a social platform.
+	// Cream-paper frame matching the public SUB12 brand lockup.
+	dc.SetHexColor(borderColor)
+	dc.DrawRectangle(18, 18, ogWidth-36, ogHeight-36)
+	dc.SetLineWidth(2)
+	dc.Stroke()
+
+	if err := h.drawBrandLockup(dc, 76, 132); err != nil {
+		return nil, err
+	}
+	h.drawTargetGrid(dc, 870, 104, 44)
+
+	contentX := 76.0
+	typeLabelY := 315.0
+
 	dc.SetHexColor(brassColor)
-	dc.DrawRectangle(0, 0, ogWidth, 4)
-	dc.Fill()
-
-	margin := 64.0
-
-	// Wordmark
-	dc.SetHexColor(textColor)
-	if err := h.drawText(dc, wordmarkText, margin, 84, wordmarkScale, true); err != nil {
+	if err := h.drawText(dc, typeLabel, contentX, typeLabelY, 24, true); err != nil {
 		return nil, err
 	}
 
-	// Type chip (right of wordmark, same baseline)
-	dc.SetHexColor(brassColor)
-	if err := h.drawText(dc, typeLabel, margin+170, 88, 20, true); err != nil {
-		return nil, err
-	}
-
-	// Divider below the header
-	dc.SetHexColor(dividerColor)
-	dc.DrawRectangle(margin, 124, ogWidth-2*margin, 1)
-	dc.Fill()
-
-	// Primary value — huge, centred vertically in the upper 60% of the canvas.
 	primarySize := primaryFontSize(primary)
-	dc.SetHexColor(textColor)
-	primaryY := 320.0
-	if err := h.drawTextCentred(dc, primary, ogWidth/2, primaryY, primarySize, true); err != nil {
-		return nil, err
+	if primarySize > 170 {
+		primarySize = 170
 	}
+	primaryY := 505.0
+	primarySize = h.drawTextFitted(dc, primary, contentX, primaryY, primarySize, 820, true, textColor)
 
-	// Sub-primary (e.g. "12X" for score cards)
-	subY := primaryY + 64
 	if subprimary != "" {
 		dc.SetHexColor(brassColor)
-		if err := h.drawTextCentred(dc, subprimary, ogWidth/2, subY, 42, true); err != nil {
+		subX := contentX + textWidth(dc, h.face(primarySize, true), primary) + 34
+		if err := h.drawText(dc, subprimary, subX, primaryY-6, 46, true); err != nil {
 			return nil, err
 		}
 	}
 
-	// Meta lines — bottom of canvas
-	metaY := 500.0
+	metaY := 555.0
 	lineHeight := 34.0
 	dc.SetHexColor(mutedColor)
 	for i, line := range meta {
@@ -343,16 +336,53 @@ func (h *OGImage) render(typeLabel, primary, subprimary string, meta []string) (
 		}
 	}
 
-	// Bottom rule matching the top accent
-	dc.SetHexColor(brassColor)
-	dc.DrawRectangle(0, ogHeight-4, ogWidth, 4)
-	dc.Fill()
-
 	var buf bytes.Buffer
 	if err := dc.EncodePNG(&buf); err != nil {
 		return nil, fmt.Errorf("encode png: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+func (h *OGImage) drawBrandLockup(dc *gg.Context, x, baseline float64) error {
+	dc.SetHexColor(textColor)
+	if err := h.drawText(dc, wordmarkText, x, baseline, wordmarkScale, true); err != nil {
+		return err
+	}
+	dc.SetHexColor(mutedColor)
+	if err := h.drawText(dc, taglineText, x+4, baseline+52, 25, false); err != nil {
+		return err
+	}
+	dc.SetHexColor(brassColor)
+	dc.DrawRectangle(x+4, baseline+88, 74, 4)
+	dc.Fill()
+	return h.drawText(dc, siteText, x+4, baseline+134, 19, true)
+}
+
+func (h *OGImage) drawTargetGrid(dc *gg.Context, x, y, gap float64) {
+	hits := map[int]bool{3: true, 11: true, 18: true}
+	for row := 0; row < 5; row++ {
+		for col := 0; col < 5; col++ {
+			i := row*5 + col
+			cx := x + float64(col)*gap
+			cy := y + float64(row)*gap
+			if hits[i] {
+				dc.SetHexColor(brassColor)
+				dc.SetLineWidth(2.4)
+				dc.DrawCircle(cx, cy, 14)
+				dc.Stroke()
+				dc.DrawCircle(cx, cy, 4.5)
+				dc.Fill()
+				continue
+			}
+			dc.SetHexColor(targetColor)
+			dc.SetLineWidth(1.1)
+			dc.DrawCircle(cx, cy, 14)
+			dc.Stroke()
+			dc.SetRGBA(63.0/255.0, 45.0/255.0, 30.0/255.0, 0.5)
+			dc.DrawCircle(cx, cy, 2.7)
+			dc.Fill()
+		}
+	}
 }
 
 func (h *OGImage) drawText(dc *gg.Context, text string, x, y, size float64, bold bool) error {
@@ -367,6 +397,25 @@ func (h *OGImage) drawTextCentred(dc *gg.Context, text string, x, y, size float6
 	dc.SetFontFace(face)
 	dc.DrawStringAnchored(text, x, y, 0.5, 0.5)
 	return nil
+}
+
+func (h *OGImage) drawTextFitted(dc *gg.Context, text string, x, y, size, maxWidth float64, bold bool, color string) float64 {
+	for size > 34 {
+		face := h.face(size, bold)
+		if textWidth(dc, face, text) <= maxWidth {
+			break
+		}
+		size -= 4
+	}
+	dc.SetHexColor(color)
+	_ = h.drawText(dc, text, x, y, size, bold)
+	return size
+}
+
+func textWidth(dc *gg.Context, face font.Face, text string) float64 {
+	dc.SetFontFace(face)
+	width, _ := dc.MeasureString(text)
+	return width
 }
 
 func (h *OGImage) face(size float64, bold bool) font.Face {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Lock, Trophy, X, FileText, KeyRound } from 'lucide-react'
+import { Plus, Users, Lock, Trophy, X, FileText } from 'lucide-react'
 import { leagueApi, CreateLeaguePayload, MyLeagueSummary, type League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -167,7 +167,6 @@ export default function Leagues() {
   const [showCreate, setShowCreate] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
-  const [codeInput, setCodeInput] = useState('')
   const [code, setCode] = useState('')
   const user = useAuthStore((s) => s.user)
 
@@ -176,14 +175,18 @@ export default function Leagues() {
     queryFn: () => leagueApi.list(code ? { code } : undefined),
   })
 
-  function applyCode(e: React.FormEvent) {
-    e.preventDefault()
-    const next = codeInput.trim().toUpperCase()
-    setCode(next)
+  function handleSearch(v: string) {
+    setSearch(v)
+    if (code) setCode('')
+  }
+
+  function handleCodeSubmit() {
+    const next = search.trim().toUpperCase()
+    if (next) setCode(next)
   }
 
   function clearCode() {
-    setCodeInput('')
+    setSearch('')
     setCode('')
   }
 
@@ -266,8 +269,9 @@ export default function Leagues() {
         </div>
         <FilterRow<Filter>
           search={search}
-          onSearch={setSearch}
-          placeholder="Search leagues…"
+          onSearch={handleSearch}
+          onSubmit={handleCodeSubmit}
+          placeholder="Search by name or code…"
           chips={[
             { value: 'all', label: 'All' },
             { value: 'active', label: 'Active' },
@@ -278,28 +282,6 @@ export default function Leagues() {
           activeChip={filter}
           onChip={setFilter}
         />
-
-        <form onSubmit={applyCode} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <KeyRound size={14} style={{ position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)', color: 'var(--muted)' }} />
-            <input
-              type="text"
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              placeholder="Find league by code"
-              className="font-mono"
-              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--ink)', fontSize: 13, padding: '8px 10px 8px 32px', textTransform: 'uppercase' }}
-              aria-label="Find league by code"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!codeInput.trim() || codeInput.trim().toUpperCase() === code}
-            className="lc-action-ghost"
-          >
-            Find
-          </button>
-        </form>
 
         {code && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>

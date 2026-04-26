@@ -22,8 +22,8 @@ import {
   Users2,
 } from 'lucide-react'
 import { CornerMark } from '../components/CornerMark'
+import { Sub12BrandLockup } from '../components/Sub12BrandLockup'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { useThemeStore } from '../store/theme'
 
 type SectionHeaderProps = {
   eyebrow: string
@@ -451,14 +451,6 @@ function HeroMockup() {
 }
 
 export default function LandingPage() {
-  const theme = useThemeStore((state) => state.theme)
-  const isDark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const headerLogoSrc = `${import.meta.env.BASE_URL}${isDark ? 'logo-horizontal-dark.svg' : 'logo-horizontal-light.svg'}`
-
   return (
     <div className="min-h-screen bg-page">
       <CornerMark className="left-5 top-5 text-muted" />
@@ -469,7 +461,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-subtle bg-nav backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3">
           <Link to="/" aria-label="SUB12 home" className="inline-flex items-center">
-            <img src={headerLogoSrc} alt="SUB12" className="h-8 w-auto" />
+            <Sub12BrandLockup variant="compact" />
           </Link>
           <nav className="hidden items-center gap-6 lg:flex">
             <a href="#image-analysis" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
@@ -499,6 +491,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(184,136,44,0.08),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(184,136,44,0.05),transparent_32%)]" />
           <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div>
+              <Sub12BrandLockup className="mb-8" />
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brass)]/20 bg-[var(--brass)]/10 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--brass)]">
                 <Crosshair size={13} />
                 For sub-12 air rifle shooters &mdash; beginners to professionals

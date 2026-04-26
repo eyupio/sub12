@@ -35,6 +35,7 @@ export function PageHeader({
 export function FilterRow<T extends string>({
   search,
   onSearch,
+  onSubmit,
   placeholder = 'Search…',
   chips,
   activeChip,
@@ -42,6 +43,7 @@ export function FilterRow<T extends string>({
 }: {
   search: string
   onSearch: (v: string) => void
+  onSubmit?: () => void
   placeholder?: string
   chips?: { value: T; label: string }[]
   activeChip?: T
@@ -55,6 +57,7 @@ export function FilterRow<T extends string>({
           type="search"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
+          onKeyDown={onSubmit ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onSubmit() } } : undefined}
           placeholder={placeholder}
         />
       </div>

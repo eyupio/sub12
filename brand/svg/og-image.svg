@@ -1,42 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
-  <title>SUB12 — Precision Shooting Platform</title>
-  <desc>SUB12 Open Graph social sharing image</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none" role="img">
+  <title>SUB12 - Precision shooting platform</title>
+  <desc>Cream SUB12 Open Graph image with serif wordmark, tagline, website reference, and target grid.</desc>
 
-  <!-- Background -->
-  <rect width="1200" height="630" fill="#0C0C0C"/>
+  <rect width="1200" height="630" fill="#EFE6D2"/>
+  <rect x="18" y="18" width="1164" height="594" stroke="#D9C9AA" stroke-width="2"/>
 
-  <!-- Crosshair — centred at (600, 240), scaled to r=60 -->
-  <circle cx="600" cy="240" r="82" stroke="#D4A44A" stroke-width="0.5"/>
-  <circle cx="600" cy="240" r="60" stroke="#D4A44A" stroke-width="1.5"/>
-  <circle cx="600" cy="240" r="4" fill="#D4A44A"/>
-  <line x1="600" y1="155" x2="600" y2="190" stroke="#D4A44A" stroke-width="1" stroke-linecap="round"/>
-  <line x1="600" y1="290" x2="600" y2="325" stroke="#D4A44A" stroke-width="1" stroke-linecap="round"/>
-  <line x1="515" y1="240" x2="550" y2="240" stroke="#D4A44A" stroke-width="1" stroke-linecap="round"/>
-  <line x1="650" y1="240" x2="685" y2="240" stroke="#D4A44A" stroke-width="1" stroke-linecap="round"/>
-  <line x1="600" y1="195" x2="600" y2="202" stroke="#D4A44A" stroke-width="0.5" stroke-linecap="round" opacity="0.5"/>
-  <line x1="600" y1="278" x2="600" y2="285" stroke="#D4A44A" stroke-width="0.5" stroke-linecap="round" opacity="0.5"/>
-  <line x1="555" y1="240" x2="562" y2="240" stroke="#D4A44A" stroke-width="0.5" stroke-linecap="round" opacity="0.5"/>
-  <line x1="638" y1="240" x2="645" y2="240" stroke="#D4A44A" stroke-width="0.5" stroke-linecap="round" opacity="0.5"/>
+  <text x="76" y="175" font-family="Georgia, 'Times New Roman', serif" font-size="118" font-weight="700" fill="#2A1F12" letter-spacing="0">SUB12</text>
+  <text x="80" y="226" font-family="system-ui, -apple-system, sans-serif" font-size="25" font-weight="400" fill="#5A4632">Precision shooting, properly tracked.</text>
+  <line x1="80" y1="262" x2="154" y2="262" stroke="#B8741F" stroke-width="4"/>
+  <text x="80" y="309" font-family="ui-monospace, 'Courier New', monospace" font-size="19" font-weight="700" fill="#B8741F">sub12.io</text>
 
-  <!-- Wordmark -->
-  <text
-    x="600" y="420"
-    text-anchor="middle"
-    font-family="'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif"
-    font-weight="500"
-    font-size="72"
-    letter-spacing="20"
-    fill="#FFFFFF"
-  >SUB12</text>
+  <g transform="translate(870 104)">
+    <g stroke="#3F2D1E" stroke-width="1.1" opacity="0.45">
+      <circle cx="0" cy="0" r="14"/><circle cx="44" cy="0" r="14"/><circle cx="88" cy="0" r="14"/><circle cx="176" cy="0" r="14"/>
+      <circle cx="0" cy="44" r="14"/><circle cx="44" cy="44" r="14"/><circle cx="88" cy="44" r="14"/><circle cx="132" cy="44" r="14"/><circle cx="176" cy="44" r="14"/>
+      <circle cx="0" cy="88" r="14"/><circle cx="88" cy="88" r="14"/><circle cx="132" cy="88" r="14"/><circle cx="176" cy="88" r="14"/>
+      <circle cx="0" cy="132" r="14"/><circle cx="44" cy="132" r="14"/><circle cx="88" cy="132" r="14"/><circle cx="132" cy="132" r="14"/>
+      <circle cx="0" cy="176" r="14"/><circle cx="44" cy="176" r="14"/><circle cx="88" cy="176" r="14"/><circle cx="132" cy="176" r="14"/><circle cx="176" cy="176" r="14"/>
+    </g>
+    <g fill="#3F2D1E" opacity="0.5">
+      <circle cx="0" cy="0" r="2.7"/><circle cx="44" cy="0" r="2.7"/><circle cx="88" cy="0" r="2.7"/><circle cx="176" cy="0" r="2.7"/>
+      <circle cx="0" cy="44" r="2.7"/><circle cx="44" cy="44" r="2.7"/><circle cx="88" cy="44" r="2.7"/><circle cx="132" cy="44" r="2.7"/><circle cx="176" cy="44" r="2.7"/>
+      <circle cx="0" cy="88" r="2.7"/><circle cx="88" cy="88" r="2.7"/><circle cx="132" cy="88" r="2.7"/><circle cx="176" cy="88" r="2.7"/>
+      <circle cx="0" cy="132" r="2.7"/><circle cx="44" cy="132" r="2.7"/><circle cx="88" cy="132" r="2.7"/><circle cx="132" cy="132" r="2.7"/>
+      <circle cx="0" cy="176" r="2.7"/><circle cx="44" cy="176" r="2.7"/><circle cx="88" cy="176" r="2.7"/><circle cx="132" cy="176" r="2.7"/><circle cx="176" cy="176" r="2.7"/>
+    </g>
+    <g stroke="#B8741F" stroke-width="2.4" fill="none">
+      <circle cx="132" cy="0" r="14"/><circle cx="44" cy="88" r="14"/><circle cx="132" cy="132" r="14"/>
+    </g>
+    <g fill="#B8741F">
+      <circle cx="132" cy="0" r="4.5"/><circle cx="44" cy="88" r="4.5"/><circle cx="132" cy="132" r="4.5"/>
+    </g>
+  </g>
 
-  <!-- Tagline -->
-  <text
-    x="600" y="465"
-    text-anchor="middle"
-    font-family="'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif"
-    font-weight="400"
-    font-size="16"
-    letter-spacing="6"
-    fill="#888888"
-  >PRECISION SHOOTING PLATFORM</text>
+  <text x="76" y="455" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="700" fill="#B8741F">PRECISION SHOOTING PLATFORM</text>
+  <text x="76" y="525" font-family="system-ui, -apple-system, sans-serif" font-size="58" font-weight="700" fill="#2A1F12">Track scores, gear, tests, and leagues.</text>
 </svg>

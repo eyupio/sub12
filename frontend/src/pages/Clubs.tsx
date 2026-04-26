@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, X, Trophy, Lock, KeyRound } from 'lucide-react'
+import { Plus, Users, X, Trophy, Lock } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { ApiError } from '../api/client'
 import { HelpIcon } from '../components/Tooltip'
@@ -110,23 +110,27 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
 export default function Clubs() {
   const [showCreate, setShowCreate] = useState(false)
   const [search, setSearch] = useState('')
-  const [codeInput, setCodeInput] = useState('')
   const [code, setCode] = useState('')
+
+  function handleSearch(v: string) {
+    setSearch(v)
+    if (code) setCode('')
+  }
+
+  function handleCodeSubmit() {
+    const next = search.trim().toUpperCase()
+    if (next) setCode(next)
+  }
+
+  function clearCode() {
+    setSearch('')
+    setCode('')
+  }
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['clubs', code || null],
     queryFn: () => clubsApi.list(code ? { code } : undefined),
   })
-
-  function applyCode(e: React.FormEvent) {
-    e.preventDefault()
-    setCode(codeInput.trim().toUpperCase())
-  }
-
-  function clearCode() {
-    setCodeInput('')
-    setCode('')
-  }
 
   const filtered: Club[] = useMemo(() => {
     const all = data?.items ?? []
@@ -163,29 +167,7 @@ export default function Clubs() {
           <StatTile label="Active Leagues" value={String(stats.totalLeagues)} sub="in your clubs" />
           <StatTile label="Top Card" value="—" sub="best across clubs" />
         </div>
-        <FilterRow search={search} onSearch={setSearch} placeholder="Search clubs…" />
-
-        <form onSubmit={applyCode} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <KeyRound size={14} style={{ position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)', color: 'var(--muted)' }} />
-            <input
-              type="text"
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              placeholder="Find club by code"
-              className="font-mono"
-              style={{ width: '100%', background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--ink)', fontSize: 13, padding: '8px 10px 8px 32px', textTransform: 'uppercase' }}
-              aria-label="Find club by code"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!codeInput.trim() || codeInput.trim().toUpperCase() === code}
-            className="lc-action-ghost"
-          >
-            Find
-          </button>
-        </form>
+        <FilterRow search={search} onSearch={handleSearch} onSubmit={handleCodeSubmit} placeholder="Search by name or code…" />
 
         {code && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>

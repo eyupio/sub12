@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CalendarDays, Camera, CheckCircle2, ChevronDown, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
+import { Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, MapPin, Plus, Sparkles, Target, Trash2, Upload, X } from 'lucide-react'
+import { useSmartBack } from '../hooks/useSmartBack'
 import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
@@ -43,18 +44,10 @@ interface GroupRow {
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2 text-primary text-sm placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs tracking-wide text-muted mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
 export default function NewPelletTest() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const smartBack = useSmartBack('/pellet-testing')
   const search = useSearch({ strict: false }) as { draftId?: string }
   const draftId = search.draftId
 
@@ -313,275 +306,154 @@ export default function NewPelletTest() {
   const filledCount = filledChecks.filter(Boolean).length
   const totalCount = filledChecks.length
 
-  const reasonText = !rifleId
-    ? 'select a rifle'
-    : !pelletId
-      ? 'select or add a pellet'
-      : !testDate
-        ? 'pick a test date'
-        : !hasGroupOrImage
-          ? 'add a group size or upload a target photo'
-          : !hasDistance && imageFiles.length === 0 && existingImages.length === 0
-            ? 'enter a distance'
-            : 'complete the highlighted fields'
+
+  const sidebarLabelCls = 't-section-title'
 
   return (
-    <div className={`p-4 lg:p-8 space-y-6 mx-auto ${draftId ? 'max-w-lg lg:max-w-6xl' : 'max-w-lg lg:max-w-3xl'}`}>
-      {draftId ? (
-        <div className="space-y-3">
-          <Link to="/drafts" className="inline-flex items-center gap-1.5 text-xs tracking-wide text-muted hover:text-secondary transition-colors">
-            <ArrowLeft size={14} /> All drafts
-          </Link>
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
-              <span className="inline-flex items-center gap-2 text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                Draft{draft?.created_at ? ` · ${relative(draft.created_at)}` : ''}
+    <div className="p-4 lg:p-8 space-y-5 lg:space-y-6 max-w-6xl mx-auto pb-24">
+      {/* Top action bar */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={smartBack}
+          aria-label="Back"
+          className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors"
+        >
+          <ChevronLeft size={16} /> Back
+        </button>
+        {draftId && (
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteDraft(true)}
+            disabled={deleteDraftMutation.isPending}
+            className="flex items-center gap-1.5 t-section-title hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Delete draft"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        )}
+      </div>
+
+      {/* Draft banner */}
+      {draftId && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 flex-wrap">
+          <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400 font-medium">Draft</span>
+          {draft?.created_at && (
+            <>
+              <span className="t-section-title">Â·</span>
+              <span className="text-xs text-secondary">Captured {captureDate(draft.created_at)}</span>
+            </>
+          )}
+          {draft?.location && (
+            <>
+              <span className="t-section-title">Â·</span>
+              <span className="text-xs text-secondary flex items-center gap-1">
+                <MapPin size={11} className="opacity-70" />{draft.location}
               </span>
-              <h1 className="t-page-title">Refine draft</h1>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-                {draft?.created_at && (
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarDays size={12} className="opacity-70" />
-                    Captured {captureDate(draft.created_at)}
-                  </span>
-                )}
-                {draft?.location && (
-                  <>
-                    <span aria-hidden className="opacity-60">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin size={12} className="opacity-70" />
-                      {draft.location}
-                    </span>
-                  </>
-                )}
-                <span aria-hidden className="opacity-60">·</span>
-                <span>{filledCount}/{totalCount} fields filled</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setConfirmDeleteDraft(true)}
-              disabled={deleteDraftMutation.isPending}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded border border-[var(--error-text)]/30 text-[var(--error-text)] text-xs tracking-widest uppercase hover:bg-[var(--error-bg)] transition-colors disabled:opacity-50"
-            >
-              <Trash2 size={14} />
-              Delete
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="t-page-title">
-            New Pellet Test
-          </h1>
+            </>
+          )}
+          <span className="text-xs text-muted ml-auto">{filledCount}/{totalCount} fields filled</span>
         </div>
       )}
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-6">
-        <div className={`space-y-4 ${draftId ? 'rounded-lg border border-subtle bg-surface p-5' : ''}`}>
-          {draftId && (
-            <h2 className="t-section-title">Test Details</h2>
-          )}
-          <Field label="Rifle">
-            {rifles.length > 0 ? (
-              <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
-                <option value="">Select rifle…</option>
-                {rifles.map(r => (
-                  <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
-                ))}
-              </select>
-            ) : (
-              <p className="text-sm text-muted">
-                <a href="/gear" className="text-[var(--brass)] hover:opacity-80">Add a rifle</a> first
+      {/* Hero */}
+      <div className="rounded-lg border border-subtle bg-surface px-5 py-5 lg:px-6 lg:py-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+          <div className="space-y-3 min-w-0">
+            <div className="flex items-baseline gap-3 font-mono">
+              <h1 className="t-page-title">
+                {testDate ? testDate.split('-').reverse().join('/') : 'â€”'}
+              </h1>
+              <span className="text-base text-muted uppercase tracking-widest">
+                {draftId ? 'Refine' : 'New'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-surface-hover text-muted">
+                Pellet Test
+              </span>
+              {hasDistance && (
+                <span className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded">
+                  {distanceValue}{distanceUnit === 'yards' ? 'yd' : 'm'}
+                </span>
+              )}
+              <span className="text-[10px] tracking-widest uppercase text-muted bg-surface-hover px-2 py-0.5 rounded">
+                {validGroups.length} group{validGroups.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          {validGroups.length > 0 && distM > 0 && (
+            <div className="font-mono shrink-0 text-right">
+              <p className="text-4xl lg:text-5xl font-semibold text-primary leading-none">
+                {calcMOA(Math.min(...validGroups.map(g => Number(g.groupSizeMM))), distM).toFixed(3)}
               </p>
-            )}
-          </Field>
-
-          <Field label="Pellet">
-            <select value={pelletId} onChange={e => {
-              if (e.target.value === '__add__') {
-                setShowAddPellet(true)
-                setPelletId('')
-              } else {
-                setPelletId(e.target.value)
-                setShowAddPellet(false)
-              }
-            }} className={inputCls}>
-              <option value="">Select pellet…</option>
-              {pellets.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}
-                </option>
-              ))}
-              <option value="__add__">+ Add new pellet…</option>
-            </select>
-          </Field>
-
-          {showAddPellet && (
-            <div className="space-y-3 p-3 rounded border border-subtle bg-surface">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Brand">
-                  <input className={inputCls} placeholder="JSB" value={newPellet.brand} onChange={e => setNewPellet(p => ({ ...p, brand: e.target.value }))} />
-                </Field>
-                <Field label="Model">
-                  <input className={inputCls} placeholder="Match Exact" value={newPellet.model} onChange={e => setNewPellet(p => ({ ...p, model: e.target.value }))} />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Head size (mm)">
-                  <input className={inputCls} type="number" step="0.01" placeholder="4.51" onChange={e => setNewPellet(p => ({ ...p, head_size_mm: e.target.value ? Number(e.target.value) : undefined }))} />
-                </Field>
-                <Field label="Weight (gr)">
-                  <input className={inputCls} type="number" step="0.01" placeholder="8.44" onChange={e => setNewPellet(p => ({ ...p, weight_grains: e.target.value ? Number(e.target.value) : undefined }))} />
-                </Field>
-              </div>
-              {addPelletMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to add pellet.</p>}
-              <div className="flex gap-2">
-                <button onClick={() => addPelletMutation.mutate()} disabled={addPelletMutation.isPending || !newPellet.brand || !newPellet.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-                  {addPelletMutation.isPending ? 'Saving…' : 'Add Pellet'}
-                </button>
-                <button onClick={() => setShowAddPellet(false)} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
-              </div>
-            </div>
-          )}
-
-          <Field label="Date">
-            <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className={`${inputCls} font-mono`} />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Distance">
-              <input type="number" step="any" placeholder="25" value={distanceValue} onChange={e => setDistanceValue(e.target.value)} className={inputCls} />
-            </Field>
-            <Field label="Unit">
-              <select value={distanceUnit} onChange={e => setDistanceUnit(e.target.value)} className={inputCls}>
-                <option value="meters">Meters</option>
-                <option value="yards">Yards</option>
-              </select>
-            </Field>
-          </div>
-
-          <Field label="Location">
-            <LocationField
-              value={location}
-              onChange={setLocation}
-              inputClassName={`${inputCls} placeholder:text-muted`}
-            />
-          </Field>
-
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Wind (mph)">
-              <input type="number" step="0.1" value={windMph} onChange={e => setWindMph(e.target.value)} placeholder="—" className={inputCls} />
-            </Field>
-            <Field label="Temp (°C)">
-              <input type="number" step="0.1" value={tempCelsius} onChange={e => setTempCelsius(e.target.value)} placeholder="—" className={inputCls} />
-            </Field>
-            <Field label="Humidity (%)">
-              <input type="number" step="1" value={humidityPct} onChange={e => setHumidityPct(e.target.value)} placeholder="—" className={inputCls} />
-            </Field>
-          </div>
-
-          <Field label="Notes">
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Conditions, observations…" className={`${inputCls} placeholder:text-muted resize-none`} />
-          </Field>
-
-          <button type="button" onClick={() => setShowChrono(v => !v)} className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors">
-            {showChrono ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            Chronograph Data
-          </button>
-          {showChrono && (
-            <div className="grid grid-cols-3 gap-3">
-              <Field label="Velocity (fps)">
-                <input type="number" step="0.1" value={velocityFps} onChange={e => setVelocityFps(e.target.value)} placeholder="—" className={inputCls} />
-              </Field>
-              <Field label="SD">
-                <input type="number" step="0.01" value={velocitySd} onChange={e => setVelocitySd(e.target.value)} placeholder="—" className={inputCls} />
-              </Field>
-              <Field label="ES (fps)">
-                <input type="number" step="0.1" value={extremeSpreadFps} onChange={e => setExtremeSpreadFps(e.target.value)} placeholder="—" className={inputCls} />
-              </Field>
-            </div>
-          )}
-
-          <button type="button" onClick={() => setShowAdvanced(v => !v)} className="flex items-center gap-1.5 t-section-title hover:text-secondary transition-colors">
-            {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            Advanced Conditions
-          </button>
-          {showAdvanced && (
-            <div className="space-y-3">
-              <Field label="Bench / Rest Setup">
-                <input type="text" value={benchSetup} onChange={e => setBenchSetup(e.target.value)} placeholder="Front rest, rear bag…" className={`${inputCls} placeholder:text-muted`} />
-              </Field>
-              <Field label="Scope Details">
-                <input type="text" value={scopeDetails} onChange={e => setScopeDetails(e.target.value)} placeholder="MTC Viper Pro 10×44, 40× mag…" className={`${inputCls} placeholder:text-muted`} />
-              </Field>
-              <Field label="Barometric Pressure (mbar)">
-                <input type="number" step="0.1" value={barometricPressure} onChange={e => setBarometricPressure(e.target.value)} placeholder="—" className={inputCls} />
-              </Field>
+              <p className="mt-2 text-[10px] tracking-widest uppercase text-muted">Best MOA</p>
             </div>
           )}
         </div>
+      </div>
 
-        <div className="space-y-4 mt-6 lg:mt-0">
-          <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
-            <div className="flex items-center justify-between">
-              <label className="t-section-title">Groups</label>
-              <button onClick={addGroup} className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
-                <Plus size={12} /> Add
-              </button>
-            </div>
-            <div className="space-y-2">
-              {groups.map((g, i) => {
-                const sizeMM = Number(g.groupSizeMM)
-                const moa = sizeMM > 0 && distM > 0 ? calcMOA(sizeMM, distM) : null
-                return (
-                  <div key={g.key} className="p-3 rounded border border-subtle bg-surface-hover space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--brass-pill-bg)] text-[var(--brass)]">
-                          <Target size={13} />
-                        </span>
-                        <span className="t-section-title">Group {i + 1}</span>
-                      </div>
-                      {groups.length > 1 && (
-                        <button onClick={() => removeGroup(g.key)} className="text-muted hover:text-[var(--error-text)] transition-colors" aria-label="Remove group">
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+      {/* Main grid: groups + sidebar */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-5 space-y-5 lg:space-y-0">
+        {/* Groups card */}
+        <div className="lg:col-span-2 rounded-lg border border-subtle bg-surface p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-subtle pb-2">
+            <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] border-b-2 border-[var(--brass)] pb-1 -mb-[9px]">Groups</span>
+            <button onClick={addGroup} className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
+              <Plus size={12} /> Add
+            </button>
+          </div>
+          <div className="space-y-2">
+            {groups.map((g, i) => {
+              const sizeMM = Number(g.groupSizeMM)
+              const moa = sizeMM > 0 && distM > 0 ? calcMOA(sizeMM, distM) : null
+              return (
+                <div key={g.key} className="p-3 rounded border border-subtle bg-surface-hover space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[var(--brass-pill-bg)] text-[var(--brass)]">
+                        <Target size={13} />
+                      </span>
+                      <span className="t-section-title">Group {i + 1}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] text-muted tracking-wide">Shots</label>
-                        <input type="number" min="1" value={g.shotCount} onChange={e => updateGroup(g.key, 'shotCount', Number(e.target.value) || 5)} className={inputCls} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted tracking-wide">Size (mm)</label>
-                        <input type="number" step="0.01" min="0" value={g.groupSizeMM} onChange={e => updateGroup(g.key, 'groupSizeMM', e.target.value)} placeholder="0.00" className={inputCls} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted tracking-wide">MOA</label>
-                        <div className="px-3 py-2 text-sm text-muted font-mono bg-surface-hover rounded border border-subtle">
-                          {moa != null ? moa.toFixed(3) : '—'}
-                        </div>
-                      </div>
-                    </div>
-                    <input type="text" value={g.notes} onChange={e => updateGroup(g.key, 'notes', e.target.value)} placeholder="Group notes (optional)" className={`${inputCls} text-xs placeholder:text-muted`} />
+                    {groups.length > 1 && (
+                      <button onClick={() => removeGroup(g.key)} className="text-muted hover:text-[var(--error-text)] transition-colors" aria-label="Remove group">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
-                )
-              })}
-            </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted tracking-wide">Shots</label>
+                      <input type="number" min="1" value={g.shotCount} onChange={e => updateGroup(g.key, 'shotCount', Number(e.target.value) || 5)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted tracking-wide">Size (mm)</label>
+                      <input type="number" step="0.01" min="0" value={g.groupSizeMM} onChange={e => updateGroup(g.key, 'groupSizeMM', e.target.value)} placeholder="0.00" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted tracking-wide">MOA</label>
+                      <div className="px-3 py-2 text-sm text-muted font-mono bg-surface rounded border border-subtle">
+                        {moa != null ? moa.toFixed(3) : 'â€”'}
+                      </div>
+                    </div>
+                  </div>
+                  <input type="text" value={g.notes} onChange={e => updateGroup(g.key, 'notes', e.target.value)} placeholder="Group notes (optional)" className={`${inputCls} text-xs placeholder:text-muted`} />
+                </div>
+              )
+            })}
           </div>
 
-          <div className={draftId ? 'rounded-lg border border-subtle bg-surface p-5 space-y-3' : ''}>
-            <label className="block t-section-title mb-1">Target Photos</label>
+          {/* Target Photos */}
+          <div className="border-t border-subtle pt-4 space-y-3">
+            <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] border-b-2 border-[var(--brass)] pb-1">Target Photos</span>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
-
             {(existingImages.length > 0 || imagePreviews.length > 0) && (
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                {existingImages.map((img, i) => (
+              <div className="grid grid-cols-3 gap-2">
+                {existingImages.map((img, idx) => (
                   <div key={img.id} className="relative">
-                    <img src={img.image_url} alt={`Draft photo ${i + 1}`} className="rounded border border-subtle w-full aspect-square object-cover" />
+                    <img src={img.image_url} alt={`Draft photo ${idx + 1}`} className="rounded border border-subtle w-full aspect-square object-cover" />
                     <button
                       onClick={() => deleteExistingImage.mutate(img.id)}
                       disabled={deleteExistingImage.isPending}
@@ -592,11 +464,11 @@ export default function NewPelletTest() {
                     </button>
                   </div>
                 ))}
-                {imagePreviews.map((preview, i) => (
-                  <div key={`new-${i}`} className="relative">
-                    <img src={preview} alt={`Target photo ${i + 1} preview`} className="rounded border border-subtle w-full aspect-square object-cover" />
+                {imagePreviews.map((preview, idx) => (
+                  <div key={`new-${idx}`} className="relative">
+                    <img src={preview} alt={`Target photo ${idx + 1} preview`} className="rounded border border-subtle w-full aspect-square object-cover" />
                     <button
-                      onClick={() => removeImage(i)}
+                      onClick={() => removeImage(idx)}
                       className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
                       aria-label="Remove photo"
                     >
@@ -606,7 +478,6 @@ export default function NewPelletTest() {
                 ))}
               </div>
             )}
-
             <div className="flex gap-2">
               <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors">
                 <Upload size={16} /> Upload
@@ -616,45 +487,226 @@ export default function NewPelletTest() {
               </button>
             </div>
           </div>
+        </div>
 
-          {mutation.isError && (
-            <p className="text-[var(--error-text)] text-sm">Failed to save test. Please try again.</p>
-          )}
-
-          {draftId && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-[var(--brass-pill-bg)] border-l-2 border-[var(--brass)] text-sm text-secondary">
-              {canSubmit ? (
-                <>
-                  <CheckCircle2 size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
-                  <span>Ready to publish — review and save changes.</span>
-                </>
+        {/* Sidebar */}
+        <div className="space-y-4">
+          {/* Equipment */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Equipment</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Rifle</label>
+              {rifles.length > 0 ? (
+                <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
+                  <option value="">Select rifleâ€¦</option>
+                  {rifles.map(r => (
+                    <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
+                  ))}
+                </select>
               ) : (
-                <>
-                  <Sparkles size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
-                  <span>Almost done — <strong className="font-medium">{reasonText}</strong> to publish as a test.</span>
-                </>
+                <p className="text-xs text-muted py-1">No rifles yet â€” <Link to="/gear" className="text-[var(--brass)] hover:opacity-80">add one in Gear</Link></p>
               )}
             </div>
-          )}
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Pellet</label>
+              <select value={pelletId} onChange={e => {
+                if (e.target.value === '__add__') {
+                  setShowAddPellet(true)
+                  setPelletId('')
+                } else {
+                  setPelletId(e.target.value)
+                  setShowAddPellet(false)
+                }
+              }} className={inputCls}>
+                <option value="">Select pelletâ€¦</option>
+                {pellets.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}
+                  </option>
+                ))}
+                <option value="__add__">+ Add new pelletâ€¦</option>
+              </select>
+              {showAddPellet && (
+                <div className="space-y-3 p-3 rounded border border-subtle bg-surface mt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={sidebarLabelCls}>Brand</label>
+                      <input className={inputCls} placeholder="JSB" value={newPellet.brand} onChange={e => setNewPellet(p => ({ ...p, brand: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className={sidebarLabelCls}>Model</label>
+                      <input className={inputCls} placeholder="Match Exact" value={newPellet.model} onChange={e => setNewPellet(p => ({ ...p, model: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={sidebarLabelCls}>Head size (mm)</label>
+                      <input className={inputCls} type="number" step="0.01" placeholder="4.51" onChange={e => setNewPellet(p => ({ ...p, head_size_mm: e.target.value ? Number(e.target.value) : undefined }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className={sidebarLabelCls}>Weight (gr)</label>
+                      <input className={inputCls} type="number" step="0.01" placeholder="8.44" onChange={e => setNewPellet(p => ({ ...p, weight_grains: e.target.value ? Number(e.target.value) : undefined }))} />
+                    </div>
+                  </div>
+                  {addPelletMutation.isError && <p className="text-[var(--error-text)] text-xs">Failed to add pellet.</p>}
+                  <div className="flex gap-2">
+                    <button onClick={() => addPelletMutation.mutate()} disabled={addPelletMutation.isPending || !newPellet.brand || !newPellet.model} className="flex-1 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
+                      {addPelletMutation.isPending ? 'Savingâ€¦' : 'Add Pellet'}
+                    </button>
+                    <button onClick={() => setShowAddPellet(false)} className="px-4 py-2 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !canSubmit}
-            className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90 inline-flex items-center justify-center gap-2"
-          >
-            {mutation.isPending ? 'Saving…' : draftId ? <><CheckCircle2 size={15} /> Save Changes</> : 'Save Test'}
-          </button>
-          {!draftId && !mutation.isPending && !canSubmit && (
-            <p className="text-xs text-muted text-center">
-              {!rifleId ? 'Select a rifle to continue.'
-                : !pelletId ? 'Select or add a pellet.'
-                : !testDate ? 'Pick a test date.'
-                : !hasGroupOrImage ? 'Add at least one group size or upload a target photo.'
-                : !hasDistance && imageFiles.length === 0 && existingImages.length === 0 ? 'Enter a distance.'
-                : 'Complete the highlighted fields to save.'}
-            </p>
-          )}
+          {/* Date & Distance */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Date & Distance</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Test Date</label>
+              <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className={`${inputCls} font-mono`} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Distance</label>
+                <input type="number" step="any" placeholder="25" value={distanceValue} onChange={e => setDistanceValue(e.target.value)} className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Unit</label>
+                <select value={distanceUnit} onChange={e => setDistanceUnit(e.target.value)} className={inputCls}>
+                  <option value="meters">Metres</option>
+                  <option value="yards">Yards</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Conditions */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
+            <div className="space-y-1.5">
+              <label className={sidebarLabelCls}>Location</label>
+              <LocationField
+                value={location}
+                onChange={setLocation}
+                inputClassName={`${inputCls} placeholder:text-muted`}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Wind (mph)</label>
+                <input type="number" step="0.1" value={windMph} onChange={e => setWindMph(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+              </div>
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Temp (Â°C)</label>
+                <input type="number" step="0.1" value={tempCelsius} onChange={e => setTempCelsius(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+              </div>
+              <div className="space-y-1.5">
+                <label className={sidebarLabelCls}>Humidity (%)</label>
+                <input type="number" step="1" value={humidityPct} onChange={e => setHumidityPct(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Notes</p>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Conditions, observationsâ€¦" className={`${inputCls} placeholder:text-muted resize-none`} />
+          </div>
+
+          {/* Chronograph */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setShowChrono(v => !v)}
+              className={`${sidebarLabelCls} flex items-center justify-between w-full`}
+            >
+              <span>Chronograph</span>
+              {showChrono ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+            {showChrono && (
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>Vel. (fps)</label>
+                  <input type="number" step="0.1" value={velocityFps} onChange={e => setVelocityFps(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>SD</label>
+                  <input type="number" step="0.01" value={velocitySd} onChange={e => setVelocitySd(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>ES (fps)</label>
+                  <input type="number" step="0.1" value={extremeSpreadFps} onChange={e => setExtremeSpreadFps(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Advanced */}
+          <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className={`${sidebarLabelCls} flex items-center justify-between w-full`}
+            >
+              <span>Advanced</span>
+              {showAdvanced ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+            {showAdvanced && (
+              <div className="space-y-2.5 pt-1">
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>Bench / Rest Setup</label>
+                  <input type="text" value={benchSetup} onChange={e => setBenchSetup(e.target.value)} placeholder="Front rest, rear bagâ€¦" className={`${inputCls} placeholder:text-muted`} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>Scope Details</label>
+                  <input type="text" value={scopeDetails} onChange={e => setScopeDetails(e.target.value)} placeholder="MTC Viper Pro 10Ã—44â€¦" className={`${inputCls} placeholder:text-muted`} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={sidebarLabelCls}>Pressure (mbar)</label>
+                  <input type="number" step="0.1" value={barometricPressure} onChange={e => setBarometricPressure(e.target.value)} placeholder="â€”" className={`${inputCls} font-mono`} />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Submit */}
+      <div className="space-y-2">
+        {draftId && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-[var(--brass-pill-bg)] border-l-2 border-[var(--brass)] text-sm text-secondary">
+            {canSubmit ? (
+              <>
+                <CheckCircle2 size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
+                <span>Ready to publish â€” review and save changes.</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={15} className="text-[var(--brass)] mt-0.5 shrink-0" />
+                <span>Almost done â€” <strong className="font-medium">{reasonText}</strong> to publish as a test.</span>
+              </>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !canSubmit}
+          className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90 inline-flex items-center justify-center gap-2"
+        >
+          {mutation.isPending ? 'Savingâ€¦' : draftId ? <><CheckCircle2 size={15} /> Save Changes</> : 'Save Test'}
+        </button>
+        {!draftId && !mutation.isPending && !canSubmit && (
+          <p className="text-center text-xs text-muted tracking-wide">
+            {!rifleId ? 'Select a rifle to continue.'
+              : !pelletId ? 'Select or add a pellet.'
+              : !testDate ? 'Pick a test date.'
+              : !hasGroupOrImage ? 'Add at least one group size or upload a target photo.'
+              : !hasDistance && imageFiles.length === 0 && existingImages.length === 0 ? 'Enter a distance.'
+              : 'Complete the highlighted fields to save.'}
+          </p>
+        )}
       </div>
 
       <ConfirmDialog

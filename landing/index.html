@@ -11,7 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <style>
     /* ── Reset & Base ───────────────────────────────────── */
@@ -120,10 +120,13 @@
       display: flex; align-items: center; gap: 10px;
       text-decoration: none;
     }
-    .nav-logo svg { width: 28px; height: 28px; }
     .nav-wordmark {
-      font-size: 15px; font-weight: 600; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--text-1);
+      font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0;
+      color: var(--text-1);
     }
     .nav-right { display: flex; align-items: center; gap: 8px; }
     .btn-ghost {
@@ -196,6 +199,98 @@
       max-width: 900px; margin: 0 auto;
       display: flex; flex-direction: column; align-items: center;
       text-align: center; gap: 28px;
+    }
+    /* ── sub12 lockup: dark mode (default, matches dark page) ── */
+    .sub12-lockup {
+      display: inline-flex;
+      align-items: center;
+      gap: 28px;
+      max-width: 100%;
+      padding: 18px 22px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(212,164,74,0.22);
+      border-radius: 8px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45), 0 0 40px rgba(212,164,74,0.05);
+      text-align: left;
+    }
+    .sub12-lockup-copy { flex-shrink: 0; min-width: 0; }
+    .sub12-lockup-title {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(52px, 8vw, 76px);
+      font-weight: 700;
+      line-height: 0.9;
+      letter-spacing: 0;
+      color: #FFFFFF;
+    }
+    .sub12-lockup-sub {
+      margin-top: 14px;
+      font-size: 17px;
+      line-height: 1.2;
+      color: rgba(255,255,255,0.65);
+    }
+    .sub12-lockup-rule {
+      width: 58px;
+      height: 2.5px;
+      margin-top: 24px;
+      background: #D4A44A;
+    }
+    .sub12-lockup-url {
+      margin-top: 18px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      color: #D4A44A;
+    }
+    .sub12-target-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 22px);
+      gap: 13px;
+      flex-shrink: 0;
+    }
+    .sub12-target {
+      position: relative;
+      width: 22px;
+      height: 22px;
+      border: 0.6px solid rgba(212,164,74,0.22);
+      border-radius: 999px;
+    }
+    .sub12-target::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(212,164,74,0.28);
+    }
+    .sub12-target.hit {
+      border-color: #D4A44A;
+      border-width: 1.3px;
+    }
+    .sub12-target.hit::after {
+      width: 6px;
+      height: 6px;
+      background: #D4A44A;
+    }
+    /* ── sub12 lockup: light mode override (parchment/print feel) ── */
+    @media (prefers-color-scheme: light) {
+      .sub12-lockup {
+        background: #EFE6D2;
+        border: 1px solid #D9C9AA;
+        box-shadow: 0 18px 60px rgba(42, 31, 18, 0.20);
+      }
+      .sub12-lockup-title { color: #2A1F12; }
+      .sub12-lockup-sub   { color: #5A4632; }
+      .sub12-lockup-rule  { background: #B8741F; }
+      .sub12-lockup-url   { color: #B8741F; }
+      .sub12-target       { border: 0.6px solid rgba(63, 45, 30, 0.45); }
+      .sub12-target::after { background: rgba(63, 45, 30, 0.5); }
+      .sub12-target.hit   { border-color: #B8741F; border-width: 1.3px; }
+      .sub12-target.hit::after { width: 6px; height: 6px; background: #B8741F; }
     }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
@@ -658,11 +753,12 @@
 
     /* ── Responsive ─────────────────────────────────────── */
     @media (max-width: 640px) {
-      .nav-logo .nav-wordmark { display: none; }
       .section { padding: 64px 0; }
       .hero { min-height: auto; padding: 60px 20px; }
       .stats-inner { grid-template-columns: repeat(2, 1fr); }
       .corner { display: none; }
+      .sub12-lockup { width: 100%; justify-content: center; padding: 16px; }
+      .sub12-target-grid { display: none; }
     }
   </style>
 </head>
@@ -694,15 +790,6 @@
   <nav>
     <div class="nav-inner">
       <a href="/" class="nav-logo">
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="40" cy="40" r="35" stroke="#D4A44A" stroke-width="0.5" opacity="0.4"/>
-          <circle cx="40" cy="40" r="26" stroke="#D4A44A" stroke-width="1.5"/>
-          <circle cx="40" cy="40" r="2.5" fill="#D4A44A"/>
-          <line x1="40" y1="6"  x2="40" y2="22" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
-          <line x1="40" y1="58" x2="40" y2="74" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
-          <line x1="6"  y1="40" x2="22" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
-          <line x1="58" y1="40" x2="74" y2="40" stroke="#D4A44A" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
         <span class="nav-wordmark">SUB12</span>
       </a>
       <div class="nav-right">
@@ -740,6 +827,42 @@
     </svg>
 
     <div class="hero-content">
+      <div class="sub12-lockup" aria-label="SUB12. Precision shooting, properly tracked. sub12.io">
+        <div class="sub12-lockup-copy">
+          <div class="sub12-lockup-title">SUB12</div>
+          <div class="sub12-lockup-sub">Precision shooting, properly tracked.</div>
+          <div class="sub12-lockup-rule"></div>
+          <div class="sub12-lockup-url">sub12.io</div>
+        </div>
+        <div class="sub12-target-grid" aria-hidden="true">
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target hit"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target hit"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target hit"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+          <span class="sub12-target"></span>
+        </div>
+      </div>
+
       <div class="hero-badge">
         <span class="hero-badge-dot"></span>
         New — Clubs, Pellet AI, Analytics & More
