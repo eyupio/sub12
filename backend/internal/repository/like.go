@@ -10,7 +10,9 @@ import (
 
 // likeCountIncrementSQL returns a pre-baked UPDATE statement keyed by
 // targetType. Each branch is a compile-time constant string, so no user input
-// ever reaches SQL composition.
+// ever reaches SQL composition. The bool reports whether targetType is valid;
+// "activity" is valid but returns empty SQL because activity like counts are
+// computed from the likes table at read time rather than denormalized.
 func likeCountIncrementSQL(targetType string) (string, bool) {
 	switch targetType {
 	case "score_card":
@@ -19,6 +21,8 @@ func likeCountIncrementSQL(targetType string) (string, bool) {
 		return `UPDATE posts SET like_count = like_count + 1 WHERE id = $1`, true
 	case "comment":
 		return `UPDATE comments SET like_count = like_count + 1 WHERE id = $1`, true
+	case "activity":
+		return "", true
 	}
 	return "", false
 }
@@ -31,6 +35,8 @@ func likeCountDecrementSQL(targetType string) (string, bool) {
 		return `UPDATE posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, true
 	case "comment":
 		return `UPDATE comments SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, true
+	case "activity":
+		return "", true
 	}
 	return "", false
 }
@@ -99,7 +105,7 @@ func (r *LikeRepository) LikeTx(ctx context.Context, userID, targetID, targetTyp
 		return false, fmt.Errorf("insert like: %w", err)
 	}
 	created := tag.RowsAffected() > 0
-	if created {
+	if created && incSQL != "" {
 		if _, err := tx.Exec(ctx, incSQL, targetID); err != nil {
 			return false, fmt.Errorf("increment like_count: %w", err)
 		}
@@ -130,7 +136,7 @@ func (r *LikeRepository) UnlikeTx(ctx context.Context, userID, targetID, targetT
 		return false, fmt.Errorf("delete like: %w", err)
 	}
 	removed := tag.RowsAffected() > 0
-	if removed {
+	if removed && decSQL != "" {
 		if _, err := tx.Exec(ctx, decSQL, targetID); err != nil {
 			return false, fmt.Errorf("decrement like_count: %w", err)
 		}
