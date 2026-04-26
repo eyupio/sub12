@@ -23,6 +23,7 @@ import { AchievementsSection } from '../components/AchievementsSection'
 import { StarBadge } from '../components/StarBadge'
 import { UserAvatar } from '../components/UserAvatar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
 import { HelpIcon } from '../components/Tooltip'
@@ -72,6 +73,7 @@ function StatCard({ label, value, gold, to, params }: { label: string; value: st
 function AvatarUpload() {
   const { user, updateUser } = useAuthStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
 
   const avatarMutation = useMutation({
     mutationFn: (file: File) => usersApi.uploadAvatar(file),
@@ -82,13 +84,18 @@ function AvatarUpload() {
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast('Image must be under 5 MB', 'error')
-        return
-      }
-      avatarMutation.mutate(file)
+    e.target.value = ''
+    if (file) setEditingFile(file)
+  }
+
+  function onEdited(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be under 5 MB', 'error')
+      setEditingFile(null)
+      return
     }
+    setEditingFile(null)
+    avatarMutation.mutate(file)
   }
 
   return (
@@ -132,6 +139,15 @@ function AvatarUpload() {
             avatarUrl={user.avatar_url}
           />
         </div>
+      )}
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          aspect={1}
+          title="Edit avatar"
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
       )}
     </div>
   )

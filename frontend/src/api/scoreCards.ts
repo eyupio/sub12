@@ -104,6 +104,27 @@ export interface CreateScoreCardPayload {
   visibility?: string
 }
 
+export interface UpdateScoreCardPayload {
+  shot_at?: string
+  shot_scores?: number[]
+  shot_xs?: boolean[]
+  location?: string
+  location_lat?: number
+  location_lng?: number
+  location_id?: string
+  wind_mph?: number
+  temp_celsius?: number
+  distance_m?: number
+  discipline?: string
+  notes?: string
+  rifle_id?: string
+  pellet_id?: string
+  league_round_id?: string
+  club_id?: string
+  visibility?: string
+  card_image_rotation?: number
+}
+
 export interface Comment {
   id: string
   target_id: string
@@ -145,7 +166,7 @@ export const scoreCardApi = {
   get: (id: string) =>
     api.get<ScoreCard>(`/score-cards/${id}`),
 
-  update: (id: string, payload: CreateScoreCardPayload) =>
+  update: (id: string, payload: UpdateScoreCardPayload) =>
     api.patch<ScoreCard>(`/score-cards/${id}`, payload),
 
   remove: (id: string) =>

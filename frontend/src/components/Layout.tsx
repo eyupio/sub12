@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -40,6 +40,7 @@ const adminNavItems = [
   { to: '/admin/leagues',        icon: Trophy,  label: 'Admin Leagues', mobileLabel: 'Lgues'  },
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
   { to: '/admin/sitemap',        icon: Globe,   label: 'Sitemap & SEO', mobileLabel: 'SEO'    },
+  { to: '/admin/backup',         icon: Database, label: 'Backups',      mobileLabel: 'Backup' },
   { to: '/admin/reports',        icon: Flag,    label: 'Admin Reports', mobileLabel: 'Reports'},
   { to: '/admin/support',         icon: Inbox,   label: 'Support Inbox', mobileLabel: 'Inbox' },
 ]
@@ -233,6 +234,12 @@ export default function Layout({ children }: PropsWithChildren) {
         {/* Page content */}
         <main className={`flex-1 overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
           {children ?? <Outlet />}
+          <footer className="border-t border-subtle mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide">
+            <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
+            <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
+            <span className="opacity-70">© sub-12</span>
+          </footer>
         </main>
 
         {/* Quick-capture FAB: hidden on capture/refine pages to avoid

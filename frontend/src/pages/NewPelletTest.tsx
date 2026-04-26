@@ -7,6 +7,7 @@ import { pelletTestApi, type PelletTestImage } from '../api/pelletTesting'
 import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { LocationPicker } from '../components/LocationPicker'
 
@@ -104,6 +105,10 @@ export default function NewPelletTest() {
   ])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  // Pending file passing through the editor before being added to the
+  // batch. Multi-select goes through the editor one file at a time.
+  const [editingFile, setEditingFile] = useState<File | null>(null)
+  const [editIndex, setEditIndex] = useState<number | null>(null)
   const [existingImages, setExistingImages] = useState<PelletTestImage[]>([])
   const imagePreviewsRef = useRef<string[]>([])
   imagePreviewsRef.current = imagePreviews
@@ -179,14 +184,38 @@ export default function NewPelletTest() {
   }
 
   function handleImageSelect(file: File | undefined) {
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast('Image must be under 10 MB', 'error')
-        return
-      }
+    if (!file) return
+    setEditIndex(null)
+    setEditingFile(file)
+  }
+
+  function onEditedImage(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image must be under 10 MB', 'error')
+      setEditingFile(null)
+      setEditIndex(null)
+      return
+    }
+    if (editIndex == null) {
       setImageFiles(f => [...f, file])
       setImagePreviews(p => [...p, URL.createObjectURL(file)])
+    } else {
+      const idx = editIndex
+      setImageFiles(f => f.map((cur, i) => (i === idx ? file : cur)))
+      setImagePreviews(p => {
+        const next = [...p]
+        URL.revokeObjectURL(next[idx])
+        next[idx] = URL.createObjectURL(file)
+        return next
+      })
     }
+    setEditingFile(null)
+    setEditIndex(null)
+  }
+
+  function startEditPending(index: number) {
+    setEditIndex(index)
+    setEditingFile(imageFiles[index])
   }
 
   function removeImage(index: number) {
@@ -519,6 +548,14 @@ export default function NewPelletTest() {
                     >
                       <X size={14} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => startEditPending(idx)}
+                      className="absolute bottom-1 right-1 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] tracking-wide"
+                      aria-label="Edit photo"
+                    >
+                      Edit
+                    </button>
                   </div>
                 ))}
               </div>
@@ -782,6 +819,14 @@ export default function NewPelletTest() {
           if (!deleteDraftMutation.isPending) setConfirmDeleteDraft(false)
         }}
       />
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEditedImage}
+          onCancel={() => { setEditingFile(null); setEditIndex(null) }}
+        />
+      )}
     </div>
   )
 }

@@ -42,6 +42,7 @@ import AdminLeagueDetail from './pages/AdminLeagueDetail'
 import AdminClubs from './pages/AdminClubs'
 import AdminClubDetail from './pages/AdminClubDetail'
 import AdminSitemap from './pages/AdminSitemap'
+import AdminBackup from './pages/AdminBackup'
 import AdminReportsQueue from './pages/AdminReportsQueue'
 import AdminSupportInbox from './pages/AdminSupportInbox'
 import ConfirmEmail from './pages/ConfirmEmail'
@@ -69,6 +70,9 @@ import AdminFaqs from './pages/AdminFaqs'
 import PostDetail from './pages/PostDetail'
 import QuickCapture from './pages/QuickCapture'
 import Drafts from './pages/Drafts'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfUse from './pages/TermsOfUse'
+import CookiePolicy from './pages/CookiePolicy'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -102,6 +106,24 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: IndexPage,
+})
+
+const privacyPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy',
+  component: PrivacyPolicy,
+})
+
+const termsOfUseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terms',
+  component: TermsOfUse,
+})
+
+const cookiePolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/cookies',
+  component: CookiePolicy,
 })
 
 const scoreHistoryRoute = createRoute({
@@ -415,6 +437,12 @@ const adminSitemapRoute = createRoute({
   component: AdminSitemap,
 })
 
+const adminBackupRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/backup',
+  component: AdminBackup,
+})
+
 const adminReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/reports',
@@ -545,6 +573,9 @@ const twoFactorChallengeRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  privacyPolicyRoute,
+  termsOfUseRoute,
+  cookiePolicyRoute,
   publicPelletLeaderboardRoute,
   sharedScoreCardRoute,
   sharedPelletTestRoute,
@@ -591,6 +622,7 @@ export const routeTree = rootRoute.addChildren([
     adminClubsRoute,
     adminClubDetailRoute,
     adminSitemapRoute,
+    adminBackupRoute,
     adminReportsRoute,
     adminSupportRoute,
     adminSupportTicketDetailRoute,

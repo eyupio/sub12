@@ -27,6 +27,7 @@ import ImageMeasurement from '../components/ImageMeasurement'
 import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { useSmartBack } from '../hooks/useSmartBack'
@@ -96,6 +97,11 @@ export default function PelletTestDetail() {
   const [measureImage, setMeasureImage] = useState<PelletTestImage | null>(null)
   const [showShare, setShowShare] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null)
+  // Image editor state. `replacing` is the existing pellet-test image
+  // record being replaced; null means a fresh upload.
+  const [editingFile, setEditingFile] = useState<File | null>(null)
+  const [replacingImage, setReplacingImage] = useState<PelletTestImage | null>(null)
+  const [confirmReplace, setConfirmReplace] = useState<PelletTestImage | null>(null)
 
   // Session edit state
   const [editing, setEditing] = useState(false)
@@ -484,12 +490,51 @@ export default function PelletTestDetail() {
   })
 
   function handleImageSelect(file: File | undefined) {
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast('Image must be under 10 MB', 'error')
-        return
+    if (!file) return
+    setReplacingImage(null)
+    setEditingFile(file)
+  }
+
+  async function onEditedImage(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image must be under 10 MB', 'error')
+      setEditingFile(null)
+      setReplacingImage(null)
+      return
+    }
+    const replacing = replacingImage
+    setEditingFile(null)
+    setReplacingImage(null)
+    try {
+      await uploadMutation.mutateAsync(file)
+      if (replacing) {
+        await deleteImageMutation.mutateAsync(replacing.id)
       }
-      uploadMutation.mutate(file)
+    } catch {
+      toast('Failed to save edited photo.', 'error')
+    }
+  }
+
+  async function startEditExistingImage(img: PelletTestImage) {
+    try {
+      const res = await fetch(img.image_url, { credentials: 'include' })
+      if (!res.ok) throw new Error('fetch')
+      const blob = await res.blob()
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      const f = new File([blob], `pellet-test.${ext}`, { type: blob.type || 'image/jpeg' })
+      setReplacingImage(img)
+      setEditingFile(f)
+    } catch {
+      toast('Could not load the photo to edit.', 'error')
+    }
+  }
+
+  function requestEditExisting(img: PelletTestImage) {
+    const hasMeasurement = measurementsByImage.has(img.id)
+    if (hasMeasurement) {
+      setConfirmReplace(img)
+    } else {
+      void startEditExistingImage(img)
     }
   }
 
@@ -981,6 +1026,7 @@ export default function PelletTestDetail() {
                     sessionDistanceUnit={session.distance_unit}
                     onOpen={() => setMeasureImage(img)}
                     onDelete={() => setPendingDelete({ kind: 'image', id: img.id })}
+                    onEdit={() => requestEditExisting(img)}
                   />
                 )
               })}
@@ -1033,6 +1079,13 @@ export default function PelletTestDetail() {
           }
           isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
           saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
+          onRequestCrop={() => {
+            const img = measureImage
+            if (!img) return
+            setMeasureImage(null)
+            setPendingGroupSync(null)
+            requestEditExisting(img)
+          }}
           onClose={() => { setMeasureImage(null); setPendingGroupSync(null) }}
           defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
           defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
@@ -1084,6 +1137,27 @@ export default function PelletTestDetail() {
           setPendingDelete(null)
         }}
       />
+
+      <ConfirmDialog
+        open={confirmReplace !== null}
+        title="Edit photo?"
+        message="Editing this photo replaces it with a new copy and clears its existing measurement. You'll need to measure again."
+        confirmLabel="Edit photo"
+        onCancel={() => setConfirmReplace(null)}
+        onConfirm={() => {
+          const img = confirmReplace
+          setConfirmReplace(null)
+          if (img) void startEditExistingImage(img)
+        }}
+      />
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEditedImage}
+          onCancel={() => { setEditingFile(null); setReplacingImage(null) }}
+        />
+      )}
       </div>
     </div>
   )

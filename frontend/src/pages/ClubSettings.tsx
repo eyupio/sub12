@@ -6,6 +6,7 @@ import { clubsApi, type Club, type ClubMember } from '../api/clubs'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { UserAvatar } from '../components/UserAvatar'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 
@@ -27,6 +28,7 @@ const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disab
 function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
 
   const mutation = useMutation({
     mutationFn: (file: File) => clubsApi.uploadImage(clubId, file),
@@ -34,6 +36,16 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
     },
   })
+
+  function onEdited(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be under 5 MB', 'error')
+      setEditingFile(null)
+      return
+    }
+    setEditingFile(null)
+    mutation.mutate(file)
+  }
 
   return (
     <div className={sectionCls}>
@@ -45,16 +57,17 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0]
-          if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-              toast('Image must be under 5 MB', 'error')
-            } else {
-              mutation.mutate(file)
-            }
-          }
           e.target.value = ''
+          if (file) setEditingFile(file)
         }}
       />
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
       <div className="flex items-center gap-4">
         <button
           onClick={() => fileInputRef.current?.click()}

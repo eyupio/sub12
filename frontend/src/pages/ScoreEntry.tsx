@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { LocationPicker } from '../components/LocationPicker'
 import { useSmartBack } from '../hooks/useSmartBack'
@@ -41,6 +42,7 @@ export default function ScoreEntry() {
   const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>(userDefaultVis)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
   const [showHelp, setShowHelp] = useState(() => {
     try { return !localStorage.getItem('sub12-score-help-seen') } catch { /* localStorage unavailable */ return true }
   })
@@ -170,14 +172,19 @@ export default function ScoreEntry() {
   }
 
   function handleImageSelect(file: File | undefined) {
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast('Image must be under 10 MB', 'error')
-        return
-      }
-      setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
+    if (!file) return
+    setEditingFile(file)
+  }
+
+  function onEdited(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image must be under 10 MB', 'error')
+      return
     }
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+    setEditingFile(null)
   }
 
   function clearImage() {
@@ -186,6 +193,10 @@ export default function ScoreEntry() {
       URL.revokeObjectURL(imagePreview)
       setImagePreview(null)
     }
+  }
+
+  function startEditExisting() {
+    if (imageFile) setEditingFile(imageFile)
   }
 
   // Keyboard navigation and direct input
@@ -685,6 +696,15 @@ export default function ScoreEntry() {
                 >
                   <X size={16} />
                 </button>
+                {imageFile && (
+                  <button
+                    type="button"
+                    onClick={startEditExisting}
+                    className="absolute bottom-2 right-2 px-3 py-1 rounded-full bg-black/60 text-white text-[11px] tracking-wide"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex gap-2">
@@ -775,6 +795,14 @@ export default function ScoreEntry() {
           if (!deleteDraftMutation.isPending) setConfirmDeleteDraft(false)
         }}
       />
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
     </div>
   )
 }

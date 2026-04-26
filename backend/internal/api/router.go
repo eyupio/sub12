@@ -50,6 +50,8 @@ func NewRouter(
 	twoFactor *service.TwoFactorService,
 	communityReview *service.CommunityReviewService,
 	locations *service.LocationService,
+	backups *service.BackupService,
+	backupRepo *repository.BackupRepository,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -481,6 +483,18 @@ func NewRouter(
 				r.Post("/admin/faqs", faqH.AdminCreate)
 				r.Patch("/admin/faqs/{id}", faqH.AdminUpdate)
 				r.Delete("/admin/faqs/{id}", faqH.AdminDelete)
+
+				// Backups
+				abh := handler.NewAdminBackup(backups, backupRepo)
+				r.Get("/admin/backup/settings", abh.GetSettings)
+				r.Patch("/admin/backup/settings", abh.PatchSettings)
+				r.Post("/admin/backup/settings/test-s3", abh.TestS3)
+				r.Post("/admin/backup/run", abh.Run)
+				r.Get("/admin/backup/runs", abh.ListRuns)
+				r.Get("/admin/backup/runs/{id}/download", abh.DownloadRun)
+				r.Delete("/admin/backup/runs/{id}", abh.DeleteRun)
+				r.Post("/admin/backup/restore/{id}", abh.RestoreFromRun)
+				r.Post("/admin/backup/restore/upload", abh.RestoreFromUpload)
 
 				// Sitemap & SEO management
 				asmh := handler.NewAdminSitemap(sitemap)

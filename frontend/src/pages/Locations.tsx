@@ -10,7 +10,7 @@ import {
   type CreateLocationInput,
 } from '../api/locations'
 import { TARGET_PRESETS, CUSTOM_PRESET_ID, getPresetById } from '../config/targetPresets'
-import { useToastStore } from '../store/toast'
+import { toast } from '../store/toast'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { MapLocationPicker, type PickedLocation } from '../components/MapLocationPicker'
 
@@ -47,7 +47,6 @@ export default function Locations() {
   const updateMutation = useUpdateLocation()
   const deleteMutation = useDeleteLocation()
   const uploadImageMutation = useUploadLocationImage()
-  const { show } = useToastStore()
 
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Location | null>(null)
@@ -86,7 +85,7 @@ export default function Locations() {
 
   const handleFileSelect = (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
-      show('Image must be under 5 MB', 'error')
+      toast('Image must be under 5 MB', 'error')
       return
     }
     setPendingImage(file)
@@ -96,8 +95,8 @@ export default function Locations() {
       uploadImageMutation.mutate(
         { id: editing.id, file },
         {
-          onSuccess: () => show('Image updated', 'success'),
-          onError: () => show('Failed to upload image', 'error'),
+          onSuccess: () => toast('Image updated', 'success'),
+          onError: () => toast('Failed to upload image', 'error'),
         },
       )
     }
@@ -117,21 +116,21 @@ export default function Locations() {
     try {
       if (editing) {
         await updateMutation.mutateAsync({ id: editing.id, input: payload })
-        show('Location updated', 'success')
+        toast('Location updated', 'success')
       } else {
         const created = await createMutation.mutateAsync(payload)
         if (pendingImage) {
           try {
             await uploadImageMutation.mutateAsync({ id: created.id, file: pendingImage })
           } catch {
-            show('Saved, but image upload failed', 'error')
+            toast('Saved, but image upload failed', 'error')
           }
         }
-        show('Location saved', 'success')
+        toast('Location saved', 'success')
       }
       setShowForm(false)
     } catch {
-      show('Failed to save location', 'error')
+      toast('Failed to save location', 'error')
     }
   }
 
@@ -139,9 +138,9 @@ export default function Locations() {
     if (!confirm('Delete this location?')) return
     try {
       await deleteMutation.mutateAsync(id)
-      show('Location deleted', 'success')
+      toast('Location deleted', 'success')
     } catch {
-      show('Failed to delete location', 'error')
+      toast('Failed to delete location', 'error')
     }
   }
 

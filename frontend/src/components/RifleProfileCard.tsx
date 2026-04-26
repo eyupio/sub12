@@ -1,9 +1,10 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Package, Camera, Pencil, Trash2, Loader2 } from 'lucide-react'
 import type { Rifle } from '../api/gear'
 import type { RifleStats } from '../api/stats'
 import { toast } from '../store/toast'
+import { ImageEditor } from './ImageEditor'
 
 interface RifleProfileCardProps {
   rifle: Rifle
@@ -48,17 +49,22 @@ export function RifleProfileCard({
   globalBest,
 }: RifleProfileCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast('Image must be under 5 MB', 'error')
-      } else {
-        onUploadImage?.(file)
-      }
-    }
     e.target.value = ''
+    if (file) setEditingFile(file)
+  }
+
+  const onEdited = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be under 5 MB', 'error')
+      setEditingFile(null)
+      return
+    }
+    setEditingFile(null)
+    onUploadImage?.(file)
   }
 
   const cardContent = (
@@ -151,5 +157,16 @@ export function RifleProfileCard({
     return <Link to="/scores">{cardContent}</Link>
   }
 
-  return cardContent
+  return (
+    <>
+      {cardContent}
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
+    </>
+  )
 }

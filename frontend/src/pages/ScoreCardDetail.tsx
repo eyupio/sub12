@@ -13,6 +13,7 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FlagDialog } from '../components/FlagDialog'
+import { ImageEditor } from '../components/ImageEditor'
 import { LikeButton } from '../components/LikeButton'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { useSmartBack } from '../hooks/useSmartBack'
@@ -956,6 +957,7 @@ export default function ScoreCardDetail() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showSubmitLeague, setShowSubmitLeague] = useState(false)
   const [submitLeagueRoundId, setSubmitLeagueRoundId] = useState('')
+  const [editingFile, setEditingFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -1075,7 +1077,7 @@ export default function ScoreCardDetail() {
 
   const rotateMutation = useMutation({
     mutationFn: (rotation: number) =>
-      scoreCardApi.update(id, { card_image_rotation: rotation } as Parameters<typeof scoreCardApi.update>[1]),
+      scoreCardApi.update(id, { card_image_rotation: rotation }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['score-cards', id] }),
     onError: () => toast('Failed to rotate image', 'error'),
   })
@@ -1105,12 +1107,35 @@ export default function ScoreCardDetail() {
 
   function handleImageSelect(file: File | undefined) {
     if (!file) return
+    setEditingFile(file)
+  }
+
+  function onEdited(file: File) {
     if (file.size > 10 * 1024 * 1024) {
       toast('Image must be under 10 MB', 'error')
       return
     }
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setEditingFile(null)
+  }
+
+  function startEditPending() {
+    if (imageFile) setEditingFile(imageFile)
+  }
+
+  async function startEditExistingCardImage(url: string) {
+    try {
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) throw new Error('fetch')
+      const blob = await res.blob()
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      const f = new File([blob], `score-card.${ext}`, { type: blob.type || 'image/jpeg' })
+      setEditingFile(f)
+    } catch {
+      toast('Could not load the current photo to edit.', 'error')
+    }
   }
 
   function clearImage() {
@@ -1337,6 +1362,15 @@ export default function ScoreCardDetail() {
                 >
                   <XIcon size={16} />
                 </button>
+                {imageFile && (
+                  <button
+                    type="button"
+                    onClick={startEditPending}
+                    className="absolute bottom-2 right-2 px-3 py-1 rounded-full bg-black/60 text-white text-[11px] tracking-wide"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             ) : card.card_image_url ? (
               <div className="space-y-2">
@@ -1357,6 +1391,14 @@ export default function ScoreCardDetail() {
                   >
                     <Camera size={16} />
                     Camera
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => card.card_image_url && startEditExistingCardImage(card.card_image_url)}
+                    className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-2.5 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
+                  >
+                    <Pencil size={16} />
+                    Edit
                   </button>
                 </div>
               </div>
@@ -1797,6 +1839,14 @@ export default function ScoreCardDetail() {
             />
           </div>
         </div>
+      )}
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          onSave={onEdited}
+          onCancel={() => setEditingFile(null)}
+        />
       )}
     </div>
   )

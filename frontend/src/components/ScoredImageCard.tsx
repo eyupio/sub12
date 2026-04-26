@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Crosshair, X } from 'lucide-react'
+import { Crosshair, Pencil, X } from 'lucide-react'
 import { mmToMOA } from '../utils/ballistics'
 import { pelletDiameterMM } from '../utils/caliber'
 import type { PelletTestImage, PelletTestMeasurement, PelletTestDetection } from '../api/pelletTesting'
@@ -12,6 +12,7 @@ interface Props {
   sessionDistanceUnit?: string
   onOpen: () => void
   onDelete: () => void
+  onEdit?: () => void
 }
 
 function resolveGroupMM(m: PelletTestMeasurement): number | null {
@@ -33,6 +34,7 @@ export default function ScoredImageCard({
   sessionDistanceUnit,
   onOpen,
   onDelete,
+  onEdit,
 }: Props) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
 
@@ -143,6 +145,16 @@ export default function ScoredImageCard({
         >
           <X size={14} />
         </button>
+        {onEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
+            className="absolute bottom-1 right-1 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+            aria-label="Edit photo"
+            title="Rotate / crop photo"
+          >
+            <Pencil size={12} />
+          </button>
+        )}
       </div>
       {scored && (
         <div className="mt-1 grid grid-cols-2 gap-x-2 text-[10px] text-muted font-mono leading-tight">
