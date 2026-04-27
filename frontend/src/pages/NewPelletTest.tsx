@@ -8,8 +8,8 @@ import { gearApi, CreatePelletPayload } from '../api/gear'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
-import { LocationField, type LocationValue } from '../components/LocationField'
-import { LocationPicker } from '../components/LocationPicker'
+import { type LocationValue } from '../components/LocationField'
+import { PlaceSelector } from '../components/PlaceSelector'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -150,6 +150,7 @@ export default function NewPelletTest() {
         lng: draft.location_lng ?? undefined,
       })
     }
+    if (draft.location_id) setSavedLocationId(draft.location_id)
     if (draft.wind_mph != null) setWindMph(String(draft.wind_mph))
     if (draft.temp_celsius != null) setTempCelsius(String(draft.temp_celsius))
     if (draft.humidity_pct != null) setHumidityPct(String(draft.humidity_pct))
@@ -668,26 +669,18 @@ export default function NewPelletTest() {
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
             <div className="space-y-1.5">
-              <label className={sidebarLabelCls}>Saved Location</label>
-              <LocationPicker
-                value={savedLocationId}
-                onChange={setSavedLocationId}
-                onApplyDefaults={(loc, lat, lng) => {
-                  if (loc?.default_distance_m != null) {
-                    setDistanceValue(String(loc.default_distance_m))
-                    if (loc.default_distance_unit) setDistanceUnit(loc.default_distance_unit)
-                  }
-                  if (lat != null && lng != null) {
-                    setLocation(prev => ({ ...prev, lat, lng }))
+              <label className={sidebarLabelCls}>Location</label>
+              <PlaceSelector
+                locationId={savedLocationId}
+                onLocationIdChange={setSavedLocationId}
+                location={location}
+                onLocationChange={setLocation}
+                onApplyDefaults={place => {
+                  if (place.default_distance_m != null) {
+                    setDistanceValue(String(place.default_distance_m))
+                    if (place.default_distance_unit) setDistanceUnit(place.default_distance_unit)
                   }
                 }}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className={sidebarLabelCls}>Location</label>
-              <LocationField
-                value={location}
-                onChange={setLocation}
                 inputClassName={`${inputCls} placeholder:text-muted`}
               />
             </div>

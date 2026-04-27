@@ -28,7 +28,8 @@ import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
-import { LocationField, type LocationValue } from '../components/LocationField'
+import { type LocationValue } from '../components/LocationField'
+import { PlaceSelector } from '../components/PlaceSelector'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { useSmartBack } from '../hooks/useSmartBack'
 
@@ -114,6 +115,7 @@ export default function PelletTestDetail() {
     is_public: false,
   })
   const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
+  const [editLocationId, setEditLocationId] = useState<string | null>(null)
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -192,6 +194,7 @@ export default function PelletTestDetail() {
         location: editLocation.label || undefined,
         location_lat: editLocation.lat,
         location_lng: editLocation.lng,
+        location_id: editLocationId ?? undefined,
         notes: editMeta.notes || undefined,
         is_public: editMeta.is_public,
       })
@@ -226,6 +229,7 @@ export default function PelletTestDetail() {
       lat: session.location_lat ?? undefined,
       lng: session.location_lng ?? undefined,
     })
+    setEditLocationId(session.location_id ?? null)
     setEditing(true)
   }
 
@@ -714,14 +718,10 @@ export default function PelletTestDetail() {
       {editing && (
         <div className="space-y-3 border border-gold/40 rounded-lg p-4 bg-gold-tint/30">
           <h2 className="t-section-title">Edit Test Details</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label htmlFor="pellet-edit-test-date" className="block t-section-title mb-1">Test Date</label>
               <input id="pellet-edit-test-date" type="date" value={editMeta.test_date} onChange={e => setEditMeta(m => ({ ...m, test_date: e.target.value }))} className={inputCls + ' font-mono'} />
-            </div>
-            <div>
-              <label htmlFor="pellet-edit-location" className="block t-section-title mb-1">Location</label>
-              <LocationField value={editLocation} onChange={setEditLocation} inputClassName={inputCls} />
             </div>
             <div>
               <label htmlFor="pellet-edit-distance" className="block t-section-title mb-1">Distance</label>
@@ -734,6 +734,25 @@ export default function PelletTestDetail() {
                 <option value="yards">yards</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label htmlFor="pellet-edit-location" className="block t-section-title mb-1">Location</label>
+            <PlaceSelector
+              locationId={editLocationId}
+              onLocationIdChange={setEditLocationId}
+              location={editLocation}
+              onLocationChange={setEditLocation}
+              onApplyDefaults={place => {
+                if (place.default_distance_m != null) {
+                  setEditMeta(m => ({
+                    ...m,
+                    distance_value: String(place.default_distance_m),
+                    distance_unit: place.default_distance_unit ?? m.distance_unit,
+                  }))
+                }
+              }}
+              inputClassName={inputCls}
+            />
           </div>
           <div>
             <label htmlFor="pellet-edit-notes" className="block t-section-title mb-1">Notes</label>

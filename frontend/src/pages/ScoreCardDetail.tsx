@@ -16,7 +16,8 @@ import { SubmitToLeagueDialog } from '../components/SubmitToLeagueDialog'
 import { FlagDialog } from '../components/FlagDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { LikeButton } from '../components/LikeButton'
-import { LocationField, type LocationValue } from '../components/LocationField'
+import { type LocationValue } from '../components/LocationField'
+import { PlaceSelector } from '../components/PlaceSelector'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { Tooltip } from '../components/Tooltip'
 import { tips } from '../components/tooltips'
@@ -957,6 +958,7 @@ export default function ScoreCardDetail() {
   const [editShots, setEditShots] = useState<Shot[]>([])
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '', distance_m: '', discipline: '' })
   const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
+  const [editLocationId, setEditLocationId] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showSubmitLeague, setShowSubmitLeague] = useState(false)
@@ -1031,6 +1033,7 @@ export default function ScoreCardDetail() {
         location: editLocation.label || undefined,
         location_lat: editLocation.lat,
         location_lng: editLocation.lng,
+        location_id: editLocationId ?? undefined,
         notes: editMeta.notes || undefined,
         rifle_id: editMeta.rifle_id || undefined,
         pellet_id: editMeta.pellet_id || undefined,
@@ -1149,6 +1152,7 @@ export default function ScoreCardDetail() {
       lat: card.location_lat ?? undefined,
       lng: card.location_lng ?? undefined,
     })
+    setEditLocationId(card.location_id ?? null)
     setEditing(true)
   }
 
@@ -1277,18 +1281,20 @@ export default function ScoreCardDetail() {
               <input type="date" value={editMeta.shot_at} onChange={e => setEditMeta(m => ({ ...m, shot_at: e.target.value }))} className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
             <div>
-              <label className="block t-section-title mb-1">Location</label>
-              <LocationField
-                value={editLocation}
-                onChange={setEditLocation}
-                inputClassName="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
-              />
-            </div>
-            <div>
               <label className="block t-section-title mb-1">Distance (m)</label>
               <input type="number" min={0} value={editMeta.distance_m} onChange={e => setEditMeta(m => ({ ...m, distance_m: e.target.value }))} placeholder="e.g. 25" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary font-mono placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
-            <div>
+            <div className="col-span-2">
+              <label className="block t-section-title mb-1">Location</label>
+              <PlaceSelector
+                locationId={editLocationId}
+                onLocationIdChange={setEditLocationId}
+                location={editLocation}
+                onLocationChange={setEditLocation}
+                inputClassName="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+              />
+            </div>
+            <div className="col-span-2">
               <label className="block t-section-title mb-1">Discipline</label>
               <input type="text" value={editMeta.discipline} onChange={e => setEditMeta(m => ({ ...m, discipline: e.target.value }))} placeholder="e.g. Benchrest" className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50" />
             </div>
