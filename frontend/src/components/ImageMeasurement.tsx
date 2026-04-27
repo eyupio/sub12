@@ -23,6 +23,8 @@ interface Props {
   defaultMeasurementUnit?: 'cm' | 'mm'
   isSaving?: boolean
   saveError?: string | null
+  /** When true the wizard fills its parent box (no fixed-position backdrop / X button) so it can embed inline. */
+  chromeless?: boolean
 }
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -58,6 +60,7 @@ export default function ImageMeasurement({
   defaultMeasurementUnit,
   isSaving = false,
   saveError = null,
+  chromeless = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -699,7 +702,7 @@ export default function ImageMeasurement({
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-page">
+    <div className={chromeless ? 'flex flex-col bg-page rounded-lg border border-line overflow-hidden h-[calc(100vh-12rem)] min-h-[520px]' : 'fixed inset-0 z-50 flex flex-col bg-page'}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-subtle">
         <button onClick={goBack} className="text-primary p-1"><ArrowLeft size={20} /></button>
@@ -711,7 +714,9 @@ export default function ImageMeasurement({
           >
             Reset
           </button>
-          <button onClick={onClose} className="text-primary p-1"><XIcon size={20} /></button>
+          {!chromeless && (
+            <button onClick={onClose} className="text-primary p-1"><XIcon size={20} /></button>
+          )}
         </div>
       </div>
 
