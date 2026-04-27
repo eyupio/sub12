@@ -43,6 +43,7 @@ export interface ActivityItem {
     achievement_name?: string
     achievement_icon?: string
     achievement_description?: string
+    earned_count?: number
     title?: string
     status?: string
     scope_type?: string

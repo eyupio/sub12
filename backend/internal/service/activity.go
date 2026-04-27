@@ -19,15 +19,22 @@ type MemberChecker interface {
 	IsMember(ctx context.Context, entityID, userID string) (bool, error)
 }
 
-type ActivityService struct {
-	repo          *repository.ActivityRepository
-	log           zerolog.Logger
-	leagueMembers MemberChecker // nil disables league feed
-	clubMembers   MemberChecker // nil disables club feed
+// AchievementCounter returns the number of distinct users who have earned each
+// of the given achievement ids. Used to enrich feed cards with a live count.
+type AchievementCounter interface {
+	CountEarners(ctx context.Context, ids []string) (map[string]int, error)
 }
 
-func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger, leagueMembers, clubMembers MemberChecker) *ActivityService {
-	return &ActivityService{repo: repo, log: log, leagueMembers: leagueMembers, clubMembers: clubMembers}
+type ActivityService struct {
+	repo               *repository.ActivityRepository
+	log                zerolog.Logger
+	leagueMembers      MemberChecker      // nil disables league feed
+	clubMembers        MemberChecker      // nil disables club feed
+	achievementCounter AchievementCounter // nil disables earner-count enrichment
+}
+
+func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger, leagueMembers, clubMembers MemberChecker, achievementCounter AchievementCounter) *ActivityService {
+	return &ActivityService{repo: repo, log: log, leagueMembers: leagueMembers, clubMembers: clubMembers, achievementCounter: achievementCounter}
 }
 
 // SyncPostEdit patches the feed's post_created metadata after a post edit.
@@ -115,6 +122,8 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		return nil, err
 	}
 
+	s.enrichAchievementCounts(ctx, items)
+
 	var nextCursor string
 	if len(items) == req.Limit {
 		nextCursor = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)
@@ -169,6 +178,61 @@ func (s *ActivityService) GetByID(ctx context.Context, activityID string) (*mode
 		return nil, err
 	}
 	return a, nil
+}
+
+// enrichAchievementCounts overwrites the Metadata of each achievement_earned
+// activity with a copy that includes the live earner count. The count is
+// computed in a single batched query against user_achievements. Failures are
+// logged but non-fatal — the feed still renders without the count.
+func (s *ActivityService) enrichAchievementCounts(ctx context.Context, items []*model.Activity) {
+	if s.achievementCounter == nil || len(items) == 0 {
+		return
+	}
+
+	type pending struct {
+		item *model.Activity
+		meta model.AchievementEarnedMeta
+	}
+	var pendings []pending
+	idSet := make(map[string]struct{})
+	for _, it := range items {
+		if it == nil || it.Type != model.ActivityAchievementEarned || len(it.Metadata) == 0 {
+			continue
+		}
+		var m model.AchievementEarnedMeta
+		if err := json.Unmarshal(it.Metadata, &m); err != nil {
+			s.log.Warn().Err(err).Str("activity_id", it.ID).Msg("activity: decode achievement meta")
+			continue
+		}
+		if m.AchievementID == "" {
+			continue
+		}
+		pendings = append(pendings, pending{item: it, meta: m})
+		idSet[m.AchievementID] = struct{}{}
+	}
+	if len(pendings) == 0 {
+		return
+	}
+
+	ids := make([]string, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+	counts, err := s.achievementCounter.CountEarners(ctx, ids)
+	if err != nil {
+		s.log.Warn().Err(err).Msg("activity: count achievement earners")
+		return
+	}
+
+	for _, p := range pendings {
+		p.meta.EarnedCount = counts[p.meta.AchievementID]
+		b, err := json.Marshal(p.meta)
+		if err != nil {
+			s.log.Warn().Err(err).Str("activity_id", p.item.ID).Msg("activity: encode achievement meta")
+			continue
+		}
+		p.item.Metadata = b
+	}
 }
 
 func truncateForFeed(s string, maxLen int) string {
