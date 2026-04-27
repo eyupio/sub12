@@ -128,8 +128,8 @@ function applyAspect(r: Rect, ratio: number, anchor: 'center' | Handle, maxW: nu
 export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = 'Edit photo', quality = 0.92 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const imgRef = useRef<HTMLImageElement | null>(null)
 
+  const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [exifRotation, setExifRotation] = useState(0)
   const [exifFlipH, setExifFlipH] = useState(false)
@@ -146,6 +146,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
   // Load file → object URL → Image, plus EXIF orientation.
   useEffect(() => {
     let cancelled = false
+    setImage(null)
     const url = URL.createObjectURL(file)
     setImageUrl(url)
     ;(async () => {
@@ -157,7 +158,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
         setExifFlipH(flipH)
         const img = await loadImage(url)
         if (cancelled) return
-        imgRef.current = img
+        setImage(img)
       } catch {
         if (!cancelled) toast('Could not read image — please pick a different one.', 'error')
       }
@@ -185,21 +186,20 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
   // Compute the displayed image dimensions on the canvas given the current
   // rotation. We always fit-contain so the whole image is visible while editing.
   const displayMetrics = useMemo(() => {
-    const img = imgRef.current
-    if (!img || stageSize.w === 0 || stageSize.h === 0) {
+    if (!image || stageSize.w === 0 || stageSize.h === 0) {
       return { drawW: 0, drawH: 0, offsetX: 0, offsetY: 0, sourceW: 0, sourceH: 0, totalRot: 0 }
     }
     const totalRot = (exifRotation + rotation + 360) % 360
     const swapped = totalRot === 90 || totalRot === 270
-    const sourceW = swapped ? img.naturalHeight : img.naturalWidth
-    const sourceH = swapped ? img.naturalWidth : img.naturalHeight
+    const sourceW = swapped ? image.naturalHeight : image.naturalWidth
+    const sourceH = swapped ? image.naturalWidth : image.naturalHeight
     const scale = Math.min(stageSize.w / sourceW, stageSize.h / sourceH)
     const drawW = sourceW * scale
     const drawH = sourceH * scale
     const offsetX = (stageSize.w - drawW) / 2
     const offsetY = (stageSize.h - drawH) / 2
     return { drawW, drawH, offsetX, offsetY, sourceW, sourceH, totalRot }
-  }, [exifRotation, rotation, stageSize])
+  }, [image, exifRotation, rotation, stageSize])
 
   // Reset / recompute the crop rect when image, rotation, or ratio changes.
   useEffect(() => {
@@ -224,7 +224,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
   // Draw the canvas on every frame-relevant change.
   useEffect(() => {
     const canvas = canvasRef.current
-    const img = imgRef.current
+    const img = image
     if (!canvas || !img || stageSize.w === 0) return
     const dpr = window.devicePixelRatio || 1
     canvas.width = Math.floor(stageSize.w * dpr)
@@ -290,7 +290,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     for (const [hx, hy] of handles) {
       ctx.fillRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE)
     }
-  }, [stageSize, displayMetrics, crop, exifFlipH])
+  }, [image, stageSize, displayMetrics, crop, exifFlipH])
 
   // Hit-test which handle (if any) the pointer is over.
   function hitTest(px: number, py: number): Handle {
@@ -442,7 +442,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
   }
 
   async function apply() {
-    const img = imgRef.current
+    const img = image
     if (!img || !crop) return
     setBusy(true)
     try {
