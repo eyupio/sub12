@@ -112,6 +112,9 @@ type AchievementEarnedMeta struct {
 	AchievementName        string `json:"achievement_name"`
 	AchievementIcon        string `json:"achievement_icon,omitempty"`
 	AchievementDescription string `json:"achievement_description,omitempty"`
+	// EarnedCount is populated at feed-read time with the number of distinct
+	// users who have earned this achievement. Not persisted to the activities row.
+	EarnedCount int `json:"earned_count,omitempty"`
 }
 
 // FeatureRequestMeta is the JSONB metadata for ActivityFeatureRequestCreated and

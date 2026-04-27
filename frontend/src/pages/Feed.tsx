@@ -1091,7 +1091,11 @@ function AchievementPost({ post }: { post: FeedPost }) {
         {item.metadata?.achievement_description && <p>{item.metadata.achievement_description}</p>}
         <div className="achievement-meta">
           <span className="rarity rarity-uncommon">Uncommon</span>
-          <span>earned by SUB12 shooters</span>
+          <span>
+            {typeof item.metadata?.earned_count === 'number' && item.metadata.earned_count > 0
+              ? `earned by ${item.metadata.earned_count} SUB12 shooter${item.metadata.earned_count === 1 ? '' : 's'}`
+              : 'earned by SUB12 shooters'}
+          </span>
         </div>
       </div>
     </div>

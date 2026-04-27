@@ -67,6 +67,35 @@ func (r *AchievementRepository) ListDefs(ctx context.Context) ([]*model.Achievem
 	return items, rows.Err()
 }
 
+// CountEarners returns a map keyed by achievement id holding the number of
+// distinct users who have earned each of the given achievements. Achievement
+// ids with zero earners are simply absent from the returned map.
+func (r *AchievementRepository) CountEarners(ctx context.Context, ids []string) (map[string]int, error) {
+	out := make(map[string]int, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT achievement_id, COUNT(*)
+		FROM user_achievements
+		WHERE achievement_id = ANY($1)
+		GROUP BY achievement_id
+	`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("count earners: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("scan earner count: %w", err)
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}
+
 // ListForUser returns all achievements earned by a user, newest first.
 func (r *AchievementRepository) ListForUser(ctx context.Context, userID string) ([]*model.UserAchievement, error) {
 	rows, err := r.db.Query(ctx, `

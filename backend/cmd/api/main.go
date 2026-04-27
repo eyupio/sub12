@@ -77,9 +77,9 @@ func main() {
 	leagueRepo := repository.NewLeagueRepository(pool)
 	clubRepo := repository.NewClubRepository(pool)
 
-	activitySvc := service.NewActivityService(activityRepo, log.Logger, leagueRepo, clubRepo)
-
 	achievementRepo := repository.NewAchievementRepository(pool)
+
+	activitySvc := service.NewActivityService(activityRepo, log.Logger, leagueRepo, clubRepo, achievementRepo)
 	blockRepo := repository.NewBlockRepository(pool)
 
 	postRepo := repository.NewPostRepository(pool)
