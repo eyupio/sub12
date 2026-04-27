@@ -37,7 +37,7 @@ function ConfirmDeleteModal({ user, onConfirm, onCancel, isPending }: {
       <div className="relative w-full sm:max-w-sm bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="t-section-title">Delete User</h2>
-          <button onClick={onCancel} className="text-muted hover:text-secondary transition-colors">
+          <button onClick={onCancel} aria-label="Close" className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
         </div>
