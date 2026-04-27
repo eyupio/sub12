@@ -95,7 +95,7 @@ func (r *EventRepository) Create(ctx context.Context, ownerID string, in *model.
 		}
 		var ev model.Event
 		err = r.db.QueryRow(ctx, `
-			INSERT INTO events (
+			INSERT INTO events AS e (
 				slug, name, description, location, starts_at, ends_at,
 				discipline, course, scoring_rules, category_ids,
 				visibility, state, owner_user_id, club_id
@@ -302,7 +302,7 @@ func (r *EventRepository) Update(ctx context.Context, id string, in *model.Updat
 	}
 
 	row := r.db.QueryRow(ctx, `
-		UPDATE events SET
+		UPDATE events AS e SET
 			name          = COALESCE($2, name),
 			description   = COALESCE($3, description),
 			location      = COALESCE($4, location),
