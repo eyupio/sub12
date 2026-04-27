@@ -23,6 +23,10 @@ const (
 	ActivityPostCreated               ActivityType = "post_created"
 	ActivityCommunityReviewRequested  ActivityType = "community_review_requested"
 	ActivityCommunityReviewVerified   ActivityType = "community_review_verified"
+	ActivityEventCreated              ActivityType = "event_created"
+	ActivityEventJoined               ActivityType = "event_joined"
+	ActivityEventWentLive             ActivityType = "event_went_live"
+	ActivityEventCompletedWithResults ActivityType = "event_completed_with_results"
 )
 
 // FeedFilter controls which slice of the activity feed to return.

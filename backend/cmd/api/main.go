@@ -226,6 +226,16 @@ func main() {
 
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 
+	// Live Events
+	categoryRepo := repository.NewCategoryRepository(pool)
+	categorySvc := service.NewCategoryService(categoryRepo)
+	eventRepo := repository.NewEventRepository(pool)
+	eventSvc := service.NewEventService(eventRepo, clubRepo, categoryRepo, activitySvc, achievementSvc)
+	achievementSvc.SetEventCounts(eventRepo)
+
+	// Daily archive sweep for completed events whose 30-day window has elapsed.
+	go runEventArchiveSweep(ctx, eventSvc)
+
 	backupRepo := repository.NewBackupRepository(pool)
 	backupSvc := service.NewBackupService(backupRepo, service.BackupConfig{
 		DBHost:     cfg.DBHost,
@@ -238,7 +248,7 @@ func main() {
 	backupScheduler := service.NewBackupScheduler(backupRepo, backupSvc, log.Logger)
 	go backupScheduler.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -264,4 +274,35 @@ func main() {
 		log.Error().Err(err).Msg("graceful shutdown failed")
 	}
 	log.Info().Msg("server stopped")
+}
+
+// runEventArchiveSweep flips completed events past their 30-day window into
+// the archived state once a day. Logs the count for visibility; failures are
+// non-fatal and retried on the next tick.
+func runEventArchiveSweep(ctx context.Context, eventSvc *service.EventService) {
+	tick := time.NewTicker(24 * time.Hour)
+	defer tick.Stop()
+	// First run shortly after start so a stale deployment catches up.
+	first := time.NewTimer(2 * time.Minute)
+	defer first.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			n, err := eventSvc.RunArchiveSweep(ctx)
+			if err != nil {
+				log.Warn().Err(err).Msg("event archive sweep failed")
+			} else if n > 0 {
+				log.Info().Int("archived", n).Msg("event archive sweep")
+			}
+		case <-tick.C:
+			n, err := eventSvc.RunArchiveSweep(ctx)
+			if err != nil {
+				log.Warn().Err(err).Msg("event archive sweep failed")
+			} else if n > 0 {
+				log.Info().Int("archived", n).Msg("event archive sweep")
+			}
+		}
+	}
 }

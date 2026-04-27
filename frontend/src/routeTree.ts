@@ -73,6 +73,13 @@ import Drafts from './pages/Drafts'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfUse from './pages/TermsOfUse'
 import CookiePolicy from './pages/CookiePolicy'
+import Events from './pages/Events'
+import EventCreate from './pages/EventCreate'
+import EventDetail from './pages/EventDetail'
+import EventLive from './pages/EventLive'
+import EventScorecard from './pages/EventScorecard'
+import EventSettings from './pages/EventSettings'
+import AdminCategories from './pages/AdminCategories'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -210,6 +217,48 @@ const leagueReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues/$id/reports',
   component: LeagueReportsPage,
+})
+
+const eventsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events',
+  component: Events,
+})
+
+const eventCreateRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/new',
+  component: EventCreate,
+})
+
+const eventDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/$slug',
+  component: EventDetail,
+})
+
+const eventLiveRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/$slug/live',
+  component: EventLive,
+})
+
+const eventScorecardRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/$slug/scorecard',
+  component: EventScorecard,
+})
+
+const eventSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/$slug/settings',
+  component: EventSettings,
+})
+
+const adminCategoriesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/categories',
+  component: AdminCategories,
 })
 
 const pelletTestingRoute = createRoute({
@@ -610,6 +659,13 @@ export const routeTree = rootRoute.addChildren([
     leagueDetailRoute,
     leagueSettingsRoute,
     leagueReportsRoute,
+    eventsRoute,
+    eventCreateRoute,
+    eventDetailRoute,
+    eventLiveRoute,
+    eventScorecardRoute,
+    eventSettingsRoute,
+    adminCategoriesRoute,
     clubsRoute,
     clubDetailRoute,
     clubSettingsRoute,

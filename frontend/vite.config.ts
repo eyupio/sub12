@@ -31,6 +31,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The bundled SPA chunk has crept above the 2 MiB default precache
+        // limit as more features land (now ~2.1 MiB). Raise the ceiling so the
+        // service worker continues to precache the shell instead of falling
+        // back to network-only for the main entry. A code-splitting pass
+        // would be a more durable fix.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Prevent the service worker from serving the SPA shell for
         // backend-generated SEO endpoints (sitemap, robots, IndexNow key files).
         navigateFallbackDenylist: [

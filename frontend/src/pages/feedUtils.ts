@@ -188,6 +188,26 @@ function fallbackBody(item: ActivityItem): string {
       return item.metadata?.title ? `Feature request: ${item.metadata.title}` : 'Created a feature request'
     case 'feature_request_implemented':
       return item.metadata?.title ? `Feature implemented: ${item.metadata.title}` : 'Feature implemented'
+    case 'event_created':
+      return item.metadata?.event_name
+        ? `Created live event: ${item.metadata.event_name}`
+        : 'Created a live event'
+    case 'event_joined':
+      return item.metadata?.event_name
+        ? `Joined live event: ${item.metadata.event_name}`
+        : 'Joined a live event'
+    case 'event_went_live':
+      return item.metadata?.event_name
+        ? `${item.metadata.event_name} is now live`
+        : 'A live event has started'
+    case 'event_completed_with_results': {
+      const m = item.metadata ?? {}
+      if (m.event_name && m.position && m.points != null) {
+        const ordinal = m.position === 1 ? '1st' : m.position === 2 ? '2nd' : m.position === 3 ? '3rd' : `${m.position}th`
+        return `Finished ${ordinal} at ${m.event_name} with ${m.points} pts`
+      }
+      return m.event_name ? `${m.event_name} results posted` : 'Live event results posted'
+    }
     default:
       return 'Posted an update'
   }
