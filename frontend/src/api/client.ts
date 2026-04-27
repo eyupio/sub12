@@ -59,7 +59,15 @@ async function handleUnauthorized(): Promise<boolean> {
 
 async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
   const { body, headers, ...rest } = options
-  const token = useAuthStore.getState().accessToken
+  let token = useAuthStore.getState().accessToken
+
+  // After a page reload the access token (in-memory only) is gone but the
+  // persisted user remains. Refresh upfront so OptionalAuthenticate-gated
+  // endpoints see the viewer and return owner/scorer flags correctly.
+  if (!token && !path.startsWith(AUTH_PATH_PREFIX) && useAuthStore.getState().user) {
+    await handleUnauthorized()
+    token = useAuthStore.getState().accessToken
+  }
 
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
@@ -99,7 +107,12 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
 }
 
 async function requestMultipart<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
-  const token = useAuthStore.getState().accessToken
+  let token = useAuthStore.getState().accessToken
+
+  if (!token && !path.startsWith(AUTH_PATH_PREFIX) && useAuthStore.getState().user) {
+    await handleUnauthorized()
+    token = useAuthStore.getState().accessToken
+  }
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
