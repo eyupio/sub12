@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMeasurementSync } from '../hooks/useMeasurementSync'
 import {
   LineChart,
   Line,
@@ -18,18 +19,14 @@ import {
   pelletTestApi,
   PelletTestGroup,
   PelletTestImage,
-  type CreateMeasurementPayload,
   type PelletTestMeasurement,
   type PelletTestDetection,
 } from '../api/pelletTesting'
-import type { DetectedHole } from '../utils/holeDetection'
 import ImageMeasurement from '../components/ImageMeasurement'
 import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
-import { type LocationValue } from '../components/LocationField'
-import { PlaceSelector } from '../components/PlaceSelector'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { useSmartBack } from '../hooks/useSmartBack'
 
@@ -86,13 +83,9 @@ export default function PelletTestDetail() {
   const [newGroupNotes, setNewGroupNotes] = useState('')
   const [newGroupMethod, setNewGroupMethod] = useState<'manual' | 'image'>('manual')
   const [newGroupImageId, setNewGroupImageId] = useState('')
-  type PendingGroupSync =
-    | { mode: 'update'; groupId: string }
-    | { mode: 'create'; shotCount: number; notes?: string }
-    | null
-  const [pendingGroupSync, setPendingGroupSync] = useState<PendingGroupSync>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate()
 
   // Measurement modal state
   const [measureImage, setMeasureImage] = useState<PelletTestImage | null>(null)
@@ -104,18 +97,6 @@ export default function PelletTestDetail() {
   const [replacingImage, setReplacingImage] = useState<PelletTestImage | null>(null)
   const [confirmReplace, setConfirmReplace] = useState<PelletTestImage | null>(null)
 
-  // Session edit state
-  const [editing, setEditing] = useState(false)
-  const [editMeta, setEditMeta] = useState({
-    test_date: '',
-    distance_value: '',
-    distance_unit: 'meters',
-    location: '',
-    notes: '',
-    is_public: false,
-  })
-  const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
-  const [editLocationId, setEditLocationId] = useState<string | null>(null)
 
   const { data: session, isLoading } = useQuery({
     queryKey: ['pellet-tests', id],
@@ -184,55 +165,6 @@ export default function PelletTestDetail() {
     },
   })
 
-  const updateSessionMutation = useMutation({
-    mutationFn: () => {
-      const distance = editMeta.distance_value === '' ? undefined : Number(editMeta.distance_value)
-      return pelletTestApi.update(id!, {
-        test_date: editMeta.test_date || undefined,
-        distance_value: distance,
-        distance_unit: editMeta.distance_unit || undefined,
-        location: editLocation.label || undefined,
-        location_lat: editLocation.lat,
-        location_lng: editLocation.lng,
-        location_id: editLocationId ?? undefined,
-        notes: editMeta.notes || undefined,
-        is_public: editMeta.is_public,
-      })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-tests'] })
-      setEditing(false)
-      toast('Pellet test updated', 'success')
-    },
-    onError: () => {
-      toast('Failed to update pellet test', 'error')
-    },
-  })
-
-  const startSessionEdit = () => {
-    if (!session) return
-    const unit = session.distance_unit || 'meters'
-    const distanceValue = unit === 'yards'
-      ? (session.distance_m / 0.9144).toFixed(0)
-      : String(session.distance_m)
-    setEditMeta({
-      test_date: session.test_date,
-      distance_value: distanceValue,
-      distance_unit: unit,
-      location: session.location ?? '',
-      notes: session.notes ?? '',
-      is_public: session.is_public,
-    })
-    setEditLocation({
-      label: session.location ?? '',
-      lat: session.location_lat ?? undefined,
-      lng: session.location_lng ?? undefined,
-    })
-    setEditLocationId(session.location_id ?? null)
-    setEditing(true)
-  }
-
   const addGroupMutation = useMutation({
     mutationFn: () => pelletTestApi.createGroup(id!, {
       shot_count: newShotCount,
@@ -254,11 +186,10 @@ export default function PelletTestDetail() {
   const startImageGroupMeasurement = () => {
     const picked = (session?.images ?? []).find(img => img.id === newGroupImageId)
     if (!picked) return
-    setPendingGroupSync({
-      mode: 'create',
-      shotCount: newShotCount,
-      notes: newGroupNotes || undefined,
-    })
+    if (id) {
+      navigate({ to: '/pellet-testing/new', search: { draftId: id, step: 4, imageId: picked.id } })
+      return
+    }
     setMeasureImage(picked)
     setAddingGroup(false)
     setNewGroupSize('')
@@ -276,81 +207,6 @@ export default function PelletTestDetail() {
     },
   })
 
-  const syncMeasuredGroupMutation = useMutation({
-    mutationFn: ({ groupId, sizeMM, shotCount }: { groupId: string; sizeMM: number; shotCount: number }) => {
-      const existing = session?.groups?.find(g => g.id === groupId)
-      return pelletTestApi.updateGroup(id!, groupId, {
-        group_size_mm: sizeMM,
-        shot_count: shotCount > 0 ? shotCount : (existing?.shot_count ?? newShotCount),
-        notes: withSourceTag(existing?.notes, 'image'),
-      })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-    },
-  })
-
-  async function syncGroupFromAnalysis(args: {
-    imageId: string
-    measurementId: string
-    existingGroupId?: string
-    analyzedSizeMM?: number | null
-    analyzedShotCount?: number
-  }) {
-    const { imageId, measurementId, existingGroupId, analyzedSizeMM, analyzedShotCount } = args
-    if (!analyzedSizeMM || analyzedSizeMM <= 0) return
-
-    // When the user explicitly picked "add a new group from image", always create a
-    // fresh group — even if the image was already linked to one from a prior score.
-    const forceCreate = pendingGroupSync?.mode === 'create'
-    const targetGroupId =
-      pendingGroupSync?.mode === 'update'
-        ? pendingGroupSync.groupId
-        : forceCreate
-          ? undefined
-          : existingGroupId
-
-    const resolvedShotCount = (() => {
-      if (analyzedShotCount && analyzedShotCount > 0) return analyzedShotCount
-      if (pendingGroupSync?.mode === 'create') return pendingGroupSync.shotCount
-      if (targetGroupId) {
-        const existing = session?.groups?.find(g => g.id === targetGroupId)
-        if (existing?.shot_count) return existing.shot_count
-      }
-      return newShotCount
-    })()
-
-    if (targetGroupId) {
-      // Fall back to creating a new group when the linked group has been
-      // deleted out from under us — the loaded session data is the source
-      // of truth. Without this, re-saving a measurement whose group was
-      // removed would 404 and surface a "Failed to save" toast.
-      const linkedGroupExists = session?.groups?.some(g => g.id === targetGroupId)
-      if (linkedGroupExists) {
-        await syncMeasuredGroupMutation.mutateAsync({
-          groupId: targetGroupId,
-          sizeMM: analyzedSizeMM,
-          shotCount: resolvedShotCount,
-        })
-        return
-      }
-    }
-
-    const notes = pendingGroupSync?.mode === 'create' ? pendingGroupSync.notes : undefined
-    const created = await pelletTestApi.createGroup(id!, {
-      shot_count: resolvedShotCount,
-      group_size_mm: analyzedSizeMM,
-      notes: withSourceTag(notes, 'image'),
-    })
-    try {
-      await pelletTestApi.updateMeasurement(id!, imageId, measurementId, { group_id: created.id })
-    } catch {
-      // Link-back is best-effort: the group is persisted either way. On re-score without
-      // the link the next save would create a second group, but that's recoverable.
-    }
-  }
-
   const uploadMutation = useMutation({
     mutationFn: (file: File) => pelletTestApi.uploadImage(id!, file),
     onSuccess: () => {
@@ -365,132 +221,16 @@ export default function PelletTestDetail() {
     },
   })
 
-  const saveMeasurementMutation = useMutation({
-    mutationFn: async ({ imageId, payload, measurementId, existingGroupId, analyzedSizeMM, analyzedShotCount, analyzedDistanceValue, analyzedDistanceUnit }: { imageId: string; payload: CreateMeasurementPayload; measurementId?: string; existingGroupId?: string; analyzedSizeMM?: number | null; analyzedShotCount?: number; analyzedDistanceValue?: number; analyzedDistanceUnit?: 'meters' | 'yards' }) => {
-      const measurement = measurementId
-        ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
-        : await pelletTestApi.createMeasurement(id!, imageId, payload)
-      // Side-effect operations are best-effort: a failure here (e.g. distance
-      // validation or a deleted group) should not roll the whole save back —
-      // the measurement itself is already persisted.
-      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        try {
-          await pelletTestApi.update(id!, {
-            distance_value: analyzedDistanceValue,
-            distance_unit: analyzedDistanceUnit ?? 'meters',
-          })
-        } catch { /* best-effort */ }
-      }
-      try {
-        await syncGroupFromAnalysis({
-          imageId,
-          measurementId: measurement.id,
-          existingGroupId,
-          analyzedSizeMM,
-          analyzedShotCount,
-        })
-      } catch { /* best-effort */ }
-      return measurement
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
-      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-      setMeasureImage(null)
-      setPendingGroupSync(null)
-    },
-    onError: () => {
-      toast('Failed to save measurement.', 'error')
-      setPendingGroupSync(null)
-    },
-  })
-
-  const saveDetectionsMutation = useMutation({
-    mutationFn: async ({
-      imageId,
-      payload,
-      measurementId,
-      existingGroupId,
-      detections,
-      annotatedBlob,
-      analyzedSizeMM,
-      analyzedShotCount,
-      analyzedDistanceValue,
-      analyzedDistanceUnit,
-    }: {
-      imageId: string
-      payload: CreateMeasurementPayload
-      measurementId?: string
-      existingGroupId?: string
-      detections: DetectedHole[]
-      annotatedBlob: Blob | null
-      analyzedSizeMM?: number | null
-      analyzedShotCount?: number
-      analyzedDistanceValue?: number
-      analyzedDistanceUnit?: 'meters' | 'yards'
-    }) => {
-      const measurement = measurementId
-        ? await pelletTestApi.updateMeasurement(id!, imageId, measurementId, payload)
-        : await pelletTestApi.createMeasurement(id!, imageId, payload)
-
-      const detectionsPayload = {
-        detection_method: 'auto',
-        detections: detections.map(detection => ({
-          center_x: detection.centerX,
-          center_y: detection.centerY,
-          radius_pixels: detection.radiusPixels,
-          diameter_mm: detection.diameterMM,
-          confidence: detection.confidence,
-        })),
-      }
-      if (measurementId) {
-        await pelletTestApi.replaceDetections(id!, imageId, measurement.id, detectionsPayload)
-      } else {
-        await pelletTestApi.createDetections(id!, imageId, measurement.id, detectionsPayload)
-      }
-
-      // Annotated image upload, session distance update, and group sync are
-      // best-effort: e.g. the annotated PNG can exceed the 10 MB upload cap on
-      // re-save of high-res photos, or a linked group may have been deleted.
-      // Those failures shouldn't roll back a measurement+detections save the
-      // user already completed.
-      if (annotatedBlob) {
-        try {
-          await pelletTestApi.uploadAnnotatedImage(id!, imageId, measurement.id, annotatedBlob)
-        } catch { /* best-effort */ }
-      }
-      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        try {
-          await pelletTestApi.update(id!, {
-            distance_value: analyzedDistanceValue,
-            distance_unit: analyzedDistanceUnit ?? 'meters',
-          })
-        } catch { /* best-effort */ }
-      }
-
-      try {
-        await syncGroupFromAnalysis({
-          imageId,
-          measurementId: measurement.id,
-          existingGroupId,
-          analyzedSizeMM,
-          analyzedShotCount,
-        })
-      } catch { /* best-effort */ }
-
-      return measurement
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id] })
-      qc.invalidateQueries({ queryKey: ['pellet-tests', id, 'scoring'] })
-      qc.invalidateQueries({ queryKey: ['pellet-test-stats'] })
-      setMeasureImage(null)
-      setPendingGroupSync(null)
-    },
-    onError: () => {
-      toast('Failed to save detections.', 'error')
-      setPendingGroupSync(null)
-    },
+  const {
+    saveMeasurementMutation,
+    saveDetectionsMutation,
+    isSaving: measurementSaving,
+    saveError: measurementSaveError,
+  } = useMeasurementSync({
+    sessionId: id ?? '',
+    groups: session?.groups,
+    defaultShotCount: newShotCount,
+    onSettled: () => setMeasureImage(null),
   })
 
   function handleImageSelect(file: File | undefined) {
@@ -619,9 +359,9 @@ export default function PelletTestDetail() {
           >
             <Share2 size={12} /> Share
           </button>
-          {!editing && (
+          {id && (
             <button
-              onClick={startSessionEdit}
+              onClick={() => navigate({ to: '/pellet-testing/new', search: { draftId: id, step: 5 } })}
               className="p-1.5 text-muted hover:text-gold transition-colors"
               aria-label="Edit test"
             >
@@ -714,64 +454,6 @@ export default function PelletTestDetail() {
       {/* Hidden file inputs (used by Add photo button & Photos card) */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { handleImageSelect(e.target.files?.[0]); e.target.value = '' }} />
-
-      {editing && (
-        <div className="space-y-3 border border-gold/40 rounded-lg p-4 bg-gold-tint/30">
-          <h2 className="t-section-title">Edit Test Details</h2>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label htmlFor="pellet-edit-test-date" className="block t-section-title mb-1">Test Date</label>
-              <input id="pellet-edit-test-date" type="date" value={editMeta.test_date} onChange={e => setEditMeta(m => ({ ...m, test_date: e.target.value }))} className={inputCls + ' font-mono'} />
-            </div>
-            <div>
-              <label htmlFor="pellet-edit-distance" className="block t-section-title mb-1">Distance</label>
-              <input id="pellet-edit-distance" type="number" inputMode="decimal" value={editMeta.distance_value} onChange={e => setEditMeta(m => ({ ...m, distance_value: e.target.value }))} className={inputCls + ' font-mono'} />
-            </div>
-            <div>
-              <label htmlFor="pellet-edit-distance-unit" className="block t-section-title mb-1">Unit</label>
-              <select id="pellet-edit-distance-unit" value={editMeta.distance_unit} onChange={e => setEditMeta(m => ({ ...m, distance_unit: e.target.value }))} className={inputCls}>
-                <option value="meters">meters</option>
-                <option value="yards">yards</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label htmlFor="pellet-edit-location" className="block t-section-title mb-1">Location</label>
-            <PlaceSelector
-              locationId={editLocationId}
-              onLocationIdChange={setEditLocationId}
-              location={editLocation}
-              onLocationChange={setEditLocation}
-              onApplyDefaults={place => {
-                if (place.default_distance_m != null) {
-                  setEditMeta(m => ({
-                    ...m,
-                    distance_value: String(place.default_distance_m),
-                    distance_unit: place.default_distance_unit ?? m.distance_unit,
-                  }))
-                }
-              }}
-              inputClassName={inputCls}
-            />
-          </div>
-          <div>
-            <label htmlFor="pellet-edit-notes" className="block t-section-title mb-1">Notes</label>
-            <textarea id="pellet-edit-notes" value={editMeta.notes} onChange={e => setEditMeta(m => ({ ...m, notes: e.target.value }))} rows={2} className={inputCls + ' resize-none'} />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-ink-2">
-            <input type="checkbox" checked={editMeta.is_public} onChange={e => setEditMeta(m => ({ ...m, is_public: e.target.checked }))} />
-            Share this test on the public leaderboard
-          </label>
-          <div className="flex gap-2 pt-1">
-            <button onClick={() => updateSessionMutation.mutate()} disabled={updateSessionMutation.isPending || !editMeta.test_date} className="flex-1 py-2.5 rounded bg-gold text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
-              {updateSessionMutation.isPending ? 'Saving…' : 'Save Changes'}
-            </button>
-            <button onClick={() => setEditing(false)} disabled={updateSessionMutation.isPending} className="px-4 py-2.5 rounded border border-line text-muted text-sm hover:text-ink-2 transition-colors">
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Two-column body */}
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
@@ -1096,16 +778,15 @@ export default function PelletTestDetail() {
               analyzedDistanceUnit: analysisMeta.distanceUnit,
             })
           }
-          isSaving={saveMeasurementMutation.isPending || saveDetectionsMutation.isPending}
-          saveError={saveMeasurementMutation.isError ? 'Failed to save.' : saveDetectionsMutation.isError ? 'Failed to save.' : null}
+          isSaving={measurementSaving}
+          saveError={measurementSaveError}
           onRequestCrop={() => {
             const img = measureImage
             if (!img) return
             setMeasureImage(null)
-            setPendingGroupSync(null)
             requestEditExisting(img)
           }}
-          onClose={() => { setMeasureImage(null); setPendingGroupSync(null) }}
+          onClose={() => setMeasureImage(null)}
           defaultDistanceUnit={(authUser?.default_distance_unit as 'meters' | 'yards') ?? undefined}
           defaultMeasurementUnit={(authUser?.default_measurement_unit as 'cm' | 'mm') ?? undefined}
         />

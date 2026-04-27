@@ -173,11 +173,13 @@ function FloatingCapture() {
 // ── Overview tab ───────────────────────────────────────────────────────────
 function OverviewTab({
   recent,
+  drafts,
   topCombos,
   timeline,
   loading,
 }: {
   recent: PelletTestSessionSummary[]
+  drafts: PelletTestSessionSummary[]
   topCombos: ComboPerformanceSummary[]
   timeline: GroupTimelinePoint[]
   loading: boolean
@@ -278,6 +280,29 @@ function OverviewTab({
         </div>
       </section>
 
+      {/* Drafts rail */}
+      {drafts.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <h3 className="t-subsection-title">Pellet drafts</h3>
+              <p className="text-xs text-muted mt-0.5">Pick up where you left off — measure photos and finish the test.</p>
+            </div>
+            <Link
+              to="/drafts"
+              className="text-[11px] tracking-widest uppercase text-gold hover:opacity-80"
+            >
+              All drafts <ChevronRight size={11} className="inline -mt-px" />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drafts.slice(0, 3).map(d => (
+              <DraftRow key={d.id} draft={d} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Recent + Top combos */}
       <section className="grid lg:grid-cols-2 gap-8 lg:gap-10">
         <div>
@@ -336,6 +361,37 @@ function OverviewTab({
         </div>
       </section>
     </div>
+  )
+}
+
+function DraftRow({ draft }: { draft: PelletTestSessionSummary }) {
+  const prefs = useRegionalPrefs()
+  const status = !draft.first_image_url
+    ? { label: 'Needs photo', color: 'text-muted' }
+    : draft.group_count === 0
+      ? { label: 'Needs measurement', color: 'text-gold' }
+      : { label: 'Ready to publish', color: 'text-[var(--green)]' }
+  return (
+    <Link
+      to="/pellet-testing/new"
+      search={{ draftId: draft.id }}
+      className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-line hover:border-gold/40 hover:shadow-card transition-all"
+    >
+      <TargetThumb src={draft.first_image_url} fallbackHole />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-ink leading-tight truncate">
+          {draft.pellet_brand} {draft.pellet_model}
+        </p>
+        <p className="text-[11px] text-muted truncate">{draft.rifle_make} {draft.rifle_model}</p>
+        <p className="text-[10px] text-muted mt-0.5">
+          {formatDate(draft.test_date, prefs)}
+          {draft.distance_m > 0 && ` · ${formatDistance(draft.distance_m, draft.distance_unit)}`}
+        </p>
+        <p className={`text-[10px] uppercase tracking-widest mt-1 ${status.color}`}>
+          {status.label}
+        </p>
+      </div>
+    </Link>
   )
 }
 
@@ -887,6 +943,10 @@ export default function PelletTesting() {
     queryKey: ['pellet-tests', 'all'],
     queryFn: () => pelletTestApi.list(100, 0),
   })
+  const { data: draftsData } = useQuery({
+    queryKey: ['pellet-drafts'],
+    queryFn: () => pelletTestApi.list(10, 0, 'drafts'),
+  })
   const { data: combosData } = useQuery({
     queryKey: ['combo-analytics', null],
     queryFn: () => pelletTestApi.comboAnalytics(),
@@ -901,6 +961,7 @@ export default function PelletTesting() {
   })
 
   const tests = useMemo(() => testsData?.items ?? [], [testsData])
+  const drafts = useMemo(() => draftsData?.items ?? [], [draftsData])
   const combos = useMemo(() => combosData?.items ?? [], [combosData])
   const batches = useMemo(() => batchesData?.items ?? [], [batchesData])
   const timeline = useMemo(() => timelineData?.items ?? [], [timelineData])
@@ -948,6 +1009,7 @@ export default function PelletTesting() {
         {tab === 'overview' && (
           <OverviewTab
             recent={tests}
+            drafts={drafts}
             topCombos={sortedCombos}
             timeline={timeline}
             loading={timelineLoading}

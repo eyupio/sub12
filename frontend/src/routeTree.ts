@@ -13,7 +13,7 @@ import Leagues from './pages/Leagues'
 import LeagueDetail from './pages/LeagueDetail'
 import LeagueSettings from './pages/LeagueSettings'
 import PelletTesting from './pages/PelletTesting'
-import NewPelletTest from './pages/NewPelletTest'
+import PelletTestWizard from './pages/PelletTestWizard'
 import PelletTestDetail from './pages/PelletTestDetail'
 import PelletTestLeaderboard from './pages/PelletTestLeaderboard'
 import PelletComparison from './pages/PelletComparison'
@@ -226,10 +226,17 @@ const pelletTestingRoute = createRoute({
 const newPelletTestRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/new',
-  component: NewPelletTest,
-  validateSearch: (search: Record<string, unknown>): { draftId?: string } => ({
-    draftId: (search.draftId as string) || undefined,
-  }),
+  component: PelletTestWizard,
+  validateSearch: (search: Record<string, unknown>): { draftId?: string; step?: number; imageId?: string } => {
+    const stepRaw = search.step
+    const stepNum = typeof stepRaw === 'number' ? stepRaw : typeof stepRaw === 'string' ? parseInt(stepRaw, 10) : undefined
+    const step = Number.isFinite(stepNum) && stepNum! >= 1 && stepNum! <= 5 ? stepNum : undefined
+    return {
+      draftId: (search.draftId as string) || undefined,
+      step,
+      imageId: (search.imageId as string) || undefined,
+    }
+  },
 })
 
 const pelletTestDetailRoute = createRoute({
