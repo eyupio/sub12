@@ -160,7 +160,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
 
 function shortCode(joinCode?: string): string {
   if (!joinCode) return ''
-  return joinCode.slice(0, 4).toUpperCase()
+  return joinCode.toUpperCase()
 }
 
 export default function Leagues() {
@@ -177,7 +177,12 @@ export default function Leagues() {
 
   function handleSearch(v: string) {
     setSearch(v)
-    if (code) setCode('')
+    const trimmed = v.trim()
+    if (/^[0-9a-fA-F]{8}$/.test(trimmed)) {
+      setCode(trimmed.toUpperCase())
+    } else if (code) {
+      setCode('')
+    }
   }
 
   function handleCodeSubmit() {
@@ -206,7 +211,11 @@ export default function Leagues() {
     if (code) return all
     const q = search.trim().toLowerCase()
     return all.filter((l) => {
-      if (q && !l.name.toLowerCase().includes(q)) return false
+      if (q) {
+        const nameMatch = l.name.toLowerCase().includes(q)
+        const codeMatch = !!l.join_code && l.join_code.toLowerCase().includes(q)
+        if (!nameMatch && !codeMatch) return false
+      }
       const isJoined = myLeagueMap.has(l.id)
       const isOwned = user?.id === l.created_by
       switch (filter) {
