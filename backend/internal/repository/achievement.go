@@ -76,7 +76,7 @@ func (r *AchievementRepository) CountEarners(ctx context.Context, ids []string) 
 		return out, nil
 	}
 	rows, err := r.db.Query(ctx, `
-		SELECT achievement_id, COUNT(DISTINCT user_id)
+		SELECT achievement_id, COUNT(*)
 		FROM user_achievements
 		WHERE achievement_id = ANY($1)
 		GROUP BY achievement_id
