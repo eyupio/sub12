@@ -23,11 +23,14 @@ var (
 )
 
 // allowedTransitions encodes the event state machine. archived is reachable
-// only via the daily sweep, never via user action.
+// only via the daily sweep, never via user action. complete → live exists so
+// an owner can reopen an event closed by mistake; the Reopen path also clears
+// archive_at and skips re-broadcasting "went live".
 var allowedTransitions = map[string]map[string]struct{}{
-	model.EventStateDraft:           {model.EventStateOpenForEntries: {}},
-	model.EventStateOpenForEntries:  {model.EventStateLive: {}, model.EventStateDraft: {}},
-	model.EventStateLive:            {model.EventStateComplete: {}},
+	model.EventStateDraft:          {model.EventStateOpenForEntries: {}},
+	model.EventStateOpenForEntries: {model.EventStateLive: {}, model.EventStateDraft: {}},
+	model.EventStateLive:           {model.EventStateComplete: {}},
+	model.EventStateComplete:       {model.EventStateLive: {}},
 }
 
 // EventArchiveAfter is the grace window between completion and auto-archive.
@@ -244,6 +247,8 @@ func (s *EventService) Update(ctx context.Context, slug, userID string, in *mode
 
 // Promote transitions the event to the requested state. Validates the
 // transition against allowedTransitions; the daily sweep handles archival.
+// The complete → live edge is the "reopen" path: it clears archive_at and
+// suppresses the went-live activity so reopens don't double-post.
 func (s *EventService) Promote(ctx context.Context, slug, userID, target string) (*model.Event, error) {
 	ev, err := s.events.GetBySlug(ctx, slug)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -259,13 +264,21 @@ func (s *EventService) Promote(ctx context.Context, slug, userID, target string)
 	if _, ok := allowed[target]; !ok {
 		return nil, fmt.Errorf("%w: cannot move from %s to %s", ErrInvalidEventState, ev.State, target)
 	}
-	var archiveAt *time.Time
-	if target == model.EventStateComplete {
-		t := time.Now().Add(EventArchiveAfter)
-		archiveAt = &t
-	}
-	if err := s.events.SetState(ctx, ev.ID, target, archiveAt); err != nil {
-		return nil, err
+	prevState := ev.State
+	isReopen := target == model.EventStateLive && prevState == model.EventStateComplete
+	if isReopen {
+		if err := s.events.Reopen(ctx, ev.ID); err != nil {
+			return nil, err
+		}
+	} else {
+		var archiveAt *time.Time
+		if target == model.EventStateComplete {
+			t := time.Now().Add(EventArchiveAfter)
+			archiveAt = &t
+		}
+		if err := s.events.SetState(ctx, ev.ID, target, archiveAt); err != nil {
+			return nil, err
+		}
 	}
 	updated, err := s.events.GetByID(ctx, ev.ID)
 	if err != nil {
@@ -273,7 +286,9 @@ func (s *EventService) Promote(ctx context.Context, slug, userID, target string)
 	}
 	switch target {
 	case model.EventStateLive:
-		s.fanOutWentLive(ctx, updated)
+		if !isReopen {
+			s.fanOutWentLive(ctx, updated)
+		}
 	case model.EventStateComplete:
 		s.handleCompletion(ctx, updated)
 	}
@@ -295,9 +310,14 @@ func (s *EventService) fanOutWentLive(ctx context.Context, ev *model.Event) {
 }
 
 // handleCompletion is the heaviest lifecycle hook: it computes final standings,
-// fans out per-participant feed entries, and triggers achievement evaluation
-// for every registered participant plus the host.
+// fans out per-participant feed entries, posts a single owner-authored
+// aggregate naming the winner and per-band winners, and triggers achievement
+// evaluation. Idempotent across reopen → re-complete cycles via the
+// HasCompletionActivity guard.
 func (s *EventService) handleCompletion(ctx context.Context, ev *model.Event) {
+	if has, err := s.events.HasCompletionActivity(ctx, ev.ID); err == nil && has {
+		return
+	}
 	standings, err := s.events.Standings(ctx, ev.ID, ev.ScoringRules)
 	if err != nil {
 		return
@@ -322,14 +342,79 @@ func (s *EventService) handleCompletion(ctx context.Context, ev *model.Event) {
 				Points:        row.Points,
 				HitCount:      row.HitCount,
 				ShotsRecorded: row.ShotsRecorded,
+				CategoryLabel: derefString(row.CategoryLabel),
 			}
 			uid := *row.UserID
 			go s.activity.Ingest(context.Background(), uid, model.ActivityEventCompletedWithResults, &tid, &tt, meta, nil, ev.ClubID, visibility)
 		}
+		aggregate := buildEventResultsMeta(ev.Name, ev.Slug, clubName, standings)
+		go s.activity.Ingest(context.Background(), ev.OwnerUserID, model.ActivityEventResultsPosted, &tid, &tt, aggregate, nil, ev.ClubID, visibility)
 	}
 	if s.achievements != nil {
 		s.achievements.EvaluateForEventCompletion(ctx, ev, standings)
 	}
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+// buildEventResultsMeta packages a sorted standings list into the public
+// aggregate posted on completion. Standings are assumed pre-sorted by Position.
+// Guests are included in the podium (display name is COALESCE'd server-side)
+// but their UserID is empty.
+func buildEventResultsMeta(name, slug, clubName string, standings []*model.EventStandingRow) model.EventResultsMeta {
+	meta := model.EventResultsMeta{
+		EventName: name,
+		EventSlug: slug,
+		ClubName:  clubName,
+	}
+	if len(standings) == 0 {
+		return meta
+	}
+	winner := podiumEntryFrom(standings[0])
+	meta.Winner = &winner
+
+	top := standings
+	if len(top) > 3 {
+		top = top[:3]
+	}
+	for _, row := range top {
+		meta.Top3 = append(meta.Top3, podiumEntryFrom(row))
+	}
+
+	// Per-band winner = lowest Position per non-nil CategoryID. Standings are
+	// sorted by points desc, so the first row we see for a band is the winner.
+	seen := map[string]struct{}{}
+	for _, row := range standings {
+		if row.CategoryID == nil || *row.CategoryID == "" {
+			continue
+		}
+		if _, dup := seen[*row.CategoryID]; dup {
+			continue
+		}
+		seen[*row.CategoryID] = struct{}{}
+		meta.PerBandWinners = append(meta.PerBandWinners, podiumEntryFrom(row))
+	}
+	return meta
+}
+
+func podiumEntryFrom(row *model.EventStandingRow) model.EventResultsPodiumEntry {
+	entry := model.EventResultsPodiumEntry{
+		DisplayName:   row.DisplayName,
+		CategoryLabel: derefString(row.CategoryLabel),
+		Position:      row.Position,
+		Points:        row.Points,
+		HitCount:      row.HitCount,
+		ShotsRecorded: row.ShotsRecorded,
+	}
+	if row.UserID != nil {
+		entry.UserID = *row.UserID
+	}
+	return entry
 }
 
 func (s *EventService) lookupClubName(ctx context.Context, ev *model.Event) string {

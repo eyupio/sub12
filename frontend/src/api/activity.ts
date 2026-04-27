@@ -19,8 +19,19 @@ export type ActivityType =
   | 'event_joined'
   | 'event_went_live'
   | 'event_completed_with_results'
+  | 'event_results_posted'
 
 export type FeedFilter = 'public' | 'for_you' | 'league' | 'club'
+
+export interface EventResultsPodiumEntry {
+  display_name: string
+  user_id?: string
+  category_label?: string
+  position: number
+  points: number
+  hit_count: number
+  shots_recorded: number
+}
 
 export interface ActivityItem {
   id: string
@@ -67,6 +78,10 @@ export interface ActivityItem {
     hit_count?: number
     shots_recorded?: number
     category_label?: string
+    // Owner-authored event_results_posted aggregate
+    winner?: EventResultsPodiumEntry
+    top3?: EventResultsPodiumEntry[]
+    per_band_winners?: EventResultsPodiumEntry[]
   }
   league_id?: string
   club_id?: string
