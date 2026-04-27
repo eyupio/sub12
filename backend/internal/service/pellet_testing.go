@@ -322,7 +322,16 @@ func (s *PelletTestService) CreateMeasurement(ctx context.Context, sessionID, us
 		in.MeasuredSizeMOA = &moa
 	}
 
-	return s.repo.CreateMeasurement(ctx, sessionID, userID, imageID, in)
+	m, err := s.repo.CreateMeasurement(ctx, sessionID, userID, imageID, in)
+	if err != nil {
+		return nil, err
+	}
+	if m.GroupID != nil && *m.GroupID != "" {
+		if err := s.repo.SyncGroupFromMeasurements(ctx, *m.GroupID, sessionID); err != nil {
+			return nil, err
+		}
+	}
+	return m, nil
 }
 
 // distanceForMeasurement prefers the per-measurement override when set, falling
@@ -374,7 +383,16 @@ func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID
 		}
 	}
 
-	return s.repo.UpdateMeasurement(ctx, measurementID, sessionID, userID, in)
+	m, err := s.repo.UpdateMeasurement(ctx, measurementID, sessionID, userID, in)
+	if err != nil {
+		return nil, err
+	}
+	if m.GroupID != nil && *m.GroupID != "" {
+		if err := s.repo.SyncGroupFromMeasurements(ctx, *m.GroupID, sessionID); err != nil {
+			return nil, err
+		}
+	}
+	return m, nil
 }
 
 type SessionScoring struct {
@@ -421,11 +439,39 @@ func (s *PelletTestService) ReplaceDetections(ctx context.Context, measurementID
 	if err := s.repo.UpdateMeasurementDetectionMeta(ctx, measurementID, method, len(detections), autoGroupMM, autoGroupMOA, avgConfidence); err != nil {
 		return nil, err
 	}
+	if err := s.syncGroupForMeasurement(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 	return detections, nil
 }
 
 func (s *PelletTestService) DeleteMeasurement(ctx context.Context, measurementID, sessionID, userID string) error {
-	return s.repo.DeleteMeasurement(ctx, measurementID, sessionID, userID)
+	m, lookupErr := s.repo.GetMeasurementByID(ctx, measurementID, sessionID)
+	if err := s.repo.DeleteMeasurement(ctx, measurementID, sessionID, userID); err != nil {
+		return err
+	}
+	if lookupErr == nil && m.GroupID != nil && *m.GroupID != "" {
+		if err := s.repo.SyncGroupFromMeasurements(ctx, *m.GroupID, sessionID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// syncGroupForMeasurement looks up the measurement's group_id (if any) and
+// rebuilds the group's recorded size from its current measurement state.
+func (s *PelletTestService) syncGroupForMeasurement(ctx context.Context, measurementID, sessionID string) error {
+	m, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	if m.GroupID == nil || *m.GroupID == "" {
+		return nil
+	}
+	return s.repo.SyncGroupFromMeasurements(ctx, *m.GroupID, sessionID)
 }
 
 // ── Comparison ──────────────────────────────────────────────────────────────────
@@ -486,6 +532,9 @@ func (s *PelletTestService) CreateDetections(ctx context.Context, measurementID,
 	}
 
 	if err := s.repo.UpdateMeasurementDetectionMeta(ctx, measurementID, method, holeCount, autoGroupMM, autoGroupMOA, avgConfidence); err != nil {
+		return nil, err
+	}
+	if err := s.syncGroupForMeasurement(ctx, measurementID, sessionID); err != nil {
 		return nil, err
 	}
 

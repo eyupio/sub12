@@ -456,6 +456,64 @@ func (r *PelletTestRepository) updateSessionAggregates(ctx context.Context, sess
 	return nil
 }
 
+// SyncGroupFromMeasurements rewrites pellet_test_groups.group_size_mm /
+// group_size_moa for the given group from its most recently updated linked
+// measurement, then refreshes the session aggregates. Resolution order matches
+// the frontend ScoredImageCard (measured → manual → auto). When no linked
+// measurement has a usable size, the group's recorded size is left untouched
+// so a manually entered size survives detection churn.
+func (r *PelletTestRepository) SyncGroupFromMeasurements(ctx context.Context, groupID, sessionID string) error {
+	if groupID == "" {
+		return nil
+	}
+	var sizeMM, sizeMOA *float64
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COALESCE(measured_size_mm, manual_group_size_mm, auto_group_size_mm),
+			COALESCE(measured_size_moa, auto_group_size_moa)
+		FROM pellet_test_measurements
+		WHERE group_id = $1 AND session_id = $2
+		  AND COALESCE(measured_size_mm, manual_group_size_mm, auto_group_size_mm) IS NOT NULL
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, groupID, sessionID).Scan(&sizeMM, &sizeMOA)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("lookup measurement for group sync: %w", err)
+	}
+	if sizeMM == nil {
+		return nil
+	}
+	if _, err := r.db.Exec(ctx, `
+		UPDATE pellet_test_groups SET
+			group_size_mm  = $3,
+			group_size_moa = COALESCE($4, group_size_moa),
+			updated_at     = NOW()
+		WHERE id = $1 AND session_id = $2
+	`, groupID, sessionID, *sizeMM, sizeMOA); err != nil {
+		return fmt.Errorf("sync group size from measurement: %w", err)
+	}
+	return r.updateSessionAggregates(ctx, sessionID)
+}
+
+// GetMeasurementByID returns a single measurement scoped to a session.
+func (r *PelletTestRepository) GetMeasurementByID(ctx context.Context, measurementID, sessionID string) (*model.PelletTestMeasurement, error) {
+	m, err := scanMeasurement(r.db.QueryRow(ctx, `
+		SELECT `+measurementCols+`
+		FROM pellet_test_measurements
+		WHERE id = $1 AND session_id = $2
+	`, measurementID, sessionID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get measurement: %w", err)
+	}
+	return m, nil
+}
+
 // ── Images ──────────────────────────────────────────────────────────────────────
 
 func (r *PelletTestRepository) listImages(ctx context.Context, sessionID string) ([]*model.PelletTestImage, error) {

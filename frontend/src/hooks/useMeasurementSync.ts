@@ -68,7 +68,6 @@ export function useMeasurementSync({
       analyzedShotCount?: number
     }) => {
       const { imageId, measurementId, existingGroupId, analyzedSizeMM, analyzedShotCount } = args
-      if (!analyzedSizeMM || analyzedSizeMM <= 0) return
 
       const forceCreate = pendingGroupSync?.mode === 'create'
       const targetGroupId =
@@ -91,15 +90,21 @@ export function useMeasurementSync({
       if (targetGroupId) {
         const linkedGroupExists = groups?.some(g => g.id === targetGroupId)
         if (linkedGroupExists) {
+          // Group size is now resynced server-side from the measurement
+          // (see PelletTestService.SyncGroupFromMeasurements); only patch
+          // shot_count here, since that isn't derived from the measurement.
           const existing = groups?.find(g => g.id === targetGroupId)
-          await pelletTestApi.updateGroup(sessionId, targetGroupId, {
-            group_size_mm: analyzedSizeMM,
-            shot_count: resolvedShotCount,
-            notes: withSourceTag(existing?.notes, 'image'),
-          })
+          if (existing && existing.shot_count !== resolvedShotCount) {
+            await pelletTestApi.updateGroup(sessionId, targetGroupId, {
+              shot_count: resolvedShotCount,
+              notes: withSourceTag(existing?.notes, 'image'),
+            })
+          }
           return
         }
       }
+
+      if (!analyzedSizeMM || analyzedSizeMM <= 0) return
 
       const notes = pendingGroupSync?.mode === 'create' ? pendingGroupSync.notes : undefined
       const created = await pelletTestApi.createGroup(sessionId, {
