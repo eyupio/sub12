@@ -15,9 +15,9 @@ var (
 )
 
 // parseAndValidateImage reads a multipart image upload, validates it, and
-// returns the raw bytes and a normalised content type. It uses
-// http.DetectContentType (magic-byte sniffing) instead of trusting the
-// Content-Type header, which is unreliable on mobile browsers (e.g. HEIC).
+// returns the raw bytes and a normalised content type. Type is determined
+// by magic-byte sniffing (http.DetectContentType + an HEIC sniffer); the
+// client-supplied Content-Type header is not trusted.
 func parseAndValidateImage(r *http.Request, fieldName string, maxBytes int64) ([]byte, string, error) {
 	r.Body = http.MaxBytesReader(nil, r.Body, maxBytes)
 
@@ -40,20 +40,33 @@ func parseAndValidateImage(r *http.Request, fieldName string, maxBytes int64) ([
 	detected := http.DetectContentType(data)
 
 	contentType, ok := normaliseImageType(detected)
-	if !ok {
-		// Fall back to the multipart header — some formats (HEIC, WebP)
-		// are not recognised by Go's DetectContentType.
-		_, hdr, _ := r.FormFile(fieldName)
-		if hdr != nil {
-			headerCT := hdr.Header.Get("Content-Type")
-			contentType, ok = normaliseImageType(headerCT)
-		}
+	if !ok && isHEIC(data) {
+		// Go's DetectContentType doesn't recognise HEIC/HEIF; sniff it ourselves.
+		contentType, ok = normaliseImageType("image/heic")
 	}
 	if !ok {
 		return nil, "", ErrUnsupportedType
 	}
 
 	return data, contentType, nil
+}
+
+// isHEIC reports whether data looks like an ISO base media file with an
+// HEIC/HEIF brand. The structure is: 4 bytes box size, "ftyp", 4 bytes major
+// brand, 4 bytes minor version, then compatible brands. We accept any of the
+// known HEIC/HEIF major brands.
+func isHEIC(data []byte) bool {
+	if len(data) < 12 {
+		return false
+	}
+	if string(data[4:8]) != "ftyp" {
+		return false
+	}
+	switch string(data[8:12]) {
+	case "heic", "heix", "heim", "heis", "hevc", "hevm", "hevs", "mif1", "msf1":
+		return true
+	}
+	return false
 }
 
 // normaliseImageType maps a detected or header content type to one of the
@@ -70,9 +83,6 @@ func normaliseImageType(ct string) (string, bool) {
 	case strings.HasPrefix(ct, "image/heic"),
 		strings.HasPrefix(ct, "image/heif"):
 		// HEIC from iOS — store as-is; browsers that captured it can display it.
-		return "image/jpeg", true
-	case ct == "application/octet-stream":
-		// Some mobile browsers send this for camera captures; treat as JPEG.
 		return "image/jpeg", true
 	default:
 		return "", false
