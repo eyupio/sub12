@@ -578,7 +578,7 @@ function eventStateBadge(state: EventState) {
 
 function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
   const navigate = useNavigate()
-  const { data } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['club', clubId, 'events'],
     queryFn: () => eventsApi.list({ clubId }),
   })
@@ -599,7 +599,24 @@ function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
         ) : null
       }
     >
-      {events.length === 0 ? (
+      {isLoading ? (
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                height: 64,
+                borderRadius: 'var(--radius)',
+                background: 'var(--lc-surface)',
+                border: '1px solid var(--line)',
+                opacity: 0.6,
+              }}
+            />
+          ))}
+        </div>
+      ) : error ? (
+        <p style={{ padding: 18, color: 'var(--red)', fontSize: 13 }}>Failed to load events.</p>
+      ) : events.length === 0 ? (
         <EmptyState
           icon={<CalendarClock size={36} />}
           title="No events yet"

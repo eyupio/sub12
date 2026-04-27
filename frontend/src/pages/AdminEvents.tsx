@@ -220,6 +220,11 @@ function CategoriesPanel({
       </div>
     )
   }
+  if (query.error) {
+    return (
+      <p style={{ padding: 18, color: 'var(--error-text)', fontSize: 13 }}>{parseError(query.error)}</p>
+    )
+  }
 
   const items = query.data?.items ?? []
 

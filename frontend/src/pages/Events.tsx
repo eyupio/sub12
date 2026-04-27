@@ -9,6 +9,7 @@ import {
   Badge,
   EmptyState,
   EntityCard,
+  type MetaItem,
   PageGrid,
   PageHeader,
 } from '../components/leagues'
@@ -125,7 +126,7 @@ export default function Events() {
                   )}
                 </>
               )
-              const meta = [
+              const meta: MetaItem[] = [
                 { icon: <Trophy size={12} />, text: ev.discipline },
                 { icon: <CalendarClock size={12} />, text: `${ev.course.lanes} lanes` },
                 {
@@ -134,7 +135,7 @@ export default function Events() {
                 },
               ]
               if (ev.location) {
-                meta.push({ icon: null as never, text: ev.location })
+                meta.push({ text: ev.location })
               }
               return (
                 <EntityCard

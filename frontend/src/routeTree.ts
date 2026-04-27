@@ -230,7 +230,7 @@ const eventCreateRoute = createRoute({
   path: '/events/new',
   component: EventCreate,
   validateSearch: (search: Record<string, unknown>): { clubId?: string } => ({
-    clubId: (search.clubId as string) || undefined,
+    clubId: typeof search.clubId === 'string' && search.clubId ? search.clubId : undefined,
   }),
 })
 
