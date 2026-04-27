@@ -201,7 +201,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               onClick={() => mutation.mutate({ type: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.type === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -227,7 +227,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               onClick={() => mutation.mutate({ join_policy: value })}
               className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.join_policy === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -273,7 +273,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
               onClick={() => mutation.mutate({ post_visibility: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.post_visibility === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -329,7 +329,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
               onClick={() => mutation.mutate({ date_format: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -350,7 +350,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
               onClick={() => mutation.mutate({ time_format: v })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >

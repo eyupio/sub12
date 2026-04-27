@@ -343,7 +343,7 @@ function EditTab() {
 
   const toggleBtnCls = (active: boolean) =>
     `flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-      active ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]' : 'border-subtle text-muted hover:text-secondary'
+      active ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse' : 'border-subtle text-muted hover:text-secondary'
     }`
 
   function handleSave() {
