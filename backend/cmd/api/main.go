@@ -110,6 +110,7 @@ func main() {
 
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 	scoreCardSvc.SetUserReader(userRepo)
+	scoreCardSvc.SetLogger(log.Logger)
 
 	statsRepo := repository.NewStatsRepository(pool)
 	statsSvc := service.NewStatsService(statsRepo)

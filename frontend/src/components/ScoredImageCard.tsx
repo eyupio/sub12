@@ -60,7 +60,7 @@ export default function ScoredImageCard({
       <div className="relative aspect-square overflow-hidden rounded border border-subtle">
         <img
           src={image.image_url}
-          alt=""
+          alt={scored ? 'Pellet test target with measured group' : 'Pellet test target'}
           className="w-full h-full object-cover cursor-pointer"
           style={rot ? { transform: `rotate(${rot}deg)` } : undefined}
           onClick={onOpen}

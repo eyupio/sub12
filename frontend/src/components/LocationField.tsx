@@ -116,6 +116,7 @@ export function LocationField({
           value={value.label}
           onChange={(e) => onChange({ ...value, label: e.target.value })}
           placeholder={inputPlaceholder}
+          aria-label={inputPlaceholder}
           className={
             inputClassName ??
             'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50'

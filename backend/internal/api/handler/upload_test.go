@@ -19,7 +19,7 @@ func TestNormaliseImageType(t *testing.T) {
 		{"webp", "image/webp", "image/webp", true},
 		{"heic", "image/heic", "image/jpeg", true},
 		{"heif", "image/heif", "image/jpeg", true},
-		{"octet-stream", "application/octet-stream", "image/jpeg", true},
+		{"octet-stream rejected", "application/octet-stream", "", false},
 		{"JPEG uppercase", "Image/JPEG", "image/jpeg", true},
 		{"gif rejected", "image/gif", "", false},
 		{"text rejected", "text/plain", "", false},

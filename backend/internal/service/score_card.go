@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
@@ -56,6 +58,7 @@ type ScoreCardService struct {
 	users       UserProfileReader   // optional; nil skips owner-privacy checks
 	activity    *ActivityService    // optional; nil disables feed ingestion
 	achievement *AchievementService // optional; nil disables achievement evaluation
+	log         zerolog.Logger
 }
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
@@ -66,6 +69,25 @@ func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activ
 // profile_visibility when deciding whether to expose a public card.
 func (s *ScoreCardService) SetUserReader(users UserProfileReader) {
 	s.users = users
+}
+
+// SetLogger wires a logger used by background goroutines for panic recovery
+// and best-effort failure reporting on activity/achievement ingestion.
+func (s *ScoreCardService) SetLogger(log zerolog.Logger) {
+	s.log = log
+}
+
+// safeGo runs fn in a goroutine, recovering panics so a failure in async
+// activity/achievement ingestion cannot crash the API process.
+func (s *ScoreCardService) safeGo(name string, fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Error().Interface("panic", r).Str("task", name).Msg("score_card: background task panicked")
+			}
+		}()
+		fn()
+	}()
 }
 
 // Create validates the input and persists a new score card.
@@ -162,12 +184,18 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		if isPB {
 			activityType = model.ActivityPersonalBest
 		}
-		go s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, card.ClubID, card.Visibility)
+		s.safeGo("activity.Ingest(create)", func() {
+			s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, card.ClubID, card.Visibility)
+		})
 	}
 
 	if s.achievement != nil {
-		go s.achievement.EvaluateForScoreCard(context.Background(), userID, card)
-		go s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
+		s.safeGo("achievement.EvaluateForScoreCard(create)", func() {
+			s.achievement.EvaluateForScoreCard(context.Background(), userID, card)
+		})
+		s.safeGo("achievement.EvaluateForPersonalBest(create)", func() {
+			s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
+		})
 	}
 
 	return card, nil
@@ -384,12 +412,18 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		if isPB {
 			activityType = model.ActivityPersonalBest
 		}
-		go s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, updated.ClubID, updated.Visibility)
+		s.safeGo("activity.Ingest(update)", func() {
+			s.activity.Ingest(context.Background(), userID, activityType, &targetID, &targetType, meta, leagueID, updated.ClubID, updated.Visibility)
+		})
 	}
 
 	if s.achievement != nil {
-		go s.achievement.EvaluateForScoreCard(context.Background(), userID, updated)
-		go s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
+		s.safeGo("achievement.EvaluateForScoreCard(update)", func() {
+			s.achievement.EvaluateForScoreCard(context.Background(), userID, updated)
+		})
+		s.safeGo("achievement.EvaluateForPersonalBest(update)", func() {
+			s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
+		})
 	}
 
 	return updated, nil

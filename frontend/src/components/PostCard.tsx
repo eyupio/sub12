@@ -16,13 +16,13 @@ import { formatDate, useRegionalPrefs } from '../utils/date'
 import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { UserAvatar } from './UserAvatar'
 
-function AttachmentPreview({ attachment }: { attachment: PostAttachment }) {
+function AttachmentPreview({ attachment, authorName }: { attachment: PostAttachment; authorName: string }) {
   switch (attachment.type) {
     case 'image':
       return attachment.image_url ? (
         <img
           src={attachment.image_url}
-          alt="Attached image"
+          alt={`Image attached to ${authorName}'s post`}
           className="rounded border border-subtle max-h-48 object-contain bg-surface"
           loading="lazy"
         />
@@ -358,7 +358,7 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
       {post.attachments.length > 0 && (
         <div className="space-y-2">
           {post.attachments.map((a) => (
-            <AttachmentPreview key={a.id} attachment={a} />
+            <AttachmentPreview key={a.id} attachment={a} authorName={post.display_name} />
           ))}
         </div>
       )}

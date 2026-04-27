@@ -62,7 +62,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
       <div role="dialog" aria-modal="true" aria-labelledby="new-club-modal-title" className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 id="new-club-modal-title" className="t-section-title">New Club</h2>
-          <button onClick={onClose} className="text-muted hover:text-secondary transition-colors"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary transition-colors"><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
