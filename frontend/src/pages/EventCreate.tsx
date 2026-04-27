@@ -37,7 +37,7 @@ function toggleCls(active: boolean) {
 
 export default function EventCreate() {
   const navigate = useNavigate()
-  const search = useSearch({ from: '/events/new' as never }) as { clubId?: string }
+  const search = useSearch({ strict: false }) as { clubId?: string }
   const clubId = search.clubId
 
   const [presetId, setPresetId] = useState(disciplinePresets[0].id)
