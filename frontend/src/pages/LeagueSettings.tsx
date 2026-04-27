@@ -183,7 +183,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
               onClick={() => mutation.mutate({ type: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.type === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -209,7 +209,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
               onClick={() => mutation.mutate({ post_visibility: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.post_visibility === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -265,7 +265,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
               onClick={() => mutation.mutate({ date_format: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -286,7 +286,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
               onClick={() => mutation.mutate({ time_format: v })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
-                  ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
               }`}
             >
@@ -369,7 +369,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
               className={[
                 'flex-1 py-2 rounded text-[11px] tracking-widest uppercase font-medium transition-colors border',
                 scoringRule === rule
-                  ? 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]'
+                  ? 'bg-[var(--brass)] border-[var(--brass)] text-inverse'
                   : 'bg-surface border-subtle text-muted hover:text-secondary',
               ].join(' ')}
             >
@@ -489,7 +489,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
             className={[
               'w-full text-left py-2.5 px-3 rounded text-sm transition-colors border',
               joinPolicy === policy
-                ? 'bg-[var(--brass)]/15 border-[var(--brass)]/50 text-[var(--brass)]'
+                ? 'bg-[var(--brass)] border-[var(--brass)] text-inverse'
                 : 'bg-surface border-subtle text-muted hover:text-secondary',
             ].join(' ')}
           >

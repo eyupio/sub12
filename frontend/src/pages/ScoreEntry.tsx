@@ -644,7 +644,7 @@ export default function ScoreEntry() {
                   onClick={() => setVisibility(v)}
                   className={`flex-1 px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
                     visibility === v
-                      ? 'border-[var(--brass)]/50 bg-[var(--brass)]/10 text-[var(--brass)]'
+                      ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                       : 'border-subtle text-muted hover:text-secondary'
                   }`}
                 >
