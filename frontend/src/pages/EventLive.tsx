@@ -4,6 +4,9 @@ import { useParams } from '@tanstack/react-router'
 import { Download, RefreshCw } from 'lucide-react'
 import { eventsApi } from '../api/events'
 import { categoriesApi } from '../api/categories'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import { PageGrid, PageHeader, Section } from '../components/leagues'
 
 const REFRESH_INTERVAL_SECONDS = 30
 
@@ -23,12 +26,10 @@ export default function EventLive() {
 
   const categoryLookup = useMemo(() => new Map((cats.data?.items ?? []).map((c) => [c.id, c])), [cats.data])
 
-  // Reset countdown each time the scoreboard query refetches.
   useEffect(() => {
     setCountdown(REFRESH_INTERVAL_SECONDS)
   }, [board.dataUpdatedAt])
 
-  // Tick the countdown (cosmetic only — actual refetch driven by refetchInterval).
   useEffect(() => {
     const id = window.setInterval(() => setCountdown((c) => (c <= 1 ? REFRESH_INTERVAL_SECONDS : c - 1)), 1000)
     return () => window.clearInterval(id)
@@ -41,111 +42,199 @@ export default function EventLive() {
   }, [board.data, categoryFilter])
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold truncate">{ev.data?.name ?? 'Live scoreboard'}</h1>
-          <p className="text-xs text-muted mt-1">
-            {ev.data?.discipline} · auto-refresh in {countdown}s
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => board.refetch()}
-            aria-label="Refresh"
-            className="rounded-md border border-subtle p-2 hover:border-blue-500"
-          >
-            <RefreshCw size={16} className={board.isFetching ? 'animate-spin' : ''} />
-          </button>
-          <a
-            href={eventsApi.resultsCsvUrl(slug)}
-            className="rounded-md border border-subtle px-3 py-1.5 text-sm hover:border-blue-500 inline-flex items-center gap-1"
-          >
-            <Download size={14} /> CSV
-          </a>
-        </div>
+    <PageGrid>
+      <PageHeader
+        title={ev.data?.name ?? 'Live scoreboard'}
+        info={<HelpIcon content={pageHelp.eventLive} />}
+        description={`${ev.data?.discipline ?? ''} · auto-refresh in ${countdown}s`}
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => board.refetch()}
+              aria-label="Refresh"
+              className="lc-icon-btn"
+            >
+              <RefreshCw size={14} className={board.isFetching ? 'animate-spin' : ''} />
+            </button>
+            <a href={eventsApi.resultsCsvUrl(slug)} className="lc-action-ghost">
+              <Download size={14} /> CSV
+            </a>
+          </div>
+        }
+      />
+
+      <div className="lc-stack">
+        {ev.data?.category_ids && ev.data.category_ids.length > 0 && (
+          <div className="lc-chips">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`lc-chip ${categoryFilter === 'all' ? 'is-active' : ''}`}
+            >
+              All
+            </button>
+            {ev.data.category_ids.map((id) => {
+              const c = categoryLookup.get(id)
+              if (!c) return null
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCategoryFilter(id)}
+                  className={`lc-chip ${categoryFilter === id ? 'is-active' : ''}`}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <Section>
+          {board.isLoading && (
+            <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>Loading scoreboard…</p>
+          )}
+          {board.error && (
+            <p style={{ padding: 18, fontSize: 13, color: 'var(--red)' }}>
+              Failed to load scoreboard.
+            </p>
+          )}
+          {!board.isLoading && !board.error && rows.length === 0 && (
+            <p style={{ padding: 32, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+              No scores yet.
+            </p>
+          )}
+          {rows.length > 0 && (
+            <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-2)' }}>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      width: 50,
+                    }}
+                  >
+                    #
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                    }}
+                  >
+                    Shooter
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      width: 70,
+                    }}
+                  >
+                    Pts
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      width: 70,
+                    }}
+                  >
+                    Hits
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--muted)',
+                      width: 70,
+                    }}
+                  >
+                    Shots
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const cat = r.category_id ? categoryLookup.get(r.category_id) : null
+                  return (
+                    <tr
+                      key={r.participant_id}
+                      style={{ borderTop: i === 0 ? 'none' : '1px solid var(--line)' }}
+                    >
+                      <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', color: 'var(--muted)' }}>
+                        {r.position}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>
+                          {r.display_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          {[cat?.label, r.team].filter(Boolean).join(' · ')}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'right',
+                          fontFamily: 'var(--mono)',
+                          fontSize: 14,
+                          color: 'var(--gold)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {r.points}
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'right',
+                          fontFamily: 'var(--mono)',
+                          fontSize: 13,
+                        }}
+                      >
+                        {r.hit_count}
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'right',
+                          fontFamily: 'var(--mono)',
+                          fontSize: 13,
+                          color: 'var(--muted)',
+                        }}
+                      >
+                        {r.shots_recorded}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </Section>
       </div>
-
-      {ev.data?.category_ids && ev.data.category_ids.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <FilterChip
-            label="All"
-            active={categoryFilter === 'all'}
-            onClick={() => setCategoryFilter('all')}
-          />
-          {ev.data.category_ids.map((id) => {
-            const c = categoryLookup.get(id)
-            if (!c) return null
-            return (
-              <FilterChip
-                key={id}
-                label={c.label}
-                active={categoryFilter === id}
-                onClick={() => setCategoryFilter(id)}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {board.isLoading && <p className="text-sm text-muted">Loading scoreboard…</p>}
-      {board.error && <p className="text-sm text-red-600">Failed to load scoreboard.</p>}
-
-      {!board.isLoading && rows.length === 0 && (
-        <p className="text-sm text-muted text-center py-8">No scores yet.</p>
-      )}
-
-      {rows.length > 0 && (
-        <div className="rounded-lg border border-subtle bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-xs uppercase tracking-wider text-secondary">
-              <tr>
-                <th className="text-left px-3 py-2 w-10">#</th>
-                <th className="text-left px-3 py-2">Shooter</th>
-                <th className="text-right px-3 py-2 w-16">Pts</th>
-                <th className="text-right px-3 py-2 w-16">Hits</th>
-                <th className="text-right px-3 py-2 w-16">Shots</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const cat = r.category_id ? categoryLookup.get(r.category_id) : null
-                return (
-                  <tr key={r.participant_id} className="border-t border-subtle">
-                    <td className="px-3 py-2 text-muted font-mono">{r.position}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{r.display_name}</div>
-                      <div className="text-xs text-muted">
-                        {[cat?.label, r.team].filter(Boolean).join(' · ')}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">{r.points}</td>
-                    <td className="px-3 py-2 text-right font-mono">{r.hit_count}</td>
-                    <td className="px-3 py-2 text-right font-mono text-muted">{r.shots_recorded}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1 rounded-full border text-xs ${
-        active
-          ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-          : 'border-subtle text-secondary'
-      }`}
-    >
-      {label}
-    </button>
+    </PageGrid>
   )
 }

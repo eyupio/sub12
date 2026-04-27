@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Tags } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -40,7 +40,7 @@ const adminNavItems = [
   { to: '/admin/users',          icon: UserCog, label: 'Admin Users',   mobileLabel: 'Users'  },
   { to: '/admin/leagues',        icon: Trophy,  label: 'Admin Leagues', mobileLabel: 'Lgues'  },
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
-  { to: '/admin/categories',     icon: Tags,    label: 'Categories',    mobileLabel: 'Cats'   },
+  { to: '/admin/events',         icon: CalendarClock, label: 'Admin Events',  mobileLabel: 'Events' },
   { to: '/admin/sitemap',        icon: Globe,   label: 'Sitemap & SEO', mobileLabel: 'SEO'    },
   { to: '/admin/backup',         icon: Database, label: 'Backups',      mobileLabel: 'Backup' },
   { to: '/admin/reports',        icon: Flag,    label: 'Admin Reports', mobileLabel: 'Reports'},

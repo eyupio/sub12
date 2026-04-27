@@ -523,6 +523,11 @@ func NewRouter(
 				r.Post("/admin/categories", cath.AdminCreate)
 				r.Patch("/admin/categories/{id}", cath.AdminUpdate)
 				r.Delete("/admin/categories/{id}", cath.AdminDelete)
+
+				// Live Events (admin list + delete).
+				adminEH := handler.NewAdminEvents(events)
+				r.Get("/admin/events", adminEH.List)
+				r.Delete("/admin/events/{id}", adminEH.Delete)
 			})
 		})
 

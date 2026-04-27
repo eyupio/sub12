@@ -4,10 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Copy, Check, Trash2, ImagePlus, Trophy, Plus, Settings,
   Shield, ShieldOff, LogOut, Lock, Flag, Share2, Activity, Flame,
-  UserPlus,
+  UserPlus, CalendarClock, Eye,
 } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { clubsApi, type ClubMember } from '../api/clubs'
+import { eventsApi, type EventState } from '../api/events'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -521,6 +522,9 @@ export default function ClubDetail() {
           </Section>
         )}
 
+        {/* Events (members only) */}
+        {club.is_member && <ClubEvents clubId={id} isAdmin={!!club.is_admin} />}
+
         {/* Feed */}
         {club.is_member && <ClubFeed clubId={id} postVisibility={club.post_visibility} />}
       </div>
@@ -553,6 +557,102 @@ export default function ClubDetail() {
         />
       )}
     </PageGrid>
+  )
+}
+
+function eventStateBadge(state: EventState) {
+  switch (state) {
+    case 'live':
+      return <Badge variant="red" live>Live</Badge>
+    case 'open_for_entries':
+      return <Badge variant="green">Open</Badge>
+    case 'complete':
+      return <Badge variant="gold">Complete</Badge>
+    case 'archived':
+      return <Badge variant="neutral">Archived</Badge>
+    case 'draft':
+    default:
+      return <Badge variant="neutral">Draft</Badge>
+  }
+}
+
+function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
+  const navigate = useNavigate()
+  const { data } = useQuery({
+    queryKey: ['club', clubId, 'events'],
+    queryFn: () => eventsApi.list({ clubId }),
+  })
+  const events = data?.items ?? []
+
+  return (
+    <Section
+      title="Events"
+      icon={<CalendarClock size={12} />}
+      actions={
+        isAdmin ? (
+          <button
+            className="lc-action-ghost"
+            onClick={() => navigate({ to: '/events/new', search: { clubId } })}
+          >
+            <Plus size={12} /> New Event
+          </button>
+        ) : null
+      }
+    >
+      {events.length === 0 ? (
+        <EmptyState
+          icon={<CalendarClock size={36} />}
+          title="No events yet"
+          body={isAdmin ? 'Run your first event for the club.' : 'Check back later.'}
+          cta={
+            isAdmin ? (
+              <button
+                className="lc-action-ghost"
+                onClick={() => navigate({ to: '/events/new', search: { clubId } })}
+              >
+                <Plus size={12} /> New Event
+              </button>
+            ) : null
+          }
+        />
+      ) : (
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {events.map((ev) => {
+            const badges = (
+              <>
+                {eventStateBadge(ev.state)}
+                {ev.visibility === 'club_only' && (
+                  <Badge variant="neutral">
+                    <Lock size={10} /> Club only
+                  </Badge>
+                )}
+                {ev.visibility === 'unlisted' && (
+                  <Badge variant="neutral">
+                    <Eye size={10} /> Unlisted
+                  </Badge>
+                )}
+              </>
+            )
+            return (
+              <EntityCard
+                key={ev.id}
+                to="/events/$slug"
+                toParams={{ slug: ev.slug }}
+                thumbIcon={<CalendarClock size={20} />}
+                name={ev.name}
+                badges={badges}
+                meta={[
+                  { icon: <Trophy size={11} />, text: ev.discipline },
+                  { icon: <Users size={11} />, text: `${ev.participant_count} participant${ev.participant_count === 1 ? '' : 's'}` },
+                ]}
+                rightRail="chevron"
+                size="small"
+              />
+            )
+          })}
+        </div>
+      )}
+    </Section>
   )
 }
 

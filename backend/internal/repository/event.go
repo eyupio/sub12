@@ -724,6 +724,77 @@ func (r *EventRepository) ArchiveSweep(ctx context.Context, now time.Time) (int,
 	return int(tag.RowsAffected()), nil
 }
 
+// AdminEventRow is a flattened row returned from AdminListAll. It includes
+// joined club name and owner display name so the admin UI can render them
+// without a follow-up fetch.
+type AdminEventRow struct {
+	model.Event
+	ClubName        *string `json:"club_name,omitempty"`
+	OwnerDisplayName string  `json:"owner_display_name"`
+}
+
+// AdminListAll returns every event regardless of visibility/state, joined with
+// club name and owner display name. Intended for the platform-admin events
+// list. Newest first; capped to 500 to keep the response bounded.
+func (r *EventRepository) AdminListAll(ctx context.Context) ([]*AdminEventRow, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT `+eventColumns+`,
+			(SELECT COUNT(*) FROM event_participants p WHERE p.event_id = e.id) AS participant_count,
+			c.name AS club_name,
+			COALESCE(u.display_name, '') AS owner_display_name
+		FROM events e
+		LEFT JOIN clubs c ON c.id = e.club_id
+		LEFT JOIN users u ON u.id = e.owner_user_id
+		ORDER BY e.created_at DESC
+		LIMIT 500
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("admin list events: %w", err)
+	}
+	defer rows.Close()
+	var items []*AdminEventRow
+	for rows.Next() {
+		var row AdminEventRow
+		var courseRaw, rulesRaw []byte
+		if err := rows.Scan(
+			&row.ID, &row.Slug, &row.Name, &row.Description, &row.Location,
+			&row.StartsAt, &row.EndsAt, &row.ArchiveAt,
+			&row.Discipline, &courseRaw, &rulesRaw, &row.CategoryIDs,
+			&row.Visibility, &row.State, &row.OwnerUserID, &row.ClubID,
+			&row.CreatedAt, &row.UpdatedAt,
+			&row.ParticipantCount,
+			&row.ClubName,
+			&row.OwnerDisplayName,
+		); err != nil {
+			return nil, fmt.Errorf("scan admin event: %w", err)
+		}
+		if len(courseRaw) > 0 {
+			_ = json.Unmarshal(courseRaw, &row.Course)
+		}
+		if len(rulesRaw) > 0 {
+			_ = json.Unmarshal(rulesRaw, &row.ScoringRules)
+		}
+		if row.CategoryIDs == nil {
+			row.CategoryIDs = []string{}
+		}
+		items = append(items, &row)
+	}
+	return items, rows.Err()
+}
+
+// AdminDelete removes an event by ID, cascading via FKs to participants and
+// scores. No ownership check; caller must have already gated on admin role.
+func (r *EventRepository) AdminDelete(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM events WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("admin delete event: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CountHostedByUser returns the number of events the user has owned that have
 // reached state 'complete' (used for Host achievement tiers).
 func (r *EventRepository) CountHostedByUser(ctx context.Context, userID string) (int, error) {
