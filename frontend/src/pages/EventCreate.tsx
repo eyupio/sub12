@@ -1,9 +1,12 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { categoriesApi } from '../api/categories'
 import { eventsApi, type CreateEventPayload, type EventVisibility } from '../api/events'
 import { customPreset, disciplinePresets } from '../config/disciplinePresets'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import { PageGrid, PageHeader, Section } from '../components/leagues'
 import { toast } from '../store/toast'
 
 function parseLaneList(input: string): number[] {
@@ -21,8 +24,22 @@ function parseLaneList(input: string): number[] {
   return out.sort((a, b) => a - b)
 }
 
+const inputCls =
+  'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors'
+
+function toggleCls(active: boolean) {
+  return `px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+    active
+      ? 'border-[var(--gold)]/50 bg-[var(--gold-tint)] text-[var(--gold)]'
+      : 'border-subtle text-muted hover:text-secondary'
+  }`
+}
+
 export default function EventCreate() {
   const navigate = useNavigate()
+  const search = useSearch({ strict: false }) as { clubId?: string }
+  const clubId = search.clubId
+
   const [presetId, setPresetId] = useState(disciplinePresets[0].id)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -32,9 +49,14 @@ export default function EventCreate() {
   const [shotsPerTarget, setShotsPerTarget] = useState(disciplinePresets[0].course.shots_per_target)
   const [standing, setStanding] = useState('')
   const [kneeling, setKneeling] = useState('')
-  const [visibility, setVisibility] = useState<EventVisibility>('public')
+  const [visibility, setVisibility] = useState<EventVisibility>(clubId ? 'club_only' : 'public')
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [error, setError] = useState('')
+
+  // If the user navigated from a club, default visibility to club_only.
+  useEffect(() => {
+    if (clubId) setVisibility('club_only')
+  }, [clubId])
 
   const { data: catsData } = useQuery({
     queryKey: ['categories', 'public'],
@@ -61,7 +83,11 @@ export default function EventCreate() {
     mutationFn: (body: CreateEventPayload) => eventsApi.create(body),
     onSuccess: (ev) => {
       toast('Event created', 'success')
-      navigate({ to: '/events/$slug', params: { slug: ev.slug } })
+      if (clubId) {
+        navigate({ to: '/clubs/$id', params: { id: clubId } })
+      } else {
+        navigate({ to: '/events/$slug', params: { slug: ev.slug } })
+      }
     },
     onError: (err) => setError(String(err instanceof Error ? err.message : err)),
   })
@@ -91,6 +117,7 @@ export default function EventCreate() {
       scoring_rules: preset.scoringRules,
       category_ids: selectedCategoryIds,
       visibility,
+      club_id: clubId,
     })
   }
 
@@ -101,170 +128,185 @@ export default function EventCreate() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-semibold mb-5">New live event</h1>
+    <PageGrid>
+      <PageHeader
+        title="New Event"
+        info={<HelpIcon content={pageHelp.eventCreate} />}
+        description={
+          clubId
+            ? 'Hosting on behalf of your club. Visibility defaults to club only.'
+            : 'Pick a discipline, course, and categories. Visibility controls who can find or join it.'
+        }
+      />
 
-      <form onSubmit={onSubmit} className="space-y-5">
-        <Field label="Name">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Spring HFT shoot"
-            autoFocus
-          />
-        </Field>
+      <form onSubmit={onSubmit}>
+        <div className="lc-stack">
+          <Section title="Basics">
+            <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="Name">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={inputCls}
+                  placeholder="Spring HFT shoot"
+                  autoFocus
+                />
+              </Field>
+              <Field label="Description (optional)">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className={`${inputCls} resize-none`}
+                  rows={2}
+                />
+              </Field>
+              <Field label="Location (optional)">
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. North field range"
+                />
+              </Field>
+            </div>
+          </Section>
 
-        <Field label="Description (optional)">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={2}
-          />
-        </Field>
+          <Section title="Discipline & Course">
+            <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="Discipline preset">
+                <div className="flex flex-wrap gap-2">
+                  {[...disciplinePresets, customPreset].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => applyPreset(p.id)}
+                      className={toggleCls(presetId === p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
 
-        <Field label="Location (optional)">
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g. North field range"
-          />
-        </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Discipline">
+                  <input
+                    value={discipline}
+                    onChange={(e) => setDiscipline(e.target.value)}
+                    className={inputCls}
+                    placeholder="HFT, FT, …"
+                  />
+                </Field>
+                <Field label="Lanes">
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={lanes}
+                    onChange={(e) => setLanes(Number.parseInt(e.target.value || '0', 10))}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
 
-        <Field label="Discipline preset">
-          <div className="flex flex-wrap gap-2">
-            {[...disciplinePresets, customPreset].map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => applyPreset(p.id)}
-                className={`px-3 py-1.5 rounded-full border text-sm ${
-                  presetId === p.id
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                    : 'border-subtle'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+              <Field label="Shots per target">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={shotsPerTarget}
+                  onChange={(e) => setShotsPerTarget(Number.parseInt(e.target.value || '0', 10))}
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="Standing lanes (optional)">
+                <input
+                  value={standing}
+                  onChange={(e) => setStanding(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. 1, 4, 5"
+                  inputMode="text"
+                />
+              </Field>
+
+              <Field label="Kneeling lanes (optional)">
+                <input
+                  value={kneeling}
+                  onChange={(e) => setKneeling(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. 7, 12"
+                  inputMode="text"
+                />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Categories & Visibility">
+            <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="Categories">
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCategory(c.id)}
+                      className={toggleCls(selectedCategoryIds.includes(c.id))}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                  {categories.length === 0 && (
+                    <p className="text-xs text-muted">No categories available.</p>
+                  )}
+                </div>
+              </Field>
+
+              <Field label="Visibility">
+                <div className="flex gap-2">
+                  {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setVisibility(v)}
+                      className={`${toggleCls(visibility === v)} flex-1`}
+                    >
+                      {v === 'public' ? 'Public' : v === 'club_only' ? 'Club only' : 'Unlisted'}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+          </Section>
+
+          {error && <p style={{ color: 'var(--error-text)', fontSize: 13 }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="submit"
+              disabled={create.isPending}
+              className="bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-5 py-3 rounded transition-opacity"
+            >
+              {create.isPending ? 'Creating…' : 'Create event'}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate({ to: clubId ? '/clubs/$id' : '/events', params: clubId ? { id: clubId } : undefined as never })}
+              className="lc-action-ghost"
+            >
+              Cancel
+            </button>
           </div>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Discipline">
-            <input
-              value={discipline}
-              onChange={(e) => setDiscipline(e.target.value)}
-              className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="HFT, FT, …"
-            />
-          </Field>
-          <Field label="Lanes">
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={lanes}
-              onChange={(e) => setLanes(Number.parseInt(e.target.value || '0', 10))}
-              className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </Field>
-        </div>
-
-        <Field label="Shots per target">
-          <input
-            type="number"
-            min={1}
-            max={10}
-            value={shotsPerTarget}
-            onChange={(e) => setShotsPerTarget(Number.parseInt(e.target.value || '0', 10))}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </Field>
-
-        <Field label="Standing lanes (optional)">
-          <input
-            value={standing}
-            onChange={(e) => setStanding(e.target.value)}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g. 1, 4, 5"
-            inputMode="text"
-          />
-        </Field>
-
-        <Field label="Kneeling lanes (optional)">
-          <input
-            value={kneeling}
-            onChange={(e) => setKneeling(e.target.value)}
-            className="w-full rounded-md border border-subtle bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g. 7, 12"
-            inputMode="text"
-          />
-        </Field>
-
-        <Field label="Categories">
-          <div className="flex flex-wrap gap-2">
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => toggleCategory(c.id)}
-                className={`px-3 py-1 rounded-full border text-sm ${
-                  selectedCategoryIds.includes(c.id)
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                    : 'border-subtle'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-            {categories.length === 0 && <p className="text-xs text-muted">No categories available.</p>}
-          </div>
-        </Field>
-
-        <Field label="Visibility">
-          <div className="flex gap-2">
-            {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setVisibility(v)}
-                className={`px-3 py-1.5 rounded-md border text-sm flex-1 ${
-                  visibility === v
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                    : 'border-subtle'
-                }`}
-              >
-                {v === 'public' ? 'Public' : v === 'club_only' ? 'Club only' : 'Unlisted'}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={create.isPending}
-            className="rounded-md bg-blue-600 hover:bg-blue-700 px-4 py-2 text-white text-sm disabled:opacity-50"
-          >
-            {create.isPending ? 'Creating…' : 'Create event'}
-          </button>
         </div>
       </form>
-    </div>
+    </PageGrid>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium uppercase tracking-wider text-secondary mb-1">
-        {label}
-      </span>
+      <span className="t-section-title block mb-1.5">{label}</span>
       {children}
     </label>
   )

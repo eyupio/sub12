@@ -1,10 +1,30 @@
 import { FormEvent, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { ChevronRight, Plus, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { CalendarClock, ChevronRight, Plus, Settings, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { eventsApi, type EventState } from '../api/events'
 import { categoriesApi } from '../api/categories'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import { Badge, EntityDetailHeader, PageGrid, Section } from '../components/leagues'
+import { DisciplineThumb } from '../components/leagues/structure'
 import { toast } from '../store/toast'
+
+function StateBadge({ state }: { state: EventState }) {
+  switch (state) {
+    case 'live':
+      return <Badge variant="red" live>Live</Badge>
+    case 'open_for_entries':
+      return <Badge variant="green">Open</Badge>
+    case 'complete':
+      return <Badge variant="gold">Complete</Badge>
+    case 'archived':
+      return <Badge variant="neutral">Archived</Badge>
+    case 'draft':
+    default:
+      return <Badge variant="neutral">Draft</Badge>
+  }
+}
 
 export default function EventDetail() {
   const { slug } = useParams({ from: '/app/events/$slug' })
@@ -56,145 +76,179 @@ export default function EventDetail() {
     )
   }
 
-  if (eventQuery.isLoading) return <p className="p-6 text-sm text-muted">Loading…</p>
-  if (eventQuery.error || !ev) return <p className="p-6 text-sm text-red-600">Failed to load event.</p>
+  if (eventQuery.isLoading) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+      </PageGrid>
+    )
+  }
+  if (eventQuery.error || !ev) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--red)' }}>Failed to load event.</p>
+      </PageGrid>
+    )
+  }
 
   const nextState = nextStateFor(ev.state)
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold">{ev.name}</h1>
-        <p className="text-sm text-muted mt-1">
-          {ev.discipline} · {ev.course.lanes} lanes · {ev.state}
-        </p>
-        {ev.location && <p className="text-sm text-muted">{ev.location}</p>}
-        <p className="text-xs text-muted mt-1 font-mono">Event ID: {ev.slug}</p>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-6">
-        {ev.is_scorer && (
-          <Link
-            to="/events/$slug/scorecard"
-            params={{ slug: ev.slug }}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-white text-sm"
-          >
-            Open scorecard <ChevronRight size={14} />
-          </Link>
-        )}
-        <Link
-          to="/events/$slug/live"
-          params={{ slug: ev.slug }}
-          className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-3 py-1.5 text-sm hover:bg-surface-hover"
-        >
-          Live scoreboard <ChevronRight size={14} />
-        </Link>
-        <button
-          type="button"
-          onClick={copyLink}
-          className="inline-flex items-center gap-1 rounded-md border border-subtle px-3 py-1.5 text-sm"
-        >
-          <Share2 size={14} /> Share
-        </button>
-        {ev.is_owner && nextState && (
-          <button
-            type="button"
-            onClick={() => promote.mutate(nextState)}
-            disabled={promote.isPending}
-            className="inline-flex items-center gap-1 rounded-md border border-emerald-500 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-950"
-          >
-            {promote.isPending ? 'Updating…' : labelFor(nextState)}
-          </button>
-        )}
-        {ev.is_owner && (
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/events/$slug/settings', params: { slug: ev.slug } })}
-            className="inline-flex items-center gap-1 rounded-md border border-subtle px-3 py-1.5 text-sm"
-          >
-            Settings
-          </button>
-        )}
-      </div>
-
-      <section className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium uppercase tracking-wider text-secondary">
-            <Users className="inline mr-1" size={14} /> Participants ({participants.length})
-          </h2>
-          <div className="flex gap-2">
-            {!ev.is_owner && (ev.state === 'open_for_entries' || ev.state === 'live') && (
-              <button
-                type="button"
-                onClick={() => join.mutate()}
-                disabled={join.isPending}
-                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-              >
-                <UserPlus size={14} /> Join
-              </button>
+    <PageGrid>
+      <EntityDetailHeader
+        onBack={() => navigate({ to: '/events' })}
+        thumb={<DisciplineThumb size={64} icon={<CalendarClock size={28} />} />}
+        title={ev.name}
+        tag={
+          <span style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
+            <StateBadge state={ev.state} />
+          </span>
+        }
+        sub={
+          <>
+            <span>
+              {ev.discipline} · {ev.course.lanes} lanes
+            </span>
+            {ev.location && (
+              <>
+                <span className="lc-detail-sub-sep">·</span>
+                <span>{ev.location}</span>
+              </>
             )}
+            <span className="lc-detail-sub-sep">·</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{ev.slug}</span>
+            <HelpIcon content={pageHelp.eventDetail} className="ml-2" />
+          </>
+        }
+        rightActions={
+          <>
+            <button type="button" onClick={copyLink} className="lc-icon-btn" aria-label="Share">
+              <Share2 size={14} />
+            </button>
             {ev.is_owner && (
               <button
                 type="button"
-                onClick={() => setShowAddGuest((v) => !v)}
-                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                onClick={() => navigate({ to: '/events/$slug/settings', params: { slug: ev.slug } })}
+                className="lc-icon-btn"
+                aria-label="Settings"
               >
-                <Plus size={14} /> Add guest
+                <Settings size={14} />
               </button>
             )}
-          </div>
+          </>
+        }
+      />
+
+      <div className="lc-stack">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {ev.is_scorer && (
+            <Link to="/events/$slug/scorecard" params={{ slug: ev.slug }} className="lc-action-ghost">
+              Open scorecard <ChevronRight size={14} />
+            </Link>
+          )}
+          <Link to="/events/$slug/live" params={{ slug: ev.slug }} className="lc-action-ghost">
+            Live scoreboard <ChevronRight size={14} />
+          </Link>
+          {!ev.is_owner && (ev.state === 'open_for_entries' || ev.state === 'live') && (
+            <button
+              type="button"
+              onClick={() => join.mutate()}
+              disabled={join.isPending}
+              className="lc-action-ghost"
+            >
+              <UserPlus size={14} /> {join.isPending ? 'Joining…' : 'Join'}
+            </button>
+          )}
+          {ev.is_owner && nextState && (
+            <button
+              type="button"
+              onClick={() => promote.mutate(nextState)}
+              disabled={promote.isPending}
+              className="lc-cta"
+              style={{ width: 'auto', padding: '8px 14px' }}
+            >
+              {promote.isPending ? 'Updating…' : labelFor(nextState)}
+            </button>
+          )}
         </div>
 
-        {showAddGuest && ev.is_owner && (
-          <AddGuestForm
-            slug={slug}
-            categoryOptions={ev.category_ids
-              .map((id) => categoryLookup.get(id))
-              .filter((c): c is NonNullable<typeof c> => Boolean(c))}
-            onAdded={() => {
-              setShowAddGuest(false)
-              queryClient.invalidateQueries({ queryKey: ['event-participants', slug] })
-            }}
-          />
-        )}
-
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-subtle bg-card">
-          {participants.length === 0 && (
-            <li className="p-3 text-sm text-muted">No participants yet.</li>
-          )}
-          {participants.map((p) => {
-            const cat = p.category_id ? categoryLookup.get(p.category_id) : undefined
-            return (
-              <li key={p.id} className="p-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium truncate">
-                    {p.display_name}
-                    {!p.user_id && (
-                      <span className="ml-2 text-[10px] uppercase rounded px-1 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                        Guest
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {[cat?.label, p.team, p.weapon_label].filter(Boolean).join(' · ') || ' '}
-                  </p>
-                </div>
-                {ev.is_owner && (
-                  <button
-                    type="button"
-                    onClick={() => removeParticipant.mutate(p.id)}
-                    aria-label={`Remove ${p.display_name}`}
-                    className="text-muted hover:text-red-600 p-1"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
+        <Section
+          title={`Participants (${participants.length})`}
+          icon={<Users size={12} />}
+          actions={
+            ev.is_owner ? (
+              <button
+                type="button"
+                onClick={() => setShowAddGuest((v) => !v)}
+                className="lc-action-ghost"
+              >
+                <Plus size={12} /> Add guest
+              </button>
+            ) : null
+          }
+        >
+          <div style={{ padding: showAddGuest ? '14px 18px' : 0 }}>
+            {showAddGuest && ev.is_owner && (
+              <AddGuestForm
+                slug={slug}
+                categoryOptions={ev.category_ids
+                  .map((id) => categoryLookup.get(id))
+                  .filter((c): c is NonNullable<typeof c> => Boolean(c))}
+                onAdded={() => {
+                  setShowAddGuest(false)
+                  queryClient.invalidateQueries({ queryKey: ['event-participants', slug] })
+                }}
+              />
+            )}
+          </div>
+          <ul style={{ display: 'flex', flexDirection: 'column' }}>
+            {participants.length === 0 && (
+              <li style={{ padding: '14px 18px', fontSize: 13, color: 'var(--muted)' }}>
+                No participants yet.
               </li>
-            )
-          })}
-        </ul>
-      </section>
-    </div>
+            )}
+            {participants.map((p, i) => {
+              const cat = p.category_id ? categoryLookup.get(p.category_id) : undefined
+              return (
+                <li
+                  key={p.id}
+                  style={{
+                    padding: '12px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>
+                        {p.display_name}
+                      </span>
+                      {!p.user_id && <Badge variant="gold">Guest</Badge>}
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      {[cat?.label, p.team, p.weapon_label].filter(Boolean).join(' · ') || ' '}
+                    </p>
+                  </div>
+                  {ev.is_owner && (
+                    <button
+                      type="button"
+                      onClick={() => removeParticipant.mutate(p.id)}
+                      aria-label={`Remove ${p.display_name}`}
+                      className="lc-icon-btn"
+                      style={{ color: 'var(--red)' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </Section>
+      </div>
+    </PageGrid>
   )
 }
 
@@ -234,29 +288,28 @@ function AddGuestForm({
     add.mutate()
   }
 
+  const inputCls =
+    'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors'
+
   return (
-    <form onSubmit={onSubmit} className="rounded-lg border border-subtle bg-surface p-3 mb-3 space-y-2">
+    <form onSubmit={onSubmit} className="space-y-2 mb-3">
       <input
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Guest name"
         autoFocus
-        className="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+        className={inputCls}
       />
       <input
         type="text"
         value={team}
         onChange={(e) => setTeam(e.target.value)}
         placeholder="Team (optional)"
-        className="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
+        className={inputCls}
       />
       {categoryOptions.length > 0 && (
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="w-full rounded-md border border-subtle bg-surface px-3 py-2 text-sm"
-        >
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
           <option value="">Category (optional)</option>
           {categoryOptions.map((c) => (
             <option key={c.id} value={c.id}>
@@ -268,7 +321,7 @@ function AddGuestForm({
       <button
         type="submit"
         disabled={add.isPending || !name.trim()}
-        className="rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-white text-sm disabled:opacity-50"
+        className="bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-4 py-2 rounded transition-opacity"
       >
         {add.isPending ? 'Adding…' : 'Add guest'}
       </button>

@@ -1,8 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Plus, Trophy, Lock, Eye, Calendar } from 'lucide-react'
+import { CalendarClock, Eye, Lock, Plus, Trophy, Users } from 'lucide-react'
 import { eventsApi, type EventDTO, type EventState } from '../api/events'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import {
+  Badge,
+  EmptyState,
+  EntityCard,
+  type MetaItem,
+  PageGrid,
+  PageHeader,
+} from '../components/leagues'
 
 const FILTERS: { id: 'all' | EventState; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -10,6 +20,22 @@ const FILTERS: { id: 'all' | EventState; label: string }[] = [
   { id: 'open_for_entries', label: 'Open' },
   { id: 'complete', label: 'Completed' },
 ]
+
+function StateBadge({ state }: { state: EventState }) {
+  switch (state) {
+    case 'live':
+      return <Badge variant="red" live>Live</Badge>
+    case 'open_for_entries':
+      return <Badge variant="green">Open</Badge>
+    case 'complete':
+      return <Badge variant="gold">Complete</Badge>
+    case 'archived':
+      return <Badge variant="neutral">Archived</Badge>
+    case 'draft':
+    default:
+      return <Badge variant="neutral">Draft</Badge>
+  }
+}
 
 export default function Events() {
   const [filter, setFilter] = useState<'all' | EventState>('all')
@@ -22,91 +48,111 @@ export default function Events() {
   const items: EventDTO[] = useMemo(() => data?.items ?? [], [data])
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-semibold">Live Events</h1>
-        <Link
-          to="/events/new"
-          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-white text-sm hover:bg-blue-700"
-        >
-          <Plus size={16} /> New event
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4" role="tablist">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === f.id}
-            onClick={() => setFilter(f.id)}
-            className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
-              filter === f.id
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-card border-subtle text-secondary hover:border-blue-500'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading && <p className="text-sm text-muted">Loading…</p>}
-      {error && <p className="text-sm text-red-600">Failed to load events.</p>}
-
-      {!isLoading && items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-subtle p-8 text-center text-muted">
-          <Calendar className="mx-auto mb-2" size={28} />
-          <p className="text-sm">No events yet.</p>
-          <Link to="/events/new" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-            Create the first one
+    <PageGrid>
+      <PageHeader
+        title="Live Events"
+        info={<HelpIcon content={pageHelp.events} />}
+        description="Browse, join, or run live shooting events. Open events accept entries; live events show a real-time scoreboard."
+        action={
+          <Link to="/events/new" className="lc-action-ghost">
+            <Plus size={14} /> New
           </Link>
-        </div>
-      )}
+        }
+      />
 
-      <ul className="space-y-3">
-        {items.map((ev) => (
-          <li key={ev.id}>
-            <Link
-              to="/events/$slug"
-              params={{ slug: ev.slug }}
-              className="block rounded-lg border border-subtle bg-card p-4 hover:border-blue-500 transition-colors"
+      <div className="lc-stack">
+        <div className="lc-chips" role="tablist">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.id}
+              onClick={() => setFilter(f.id)}
+              className={`lc-chip ${filter === f.id ? 'is-active' : ''}`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-medium truncate">{ev.name}</h2>
-                    <StateBadge state={ev.state} />
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    {ev.discipline} · {ev.course.lanes} lanes · {ev.participant_count} participant
-                    {ev.participant_count === 1 ? '' : 's'}
-                  </p>
-                  {ev.location && <p className="text-xs text-muted mt-0.5 truncate">{ev.location}</p>}
-                </div>
-                <div className="flex items-center gap-1 text-muted shrink-0">
-                  {ev.visibility === 'club_only' && <Lock size={14} aria-label="Club only" />}
-                  {ev.visibility === 'unlisted' && <Eye size={14} aria-label="Unlisted" />}
-                  {ev.state === 'complete' && <Trophy size={14} aria-label="Complete" />}
-                </div>
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-function StateBadge({ state }: { state: EventState }) {
-  const map: Record<EventState, { label: string; cls: string }> = {
-    draft: { label: 'Draft', cls: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
-    open_for_entries: { label: 'Open', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' },
-    live: { label: 'Live', cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-pulse' },
-    complete: { label: 'Complete', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-    archived: { label: 'Archived', cls: 'bg-zinc-100 text-muted dark:bg-zinc-900 dark:text-muted' },
-  }
-  const { label, cls } = map[state]
-  return <span className={`text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 ${cls}`}>{label}</span>
+        {isLoading && (
+          <div className="lc-stack" aria-busy>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: 88,
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--lc-surface)',
+                  border: '1px solid var(--line)',
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>Failed to load events.</p>}
+
+        {!isLoading && !error && items.length === 0 && (
+          <EmptyState
+            icon={<CalendarClock size={42} />}
+            title="No events yet"
+            body="Create the first one to get started."
+            cta={
+              <Link to="/events/new" className="lc-action-ghost">
+                <Plus size={14} /> New event
+              </Link>
+            }
+          />
+        )}
+
+        {items.length > 0 && (
+          <div className="lc-stack">
+            {items.map((ev) => {
+              const badges = (
+                <>
+                  <StateBadge state={ev.state} />
+                  {ev.visibility === 'club_only' && (
+                    <Badge variant="neutral">
+                      <Lock size={10} /> Club only
+                    </Badge>
+                  )}
+                  {ev.visibility === 'unlisted' && (
+                    <Badge variant="neutral">
+                      <Eye size={10} /> Unlisted
+                    </Badge>
+                  )}
+                </>
+              )
+              const meta: MetaItem[] = [
+                { icon: <Trophy size={12} />, text: ev.discipline },
+                { icon: <CalendarClock size={12} />, text: `${ev.course.lanes} lanes` },
+                {
+                  icon: <Users size={12} />,
+                  text: `${ev.participant_count} participant${ev.participant_count === 1 ? '' : 's'}`,
+                },
+              ]
+              if (ev.location) {
+                meta.push({ text: ev.location })
+              }
+              return (
+                <EntityCard
+                  key={ev.id}
+                  to="/events/$slug"
+                  toParams={{ slug: ev.slug }}
+                  thumbIcon={<CalendarClock size={24} />}
+                  name={ev.name}
+                  badges={badges}
+                  meta={meta}
+                  rightRail="chevron"
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </PageGrid>
+  )
 }

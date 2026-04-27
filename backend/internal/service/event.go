@@ -532,6 +532,22 @@ func (s *EventService) ListScoresForCSV(ctx context.Context, slug string) (*mode
 	return ev, parts, scores, nil
 }
 
+// AdminListEvents returns every event on the platform, joined with club name
+// and owner display name. Caller must already be a platform admin (gated by
+// middleware.RequireAdmin in the router).
+func (s *EventService) AdminListEvents(ctx context.Context) ([]*repository.AdminEventRow, error) {
+	return s.events.AdminListAll(ctx)
+}
+
+// AdminDeleteEvent hard-deletes an event by ID without ownership checks.
+func (s *EventService) AdminDeleteEvent(ctx context.Context, id string) error {
+	err := s.events.AdminDelete(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrEventNotFound
+	}
+	return err
+}
+
 // RunArchiveSweep flips completed events whose 30-day archive window has
 // elapsed into 'archived'. Intended to run on a daily ticker from main.
 func (s *EventService) RunArchiveSweep(ctx context.Context) (int, error) {

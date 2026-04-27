@@ -79,7 +79,7 @@ import EventDetail from './pages/EventDetail'
 import EventLive from './pages/EventLive'
 import EventScorecard from './pages/EventScorecard'
 import EventSettings from './pages/EventSettings'
-import AdminCategories from './pages/AdminCategories'
+import AdminEvents from './pages/AdminEvents'
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -229,6 +229,9 @@ const eventCreateRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/new',
   component: EventCreate,
+  validateSearch: (search: Record<string, unknown>): { clubId?: string } => ({
+    clubId: typeof search.clubId === 'string' && search.clubId ? search.clubId : undefined,
+  }),
 })
 
 const eventDetailRoute = createRoute({
@@ -255,10 +258,10 @@ const eventSettingsRoute = createRoute({
   component: EventSettings,
 })
 
-const adminCategoriesRoute = createRoute({
+const adminEventsRoute = createRoute({
   getParentRoute: () => appRoute,
-  path: '/admin/categories',
-  component: AdminCategories,
+  path: '/admin/events',
+  component: AdminEvents,
 })
 
 const pelletTestingRoute = createRoute({
@@ -665,7 +668,7 @@ export const routeTree = rootRoute.addChildren([
     eventLiveRoute,
     eventScorecardRoute,
     eventSettingsRoute,
-    adminCategoriesRoute,
+    adminEventsRoute,
     clubsRoute,
     clubDetailRoute,
     clubSettingsRoute,

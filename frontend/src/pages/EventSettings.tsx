@@ -1,11 +1,27 @@
 import { FormEvent, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { ChevronLeft } from 'lucide-react'
 import { eventsApi, type EventVisibility } from '../api/events'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import { PageGrid, PageHeader, Section } from '../components/leagues'
 import { toast } from '../store/toast'
+
+const inputCls =
+  'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors'
+
+function toggleCls(active: boolean) {
+  return `flex-1 px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+    active
+      ? 'border-[var(--gold)]/50 bg-[var(--gold-tint)] text-[var(--gold)]'
+      : 'border-subtle text-muted hover:text-secondary'
+  }`
+}
 
 export default function EventSettings() {
   const { slug } = useParams({ from: '/app/events/$slug/settings' })
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [scorerUserId, setScorerUserId] = useState('')
 
@@ -29,16 +45,34 @@ export default function EventSettings() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to add scorer', 'error'),
   })
 
-  if (ev.isLoading) return <p className="p-6 text-sm text-muted">Loading…</p>
-  if (!ev.data) return <p className="p-6 text-sm text-red-600">Event not found.</p>
+  if (ev.isLoading) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+      </PageGrid>
+    )
+  }
+  if (!ev.data) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--red)' }}>Event not found.</p>
+      </PageGrid>
+    )
+  }
   if (!ev.data.is_owner) {
     return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <p className="text-sm text-secondary mb-3">Owner-only page.</p>
-        <Link to="/events/$slug" params={{ slug }} className="text-blue-600 hover:underline text-sm">
-          Back to event
-        </Link>
-      </div>
+      <PageGrid>
+        <Section title="Owner only">
+          <div style={{ padding: 24, textAlign: 'center' }}>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+              This page is only available to the event owner.
+            </p>
+            <Link to="/events/$slug" params={{ slug }} className="lc-action-ghost">
+              <ChevronLeft size={14} /> Back to event
+            </Link>
+          </div>
+        </Section>
+      </PageGrid>
     )
   }
 
@@ -49,60 +83,64 @@ export default function EventSettings() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-semibold mb-1">Event settings</h1>
-      <p className="text-sm text-muted mb-5">{ev.data.name}</p>
-
-      <section className="mb-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-secondary mb-2">
-          Visibility
-        </h2>
-        <div className="flex gap-2">
-          {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => updateVisibility.mutate(v)}
-              disabled={updateVisibility.isPending}
-              className={`px-3 py-1.5 rounded-md border text-sm flex-1 ${
-                ev.data.visibility === v
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                  : 'border-subtle'
-              }`}
-            >
-              {v === 'public' ? 'Public' : v === 'club_only' ? 'Club only' : 'Unlisted'}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-secondary mb-2">
-          Delegated scorers
-        </h2>
-        <p className="text-xs text-muted mb-2">
-          Grant another user permission to record scores for this event. You always have scoring rights as the owner.
-        </p>
-        <form onSubmit={onAddScorer} className="flex gap-2">
-          <input
-            value={scorerUserId}
-            onChange={(e) => setScorerUserId(e.target.value)}
-            placeholder="User ID (UUID)"
-            className="flex-1 rounded-md border border-subtle bg-card px-3 py-2 text-sm font-mono"
-          />
+    <PageGrid>
+      <PageHeader
+        title="Event settings"
+        info={<HelpIcon content={pageHelp.eventSettings} />}
+        description={ev.data.name}
+        action={
           <button
-            type="submit"
-            disabled={addScorer.isPending || !scorerUserId.trim()}
-            className="rounded-md bg-blue-600 hover:bg-blue-700 px-4 py-2 text-white text-sm disabled:opacity-50"
+            type="button"
+            onClick={() => navigate({ to: '/events/$slug', params: { slug } })}
+            className="lc-action-ghost"
           >
-            Add
+            <ChevronLeft size={14} /> Back
           </button>
-        </form>
-      </section>
+        }
+      />
 
-      <Link to="/events/$slug" params={{ slug }} className="text-blue-600 hover:underline text-sm">
-        ← Back to event
-      </Link>
-    </div>
+      <div className="lc-stack">
+        <Section title="Visibility">
+          <div style={{ padding: 18 }}>
+            <div className="flex gap-2">
+              {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => updateVisibility.mutate(v)}
+                  disabled={updateVisibility.isPending}
+                  className={toggleCls(ev.data.visibility === v)}
+                >
+                  {v === 'public' ? 'Public' : v === 'club_only' ? 'Club only' : 'Unlisted'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Delegated scorers">
+          <div style={{ padding: 18 }}>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+              Grant another user permission to record scores for this event. You always have scoring rights as the owner.
+            </p>
+            <form onSubmit={onAddScorer} className="flex gap-2">
+              <input
+                value={scorerUserId}
+                onChange={(e) => setScorerUserId(e.target.value)}
+                placeholder="User ID (UUID)"
+                className={`${inputCls} font-mono flex-1`}
+              />
+              <button
+                type="submit"
+                disabled={addScorer.isPending || !scorerUserId.trim()}
+                className="bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-5 py-3 rounded transition-opacity"
+              >
+                Add
+              </button>
+            </form>
+          </div>
+        </Section>
+      </div>
+    </PageGrid>
   )
 }

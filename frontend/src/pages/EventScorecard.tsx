@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
-import { Cloud, CloudOff, RefreshCw } from 'lucide-react'
+import { ChevronLeft, Cloud, CloudOff, RefreshCw } from 'lucide-react'
 import { eventsApi, type EventDTO, type EventParticipantDTO } from '../api/events'
 import { enqueue, flush, installOnlineListener, newClientId, peek } from '../offline/scoreOutbox'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
+import { PageGrid } from '../components/leagues'
 import { toast } from '../store/toast'
 
 // Cycle order: empty → first listed result token → next → … → empty.
@@ -172,16 +175,32 @@ export default function EventScorecard() {
     }
   }
 
-  if (evQuery.isLoading || partsQuery.isLoading) return <p className="p-6 text-sm text-muted">Loading…</p>
-  if (!ev) return <p className="p-6 text-sm text-red-600">Event not found.</p>
+  if (evQuery.isLoading || partsQuery.isLoading) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+      </PageGrid>
+    )
+  }
+  if (!ev) {
+    return (
+      <PageGrid>
+        <p style={{ padding: 24, fontSize: 13, color: 'var(--red)' }}>Event not found.</p>
+      </PageGrid>
+    )
+  }
   if (!ev.is_scorer) {
     return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <p className="text-sm text-secondary mb-3">You don't have permission to score this event.</p>
-        <Link to="/events/$slug" params={{ slug }} className="text-blue-600 hover:underline text-sm">
-          Back to event
-        </Link>
-      </div>
+      <PageGrid>
+        <div style={{ padding: 24, textAlign: 'center' }}>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+            You don't have permission to score this event.
+          </p>
+          <Link to="/events/$slug" params={{ slug }} className="lc-action-ghost">
+            <ChevronLeft size={14} /> Back to event
+          </Link>
+        </div>
+      </PageGrid>
     )
   }
 
@@ -193,24 +212,23 @@ export default function EventScorecard() {
   const tally = activeParticipant ? computeTally(local, serverByKey, activeParticipant.id, lanes, shotsPerTarget, ev.scoring_rules.points) : null
 
   return (
-    <div className="max-w-3xl mx-auto px-3 py-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold truncate">{ev.name}</h1>
-          <p className="text-xs text-muted">
-            {ev.discipline} · {ev.course.lanes}L × {shotsPerTarget}S
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <SyncBadge online={isOnline} pending={outboxSize} flushing={flushing} onClick={manualFlush} />
-          <Link
-            to="/events/$slug"
-            params={{ slug }}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Back
+    <PageGrid>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link to="/events/$slug" params={{ slug }} className="lc-icon-btn" aria-label="Back">
+            <ChevronLeft size={14} />
           </Link>
+          <div style={{ minWidth: 0 }}>
+            <h1 className="t-page-title" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {ev.name}
+              <HelpIcon content={pageHelp.eventScorecard} size={14} />
+            </h1>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+              {ev.discipline} · {ev.course.lanes}L × {shotsPerTarget}S
+            </p>
+          </div>
         </div>
+        <SyncBadge online={isOnline} pending={outboxSize} flushing={flushing} onClick={manualFlush} />
       </div>
 
       <ParticipantTabs
@@ -250,7 +268,7 @@ export default function EventScorecard() {
       {scoresQuery.isFetching && (
         <p className="text-xs text-muted text-center mt-3">Syncing with server…</p>
       )}
-    </div>
+    </PageGrid>
   )
 }
 
@@ -275,7 +293,7 @@ function ParticipantTabs({
           onClick={() => onSelect(p.id)}
           className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap border transition-colors ${
             p.id === activeId
-              ? 'bg-blue-600 border-blue-600 text-white'
+              ? 'bg-[var(--gold)] border-[var(--gold)] text-white'
               : 'border-subtle text-secondary'
           }`}
         >
