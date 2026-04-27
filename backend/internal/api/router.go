@@ -52,6 +52,8 @@ func NewRouter(
 	locations *service.LocationService,
 	backups *service.BackupService,
 	backupRepo *repository.BackupRepository,
+	categories *service.CategoryService,
+	events *service.EventService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -424,6 +426,17 @@ func NewRouter(
 			r.Get("/users/me/achievements", ah.ListMine)
 			r.Get("/users/{id}/achievements", ah.ListForUser)
 
+			// Live Events (mutations + protected reads)
+			eh := handler.NewEvent(events)
+			r.Post("/events", eh.Create)
+			r.Patch("/events/{slug}", eh.Update)
+			r.Post("/events/{slug}/promote", eh.Promote)
+			r.Post("/events/{slug}/participants", eh.Join)
+			r.Post("/events/{slug}/guests", eh.AddGuest)
+			r.Delete("/events/{slug}/participants/{participantId}", eh.RemoveParticipant)
+			r.Post("/events/{slug}/scorers", eh.AddScorer)
+			r.Post("/events/{slug}/scores", eh.RecordScores)
+
 			// Admin routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
@@ -503,6 +516,13 @@ func NewRouter(
 				r.Get("/admin/sitemap/indexnow-key", asmh.KeyInfo)
 				r.Post("/admin/sitemap/ping", asmh.Ping)
 				r.Get("/admin/sitemap/submissions", asmh.ListSubmissions)
+
+				// Categories master data (admin CRUD).
+				cath := handler.NewCategory(categories)
+				r.Get("/admin/categories", cath.AdminList)
+				r.Post("/admin/categories", cath.AdminCreate)
+				r.Patch("/admin/categories/{id}", cath.AdminUpdate)
+				r.Delete("/admin/categories/{id}", cath.AdminDelete)
 			})
 		})
 
@@ -518,6 +538,10 @@ func NewRouter(
 		// remain behind /users/{id}/achievements with privacy enforcement.
 		achH := handler.NewAchievement(achievements)
 		r.Get("/achievements", achH.ListDefs)
+
+		// Public categories catalog used by event-create form.
+		catH := handler.NewCategory(categories)
+		r.Get("/categories", catH.ListPublic)
 
 		// Public routes where viewer context is used for privacy enforcement.
 		r.Group(func(r chi.Router) {
@@ -550,6 +574,15 @@ func NewRouter(
 			r.Get("/leagues/{id}/standings", publicLH.Standings)
 			r.Get("/leagues/{id}/scores", publicLH.ListScores)
 			r.Get("/leagues/{id}/members", publicLH.ListMembers)
+
+			// Public Live Event reads. Visibility is enforced server-side.
+			publicEH := handler.NewEvent(events)
+			r.Get("/events", publicEH.List)
+			r.Get("/events/{slug}", publicEH.Get)
+			r.Get("/events/{slug}/participants", publicEH.ListParticipants)
+			r.Get("/events/{slug}/scoreboard", publicEH.Scoreboard)
+			r.Get("/events/{slug}/scores", publicEH.ListScores)
+			r.Get("/events/{slug}/results.csv", publicEH.ResultsCSV)
 
 			// Public user profile. Service redacts private profiles via
 			// `is_private:true` so UIs can show a "request to follow" state

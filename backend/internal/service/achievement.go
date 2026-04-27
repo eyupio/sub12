@@ -53,6 +53,14 @@ type CommunityReviewCountRepo interface {
 	CountConfirmationsByUser(ctx context.Context, userID string) (int, error)
 }
 
+// EventCountRepo exposes lifetime counts used by Live Events achievements:
+// hosted = events the user owned to completion; completed = events the user
+// participated in (registered, not guest) that reached completion.
+type EventCountRepo interface {
+	CountHostedByUser(ctx context.Context, userID string) (int, error)
+	CountCompletedByUser(ctx context.Context, userID string) (int, error)
+}
+
 // StarLevelRepo updates a user's computed star_level.
 type StarLevelRepo interface {
 	UpdateStarLevel(ctx context.Context, userID string) error
@@ -67,6 +75,7 @@ type AchievementService struct {
 	pelletTests     PelletTestCountRepo
 	likes           LikeCountRepo
 	communityReview CommunityReviewCountRepo
+	events          EventCountRepo
 	starLevel       StarLevelRepo
 	activity        *ActivityService // nil disables feed ingestion
 	social          *SocialService   // nil disables privacy enforcement
@@ -96,6 +105,12 @@ func NewAchievementService(
 		starLevel:       starLevel,
 		activity:        activity,
 	}
+}
+
+// SetEventCounts wires the event-count repo. Done post-construction so
+// AchievementService doesn't need to know about EventRepository at build time.
+func (s *AchievementService) SetEventCounts(events EventCountRepo) {
+	s.events = events
 }
 
 // SetSocial wires the social service used for profile-visibility enforcement.
@@ -356,6 +371,69 @@ func (s *AchievementService) EvaluateForCommunityReview(ctx context.Context, rev
 	}
 	if !requestCreatedAt.IsZero() && time.Since(requestCreatedAt) <= 24*time.Hour {
 		s.award(ctx, reviewerID, "helpful_reviewer")
+	}
+}
+
+// EvaluateForEventCompletion runs the Live Events achievement rules after an
+// event reaches the 'complete' state. Awards:
+//   - event_first_join: every registered participant whose lifetime completed
+//     count is now 1.
+//   - event_veteran_{10,25,50}: registered participants who cross those tiers.
+//   - event_clean_card: registered participants who recorded at least one shot
+//     and whose hits == shots_recorded (i.e. 100% hits).
+//   - event_podium: top 3 by points (across all categories) for registered
+//     participants only.
+//   - event_host_{1,5,25}: the owner crossing those lifetime tiers.
+// Guests never receive achievements (they have no account).
+func (s *AchievementService) EvaluateForEventCompletion(ctx context.Context, ev *model.Event, standings []*model.EventStandingRow) {
+	if s == nil || s.events == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Per-participant rules
+	for _, row := range standings {
+		if row.UserID == nil {
+			continue
+		}
+		uid := *row.UserID
+		if row.ShotsRecorded > 0 && row.HitCount == row.ShotsRecorded {
+			s.award(ctx, uid, "event_clean_card")
+		}
+		if row.Position >= 1 && row.Position <= 3 && row.ShotsRecorded > 0 {
+			s.award(ctx, uid, "event_podium")
+		}
+		count, err := s.events.CountCompletedByUser(ctx, uid)
+		if err == nil {
+			if count >= 1 {
+				s.award(ctx, uid, "event_first_join")
+			}
+			if count >= 10 {
+				s.award(ctx, uid, "event_veteran_10")
+			}
+			if count >= 25 {
+				s.award(ctx, uid, "event_veteran_25")
+			}
+			if count >= 50 {
+				s.award(ctx, uid, "event_veteran_50")
+			}
+		}
+	}
+
+	// Host tiers
+	if ev != nil {
+		if hosted, err := s.events.CountHostedByUser(ctx, ev.OwnerUserID); err == nil {
+			if hosted >= 1 {
+				s.award(ctx, ev.OwnerUserID, "event_host_1")
+			}
+			if hosted >= 5 {
+				s.award(ctx, ev.OwnerUserID, "event_host_5")
+			}
+			if hosted >= 25 {
+				s.award(ctx, ev.OwnerUserID, "event_host_25")
+			}
+		}
 	}
 }
 

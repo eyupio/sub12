@@ -1,6 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Tags } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -22,6 +22,7 @@ const baseNavItems = [
   { to: '/feed', icon: Activity, label: 'Feed', mobileLabel: 'Feed' },
   { to: '/clubs', icon: Users, label: 'Clubs', mobileLabel: 'Clubs' },
   { to: '/leagues', icon: Trophy, label: 'Leagues', mobileLabel: 'League' },
+  { to: '/events', icon: CalendarClock, label: 'Events', mobileLabel: 'Events' },
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/locations', icon: MapPin, label: 'Locations', mobileLabel: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
@@ -39,6 +40,7 @@ const adminNavItems = [
   { to: '/admin/users',          icon: UserCog, label: 'Admin Users',   mobileLabel: 'Users'  },
   { to: '/admin/leagues',        icon: Trophy,  label: 'Admin Leagues', mobileLabel: 'Lgues'  },
   { to: '/admin/clubs',          icon: Users,   label: 'Admin Clubs',   mobileLabel: 'Clubs'  },
+  { to: '/admin/categories',     icon: Tags,    label: 'Categories',    mobileLabel: 'Cats'   },
   { to: '/admin/sitemap',        icon: Globe,   label: 'Sitemap & SEO', mobileLabel: 'SEO'    },
   { to: '/admin/backup',         icon: Database, label: 'Backups',      mobileLabel: 'Backup' },
   { to: '/admin/reports',        icon: Flag,    label: 'Admin Reports', mobileLabel: 'Reports'},
@@ -55,6 +57,7 @@ const mobileNavItems = [
 
 // Everything not in mobileNavItems appears in the "More" overlay.
 const moreMenuItems = [
+  { to: '/events', icon: CalendarClock, label: 'Events' },
   { to: '/gear', icon: Package, label: 'Gear' },
   { to: '/locations', icon: MapPin, label: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores' },

@@ -15,6 +15,10 @@ export type ActivityType =
   | 'post_created'
   | 'community_review_requested'
   | 'community_review_verified'
+  | 'event_created'
+  | 'event_joined'
+  | 'event_went_live'
+  | 'event_completed_with_results'
 
 export type FeedFilter = 'public' | 'for_you' | 'league' | 'club'
 
@@ -54,6 +58,15 @@ export interface ActivityItem {
     attachment_image_urls?: string[]
     card_image_url?: string
     required_confirmations?: number
+    // Live Events activity metadata
+    event_name?: string
+    event_slug?: string
+    discipline?: string
+    position?: number
+    points?: number
+    hit_count?: number
+    shots_recorded?: number
+    category_label?: string
   }
   league_id?: string
   club_id?: string
