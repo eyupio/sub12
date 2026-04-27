@@ -736,6 +736,16 @@
   text-transform: uppercase;
 }
 
+.event-activity-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.event-activity-link:hover p {
+  color: var(--gold);
+}
+
 .standings-block {
   display: flex;
   align-items: center;

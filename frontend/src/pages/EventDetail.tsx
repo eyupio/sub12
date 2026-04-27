@@ -1,13 +1,14 @@
 import { FormEvent, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { CalendarClock, ChevronRight, Plus, Settings, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { CalendarClock, Check, ChevronRight, Plus, Settings, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { eventsApi, type EventState } from '../api/events'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { Badge, EntityDetailHeader, PageGrid, Section } from '../components/leagues'
 import { DisciplineThumb } from '../components/leagues/structure'
+import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 
 function StateBadge({ state }: { state: EventState }) {
@@ -39,8 +40,10 @@ export default function EventDetail() {
   })
   const catsQuery = useQuery({ queryKey: ['categories', 'public'], queryFn: () => categoriesApi.listPublic() })
 
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const ev = eventQuery.data
   const participants = partsQuery.data?.items ?? []
+  const isParticipant = !!currentUserId && participants.some((p) => p.user_id === currentUserId)
   const categoryLookup = new Map((catsQuery.data?.items ?? []).map((c) => [c.id, c]))
 
   const promote = useMutation({
@@ -150,14 +153,25 @@ export default function EventDetail() {
             Live scoreboard <ChevronRight size={14} />
           </Link>
           {!ev.is_owner && (ev.state === 'open_for_entries' || ev.state === 'live') && (
-            <button
-              type="button"
-              onClick={() => join.mutate()}
-              disabled={join.isPending}
-              className="lc-action-ghost"
-            >
-              <UserPlus size={14} /> {join.isPending ? 'Joining…' : 'Join'}
-            </button>
+            isParticipant ? (
+              <button
+                type="button"
+                disabled
+                className="lc-action-ghost"
+                aria-label="Already joined"
+              >
+                <Check size={14} /> Joined
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => join.mutate()}
+                disabled={join.isPending}
+                className="lc-action-ghost"
+              >
+                <UserPlus size={14} /> {join.isPending ? 'Joining…' : 'Join'}
+              </button>
+            )
           )}
           {ev.is_owner && nextState && (
             <button

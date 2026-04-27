@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
-import { Download, RefreshCw } from 'lucide-react'
+import { Link, useParams } from '@tanstack/react-router'
+import { ChevronLeft, RefreshCw } from 'lucide-react'
 import { eventsApi } from '../api/events'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
-import { PageGrid, PageHeader, Section } from '../components/leagues'
+import { PageGrid, Section } from '../components/leagues'
 
 const REFRESH_INTERVAL_SECONDS = 30
 
@@ -43,26 +43,28 @@ export default function EventLive() {
 
   return (
     <PageGrid>
-      <PageHeader
-        title={ev.data?.name ?? 'Live scoreboard'}
-        info={<HelpIcon content={pageHelp.eventLive} />}
-        description={`${ev.data?.discipline ?? ''} · auto-refresh in ${countdown}s`}
-        action={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => board.refetch()}
-              aria-label="Refresh"
-              className="lc-icon-btn"
-            >
-              <RefreshCw size={14} className={board.isFetching ? 'animate-spin' : ''} />
-            </button>
-            <a href={eventsApi.resultsCsvUrl(slug)} className="lc-action-ghost">
-              <Download size={14} /> CSV
-            </a>
-          </div>
-        }
-      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <Link to="/events/$slug" params={{ slug }} className="lc-icon-btn" aria-label="Back to event">
+          <ChevronLeft size={14} />
+        </Link>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h1 className="t-page-title" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {ev.data?.name ?? 'Live scoreboard'}
+            <HelpIcon content={pageHelp.eventLive} size={14} />
+          </h1>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            {ev.data?.discipline ?? ''} · auto-refresh in {countdown}s
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => board.refetch()}
+          aria-label="Refresh"
+          className="lc-icon-btn"
+        >
+          <RefreshCw size={14} className={board.isFetching ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
       <div className="lc-stack">
         {ev.data?.category_ids && ev.data.category_ids.length > 0 && (
