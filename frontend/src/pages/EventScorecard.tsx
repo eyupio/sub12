@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
-import { ChevronLeft, Cloud, CloudOff, RefreshCw } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { eventsApi, type EventDTO, type EventParticipantDTO } from '../api/events'
-import { enqueue, flush, installOnlineListener, newClientId, peek } from '../offline/scoreOutbox'
+import { enqueue, flush, installOnlineListener, newClientId } from '../offline/scoreOutbox'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid } from '../components/leagues'
@@ -47,9 +47,6 @@ export default function EventScorecard() {
   const queryClient = useQueryClient()
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null)
   const [local, setLocal] = useState<LocalState>(new Map())
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
-  const [outboxSize, setOutboxSize] = useState(0)
-  const [flushing, setFlushing] = useState(false)
 
   const evQuery = useQuery({ queryKey: ['event', slug], queryFn: () => eventsApi.get(slug) })
   const partsQuery = useQuery({
@@ -83,36 +80,12 @@ export default function EventScorecard() {
     }
   }, [participants, activeParticipantId])
 
-  // Online/offline listeners + initial outbox size.
+  // Auto-flush when we come back online.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onlineHandler = () => setIsOnline(true)
-    const offlineHandler = () => setIsOnline(false)
-    window.addEventListener('online', onlineHandler)
-    window.addEventListener('offline', offlineHandler)
-    return () => {
-      window.removeEventListener('online', onlineHandler)
-      window.removeEventListener('offline', offlineHandler)
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    peek(slug)
-      .then((items) => !cancelled && setOutboxSize(items.length))
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [slug])
-
-  // Auto-flush when we go online.
-  useEffect(() => {
-    return installOnlineListener(slug, async (n) => {
+    return installOnlineListener(slug, (n) => {
       if (n > 0) toast(`Synced ${n} score${n === 1 ? '' : 's'}`, 'success')
-      const remaining = await peek(slug).catch(() => [])
-      setOutboxSize(remaining.length)
       queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event-scores', slug] })
     })
   }, [slug, queryClient])
 
@@ -130,13 +103,10 @@ export default function EventScorecard() {
         result: item.result,
         recorded_at: recordedAt,
       })
-      const queueSize = (await peek(slug)).length
-      setOutboxSize(queueSize)
       // If online, flush immediately. Errors leave the entry in the outbox.
       if (navigator.onLine) {
         try {
           const r = await flush(slug)
-          setOutboxSize((await peek(slug)).length)
           return r.written
         } catch {
           return 0
@@ -157,22 +127,6 @@ export default function EventScorecard() {
       return next
     })
     recordMutation.mutate({ participantId, lane, shot, result })
-  }
-
-  async function manualFlush() {
-    setFlushing(true)
-    try {
-      const r = await flush(slug)
-      const remaining = (await peek(slug)).length
-      setOutboxSize(remaining)
-      if (r.written > 0) toast(`Synced ${r.written} score${r.written === 1 ? '' : 's'}`, 'success')
-      else toast('Nothing to sync', 'info')
-      queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Sync failed', 'error')
-    } finally {
-      setFlushing(false)
-    }
   }
 
   if (evQuery.isLoading || partsQuery.isLoading) {
@@ -213,22 +167,19 @@ export default function EventScorecard() {
 
   return (
     <PageGrid>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Link to="/events/$slug" params={{ slug }} className="lc-icon-btn" aria-label="Back">
-            <ChevronLeft size={14} />
-          </Link>
-          <div style={{ minWidth: 0 }}>
-            <h1 className="t-page-title" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-              {ev.name}
-              <HelpIcon content={pageHelp.eventScorecard} size={14} />
-            </h1>
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              {ev.discipline} · {ev.course.lanes}L × {shotsPerTarget}S
-            </p>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <Link to="/events/$slug" params={{ slug }} className="lc-icon-btn" aria-label="Back">
+          <ChevronLeft size={14} />
+        </Link>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="t-page-title" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {ev.name}
+            <HelpIcon content={pageHelp.eventScorecard} size={14} />
+          </h1>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            {ev.discipline} · {ev.course.lanes}L × {shotsPerTarget}S
+          </p>
         </div>
-        <SyncBadge online={isOnline} pending={outboxSize} flushing={flushing} onClick={manualFlush} />
       </div>
 
       <ParticipantTabs
@@ -397,39 +348,6 @@ function positionBadgeClass(badge: string): string {
     default:
       return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
   }
-}
-
-function SyncBadge({
-  online,
-  pending,
-  flushing,
-  onClick,
-}: {
-  online: boolean
-  pending: number
-  flushing: boolean
-  onClick: () => void
-}) {
-  let label = online ? 'Synced' : 'Offline'
-  let cls = online
-    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-  if (pending > 0) {
-    label = `${pending} queued`
-    cls = 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-  }
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={online ? 'Tap to force sync' : 'Offline — scores queued locally'}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${cls} ${flushing ? 'opacity-60' : ''}`}
-    >
-      {online ? <Cloud size={12} /> : <CloudOff size={12} />}
-      {flushing ? <RefreshCw size={12} className="animate-spin" /> : null}
-      {label}
-    </button>
-  )
 }
 
 function computeTally(

@@ -1207,6 +1207,18 @@ function TextPost({
   const body = post.body?.trim()
   const [zoomSrc, setZoomSrc] = useState<string | null>(null)
   const hasContent = !!body || images.length > 0 || (attachmentType && attachmentId)
+  const eventSlug = item.metadata?.event_slug
+  const isEventActivity =
+    item.type === 'event_created' ||
+    item.type === 'event_joined' ||
+    item.type === 'event_went_live' ||
+    item.type === 'event_completed_with_results'
+
+  const renderedBody = body
+    ? <p>{renderBodyWithMentions(body)}</p>
+    : !hasContent
+    ? <p>{fallbackText(item)}</p>
+    : null
 
   return (
     <div className="text-post-body">
@@ -1237,7 +1249,13 @@ function TextPost({
             </button>
           </div>
         </div>
-      ) : body ? <p>{renderBodyWithMentions(body)}</p> : !hasContent ? <p>{fallbackText(item)}</p> : null}
+      ) : isEventActivity && eventSlug && renderedBody ? (
+        <Link to="/events/$slug" params={{ slug: eventSlug }} className="event-activity-link">
+          {renderedBody}
+        </Link>
+      ) : (
+        renderedBody
+      )}
       {attachmentType === 'score_card' && attachmentId && (
         <Link to="/scores/$id" params={{ id: attachmentId }} className="attachment-link">
           <Target size={13} />
