@@ -9,8 +9,8 @@ import { gearApi } from '../api/gear'
 import { leagueApi } from '../api/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
-import { LocationField, type LocationValue } from '../components/LocationField'
-import { LocationPicker } from '../components/LocationPicker'
+import { type LocationValue } from '../components/LocationField'
+import { PlaceSelector } from '../components/PlaceSelector'
 import { useSmartBack } from '../hooks/useSmartBack'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -78,6 +78,7 @@ export default function ScoreEntry() {
     if (draft.notes) setNotes(draft.notes)
     if (draft.rifle_id) setRifleId(draft.rifle_id)
     if (draft.pellet_id) setPelletId(draft.pellet_id)
+    if (draft.location_id) setLocationId(draft.location_id)
     if (draft.visibility === 'public' || draft.visibility === 'followers' || draft.visibility === 'private') {
       setVisibility(draft.visibility)
     }
@@ -584,27 +585,12 @@ export default function ScoreEntry() {
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Conditions</p>
             <div className="space-y-1.5">
-              <label className={sidebarLabelCls}>Saved location</label>
-              <LocationPicker
-                value={locationId}
-                onChange={setLocationId}
-                onApplyDefaults={(loc, lat, lng) => {
-                  if (loc) {
-                    if (loc.lat != null && loc.lng != null) setLocation(l => ({ ...l, lat: loc.lat!, lng: loc.lng! }))
-                    if (loc.default_distance_m != null) {
-                      // store as distance_m in the score card notes context (no direct field here)
-                    }
-                  } else if (lat != null && lng != null) {
-                    setLocation(l => ({ ...l, lat, lng }))
-                  }
-                }}
-              />
-            </div>
-            <div className="space-y-1.5">
               <label className={sidebarLabelCls}>Location</label>
-              <LocationField
-                value={location}
-                onChange={setLocation}
+              <PlaceSelector
+                locationId={locationId}
+                onLocationIdChange={setLocationId}
+                location={location}
+                onLocationChange={setLocation}
                 inputClassName={`${inputCls} placeholder:text-muted`}
               />
             </div>

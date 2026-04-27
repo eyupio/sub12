@@ -92,6 +92,7 @@ export interface CreateScoreCardPayload {
   location?: string
   location_lat?: number
   location_lng?: number
+  location_id?: string
   wind_mph?: number
   temp_celsius?: number
   distance_m?: number
