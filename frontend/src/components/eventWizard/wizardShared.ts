@@ -18,6 +18,9 @@ export interface WizardBasics {
   name: string
   description: string
   location: string
+  locationId: string | null
+  locationLat?: number
+  locationLng?: number
   presetId: string
   discipline: string
 }
@@ -56,6 +59,7 @@ export const initialState = (clubId?: string): WizardState => {
       name: '',
       description: '',
       location: '',
+      locationId: null,
       presetId: preset.id,
       discipline: preset.discipline,
     },

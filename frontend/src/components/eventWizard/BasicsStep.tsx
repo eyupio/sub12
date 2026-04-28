@@ -1,4 +1,6 @@
 import { customPreset, disciplinePresets } from '../../config/disciplinePresets'
+import { PlaceSelector } from '../PlaceSelector'
+import type { LocationValue } from '../LocationField'
 import {
   WIZARD_INPUT_CLS,
   WIZARD_LABEL_CLS,
@@ -42,15 +44,32 @@ export function BasicsStep({ state, onChange }: Props) {
         />
       </label>
 
-      <label className="block">
+      <div className="block">
         <span className={WIZARD_LABEL_CLS}>Location (optional)</span>
-        <input
-          className={WIZARD_INPUT_CLS}
-          placeholder="e.g. North field range"
-          value={basics.location}
-          onChange={(e) => onChange({ ...state, basics: { ...basics, location: e.target.value } })}
+        <PlaceSelector
+          locationId={basics.locationId}
+          onLocationIdChange={(id) =>
+            onChange({ ...state, basics: { ...basics, locationId: id } })
+          }
+          location={{
+            label: basics.location,
+            lat: basics.locationLat,
+            lng: basics.locationLng,
+          }}
+          onLocationChange={(value: LocationValue) =>
+            onChange({
+              ...state,
+              basics: {
+                ...basics,
+                location: value.label,
+                locationLat: value.lat,
+                locationLng: value.lng,
+              },
+            })
+          }
+          inputClassName={WIZARD_INPUT_CLS}
         />
-      </label>
+      </div>
 
       <div>
         <span className={WIZARD_LABEL_CLS}>Discipline preset</span>
