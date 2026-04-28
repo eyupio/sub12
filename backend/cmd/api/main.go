@@ -236,6 +236,9 @@ func main() {
 	eventSvc.SetCardVerificationDeps(leagueRepo, scoreCardRepo)
 	scoreCardSvc.SetEventService(eventSvc)
 
+	eventInvitationRepo := repository.NewEventInvitationRepository(pool)
+	eventInvitationSvc := service.NewEventInvitationService(eventInvitationRepo, eventRepo, userRepo, clubRepo, emailSenderSvc, cfg.EventInvitationURL, log.Logger)
+
 	// Daily archive sweep for completed events whose 30-day window has elapsed.
 	go runEventArchiveSweep(ctx, eventSvc)
 
@@ -251,7 +254,7 @@ func main() {
 	backupScheduler := service.NewBackupScheduler(backupRepo, backupSvc, log.Logger)
 	go backupScheduler.Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

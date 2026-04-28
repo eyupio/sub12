@@ -92,6 +92,40 @@ func (s *EmailSenderService) SendReportFiledNotification(ctx context.Context, to
 	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
 }
 
+// SendEventInvitation sends a branded event invite to the given user.
+// The accept link is built by the caller and inserted as `accept_link`.
+func (s *EmailSenderService) SendEventInvitation(ctx context.Context, toEmail, displayName, inviterName, eventName, eventStartsAt, eventLocation, acceptLink string) error {
+	tpl, err := s.templateRepo.GetByKey(ctx, "event_invitation")
+	if err != nil {
+		return fmt.Errorf("load event_invitation template: %w", err)
+	}
+	if !tpl.IsEnabled {
+		s.log.Warn().Msg("event_invitation template disabled; skipping email send")
+		return nil
+	}
+	payload := map[string]any{
+		"display_name":    displayName,
+		"inviter_name":    inviterName,
+		"event_name":      eventName,
+		"event_starts_at": eventStartsAt,
+		"event_location":  eventLocation,
+		"accept_link":     acceptLink,
+	}
+	subject, err := s.renderer.RenderSubject(tpl.SubjectTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render event_invitation subject: %w", err)
+	}
+	textBody, err := s.renderer.RenderText(tpl.TextTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render event_invitation text: %w", err)
+	}
+	htmlBody, err := s.renderer.RenderHTML(tpl.HTMLTemplate, payload)
+	if err != nil {
+		return fmt.Errorf("render event_invitation html: %w", err)
+	}
+	return s.sendRenderedTemplate(ctx, toEmail, subject, textBody, htmlBody)
+}
+
 func (s *EmailSenderService) SendEmailChangeConfirmation(ctx context.Context, toEmail, displayName, confirmLink string, expiresAt time.Time) error {
 	tpl, err := s.templateRepo.GetByKey(ctx, "email_change_confirm")
 	if err != nil {
