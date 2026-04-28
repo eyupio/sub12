@@ -27,7 +27,10 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 	var shotXs pgtype.FlatArray[bool]
 
 	verification := "verified"
-	if input.LeagueRoundID != nil {
+	if input.LeagueRoundID != nil || input.EventParticipantID != nil {
+		// League rounds and event submissions both default to 'pending'; the
+		// service layer flips event cards to 'verified' when the event's
+		// require_score_verification flag is off.
 		verification = "pending"
 	}
 
@@ -44,14 +47,14 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 			user_id, rifle_id, pellet_id,
 			shot_at, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
-			verification, league_round_id, club_id, location_id, visibility
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::verification_status,$18,$19,$20,$21)
+			verification, league_round_id, club_id, location_id, visibility, event_participant_id
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::verification_status,$18,$19,$20,$21,$22)
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`,
 		userID, input.RifleID, input.PelletID,
@@ -59,13 +62,13 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount,
-		verification, input.LeagueRoundID, input.ClubID, input.LocationID, visibility,
+		verification, input.LeagueRoundID, input.ClubID, input.LocationID, visibility, input.EventParticipantID,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -103,27 +106,27 @@ func (r *ScoreCardRepository) CreateDraft(ctx context.Context, userID string, in
 			user_id, rifle_id, pellet_id,
 			shot_at, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
-			verification, league_round_id, club_id, location_id, visibility, is_draft
-		) VALUES ($1,$2,$3,COALESCE(NULLIF($4,'')::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,0,0,'pending'::verification_status,$15,$16,$17,$18,TRUE)
+			verification, league_round_id, club_id, location_id, visibility, is_draft, event_participant_id
+		) VALUES ($1,$2,$3,COALESCE(NULLIF($4,'')::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,0,0,'pending'::verification_status,$15,$16,$17,$18,TRUE,$19)
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`,
 		userID, input.RifleID, input.PelletID,
 		shotAt, input.Location, input.LocationLat, input.LocationLng, input.WindMPH, input.TempCelsius, input.DistanceM, input.Discipline, input.Notes,
 		pgtype.FlatArray[int16](empty16),
 		pgtype.FlatArray[bool](emptyBool),
-		input.LeagueRoundID, input.ClubID, input.LocationID, visibility,
+		input.LeagueRoundID, input.ClubID, input.LocationID, visibility, input.EventParticipantID,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -145,7 +148,11 @@ func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (
 	err := r.db.QueryRow(ctx, `
 		UPDATE score_cards SET
 			is_draft     = FALSE,
-			verification = CASE WHEN league_round_id IS NULL THEN 'verified'::verification_status ELSE 'pending'::verification_status END,
+			verification = CASE
+				WHEN league_round_id IS NOT NULL OR event_participant_id IS NOT NULL
+					THEN 'pending'::verification_status
+				ELSE 'verified'::verification_status
+			END,
 			updated_at   = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING
@@ -153,14 +160,14 @@ func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`, id, userID).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -168,6 +175,58 @@ func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("graduate score card: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+	return &card, nil
+}
+
+// SetVerification overrides the verification status, used by the score-card
+// service after Graduate when an event_participant_id is present and the event
+// does not require peer verification.
+func (r *ScoreCardRepository) SetVerification(ctx context.Context, id, verification string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE score_cards SET verification = $2::verification_status, updated_at = NOW() WHERE id = $1`,
+		id, verification,
+	)
+	if err != nil {
+		return fmt.Errorf("set verification: %w", err)
+	}
+	return nil
+}
+
+// GetExistingCardForParticipant returns the most recent (drafts last) score
+// card linked to the given event participant, or ErrNotFound when none exists.
+// Used to short-circuit a quick-create when a finalised card already exists.
+func (r *ScoreCardRepository) GetExistingCardForParticipant(ctx context.Context, eventParticipantID string) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
+			like_count, comment_count, is_draft, event_participant_id,
+			created_at, updated_at
+		FROM score_cards
+		WHERE event_participant_id = $1
+		ORDER BY is_draft ASC, created_at DESC
+		LIMIT 1
+	`, eventParticipantID).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get existing card for participant: %w", err)
 	}
 	card.ShotScores = []int16(shotScores)
 	card.ShotXs = []bool(shotXs)
@@ -186,7 +245,7 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			EXISTS(SELECT 1 FROM likes WHERE target_id = score_cards.id AND target_type = 'score_card' AND user_id = $2) AS is_liked,
 			created_at, updated_at
 		FROM score_cards
@@ -196,7 +255,7 @@ func (r *ScoreCardRepository) GetByID(ctx context.Context, id, userID string) (*
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.IsLiked,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID, &card.IsLiked,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -223,7 +282,7 @@ func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*mo
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 		FROM score_cards
 		WHERE id = $1
@@ -232,7 +291,7 @@ func (r *ScoreCardRepository) GetPublicByID(ctx context.Context, id string) (*mo
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -338,7 +397,7 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 	query := `
 		SELECT sc.id, sc.shot_at::text, sc.total_score, sc.x_count, sc.location, sc.location_lat, sc.location_lng,
 		       sc.verification::text, sc.league_round_id, l.id, l.name, sc.club_id,
-		       sc.card_image_url, sc.is_draft, sc.created_at
+		       sc.card_image_url, sc.is_draft, sc.event_participant_id, sc.created_at
 		FROM score_cards sc
 		LEFT JOIN rounds rd ON rd.id = sc.league_round_id
 		LEFT JOIN seasons s ON s.id = rd.season_id
@@ -381,7 +440,7 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 		var c model.ScoreCardSummary
 		if err := rows.Scan(&c.ID, &c.ShotAt, &c.TotalScore, &c.XCount, &c.Location, &c.LocationLat, &c.LocationLng,
 			&c.Verification, &c.LeagueRoundID, &c.LeagueID, &c.LeagueName, &c.ClubID,
-			&c.CardImageURL, &c.IsDraft, &c.CreatedAt); err != nil {
+			&c.CardImageURL, &c.IsDraft, &c.EventParticipantID, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan score card summary: %w", err)
 		}
 		cards = append(cards, &c)
@@ -422,7 +481,11 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			visibility   = COALESCE($18, visibility),
 			location_id  = $19,
 			card_image_rotation = COALESCE($20, card_image_rotation),
-			verification = CASE WHEN league_round_id IS NULL THEN 'verified'::verification_status ELSE 'pending'::verification_status END,
+			verification = CASE
+				WHEN league_round_id IS NOT NULL OR event_participant_id IS NOT NULL
+					THEN 'pending'::verification_status
+				ELSE 'verified'::verification_status
+			END,
 			updated_at   = NOW()
 		WHERE id = $1 AND user_id = $2
 		RETURNING
@@ -430,7 +493,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`,
 		id, userID,
@@ -444,7 +507,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -542,14 +605,14 @@ func (r *ScoreCardRepository) UpdateImageRotation(ctx context.Context, id, userI
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`, id, userID, rotation).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
@@ -604,20 +667,20 @@ func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID
 			league_round_id = $3,
 			verification    = 'pending'::verification_status,
 			updated_at      = NOW()
-		WHERE id = $1 AND user_id = $2 AND is_draft = FALSE AND league_round_id IS NULL
+		WHERE id = $1 AND user_id = $2 AND is_draft = FALSE AND league_round_id IS NULL AND event_participant_id IS NULL
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft,
+			like_count, comment_count, is_draft, event_participant_id,
 			created_at, updated_at
 	`, cardID, userID, roundID).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
 		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
-		&card.LikeCount, &card.CommentCount, &card.IsDraft,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {

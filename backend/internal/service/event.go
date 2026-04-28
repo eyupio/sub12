@@ -36,12 +36,32 @@ var allowedTransitions = map[string]map[string]struct{}{
 // EventArchiveAfter is the grace window between completion and auto-archive.
 const EventArchiveAfter = 30 * 24 * time.Hour
 
+// ScoreVerificationRepo is the subset of the league repository's score-card
+// audit API that doesn't depend on league context. The event service uses it
+// to confirm / amend / reject benchrest cards while sharing the underlying
+// score_confirmations and score_card_actions tables.
+type ScoreVerificationRepo interface {
+	ConfirmScore(ctx context.Context, scoreCardID, userID string) (*model.ScoreConfirmation, error)
+	GetConfirmationCount(ctx context.Context, scoreCardID string) (int, error)
+	UpdateScoreVerification(ctx context.Context, scoreCardID, status string) error
+	AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error
+	RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error
+	GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error)
+}
+
+// CardReader exposes the score-card lookup needed by event-side verification.
+type CardReader interface {
+	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
+}
+
 type EventService struct {
 	events       *repository.EventRepository
 	clubs        *repository.ClubRepository
 	categories   *repository.CategoryRepository
 	activity     *ActivityService
 	achievements *AchievementService
+	verifyRepo   ScoreVerificationRepo
+	cardReader   CardReader
 }
 
 func NewEventService(
@@ -58,6 +78,14 @@ func NewEventService(
 		activity:     activity,
 		achievements: achievements,
 	}
+}
+
+// SetCardVerificationDeps wires the score-card audit repo and the card reader
+// used by ConfirmCard / AmendCard / RejectCard. Optional; when unset, the
+// card-verification endpoints return ErrInvalidEvent.
+func (s *EventService) SetCardVerificationDeps(verify ScoreVerificationRepo, cards CardReader) {
+	s.verifyRepo = verify
+	s.cardReader = cards
 }
 
 func (s *EventService) Create(ctx context.Context, ownerID string, in *model.CreateEventInput) (*model.Event, error) {
@@ -119,11 +147,29 @@ func validateEventInput(in *model.CreateEventInput) error {
 	if strings.TrimSpace(in.Discipline) == "" {
 		return fmt.Errorf("%w: discipline is required", ErrInvalidEvent)
 	}
-	if in.Course.Lanes < 1 || in.Course.Lanes > 200 {
-		return fmt.Errorf("%w: course.lanes must be 1..200", ErrInvalidEvent)
+	format := model.EventFormatShotGrid
+	if in.Format != nil && *in.Format != "" {
+		format = *in.Format
 	}
-	if in.Course.ShotsPerTarget < 1 || in.Course.ShotsPerTarget > 10 {
-		return fmt.Errorf("%w: course.shots_per_target must be 1..10", ErrInvalidEvent)
+	switch format {
+	case model.EventFormatShotGrid, model.EventFormatCardSubmission:
+	default:
+		return fmt.Errorf("%w: format must be 'shot_grid' or 'card_submission'", ErrInvalidEvent)
+	}
+	// Lane / shots-per-target only apply to the per-shot tap UI; card_submission
+	// uses the score_card 25-shot schema and ignores course geometry.
+	if format == model.EventFormatShotGrid {
+		if in.Course.Lanes < 1 || in.Course.Lanes > 200 {
+			return fmt.Errorf("%w: course.lanes must be 1..200", ErrInvalidEvent)
+		}
+		if in.Course.ShotsPerTarget < 1 || in.Course.ShotsPerTarget > 10 {
+			return fmt.Errorf("%w: course.shots_per_target must be 1..10", ErrInvalidEvent)
+		}
+	}
+	if in.RequiredConfirmations != nil {
+		if *in.RequiredConfirmations < 0 || *in.RequiredConfirmations > 10 {
+			return fmt.Errorf("%w: required_confirmations must be 0..10", ErrInvalidEvent)
+		}
 	}
 	if in.Visibility != nil {
 		switch *in.Visibility {
@@ -318,7 +364,13 @@ func (s *EventService) handleCompletion(ctx context.Context, ev *model.Event) {
 	if has, err := s.events.HasCompletionActivity(ctx, ev.ID); err == nil && has {
 		return
 	}
-	standings, err := s.events.Standings(ctx, ev.ID, ev.ScoringRules)
+	var standings []*model.EventStandingRow
+	var err error
+	if ev.Format == model.EventFormatCardSubmission {
+		standings, err = s.events.StandingsFromCards(ctx, ev.ID)
+	} else {
+		standings, err = s.events.Standings(ctx, ev.ID, ev.ScoringRules)
+	}
 	if err != nil {
 		return
 	}
@@ -595,7 +647,208 @@ func (s *EventService) Standings(ctx context.Context, slug string) ([]*model.Eve
 	if err != nil {
 		return nil, err
 	}
+	if ev.Format == model.EventFormatCardSubmission {
+		return s.events.StandingsFromCards(ctx, ev.ID)
+	}
 	return s.events.Standings(ctx, ev.ID, ev.ScoringRules)
+}
+
+// ListEventCards returns the per-participant card status for a card_submission
+// event. Public read; visibility mirrors the scoreboard.
+func (s *EventService) ListEventCards(ctx context.Context, slug string) (*model.Event, []*model.EventCardStatus, error) {
+	ev, err := s.events.GetBySlug(ctx, slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	items, err := s.events.ListEventCards(ctx, ev.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ev, items, nil
+}
+
+// EnsureCanSubmitCardForParticipant returns nil when userID is allowed to
+// submit/refine a card for the given participant: either the participant is a
+// registered user matching userID, or userID is the event owner or a delegated
+// scorer. Used by the score-card service when an event_participant_id is
+// supplied. Caller must have already loaded ev/p from the repository.
+func (s *EventService) EnsureCanSubmitCardForParticipant(ctx context.Context, ev *model.Event, p *model.EventParticipant, userID string) error {
+	if userID == "" {
+		return ErrUnauthenticated
+	}
+	if p.UserID != nil && *p.UserID == userID {
+		return nil
+	}
+	allowed, err := s.events.IsScorer(ctx, ev.ID, userID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrNotEventScorer
+	}
+	return nil
+}
+
+// EnsureCanVerifyEventCard returns nil when userID can confirm/amend/reject a
+// submitted card. Owner + delegated scorers only.
+func (s *EventService) EnsureCanVerifyEventCard(ctx context.Context, ev *model.Event, userID string) error {
+	if userID == "" {
+		return ErrUnauthenticated
+	}
+	allowed, err := s.events.IsScorer(ctx, ev.ID, userID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrNotEventScorer
+	}
+	return nil
+}
+
+// LookupParticipantWithEvent returns the participant and its event. Used by
+// the score-card service to validate cross-event submissions in one trip.
+func (s *EventService) LookupParticipantWithEvent(ctx context.Context, participantID string) (*model.Event, *model.EventParticipant, error) {
+	p, err := s.events.GetParticipant(ctx, participantID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	ev, err := s.events.GetByID(ctx, p.EventID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return ev, p, nil
+}
+
+// LoadEventBySlug exposes a slug→event lookup for sibling services that need
+// to read event flags (e.g. score_card service consulting verification config).
+func (s *EventService) LoadEventBySlug(ctx context.Context, slug string) (*model.Event, error) {
+	ev, err := s.events.GetBySlug(ctx, slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrEventNotFound
+	}
+	return ev, err
+}
+
+// loadEventCard loads the card and event, asserts the card belongs to a
+// participant in this event, and returns both. Used by Confirm / Amend /
+// Reject before delegating to the verification repository.
+func (s *EventService) loadEventCard(ctx context.Context, slug, scoreCardID string) (*model.Event, *model.ScoreCard, error) {
+	if s.verifyRepo == nil || s.cardReader == nil {
+		return nil, nil, fmt.Errorf("%w: card verification not enabled", ErrInvalidEvent)
+	}
+	ev, err := s.events.GetBySlug(ctx, slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	card, err := s.cardReader.GetPublicByID(ctx, scoreCardID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if card.EventParticipantID == nil || *card.EventParticipantID == "" {
+		return nil, nil, fmt.Errorf("%w: card is not linked to any event", ErrInvalidEvent)
+	}
+	p, err := s.events.GetParticipant(ctx, *card.EventParticipantID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if p.EventID != ev.ID {
+		return nil, nil, fmt.Errorf("%w: card belongs to a different event", ErrInvalidEvent)
+	}
+	return ev, card, nil
+}
+
+// ConfirmCard records a peer confirmation for an event-bound score card. When
+// the event's required-confirmation threshold is reached, flips verification
+// to 'verified'. Caller must be the event owner or a delegated scorer.
+func (s *EventService) ConfirmCard(ctx context.Context, slug, scoreCardID, userID string) error {
+	ev, card, err := s.loadEventCard(ctx, slug, scoreCardID)
+	if err != nil {
+		return err
+	}
+	if err := s.EnsureCanVerifyEventCard(ctx, ev, userID); err != nil {
+		return err
+	}
+	ownerID, err := s.verifyRepo.GetScoreCardOwner(ctx, card.ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrEventNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if ownerID == userID {
+		return fmt.Errorf("%w: cannot confirm your own submission", ErrInvalidEvent)
+	}
+	if _, err := s.verifyRepo.ConfirmScore(ctx, card.ID, userID); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return fmt.Errorf("%w: already confirmed", ErrInvalidEvent)
+		}
+		return err
+	}
+	if ev.RequireScoreVerification && ev.RequiredConfirmations > 0 {
+		count, err := s.verifyRepo.GetConfirmationCount(ctx, card.ID)
+		if err != nil {
+			return err
+		}
+		if count >= int(ev.RequiredConfirmations) {
+			if err := s.verifyRepo.UpdateScoreVerification(ctx, card.ID, "verified"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// AmendCard rewrites a submitted card's total/x-count and records an audit
+// row. Owner or delegated scorers only.
+func (s *EventService) AmendCard(ctx context.Context, slug, scoreCardID, userID string, in *model.AmendScoreInput) error {
+	if in.NewTotalScore < 0 || in.NewTotalScore > 250 {
+		return fmt.Errorf("%w: new_total_score must be 0-250", ErrInvalidEvent)
+	}
+	if in.NewXCount < 0 || in.NewXCount > 25 {
+		return fmt.Errorf("%w: new_x_count must be 0-25", ErrInvalidEvent)
+	}
+	ev, card, err := s.loadEventCard(ctx, slug, scoreCardID)
+	if err != nil {
+		return err
+	}
+	if err := s.EnsureCanVerifyEventCard(ctx, ev, userID); err != nil {
+		return err
+	}
+	return s.verifyRepo.AmendScore(ctx, card.ID, userID, in)
+}
+
+// RejectCard flips the card's verification to 'rejected' with an audit reason.
+// Owner or delegated scorers only.
+func (s *EventService) RejectCard(ctx context.Context, slug, scoreCardID, userID string, in *model.RejectScoreInput) error {
+	if in.Reason == "" {
+		return fmt.Errorf("%w: reason is required", ErrInvalidEvent)
+	}
+	ev, card, err := s.loadEventCard(ctx, slug, scoreCardID)
+	if err != nil {
+		return err
+	}
+	if err := s.EnsureCanVerifyEventCard(ctx, ev, userID); err != nil {
+		return err
+	}
+	return s.verifyRepo.RejectScore(ctx, card.ID, userID, in)
 }
 
 func (s *EventService) ListScoresForCSV(ctx context.Context, slug string) (*model.Event, []*model.EventParticipant, []*model.EventScore, error) {

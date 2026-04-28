@@ -233,6 +233,8 @@ func main() {
 	eventRepo := repository.NewEventRepository(pool)
 	eventSvc := service.NewEventService(eventRepo, clubRepo, categoryRepo, activitySvc, achievementSvc)
 	achievementSvc.SetEventCounts(eventRepo)
+	eventSvc.SetCardVerificationDeps(leagueRepo, scoreCardRepo)
+	scoreCardSvc.SetEventService(eventSvc)
 
 	// Daily archive sweep for completed events whose 30-day window has elapsed.
 	go runEventArchiveSweep(ctx, eventSvc)

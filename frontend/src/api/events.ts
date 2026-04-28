@@ -2,6 +2,7 @@ import { api } from './client'
 
 export type EventState = 'draft' | 'open_for_entries' | 'live' | 'complete' | 'archived'
 export type EventVisibility = 'public' | 'club_only' | 'unlisted'
+export type EventFormat = 'shot_grid' | 'card_submission'
 
 export interface EventCourse {
   lanes: number
@@ -27,6 +28,7 @@ export interface EventDTO {
   ends_at?: string
   archive_at?: string
   discipline: string
+  format: EventFormat
   course: EventCourse
   scoring_rules: EventScoringRules
   category_ids: string[]
@@ -34,11 +36,39 @@ export interface EventDTO {
   state: EventState
   owner_user_id: string
   club_id?: string
+  require_score_verification: boolean
+  required_confirmations: number
+  require_image_upload: boolean
+  lock_edits_after_verification: boolean
   created_at: string
   updated_at: string
   participant_count: number
   is_owner?: boolean
   is_scorer?: boolean
+}
+
+export interface EventCardStatus {
+  participant_id: string
+  display_name: string
+  user_id?: string
+  is_guest: boolean
+  card_id?: string
+  is_draft?: boolean
+  total_score?: number
+  x_count?: number
+  card_image_url?: string
+  verification?: string
+  submitted_by_user_id?: string
+}
+
+export interface AmendScorePayload {
+  new_total_score: number
+  new_x_count: number
+  reason: string
+}
+
+export interface RejectScorePayload {
+  reason: string
 }
 
 export interface EventParticipantDTO {
@@ -78,11 +108,16 @@ export interface CreateEventPayload {
   starts_at?: string
   ends_at?: string
   discipline: string
+  format?: EventFormat
   course: EventCourse
   scoring_rules: EventScoringRules
   category_ids: string[]
   visibility?: EventVisibility
   club_id?: string
+  require_score_verification?: boolean
+  required_confirmations?: number
+  require_image_upload?: boolean
+  lock_edits_after_verification?: boolean
 }
 
 export interface UpdateEventPayload {
@@ -92,10 +127,15 @@ export interface UpdateEventPayload {
   starts_at?: string
   ends_at?: string
   discipline?: string
+  format?: EventFormat
   course?: EventCourse
   scoring_rules?: EventScoringRules
   category_ids?: string[]
   visibility?: EventVisibility
+  require_score_verification?: boolean
+  required_confirmations?: number
+  require_image_upload?: boolean
+  lock_edits_after_verification?: boolean
 }
 
 export interface JoinEventPayload {
@@ -158,4 +198,12 @@ export const eventsApi = {
   listScores: (slug: string) => api.get<{ items: EventScoreDTO[] }>(`/events/${slug}/scores`),
   recordScores: (slug: string, scores: RecordScoreItem[]) => api.post<{ written: number }>(`/events/${slug}/scores`, { scores }),
   resultsCsvUrl: (slug: string) => `/api/v1/events/${slug}/results.csv`,
+  // Card-submission (benchrest) endpoints.
+  listEventCards: (slug: string) => api.get<{ items: EventCardStatus[] }>(`/events/${slug}/cards`),
+  confirmCard: (slug: string, cardId: string) =>
+    api.post<{ confirmed: boolean }>(`/events/${slug}/cards/${cardId}/confirm`, {}),
+  amendCard: (slug: string, cardId: string, body: AmendScorePayload) =>
+    api.post<{ amended: boolean }>(`/events/${slug}/cards/${cardId}/amend`, body),
+  rejectCard: (slug: string, cardId: string, body: RejectScorePayload) =>
+    api.post<{ rejected: boolean }>(`/events/${slug}/cards/${cardId}/reject`, body),
 }

@@ -19,6 +19,7 @@ export interface ScoreCardSummary {
   card_image_rotation?: number
   location_id?: string
   is_draft: boolean
+  event_participant_id?: string
   created_at: string
 }
 
@@ -66,6 +67,7 @@ export interface ScoreCard extends ScoreCardSummary {
   is_pb: boolean
   pb_delta?: number
   running_avg?: number
+  event_participant_id?: string
 }
 
 export interface QuickCreateScoreCardPayload {
@@ -83,6 +85,7 @@ export interface QuickCreateScoreCardPayload {
   league_round_id?: string
   club_id?: string
   visibility?: string
+  event_participant_id?: string
 }
 
 export interface CreateScoreCardPayload {
@@ -103,6 +106,7 @@ export interface CreateScoreCardPayload {
   league_round_id?: string
   club_id?: string
   visibility?: string
+  event_participant_id?: string
 }
 
 export interface UpdateScoreCardPayload {

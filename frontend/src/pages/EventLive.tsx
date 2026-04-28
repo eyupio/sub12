@@ -46,6 +46,10 @@ export default function EventLive() {
     return all.filter((r) => r.category_id === categoryFilter)
   }, [board.data, categoryFilter])
 
+  const isCardSubmission = ev.data?.format === 'card_submission'
+  const pointsLabel = isCardSubmission ? 'Score' : 'Pts'
+  const hitsLabel = isCardSubmission ? 'X' : 'Hits'
+
   const podium = useMemo(
     () => buildPodium(board.data?.items ?? [], categoryLookup),
     [board.data, categoryLookup],
@@ -159,7 +163,7 @@ export default function EventLive() {
                       width: 70,
                     }}
                   >
-                    Pts
+                    {pointsLabel}
                   </th>
                   <th
                     style={{
@@ -172,21 +176,23 @@ export default function EventLive() {
                       width: 70,
                     }}
                   >
-                    Hits
+                    {hitsLabel}
                   </th>
-                  <th
-                    style={{
-                      textAlign: 'right',
-                      padding: '10px 14px',
-                      fontSize: 11,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      color: 'var(--muted)',
-                      width: 70,
-                    }}
-                  >
-                    Shots
-                  </th>
+                  {!isCardSubmission && (
+                    <th
+                      style={{
+                        textAlign: 'right',
+                        padding: '10px 14px',
+                        fontSize: 11,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        color: 'var(--muted)',
+                        width: 70,
+                      }}
+                    >
+                      Shots
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -230,17 +236,19 @@ export default function EventLive() {
                       >
                         {r.hit_count}
                       </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          textAlign: 'right',
-                          fontFamily: 'var(--mono)',
-                          fontSize: 13,
-                          color: 'var(--muted)',
-                        }}
-                      >
-                        {r.shots_recorded}
-                      </td>
+                      {!isCardSubmission && (
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            textAlign: 'right',
+                            fontFamily: 'var(--mono)',
+                            fontSize: 13,
+                            color: 'var(--muted)',
+                          }}
+                        >
+                          {r.shots_recorded}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

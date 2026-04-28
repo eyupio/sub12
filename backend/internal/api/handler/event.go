@@ -415,6 +415,140 @@ func (h *EventHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": rows})
 }
 
+// GET /api/v1/events/{slug}/cards
+// Public read; returns one row per participant with their card status and
+// score so the EventDetail UI can render benchrest standings + actions.
+func (h *EventHandler) ListEventCards(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	_, items, err := h.svc.ListEventCards(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, service.ErrEventNotFound) {
+			writeError(w, http.StatusNotFound, "event not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to list event cards")
+		return
+	}
+	if items == nil {
+		items = []*model.EventCardStatus{}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// POST /api/v1/events/{slug}/cards/{cardId}/confirm
+func (h *EventHandler) ConfirmCard(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	cardID := chi.URLParam(r, "cardId")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	if !isUUID(cardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+	if err := h.svc.ConfirmCard(r.Context(), slug, cardID, userID); err != nil {
+		switch {
+		case errors.Is(err, service.ErrEventNotFound):
+			writeError(w, http.StatusNotFound, "event or card not found")
+		case errors.Is(err, service.ErrNotEventScorer):
+			writeError(w, http.StatusForbidden, "not authorised to verify cards for this event")
+		case errors.Is(err, service.ErrInvalidEvent):
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to confirm card")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"confirmed": true})
+}
+
+// POST /api/v1/events/{slug}/cards/{cardId}/amend
+func (h *EventHandler) AmendCard(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	cardID := chi.URLParam(r, "cardId")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	if !isUUID(cardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+	var in model.AmendScoreInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.AmendCard(r.Context(), slug, cardID, userID, &in); err != nil {
+		switch {
+		case errors.Is(err, service.ErrEventNotFound):
+			writeError(w, http.StatusNotFound, "event or card not found")
+		case errors.Is(err, service.ErrNotEventScorer):
+			writeError(w, http.StatusForbidden, "not authorised to amend cards for this event")
+		case errors.Is(err, service.ErrInvalidEvent):
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to amend card")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"amended": true})
+}
+
+// POST /api/v1/events/{slug}/cards/{cardId}/reject
+func (h *EventHandler) RejectCard(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	cardID := chi.URLParam(r, "cardId")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	if !isUUID(cardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+	var in model.RejectScoreInput
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.RejectCard(r.Context(), slug, cardID, userID, &in); err != nil {
+		switch {
+		case errors.Is(err, service.ErrEventNotFound):
+			writeError(w, http.StatusNotFound, "event or card not found")
+		case errors.Is(err, service.ErrNotEventScorer):
+			writeError(w, http.StatusForbidden, "not authorised to reject cards for this event")
+		case errors.Is(err, service.ErrInvalidEvent):
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to reject card")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rejected": true})
+}
+
 // GET /api/v1/events/{slug}/results.csv
 func (h *EventHandler) ResultsCSV(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")

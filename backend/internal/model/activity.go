@@ -83,6 +83,8 @@ type ScorePostedMeta struct {
 	CardImageURL string `json:"card_image_url,omitempty"`
 	RifleName    string `json:"rifle_name,omitempty"`
 	PelletName   string `json:"pellet_name,omitempty"`
+	EventName    string `json:"event_name,omitempty"`
+	EventSlug    string `json:"event_slug,omitempty"`
 }
 
 // JoinedClubMeta is the JSONB metadata for ActivityJoinedClub events.
