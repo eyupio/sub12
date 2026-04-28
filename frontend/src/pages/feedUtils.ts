@@ -208,6 +208,14 @@ function fallbackBody(item: ActivityItem): string {
       }
       return m.event_name ? `${m.event_name} results posted` : 'Live event results posted'
     }
+    case 'event_results_posted': {
+      const m = item.metadata ?? {}
+      if (m.winner && m.event_name) {
+        const band = m.winner.category_label ? ` (${m.winner.category_label})` : ''
+        return `Results: ${m.event_name} — Winner: ${m.winner.display_name}${band} · ${m.winner.points} pts`
+      }
+      return m.event_name ? `Results posted: ${m.event_name}` : 'Live event results posted'
+    }
     default:
       return 'Posted an update'
   }

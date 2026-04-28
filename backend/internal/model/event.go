@@ -225,6 +225,7 @@ type EventStandingRow struct {
 	DisplayName   string  `json:"display_name"`
 	Team          *string `json:"team,omitempty"`
 	CategoryID    *string `json:"category_id,omitempty"`
+	CategoryLabel *string `json:"category_label,omitempty"`
 	WeaponClass   *string `json:"weapon_class,omitempty"`
 	Points        int     `json:"points"`
 	HitCount      int     `json:"hit_count"`
@@ -264,6 +265,31 @@ type EventCompletedMeta struct {
 	HitCount      int    `json:"hit_count"`
 	ShotsRecorded int    `json:"shots_recorded"`
 	CategoryLabel string `json:"category_label,omitempty"`
+}
+
+// EventResultsPodiumEntry is one shooter's slot on the closed-event podium,
+// embedded inside EventResultsMeta. UserID is empty for guest entries.
+type EventResultsPodiumEntry struct {
+	DisplayName   string `json:"display_name"`
+	UserID        string `json:"user_id,omitempty"`
+	CategoryLabel string `json:"category_label,omitempty"`
+	Position      int    `json:"position"`
+	Points        int    `json:"points"`
+	HitCount      int    `json:"hit_count"`
+	ShotsRecorded int    `json:"shots_recorded"`
+}
+
+// EventResultsMeta is the JSONB metadata for a single owner-authored
+// ActivityEventResultsPosted entry that fires once the event is marked
+// complete. The per-participant ActivityEventCompletedWithResults entries
+// continue to fan out alongside it; this one is the public summary.
+type EventResultsMeta struct {
+	EventName      string                    `json:"event_name"`
+	EventSlug      string                    `json:"event_slug"`
+	ClubName       string                    `json:"club_name,omitempty"`
+	Winner         *EventResultsPodiumEntry  `json:"winner,omitempty"`
+	Top3           []EventResultsPodiumEntry `json:"top3,omitempty"`
+	PerBandWinners []EventResultsPodiumEntry `json:"per_band_winners,omitempty"`
 }
 
 // MarshalCourse / MarshalScoringRules are convenience helpers used by the

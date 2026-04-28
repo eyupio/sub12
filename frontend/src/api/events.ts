@@ -93,6 +93,7 @@ export interface EventStandingRow {
   display_name: string
   team?: string
   category_id?: string
+  category_label?: string
   weapon_class?: string
   points: number
   hit_count: number

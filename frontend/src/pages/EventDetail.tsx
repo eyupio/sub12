@@ -1,8 +1,8 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { CalendarClock, Check, ChevronRight, Plus, Settings, Share2, Trash2, UserPlus, Users } from 'lucide-react'
-import { eventsApi, type EventState, type EventCardStatus } from '../api/events'
+import { CalendarClock, Check, ChevronRight, Plus, RotateCcw, Settings, Share2, Trash2, Trophy, UserPlus, Users } from 'lucide-react'
+import { eventsApi, type EventState, type EventStandingRow, type EventCardStatus } from '../api/events'
 import { scoreCardApi } from '../api/scoreCards'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
@@ -52,17 +52,35 @@ export default function EventDetail() {
   const ev = eventQuery.data
   const participants = partsQuery.data?.items ?? []
   const isParticipant = !!currentUserId && participants.some((p) => p.user_id === currentUserId)
-  const categoryLookup = new Map((catsQuery.data?.items ?? []).map((c) => [c.id, c]))
+  const categoryLookup = useMemo(
+    () => new Map((catsQuery.data?.items ?? []).map((c) => [c.id, c])),
+    [catsQuery.data],
+  )
 
   const promote = useMutation({
     mutationFn: (target: EventState) => eventsApi.promote(slug, target),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event', slug] })
       queryClient.invalidateQueries({ queryKey: ['events'] })
+      queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event-scores', slug] })
       toast('Event updated', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to promote', 'error'),
   })
+
+  // Pulled in only when the event is complete so the detail page can render a
+  // podium block summarising winner + per-band winners. Data is the same
+  // scoreboard the live page uses; the scoreboard is sorted server-side.
+  const scoreboardQuery = useQuery({
+    queryKey: ['event-scoreboard', slug],
+    queryFn: () => eventsApi.scoreboard(slug),
+    enabled: eventQuery.data?.state === 'complete',
+  })
+  const podium = useMemo(
+    () => buildEventPodium(scoreboardQuery.data?.items ?? [], categoryLookup),
+    [scoreboardQuery.data, categoryLookup],
+  )
 
   const join = useMutation({
     mutationFn: () => eventsApi.join(slug, {}),
@@ -192,7 +210,27 @@ export default function EventDetail() {
               {promote.isPending ? 'Updating…' : labelFor(nextState)}
             </button>
           )}
+          {ev.is_owner && ev.state === 'complete' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Reopen this event? Scoring will be re-enabled and you can edit shots. The public results post stays in place.',
+                  )
+                ) {
+                  promote.mutate('live')
+                }
+              }}
+              disabled={promote.isPending}
+              className="lc-action-ghost"
+            >
+              <RotateCcw size={14} /> {promote.isPending ? 'Reopening…' : 'Reopen event'}
+            </button>
+          )}
         </div>
+
+        {ev.state === 'complete' && podium.winner && <PodiumSection podium={podium} />}
 
         {ev.format === 'card_submission' && (
           <CardSubmissionSection
@@ -361,6 +399,94 @@ function AddGuestForm({
         {add.isPending ? 'Adding…' : 'Add guest'}
       </button>
     </form>
+  )
+}
+
+interface EventPodium {
+  winner: EventStandingRow | null
+  top3: EventStandingRow[]
+  perBand: Array<{ row: EventStandingRow; label: string }>
+}
+
+function buildEventPodium(
+  rows: EventStandingRow[],
+  categoryLookup: Map<string, { label: string }>,
+): EventPodium {
+  if (rows.length === 0) return { winner: null, top3: [], perBand: [] }
+  const seen = new Set<string>()
+  const perBand: Array<{ row: EventStandingRow; label: string }> = []
+  for (const row of rows) {
+    if (!row.category_id || seen.has(row.category_id)) continue
+    seen.add(row.category_id)
+    const label = row.category_label ?? categoryLookup.get(row.category_id)?.label ?? ''
+    if (!label) continue
+    perBand.push({ row, label })
+  }
+  return { winner: rows[0], top3: rows.slice(0, 3), perBand }
+}
+
+function PodiumSection({ podium }: { podium: EventPodium }) {
+  if (!podium.winner) return null
+  const winner = podium.winner
+  const winnerLabel = winner.category_label ?? ''
+  return (
+    <Section title="Final results" icon={<Trophy size={12} />}>
+      <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Trophy size={20} color="var(--gold)" />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+              Winner: {winner.display_name}
+              {winnerLabel ? ` (${winnerLabel})` : ''}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
+              {winner.points} pts · {winner.hit_count} hits
+            </div>
+          </div>
+        </div>
+        {podium.top3.length > 1 && (
+          <ol style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 18, margin: 0 }}>
+            {podium.top3.map((r) => (
+              <li key={r.participant_id} style={{ fontSize: 12, color: 'var(--muted)' }}>
+                <span style={{ color: 'var(--ink)' }}>{r.display_name}</span>
+                {r.category_label ? ` · ${r.category_label}` : ''} · {r.points} pts
+              </li>
+            ))}
+          </ol>
+        )}
+        {podium.perBand.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--muted)',
+                marginBottom: 6,
+              }}
+            >
+              Band winners
+            </div>
+            <ul
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                paddingLeft: 0,
+                margin: 0,
+                listStyle: 'none',
+              }}
+            >
+              {podium.perBand.map(({ row, label }) => (
+                <li key={row.participant_id} style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <span style={{ color: 'var(--ink)' }}>{label}:</span> {row.display_name} · {row.points} pts
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Section>
   )
 }
 

@@ -33,6 +33,7 @@ function resultCycleFor(ev: EventDTO | undefined): string[] {
 interface LocalShot {
   result: string
   pendingFlush: boolean
+  syncError?: boolean
 }
 
 // Map of `${participantId}|${lane}|${shot}` → LocalShot
@@ -55,11 +56,13 @@ export default function EventScorecard() {
     queryFn: () => eventsApi.listParticipants(slug),
   })
   // Per-shot results from the server. Drives the initial display so reload /
-  // a co-scorer's edits don't show as empty cells.
+  // a co-scorer's edits don't show as empty cells. While the event is live we
+  // poll every 5s so co-scorers see each other's writes without manual refresh.
   const scoresQuery = useQuery({
     queryKey: ['event-scores', slug],
     queryFn: () => eventsApi.listScores(slug),
     refetchOnWindowFocus: true,
+    refetchInterval: evQuery.data?.state === 'live' ? 5000 : false,
   })
 
   const ev = evQuery.data
@@ -112,27 +115,51 @@ export default function EventScorecard() {
         result: item.result,
         recorded_at: recordedAt,
       })
-      // If online, flush immediately. Errors leave the entry in the outbox.
+      // If online, flush immediately. Errors propagate so the UI can surface
+      // them; the entry stays in the outbox for the next attempt.
       if (navigator.onLine) {
-        try {
-          const r = await flush(slug)
-          return r.written
-        } catch {
-          return 0
-        }
+        const r = await flush(slug)
+        return { written: r.written, item }
       }
-      return 0
+      return { written: 0, item }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
+      // Clear the syncError flag for this cell on a successful flush.
+      setLocal((prev) => {
+        const key = shotKey(vars.participantId, vars.lane, vars.shot)
+        const cur = prev.get(key)
+        if (!cur || (!cur.syncError && !cur.pendingFlush)) return prev
+        const next = new Map(prev)
+        next.set(key, { ...cur, pendingFlush: false, syncError: false })
+        return next
+      })
       queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
       queryClient.invalidateQueries({ queryKey: ['event-scores', slug] })
+    },
+    onError: (err, vars) => {
+      // Mark the cell so the user can see their tap didn't sync. The local
+      // optimistic value stays visible; the outbox keeps the entry queued.
+      setLocal((prev) => {
+        const key = shotKey(vars.participantId, vars.lane, vars.shot)
+        const cur = prev.get(key)
+        if (!cur) return prev
+        const next = new Map(prev)
+        next.set(key, { ...cur, syncError: true })
+        return next
+      })
+      const msg = err instanceof Error ? err.message : 'unknown error'
+      toast(`Score didn't sync — ${msg}`, 'error')
     },
   })
 
   function recordShot(participantId: string, lane: number, shot: number, result: string) {
     setLocal((prev) => {
       const next = new Map(prev)
-      next.set(shotKey(participantId, lane, shot), { result, pendingFlush: !navigator.onLine })
+      next.set(shotKey(participantId, lane, shot), {
+        result,
+        pendingFlush: !navigator.onLine,
+        syncError: false,
+      })
       return next
     })
     recordMutation.mutate({ participantId, lane, shot, result })
@@ -305,15 +332,20 @@ function LaneGrid({
           const key = shotKey(participant.id, lane, s)
           const localShot = local.get(key)
           const result = localShot?.result ?? serverByKey.get(key) ?? ''
+          const ringClass = localShot?.syncError
+            ? 'ring-2 ring-red-500'
+            : localShot?.pendingFlush
+              ? 'ring-2 ring-amber-400'
+              : ''
           cells.push(
             <button
               key={`${lane}-${s}`}
               type="button"
               onClick={() => onShot(participant.id, lane, s, nextResult(result, cycle))}
-              aria-label={`Lane ${lane} shot ${s}: ${result || 'empty'}`}
+              aria-label={`Lane ${lane} shot ${s}: ${result || 'empty'}${localShot?.syncError ? ' (sync failed)' : ''}`}
               className={`min-h-[48px] flex-1 rounded-md text-base font-bold flex items-center justify-center transition-colors active:scale-95 ${
                 resultClass(result)
-              } ${localShot?.pendingFlush ? 'ring-2 ring-amber-400' : ''}`}
+              } ${ringClass}`}
             >
               {result || '·'}
             </button>,
