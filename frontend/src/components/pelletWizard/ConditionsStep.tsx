@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { LocationField } from '../LocationField'
-import { LocationPicker } from '../LocationPicker'
+import { PlaceSelector } from '../PlaceSelector'
 import { WIZARD_INPUT_CLS, WIZARD_LABEL_CLS, type WizardConditionsValues } from './wizardShared'
 
 interface Props {
@@ -47,35 +46,25 @@ export function ConditionsStep({ values, onChange }: Props) {
       </div>
 
       {/* Location */}
-      <div className="grid lg:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <label className={WIZARD_LABEL_CLS}>Saved location</label>
-          <LocationPicker
-            value={values.savedLocationId}
-            onChange={id => onChange({ savedLocationId: id })}
-            onApplyDefaults={(loc, lat, lng) => {
-              const patch: Partial<WizardConditionsValues> = {}
-              if (loc?.default_distance_m != null) {
-                patch.distanceValue = String(loc.default_distance_m)
-                if (loc.default_distance_unit === 'yards' || loc.default_distance_unit === 'meters') {
-                  patch.distanceUnit = loc.default_distance_unit
-                }
+      <div className="space-y-1.5">
+        <label className={WIZARD_LABEL_CLS}>Location</label>
+        <PlaceSelector
+          locationId={values.savedLocationId}
+          onLocationIdChange={id => onChange({ savedLocationId: id })}
+          location={values.location}
+          onLocationChange={loc => onChange({ location: loc })}
+          onApplyDefaults={place => {
+            const patch: Partial<WizardConditionsValues> = {}
+            if (place.default_distance_m != null) {
+              patch.distanceValue = String(place.default_distance_m)
+              if (place.default_distance_unit === 'yards' || place.default_distance_unit === 'meters') {
+                patch.distanceUnit = place.default_distance_unit
               }
-              if (lat != null && lng != null) {
-                patch.location = { ...values.location, lat, lng }
-              }
-              onChange(patch)
-            }}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className={WIZARD_LABEL_CLS}>Location label</label>
-          <LocationField
-            value={values.location}
-            onChange={loc => onChange({ location: loc })}
-            inputClassName={`${WIZARD_INPUT_CLS} placeholder:text-muted`}
-          />
-        </div>
+            }
+            if (Object.keys(patch).length > 0) onChange(patch)
+          }}
+          inputClassName={`${WIZARD_INPUT_CLS} placeholder:text-muted`}
+        />
       </div>
 
       {/* Conditions */}
