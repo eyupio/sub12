@@ -27,6 +27,7 @@ const (
 	ActivityEventJoined               ActivityType = "event_joined"
 	ActivityEventWentLive             ActivityType = "event_went_live"
 	ActivityEventCompletedWithResults ActivityType = "event_completed_with_results"
+	ActivityEventResultsPosted        ActivityType = "event_results_posted"
 )
 
 // FeedFilter controls which slice of the activity feed to return.

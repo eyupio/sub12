@@ -355,6 +355,40 @@ func (r *EventRepository) SetState(ctx context.Context, id, state string, archiv
 	return nil
 }
 
+// Reopen flips a 'complete' event back to 'live' and clears its archive_at
+// stamp so the daily archive sweep doesn't catch it. Used when the owner
+// closed the event by mistake.
+func (r *EventRepository) Reopen(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE events SET state = 'live', archive_at = NULL, updated_at = NOW()
+		WHERE id = $1 AND state = 'complete'
+	`, id)
+	if err != nil {
+		return fmt.Errorf("reopen event: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// HasCompletionActivity reports whether an event_results_posted aggregate has
+// already been ingested for this event. Used as an idempotency guard so a
+// reopen → re-complete cycle doesn't duplicate the public results post.
+func (r *EventRepository) HasCompletionActivity(ctx context.Context, eventID string) (bool, error) {
+	var ok bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM activities
+			WHERE target_id = $1 AND target_type = 'event' AND type = $2
+		)
+	`, eventID, model.ActivityEventResultsPosted).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("has completion activity: %w", err)
+	}
+	return ok, nil
+}
+
 // IsOwner returns true when userID owns the event.
 func (r *EventRepository) IsOwner(ctx context.Context, eventID, userID string) (bool, error) {
 	var owner string
@@ -598,6 +632,7 @@ func (r *EventRepository) Standings(ctx context.Context, eventID string, rules m
 			COALESCE(u.display_name, p.guest_name) AS display_name,
 			p.team,
 			p.category_id,
+			cat.label AS category_label,
 			p.weapon_class,
 			COALESCE(
 				(SELECT jsonb_object_agg(c.result, c.n)
@@ -612,6 +647,7 @@ func (r *EventRepository) Standings(ctx context.Context, eventID string, rules m
 			(SELECT COUNT(*)::int FROM event_scores WHERE participant_id = p.id) AS shots_recorded
 		FROM event_participants p
 		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN categories cat ON cat.id = p.category_id
 		WHERE p.event_id = $1
 	`, eventID)
 	if err != nil {
@@ -626,7 +662,7 @@ func (r *EventRepository) Standings(ctx context.Context, eventID string, rules m
 		var shotsRecorded int
 		if err := rows.Scan(
 			&row.ParticipantID, &row.UserID, &row.DisplayName,
-			&row.Team, &row.CategoryID, &row.WeaponClass,
+			&row.Team, &row.CategoryID, &row.CategoryLabel, &row.WeaponClass,
 			&resultsRaw, &shotsRecorded,
 		); err != nil {
 			return nil, fmt.Errorf("scan standings: %w", err)

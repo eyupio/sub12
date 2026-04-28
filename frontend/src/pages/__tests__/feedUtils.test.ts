@@ -50,6 +50,33 @@ describe('feedUtils', () => {
     expect(targetShots('score-1', 3)).not.toEqual(targetShots('score-2', 3))
   })
 
+  it('renders the event_results_posted aggregate body with winner + band', () => {
+    const post = normalizeActivity(
+      activity({
+        type: 'event_results_posted',
+        metadata: {
+          event_name: 'Spring HFT',
+          winner: {
+            display_name: 'Alice',
+            category_label: 'Hunter',
+            position: 1,
+            points: 47,
+            hit_count: 24,
+            shots_recorded: 25,
+          },
+        },
+      }),
+    )
+    expect(post.body).toBe('Results: Spring HFT — Winner: Alice (Hunter) · 47 pts')
+  })
+
+  it('falls back gracefully when event_results_posted has no winner', () => {
+    const post = normalizeActivity(
+      activity({ type: 'event_results_posted', metadata: { event_name: 'Quiet day' } }),
+    )
+    expect(post.body).toBe('Results posted: Quiet day')
+  })
+
   it('sorts by latest and loaded engagement windows', () => {
     const now = Date.now()
     const isoDaysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000).toISOString()
