@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LocateFixed, MapPin, MapPinned, Plus } from 'lucide-react'
 import { useLocations, type Location } from '../api/locations'
 import { LocationField, type LocationValue } from './LocationField'
 import { SavePlaceDialog } from './SavePlaceDialog'
 import { toast } from '../store/toast'
+import { findNearbyPlace } from '../utils/geo'
 
 interface PlaceSelectorProps {
   locationId: string | null
@@ -55,9 +56,14 @@ export function PlaceSelector({
   }
 
   const handleFieldChange = (next: LocationValue) => {
-    // Any manual edit (typing, geolocation, map pick, recent chip) detaches
-    // from the saved place — otherwise we'd persist a label that no longer
-    // matches the linked place.
+    const match = findNearbyPlace(next.lat, next.lng, places)
+    if (match) {
+      applyPlace(match)
+      return
+    }
+    // No nearby saved place — any manual edit (typing, geolocation, map pick,
+    // recent chip) detaches from the saved place so we don't persist a label
+    // that no longer matches the linked place.
     if (locationId) onLocationIdChange(null)
     onLocationChange(next)
   }
@@ -69,6 +75,11 @@ export function PlaceSelector({
     }
     navigator.geolocation.getCurrentPosition(
       pos => {
+        const match = findNearbyPlace(pos.coords.latitude, pos.coords.longitude, places)
+        if (match) {
+          applyPlace(match)
+          return
+        }
         if (locationId) onLocationIdChange(null)
         onLocationChange({
           label: location.label,
@@ -80,6 +91,17 @@ export function PlaceSelector({
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
     )
   }
+
+  // Resolve incoming coords against saved places — covers loading an existing
+  // score card whose coords sit near a saved place but aren't linked, or
+  // parents pushing coords in from elsewhere.
+  useEffect(() => {
+    if (locationId) return
+    if (typeof location.lat !== 'number' || typeof location.lng !== 'number') return
+    if (places.length === 0) return
+    const match = findNearbyPlace(location.lat, location.lng, places)
+    if (match) onLocationIdChange(match.id)
+  }, [location.lat, location.lng, locationId, places, onLocationIdChange])
 
   const hasCoords = typeof location.lat === 'number' && typeof location.lng === 'number'
   const hasLabel = location.label.trim().length > 0
