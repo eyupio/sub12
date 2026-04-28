@@ -2,7 +2,8 @@ import { FormEvent, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { CalendarClock, Check, ChevronRight, Plus, Settings, Share2, Trash2, UserPlus, Users } from 'lucide-react'
-import { eventsApi, type EventState } from '../api/events'
+import { eventsApi, type EventState, type EventCardStatus } from '../api/events'
+import { scoreCardApi } from '../api/scoreCards'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
@@ -39,6 +40,13 @@ export default function EventDetail() {
     queryFn: () => eventsApi.listParticipants(slug),
   })
   const catsQuery = useQuery({ queryKey: ['categories', 'public'], queryFn: () => categoriesApi.listPublic() })
+  // Per-participant card status; only fetched when format is card_submission.
+  const cardsQuery = useQuery({
+    queryKey: ['event-cards', slug],
+    queryFn: () => eventsApi.listEventCards(slug),
+    enabled: eventQuery.data?.format === 'card_submission',
+    refetchOnWindowFocus: true,
+  })
 
   const currentUserId = useAuthStore((s) => s.user?.id)
   const ev = eventQuery.data
@@ -144,7 +152,7 @@ export default function EventDetail() {
 
       <div className="lc-stack">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {ev.is_scorer && (
+          {ev.is_scorer && ev.format !== 'card_submission' && (
             <Link to="/events/$slug/scorecard" params={{ slug: ev.slug }} className="lc-action-ghost">
               Open scorecard <ChevronRight size={14} />
             </Link>
@@ -185,6 +193,19 @@ export default function EventDetail() {
             </button>
           )}
         </div>
+
+        {ev.format === 'card_submission' && (
+          <CardSubmissionSection
+            slug={slug}
+            isLive={ev.state === 'live'}
+            isOwner={!!ev.is_owner}
+            isScorer={!!ev.is_scorer}
+            currentUserId={currentUserId}
+            cards={cardsQuery.data?.items ?? []}
+            cardsLoading={cardsQuery.isLoading}
+            requireVerification={ev.require_score_verification}
+          />
+        )}
 
         <Section
           title={`Participants (${participants.length})`}
@@ -367,4 +388,175 @@ function labelFor(state: EventState): string {
     default:
       return state
   }
+}
+
+function statusLabel(c: EventCardStatus): { label: string; tone: 'green' | 'gold' | 'neutral' | 'red' } {
+  if (!c.card_id) return { label: 'No card', tone: 'neutral' }
+  if (c.is_draft) return { label: 'In progress', tone: 'gold' }
+  if (c.verification === 'verified') return { label: 'Verified', tone: 'green' }
+  if (c.verification === 'rejected') return { label: 'Rejected', tone: 'red' }
+  return { label: 'Pending', tone: 'gold' }
+}
+
+function CardSubmissionSection({
+  slug,
+  isLive,
+  isOwner,
+  isScorer,
+  currentUserId,
+  cards,
+  cardsLoading,
+  requireVerification,
+}: {
+  slug: string
+  isLive: boolean
+  isOwner: boolean
+  isScorer: boolean
+  currentUserId: string | undefined
+  cards: EventCardStatus[]
+  cardsLoading: boolean
+  requireVerification: boolean
+}) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const startCard = useMutation({
+    mutationFn: (participantId: string) =>
+      scoreCardApi.quickCreate({ event_participant_id: participantId }),
+    onSuccess: (card) => {
+      navigate({
+        to: '/scores/new',
+        search: { draftId: card.id, eventSlug: slug } as never,
+      })
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to start card', 'error'),
+  })
+
+  const confirm = useMutation({
+    mutationFn: (cardId: string) => eventsApi.confirmCard(slug, cardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event-cards', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
+      toast('Card confirmed', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to confirm', 'error'),
+  })
+
+  const reject = useMutation({
+    mutationFn: ({ cardId, reason }: { cardId: string; reason: string }) =>
+      eventsApi.rejectCard(slug, cardId, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event-cards', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
+      toast('Card rejected', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to reject', 'error'),
+  })
+
+  return (
+    <Section title="Cards">
+      {cardsLoading && (
+        <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>Loading cards…</p>
+      )}
+      {!cardsLoading && cards.length === 0 && (
+        <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>
+          No participants yet. Add some on this page.
+        </p>
+      )}
+      <ul style={{ display: 'flex', flexDirection: 'column' }}>
+        {cards.map((c, i) => {
+          const status = statusLabel(c)
+          const isSelf = !!currentUserId && c.user_id === currentUserId
+          const canSubmit = isLive && (isSelf || isOwner || isScorer) && (!c.card_id || c.is_draft === true)
+          const canVerify = isOwner || isScorer
+          const isFinalised = !!c.card_id && c.is_draft === false
+          return (
+            <li
+              key={c.participant_id}
+              style={{
+                padding: '12px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>
+                    {c.display_name}
+                  </span>
+                  {c.is_guest && <Badge variant="gold">Guest</Badge>}
+                  <Badge variant={status.tone}>{status.label}</Badge>
+                </div>
+                {isFinalised && (
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Score {c.total_score} · {c.x_count}X
+                  </p>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {isFinalised && c.card_id && (
+                  <Link
+                    to="/scores/$id"
+                    params={{ id: c.card_id }}
+                    className="lc-action-ghost"
+                  >
+                    View
+                  </Link>
+                )}
+                {canSubmit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (c.card_id && c.is_draft) {
+                        navigate({
+                          to: '/scores/new',
+                          search: { draftId: c.card_id, eventSlug: slug } as never,
+                        })
+                      } else {
+                        startCard.mutate(c.participant_id)
+                      }
+                    }}
+                    disabled={startCard.isPending}
+                    className="lc-action-ghost"
+                  >
+                    {c.card_id && c.is_draft
+                      ? 'Continue'
+                      : isSelf
+                        ? 'Submit my card'
+                        : 'Submit card'}
+                  </button>
+                )}
+                {canVerify && isFinalised && requireVerification && c.verification !== 'verified' && (
+                  <button
+                    type="button"
+                    onClick={() => c.card_id && confirm.mutate(c.card_id)}
+                    disabled={confirm.isPending}
+                    className="lc-action-ghost"
+                  >
+                    <Check size={14} /> Verify
+                  </button>
+                )}
+                {canVerify && isFinalised && c.verification !== 'rejected' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const reason = window.prompt('Reason for rejecting this card?')
+                      if (reason && c.card_id) reject.mutate({ cardId: c.card_id, reason })
+                    }}
+                    className="lc-action-ghost"
+                    style={{ color: 'var(--red)' }}
+                  >
+                    Reject
+                  </button>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
+  )
 }

@@ -23,6 +23,14 @@ const (
 	EventVisibilityUnlisted  = "unlisted"
 )
 
+// Event scoring formats. 'shot_grid' is the per-shot tap UI used by HFT/FT
+// today; 'card_submission' uses the score_cards flow (one 25-shot card per
+// participant), introduced for benchrest.
+const (
+	EventFormatShotGrid       = "shot_grid"
+	EventFormatCardSubmission = "card_submission"
+)
+
 // EventCourse describes the physical layout of a course (lanes, shots per
 // target, special-position assignments). Persisted as JSONB so the schema
 // can extend without migrations as new disciplines are introduced.
@@ -58,6 +66,7 @@ type Event struct {
 	EndsAt        *time.Time         `json:"ends_at,omitempty"`
 	ArchiveAt     *time.Time         `json:"archive_at,omitempty"`
 	Discipline    string             `json:"discipline"`
+	Format        string             `json:"format"`
 	Course        EventCourse        `json:"course"`
 	ScoringRules  EventScoringRules  `json:"scoring_rules"`
 	CategoryIDs   []string           `json:"category_ids"`
@@ -65,6 +74,12 @@ type Event struct {
 	State         string             `json:"state"`
 	OwnerUserID   string             `json:"owner_user_id"`
 	ClubID        *string            `json:"club_id,omitempty"`
+	// Verification settings, only meaningful for format='card_submission'.
+	// Defaults mirror league_config so the team's mental model carries over.
+	RequireScoreVerification   bool  `json:"require_score_verification"`
+	RequiredConfirmations      int16 `json:"required_confirmations"`
+	RequireImageUpload         bool  `json:"require_image_upload"`
+	LockEditsAfterVerification bool  `json:"lock_edits_after_verification"`
 	CreatedAt     time.Time          `json:"created_at"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 	// Computed at read time (not persisted).
@@ -81,11 +96,16 @@ type CreateEventInput struct {
 	StartsAt     *time.Time         `json:"starts_at"`
 	EndsAt       *time.Time         `json:"ends_at"`
 	Discipline   string             `json:"discipline"`
+	Format       *string            `json:"format"`
 	Course       EventCourse        `json:"course"`
 	ScoringRules EventScoringRules  `json:"scoring_rules"`
 	CategoryIDs  []string           `json:"category_ids"`
 	Visibility   *string            `json:"visibility"`
 	ClubID       *string            `json:"club_id"`
+	RequireScoreVerification   *bool  `json:"require_score_verification"`
+	RequiredConfirmations      *int16 `json:"required_confirmations"`
+	RequireImageUpload         *bool  `json:"require_image_upload"`
+	LockEditsAfterVerification *bool  `json:"lock_edits_after_verification"`
 }
 
 // UpdateEventInput is the partial-update payload for PATCH /api/v1/events/{slug}.
@@ -96,10 +116,15 @@ type UpdateEventInput struct {
 	StartsAt     *time.Time         `json:"starts_at"`
 	EndsAt       *time.Time         `json:"ends_at"`
 	Discipline   *string            `json:"discipline"`
+	Format       *string            `json:"format"`
 	Course       *EventCourse       `json:"course"`
 	ScoringRules *EventScoringRules `json:"scoring_rules"`
 	CategoryIDs  *[]string          `json:"category_ids"`
 	Visibility   *string            `json:"visibility"`
+	RequireScoreVerification   *bool  `json:"require_score_verification"`
+	RequiredConfirmations      *int16 `json:"required_confirmations"`
+	RequireImageUpload         *bool  `json:"require_image_upload"`
+	LockEditsAfterVerification *bool  `json:"lock_edits_after_verification"`
 }
 
 // EventParticipant. Exactly one of UserID and GuestName is set. DisplayName is
@@ -173,6 +198,23 @@ type RecordScoresInput struct {
 // AddScorerInput is the payload for POST /api/v1/events/{slug}/scorers.
 type AddScorerInput struct {
 	UserID string `json:"user_id"`
+}
+
+// EventCardStatus is one row in the per-participant card-submission status
+// list, used by GET /events/{slug}/cards. CardID is null when no draft or
+// submission exists yet for that participant.
+type EventCardStatus struct {
+	ParticipantID     string  `json:"participant_id"`
+	DisplayName       string  `json:"display_name"`
+	UserID            *string `json:"user_id,omitempty"`
+	IsGuest           bool    `json:"is_guest"`
+	CardID            *string `json:"card_id,omitempty"`
+	IsDraft           *bool   `json:"is_draft,omitempty"`
+	TotalScore        *int16  `json:"total_score,omitempty"`
+	XCount            *int16  `json:"x_count,omitempty"`
+	CardImageURL      *string `json:"card_image_url,omitempty"`
+	Verification      *string `json:"verification,omitempty"`
+	SubmittedByUserID *string `json:"submitted_by_user_id,omitempty"`
 }
 
 // EventStandingRow is a single row in the live scoreboard. Aggregated server

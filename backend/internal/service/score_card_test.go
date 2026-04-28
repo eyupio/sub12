@@ -101,6 +101,10 @@ func (m *mockScoreCardRepo) SubmitToLeague(_ context.Context, _, _, _ string) (*
 	}
 	return &model.ScoreCard{ID: "test-id"}, nil
 }
+func (m *mockScoreCardRepo) SetVerification(_ context.Context, _, _ string) error { return nil }
+func (m *mockScoreCardRepo) GetExistingCardForParticipant(_ context.Context, _ string) (*model.ScoreCard, error) {
+	return nil, repository.ErrNotFound
+}
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
 type mockLeagueRepo struct {

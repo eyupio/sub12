@@ -436,6 +436,9 @@ func NewRouter(
 			r.Delete("/events/{slug}/participants/{participantId}", eh.RemoveParticipant)
 			r.Post("/events/{slug}/scorers", eh.AddScorer)
 			r.Post("/events/{slug}/scores", eh.RecordScores)
+			r.Post("/events/{slug}/cards/{cardId}/confirm", eh.ConfirmCard)
+			r.Post("/events/{slug}/cards/{cardId}/amend", eh.AmendCard)
+			r.Post("/events/{slug}/cards/{cardId}/reject", eh.RejectCard)
 
 			// Admin routes
 			r.Group(func(r chi.Router) {
@@ -587,6 +590,7 @@ func NewRouter(
 			r.Get("/events/{slug}/participants", publicEH.ListParticipants)
 			r.Get("/events/{slug}/scoreboard", publicEH.Scoreboard)
 			r.Get("/events/{slug}/scores", publicEH.ListScores)
+			r.Get("/events/{slug}/cards", publicEH.ListEventCards)
 			r.Get("/events/{slug}/results.csv", publicEH.ResultsCSV)
 
 			// Public user profile. Service redacts private profiles via

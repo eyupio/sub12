@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { categoriesApi } from '../api/categories'
-import { eventsApi, type CreateEventPayload, type EventVisibility } from '../api/events'
+import { eventsApi, type CreateEventPayload, type EventFormat, type EventVisibility } from '../api/events'
 import { customPreset, disciplinePresets } from '../config/disciplinePresets'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
@@ -45,12 +45,18 @@ export default function EventCreate() {
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
   const [discipline, setDiscipline] = useState(disciplinePresets[0].discipline)
+  const [format, setFormat] = useState<EventFormat>(disciplinePresets[0].format)
   const [lanes, setLanes] = useState(disciplinePresets[0].course.lanes)
   const [shotsPerTarget, setShotsPerTarget] = useState(disciplinePresets[0].course.shots_per_target)
   const [standing, setStanding] = useState('')
   const [kneeling, setKneeling] = useState('')
   const [visibility, setVisibility] = useState<EventVisibility>(clubId ? 'club_only' : 'public')
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  // Card-submission verification settings; mirror league_config defaults.
+  const [requireScoreVerification, setRequireScoreVerification] = useState(false)
+  const [requiredConfirmations, setRequiredConfirmations] = useState(1)
+  const [requireImageUpload, setRequireImageUpload] = useState(true)
+  const [lockEditsAfterVerification, setLockEditsAfterVerification] = useState(true)
   const [error, setError] = useState('')
 
   // If the user navigated from a club, default visibility to club_only.
@@ -73,11 +79,14 @@ export default function EventCreate() {
     setPresetId(id)
     const p = disciplinePresets.find((x) => x.id === id) ?? customPreset
     setDiscipline(p.discipline)
+    setFormat(p.format)
     setLanes(p.course.lanes)
     setShotsPerTarget(p.course.shots_per_target)
     setStanding('')
     setKneeling('')
   }
+
+  const isCardSubmission = format === 'card_submission'
 
   const create = useMutation({
     mutationFn: (body: CreateEventPayload) => eventsApi.create(body),
@@ -99,26 +108,36 @@ export default function EventCreate() {
       setError('Name is required')
       return
     }
-    if (lanes < 1 || lanes > 200) {
+    if (!isCardSubmission && (lanes < 1 || lanes > 200)) {
       setError('Lanes must be between 1 and 200')
       return
     }
-    create.mutate({
+    const payload: CreateEventPayload = {
       name: name.trim(),
       description: description.trim() || undefined,
       location: location.trim() || undefined,
       discipline,
-      course: {
-        lanes,
-        shots_per_target: shotsPerTarget,
-        standing_targets: parseLaneList(standing),
-        kneeling_targets: parseLaneList(kneeling),
-      },
+      format,
+      course: isCardSubmission
+        ? { lanes: 1, shots_per_target: 25 }
+        : {
+            lanes,
+            shots_per_target: shotsPerTarget,
+            standing_targets: parseLaneList(standing),
+            kneeling_targets: parseLaneList(kneeling),
+          },
       scoring_rules: preset.scoringRules,
       category_ids: selectedCategoryIds,
       visibility,
       club_id: clubId,
-    })
+    }
+    if (isCardSubmission) {
+      payload.require_score_verification = requireScoreVerification
+      payload.required_confirmations = requiredConfirmations
+      payload.require_image_upload = requireImageUpload
+      payload.lock_edits_after_verification = lockEditsAfterVerification
+    }
+    create.mutate(payload)
   }
 
   function toggleCategory(id: string) {
@@ -188,59 +207,109 @@ export default function EventCreate() {
                 </div>
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Discipline">
-                  <input
-                    value={discipline}
-                    onChange={(e) => setDiscipline(e.target.value)}
-                    className={inputCls}
-                    placeholder="HFT, FT, …"
-                  />
-                </Field>
-                <Field label="Lanes">
-                  <input
-                    type="number"
-                    min={1}
-                    max={200}
-                    value={lanes}
-                    onChange={(e) => setLanes(Number.parseInt(e.target.value || '0', 10))}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-
-              <Field label="Shots per target">
+              <Field label="Discipline">
                 <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={shotsPerTarget}
-                  onChange={(e) => setShotsPerTarget(Number.parseInt(e.target.value || '0', 10))}
+                  value={discipline}
+                  onChange={(e) => setDiscipline(e.target.value)}
                   className={inputCls}
+                  placeholder="HFT, FT, …"
                 />
               </Field>
 
-              <Field label="Standing lanes (optional)">
-                <input
-                  value={standing}
-                  onChange={(e) => setStanding(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. 1, 4, 5"
-                  inputMode="text"
-                />
-              </Field>
+              {isCardSubmission ? (
+                <p className="text-xs text-muted">
+                  Each member submits one 25-shot score card with a target image. Lanes and shots-per-target don't apply.
+                </p>
+              ) : (
+                <>
+                  <Field label="Lanes">
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={lanes}
+                      onChange={(e) => setLanes(Number.parseInt(e.target.value || '0', 10))}
+                      className={inputCls}
+                    />
+                  </Field>
 
-              <Field label="Kneeling lanes (optional)">
-                <input
-                  value={kneeling}
-                  onChange={(e) => setKneeling(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. 7, 12"
-                  inputMode="text"
-                />
-              </Field>
+                  <Field label="Shots per target">
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={shotsPerTarget}
+                      onChange={(e) => setShotsPerTarget(Number.parseInt(e.target.value || '0', 10))}
+                      className={inputCls}
+                    />
+                  </Field>
+
+                  <Field label="Standing lanes (optional)">
+                    <input
+                      value={standing}
+                      onChange={(e) => setStanding(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. 1, 4, 5"
+                      inputMode="text"
+                    />
+                  </Field>
+
+                  <Field label="Kneeling lanes (optional)">
+                    <input
+                      value={kneeling}
+                      onChange={(e) => setKneeling(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. 7, 12"
+                      inputMode="text"
+                    />
+                  </Field>
+                </>
+              )}
             </div>
           </Section>
+
+          {isCardSubmission && (
+            <Section title="Card verification">
+              <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={requireImageUpload}
+                    onChange={(e) => setRequireImageUpload(e.target.checked)}
+                  />
+                  Require a card image upload before submission is accepted
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={requireScoreVerification}
+                    onChange={(e) => setRequireScoreVerification(e.target.checked)}
+                  />
+                  Require peer verification (cards stay pending until confirmed)
+                </label>
+                {requireScoreVerification && (
+                  <Field label="Required confirmations">
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={requiredConfirmations}
+                      onChange={(e) => setRequiredConfirmations(Number.parseInt(e.target.value || '0', 10))}
+                      className={inputCls}
+                    />
+                  </Field>
+                )}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={lockEditsAfterVerification}
+                    onChange={(e) => setLockEditsAfterVerification(e.target.checked)}
+                  />
+                  Lock edits once a card is verified
+                </label>
+              </div>
+            </Section>
+          )}
 
           <Section title="Categories & Visibility">
             <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>

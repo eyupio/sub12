@@ -21,10 +21,11 @@ export default function ScoreEntry() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const smartBack = useSmartBack('/scores')
-  const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string; draftId?: string }
+  const search = useSearch({ strict: false }) as { leagueId?: string; roundId?: string; draftId?: string; eventSlug?: string }
   const leagueId = search.leagueId
   const roundIdParam = search.roundId
   const draftId = search.draftId
+  const eventSlug = search.eventSlug
 
   const [shots, setShots] = useState<Shot[]>(
     Array.from({ length: 25 }, () => ({ score: 0, x: false }))
@@ -306,12 +307,17 @@ export default function ScoreEntry() {
     onSuccess: ({ card, imageFailed, wasDraft }) => {
       qc.invalidateQueries({ queryKey: ['score-drafts'] })
       qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
+      qc.invalidateQueries({ queryKey: ['event-cards'] })
       if (imageFailed) {
         toast('Score card saved, but image upload failed — try again from the card', 'error')
       } else {
         toast(wasDraft ? 'Draft refined and submitted' : 'Score card saved', 'success')
       }
-      navigate({ to: '/scores/$id', params: { id: card.id } })
+      if (eventSlug) {
+        navigate({ to: '/events/$slug', params: { slug: eventSlug } })
+      } else {
+        navigate({ to: '/scores/$id', params: { id: card.id } })
+      }
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : 'Failed to save score card'

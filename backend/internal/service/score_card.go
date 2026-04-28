@@ -35,6 +35,8 @@ type ScoreCardRepo interface {
 	GetPriorScoreStats(ctx context.Context, userID, excludeID string) (*repository.PriorScoreStats, error)
 	GetGearLabels(ctx context.Context, cardID string) (string, string, error)
 	SubmitToLeague(ctx context.Context, cardID, userID, roundID string) (*model.ScoreCard, error)
+	SetVerification(ctx context.Context, id, verification string) error
+	GetExistingCardForParticipant(ctx context.Context, eventParticipantID string) (*model.ScoreCard, error)
 }
 
 // LeagueConfigRepo provides league config lookups needed by ScoreCardService.
@@ -56,6 +58,7 @@ type ScoreCardService struct {
 	cards       ScoreCardRepo
 	leagueRepo  LeagueConfigRepo    // optional; nil skips league rule enforcement
 	users       UserProfileReader   // optional; nil skips owner-privacy checks
+	events      *EventService       // optional; nil disables event-bound submissions
 	activity    *ActivityService    // optional; nil disables feed ingestion
 	achievement *AchievementService // optional; nil disables achievement evaluation
 	log         zerolog.Logger
@@ -63,6 +66,12 @@ type ScoreCardService struct {
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
 	return &ScoreCardService{cards: cards, leagueRepo: leagueRepo, activity: activity, achievement: achievement}
+}
+
+// SetEventService wires the EventService dependency. Required for event-bound
+// score-card submissions; left unset for environments that don't enable events.
+func (s *ScoreCardService) SetEventService(events *EventService) {
+	s.events = events
 }
 
 // SetUserReader wires a user lookup so GetForViewer can enforce the owner's
@@ -90,6 +99,67 @@ func (s *ScoreCardService) safeGo(name string, fn func()) {
 	}()
 }
 
+// resolveEventContext validates an event-bound submission. When the input
+// references an event_participant_id, we look up the participant and the
+// owning event, validate the event's format and live state, and gate on
+// submitter permissions. Caller is responsible for overwriting discipline /
+// club_id from the returned event so clients can't smuggle inconsistent
+// values. Returns (nil, nil) when no event link is present.
+func (s *ScoreCardService) resolveEventContext(
+	ctx context.Context,
+	userID string,
+	leagueRoundID, eventParticipantID *string,
+) (*model.Event, error) {
+	if eventParticipantID == nil || *eventParticipantID == "" {
+		return nil, nil
+	}
+	if leagueRoundID != nil && *leagueRoundID != "" {
+		return nil, fmt.Errorf("%w: cannot link a card to both a league round and an event", ErrInvalidCard)
+	}
+	if s.events == nil {
+		return nil, fmt.Errorf("%w: event submissions are not enabled", ErrInvalidCard)
+	}
+	ev, p, err := s.events.LookupParticipantWithEvent(ctx, *eventParticipantID)
+	if err != nil {
+		return nil, err
+	}
+	if ev.Format != model.EventFormatCardSubmission {
+		return nil, fmt.Errorf("%w: event does not accept card submissions", ErrInvalidCard)
+	}
+	if ev.State != model.EventStateLive {
+		return nil, fmt.Errorf("%w: event is not live", ErrInvalidCard)
+	}
+	if err := s.events.EnsureCanSubmitCardForParticipant(ctx, ev, p, userID); err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
+// applyEventDefaults overwrites discipline / club_id on a quick-create input
+// from the event, so a client cannot store mismatched values for an
+// event-bound card.
+func applyEventDefaultsQuick(in *model.QuickCreateScoreCardInput, ev *model.Event) {
+	if ev.Discipline != "" {
+		d := ev.Discipline
+		in.Discipline = &d
+	}
+	if ev.ClubID != nil {
+		c := *ev.ClubID
+		in.ClubID = &c
+	}
+}
+
+func applyEventDefaultsCreate(in *model.CreateScoreCardInput, ev *model.Event) {
+	if ev.Discipline != "" {
+		d := ev.Discipline
+		in.Discipline = &d
+	}
+	if ev.ClubID != nil {
+		c := *ev.ClubID
+		in.ClubID = &c
+	}
+}
+
 // Create validates the input and persists a new score card.
 func (s *ScoreCardService) Create(ctx context.Context, userID string, input *model.CreateScoreCardInput) (*model.ScoreCard, error) {
 	if len(input.ShotScores) != 25 {
@@ -110,6 +180,24 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		totalScore += score
 		if input.ShotXs[i] {
 			xCount++
+		}
+	}
+
+	ev, err := s.resolveEventContext(ctx, userID, input.LeagueRoundID, input.EventParticipantID)
+	if err != nil {
+		return nil, err
+	}
+	if ev != nil {
+		if ev.RequireImageUpload {
+			// Direct create has no image yet; require_image_upload is enforced
+			// at graduate-time so the user can upload after the initial create.
+			// Block here only for the full-create path.
+			return nil, fmt.Errorf("%w: event requires the card image to be uploaded; use the quick-capture flow", ErrInvalidCard)
+		}
+		applyEventDefaultsCreate(input, ev)
+		// Reject duplicate submissions for the same participant.
+		if existing, err := s.cards.GetExistingCardForParticipant(ctx, *input.EventParticipantID); err == nil && existing != nil && !existing.IsDraft {
+			return nil, fmt.Errorf("%w: this participant already has a submitted card", ErrInvalidCard)
 		}
 	}
 
@@ -333,6 +421,18 @@ func (s *ScoreCardService) GetDraftCount(ctx context.Context, userID string) (in
 // skipped — those rules apply when the user graduates the draft. Activity
 // feed ingestion is also skipped; drafts are private-to-owner until refined.
 func (s *ScoreCardService) QuickCreate(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error) {
+	ev, err := s.resolveEventContext(ctx, userID, input.LeagueRoundID, input.EventParticipantID)
+	if err != nil {
+		return nil, err
+	}
+	if ev != nil {
+		applyEventDefaultsQuick(input, ev)
+		// Reject if a finalised card already exists for this participant. Drafts
+		// are allowed alongside, so a participant can restart capture mid-shoot.
+		if existing, err := s.cards.GetExistingCardForParticipant(ctx, *input.EventParticipantID); err == nil && existing != nil && !existing.IsDraft {
+			return nil, fmt.Errorf("%w: this participant already has a submitted card", ErrInvalidCard)
+		}
+	}
 	// Auto-populate club_id from the league if a league round was chosen so
 	// refinement lands in the same club context later.
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
@@ -381,9 +481,33 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		}
 	}
 
+	// Enforce event rules at graduation when the card is event-bound.
+	var eventForCard *model.Event
+	if card.EventParticipantID != nil && *card.EventParticipantID != "" && s.events != nil {
+		ev, _, err := s.events.LookupParticipantWithEvent(ctx, *card.EventParticipantID)
+		if err != nil {
+			return nil, err
+		}
+		if ev.State != model.EventStateLive {
+			return nil, fmt.Errorf("%w: event is not live", ErrInvalidCard)
+		}
+		if ev.RequireImageUpload && (card.CardImageURL == nil || *card.CardImageURL == "") {
+			return nil, fmt.Errorf("%w: event requires a card image upload before graduation", ErrInvalidCard)
+		}
+		eventForCard = ev
+	}
+
 	updated, err := s.cards.Graduate(ctx, id, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// For event-bound cards, override the default 'pending' verification to
+	// 'verified' when the event does not require peer verification.
+	if eventForCard != nil && !eventForCard.RequireScoreVerification {
+		if err := s.cards.SetVerification(ctx, updated.ID, "verified"); err == nil {
+			updated.Verification = "verified"
+		}
 	}
 
 	isPB, pbErr := s.cards.IsPersonalBest(ctx, userID, updated.ID, updated.TotalScore)
@@ -407,6 +531,10 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 			if lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *updated.LeagueRoundID); err == nil {
 				leagueID = &lid
 			}
+		}
+		if eventForCard != nil {
+			meta.EventName = eventForCard.Name
+			meta.EventSlug = eventForCard.Slug
 		}
 		activityType := model.ActivityScorePosted
 		if isPB {
@@ -482,18 +610,25 @@ func (s *ScoreCardService) Delete(ctx context.Context, id, userID string) error 
 }
 
 // ensureNotLocked returns ErrEditsLocked when the card is verified and its
-// league has lock_edits_after_verification enabled. It silently allows the
-// action for personal cards, unverified league cards, or when the league
-// config is unavailable.
+// league or event has lock_edits_after_verification enabled. It silently
+// allows the action for personal cards, unverified cards, or when the league /
+// event config is unavailable.
 func (s *ScoreCardService) ensureNotLocked(ctx context.Context, id, userID string) error {
 	card, err := s.cards.GetByID(ctx, id, userID)
 	if err != nil {
 		return err
 	}
-	if card.LeagueRoundID == nil || *card.LeagueRoundID == "" {
+	if card.Verification != "verified" {
 		return nil
 	}
-	if card.Verification != "verified" {
+	if card.EventParticipantID != nil && *card.EventParticipantID != "" && s.events != nil {
+		ev, _, err := s.events.LookupParticipantWithEvent(ctx, *card.EventParticipantID)
+		if err == nil && ev != nil && ev.LockEditsAfterVerification {
+			return ErrEditsLocked
+		}
+		return nil
+	}
+	if card.LeagueRoundID == nil || *card.LeagueRoundID == "" {
 		return nil
 	}
 	if s.leagueRepo == nil {

@@ -1,9 +1,10 @@
-import type { EventCourse, EventScoringRules } from '../api/events'
+import type { EventCourse, EventScoringRules, EventFormat } from '../api/events'
 
 export interface DisciplinePreset {
   id: string
   label: string
   discipline: string
+  format: EventFormat
   course: EventCourse
   scoringRules: EventScoringRules
 }
@@ -15,6 +16,7 @@ export const disciplinePresets: DisciplinePreset[] = [
     id: 'hft',
     label: 'HFT (25 lanes × 2 shots)',
     discipline: 'HFT',
+    format: 'shot_grid',
     course: { lanes: 25, shots_per_target: 2, standing_targets: [], kneeling_targets: [] },
     scoringRules: { mode: 'xo', points: { X: 1, O: 0 } },
   },
@@ -22,6 +24,7 @@ export const disciplinePresets: DisciplinePreset[] = [
     id: 'ft',
     label: 'FT (50 lanes × 1 shot)',
     discipline: 'FT',
+    format: 'shot_grid',
     course: { lanes: 50, shots_per_target: 1, standing_targets: [], kneeling_targets: [] },
     scoringRules: { mode: 'xo', points: { X: 1, O: 0 } },
   },
@@ -29,8 +32,18 @@ export const disciplinePresets: DisciplinePreset[] = [
     id: 'ft-210',
     label: 'FT 2/1/0 (50 lanes)',
     discipline: 'FT',
+    format: 'shot_grid',
     course: { lanes: 50, shots_per_target: 1, standing_targets: [], kneeling_targets: [] },
     scoringRules: { mode: '210', points: { '2': 2, '1': 1, '0': 0 } },
+  },
+  {
+    id: 'benchrest',
+    label: 'Benchrest (25-shot card per shooter)',
+    discipline: 'Benchrest',
+    format: 'card_submission',
+    // course is unused for card_submission events but keeps the shape valid.
+    course: { lanes: 1, shots_per_target: 25 },
+    scoringRules: { mode: 'card', points: {} },
   },
 ]
 
@@ -38,6 +51,7 @@ export const customPreset: DisciplinePreset = {
   id: 'custom',
   label: 'Custom',
   discipline: 'HFT',
+  format: 'shot_grid',
   course: { lanes: 10, shots_per_target: 1 },
   scoringRules: { mode: 'xo', points: { X: 1, O: 0 } },
 }

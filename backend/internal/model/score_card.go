@@ -31,6 +31,7 @@ type ScoreCard struct {
 	CommentCount      int       `json:"comment_count"`
 	IsLiked           bool      `json:"is_liked"`
 	IsDraft           bool      `json:"is_draft"`
+	EventParticipantID *string  `json:"event_participant_id,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -39,21 +40,22 @@ type ScoreCard struct {
 // quick-capture endpoint. Shot grid and full metadata are filled in later
 // via the refine flow.
 type QuickCreateScoreCardInput struct {
-	RifleID       *string  `json:"rifle_id"`
-	PelletID      *string  `json:"pellet_id"`
-	ShotAt        *string  `json:"shot_at"` // YYYY-MM-DD, defaults to today
-	Location      *string  `json:"location"`
-	LocationLat   *float64 `json:"location_lat"`
-	LocationLng   *float64 `json:"location_lng"`
-	WindMPH       *float64 `json:"wind_mph"`
-	TempCelsius   *float64 `json:"temp_celsius"`
-	DistanceM     *int     `json:"distance_m"`
-	Discipline    *string  `json:"discipline"`
-	Notes         *string  `json:"notes"`
-	LeagueRoundID *string  `json:"league_round_id"`
-	ClubID        *string  `json:"club_id"`
-	LocationID    *string  `json:"location_id"`
-	Visibility    *string  `json:"visibility"`
+	RifleID            *string  `json:"rifle_id"`
+	PelletID           *string  `json:"pellet_id"`
+	ShotAt             *string  `json:"shot_at"` // YYYY-MM-DD, defaults to today
+	Location           *string  `json:"location"`
+	LocationLat        *float64 `json:"location_lat"`
+	LocationLng        *float64 `json:"location_lng"`
+	WindMPH            *float64 `json:"wind_mph"`
+	TempCelsius        *float64 `json:"temp_celsius"`
+	DistanceM          *int     `json:"distance_m"`
+	Discipline         *string  `json:"discipline"`
+	Notes              *string  `json:"notes"`
+	LeagueRoundID      *string  `json:"league_round_id"`
+	ClubID             *string  `json:"club_id"`
+	LocationID         *string  `json:"location_id"`
+	Visibility         *string  `json:"visibility"`
+	EventParticipantID *string  `json:"event_participant_id"`
 }
 
 // ScoreCardAuthor is a compact, public-safe subset of the card owner's
@@ -96,23 +98,24 @@ type ScoreCardWithAuthor struct {
 }
 
 type CreateScoreCardInput struct {
-	RifleID       *string  `json:"rifle_id"`
-	PelletID      *string  `json:"pellet_id"`
-	ShotAt        string   `json:"shot_at"`
-	Location      *string  `json:"location"`
-	LocationLat   *float64 `json:"location_lat"`
-	LocationLng   *float64 `json:"location_lng"`
-	WindMPH       *float64 `json:"wind_mph"`
-	TempCelsius   *float64 `json:"temp_celsius"`
-	DistanceM     *int     `json:"distance_m"`
-	Discipline    *string  `json:"discipline"`
-	Notes         *string  `json:"notes"`
-	ShotScores    []int16  `json:"shot_scores"`
-	ShotXs        []bool   `json:"shot_xs"`
-	LeagueRoundID *string  `json:"league_round_id"`
-	ClubID        *string  `json:"club_id"`
-	LocationID    *string  `json:"location_id"`
-	Visibility    *string  `json:"visibility"`
+	RifleID            *string  `json:"rifle_id"`
+	PelletID           *string  `json:"pellet_id"`
+	ShotAt             string   `json:"shot_at"`
+	Location           *string  `json:"location"`
+	LocationLat        *float64 `json:"location_lat"`
+	LocationLng        *float64 `json:"location_lng"`
+	WindMPH            *float64 `json:"wind_mph"`
+	TempCelsius        *float64 `json:"temp_celsius"`
+	DistanceM          *int     `json:"distance_m"`
+	Discipline         *string  `json:"discipline"`
+	Notes              *string  `json:"notes"`
+	ShotScores         []int16  `json:"shot_scores"`
+	ShotXs             []bool   `json:"shot_xs"`
+	LeagueRoundID      *string  `json:"league_round_id"`
+	ClubID             *string  `json:"club_id"`
+	LocationID         *string  `json:"location_id"`
+	Visibility         *string  `json:"visibility"`
+	EventParticipantID *string  `json:"event_participant_id"`
 }
 
 // UpdateScoreCardInput holds fields a user can change after submission.
@@ -165,21 +168,22 @@ type UpdateCommentInput struct {
 
 // ScoreCardSummary is a lighter struct used in list responses.
 type ScoreCardSummary struct {
-	ID            string    `json:"id"`
-	ShotAt        string    `json:"shot_at"`
-	TotalScore    int16     `json:"total_score"`
-	XCount        int16     `json:"x_count"`
-	Location      *string   `json:"location,omitempty"`
-	LocationLat   *float64  `json:"location_lat,omitempty"`
-	LocationLng   *float64  `json:"location_lng,omitempty"`
-	Verification  string    `json:"verification"`
-	LeagueRoundID *string   `json:"league_round_id,omitempty"`
-	LeagueID      *string   `json:"league_id,omitempty"`
-	LeagueName    *string   `json:"league_name,omitempty"`
-	ClubID        *string   `json:"club_id,omitempty"`
-	CardImageURL  *string   `json:"card_image_url,omitempty"`
-	IsDraft       bool      `json:"is_draft"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	ShotAt             string    `json:"shot_at"`
+	TotalScore         int16     `json:"total_score"`
+	XCount             int16     `json:"x_count"`
+	Location           *string   `json:"location,omitempty"`
+	LocationLat        *float64  `json:"location_lat,omitempty"`
+	LocationLng        *float64  `json:"location_lng,omitempty"`
+	Verification       string    `json:"verification"`
+	LeagueRoundID      *string   `json:"league_round_id,omitempty"`
+	LeagueID           *string   `json:"league_id,omitempty"`
+	LeagueName         *string   `json:"league_name,omitempty"`
+	ClubID             *string   `json:"club_id,omitempty"`
+	CardImageURL       *string   `json:"card_image_url,omitempty"`
+	IsDraft            bool      `json:"is_draft"`
+	EventParticipantID *string   `json:"event_participant_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // LeagueScore is a score card summary enriched with the submitter's display name,

@@ -28,8 +28,10 @@ func NewEventRepository(db *pgxpool.Pool) *EventRepository {
 const eventColumns = `
 	e.id, e.slug, e.name, e.description, e.location,
 	e.starts_at, e.ends_at, e.archive_at,
-	e.discipline, e.course, e.scoring_rules, e.category_ids,
+	e.discipline, e.format, e.course, e.scoring_rules, e.category_ids,
 	e.visibility, e.state, e.owner_user_id, e.club_id,
+	e.require_score_verification, e.required_confirmations,
+	e.require_image_upload, e.lock_edits_after_verification,
 	e.created_at, e.updated_at
 `
 
@@ -38,8 +40,10 @@ func scanEvent(row pgx.Row, e *model.Event) error {
 	if err := row.Scan(
 		&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
 		&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
-		&e.Discipline, &courseRaw, &rulesRaw, &e.CategoryIDs,
+		&e.Discipline, &e.Format, &courseRaw, &rulesRaw, &e.CategoryIDs,
 		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
+		&e.RequireScoreVerification, &e.RequiredConfirmations,
+		&e.RequireImageUpload, &e.LockEditsAfterVerification,
 		&e.CreatedAt, &e.UpdatedAt,
 	); err != nil {
 		return err
@@ -88,39 +92,54 @@ func (r *EventRepository) Create(ctx context.Context, ownerID string, in *model.
 		categoryIDs = []string{}
 	}
 
+	format := model.EventFormatShotGrid
+	if in.Format != nil && *in.Format != "" {
+		format = *in.Format
+	}
+	requireVerify := false
+	if in.RequireScoreVerification != nil {
+		requireVerify = *in.RequireScoreVerification
+	}
+	requiredConfirmations := int16(1)
+	if in.RequiredConfirmations != nil {
+		requiredConfirmations = *in.RequiredConfirmations
+	}
+	requireImage := false
+	if in.RequireImageUpload != nil {
+		requireImage = *in.RequireImageUpload
+	}
+	lockAfterVerify := true
+	if in.LockEditsAfterVerification != nil {
+		lockAfterVerify = *in.LockEditsAfterVerification
+	}
+
 	for attempt := 0; attempt < 3; attempt++ {
 		slug, err := generateSlug()
 		if err != nil {
 			return nil, err
 		}
 		var ev model.Event
-		err = r.db.QueryRow(ctx, `
+		row := r.db.QueryRow(ctx, `
 			INSERT INTO events AS e (
 				slug, name, description, location, starts_at, ends_at,
-				discipline, course, scoring_rules, category_ids,
-				visibility, state, owner_user_id, club_id
+				discipline, format, course, scoring_rules, category_ids,
+				visibility, state, owner_user_id, club_id,
+				require_score_verification, required_confirmations,
+				require_image_upload, lock_edits_after_verification
 			) VALUES (
 				$1, $2, $3, $4, $5, $6,
-				$7, $8::jsonb, $9::jsonb, $10::uuid[],
-				$11, 'draft', $12, $13
+				$7, $8, $9::jsonb, $10::jsonb, $11::uuid[],
+				$12, 'draft', $13, $14,
+				$15, $16, $17, $18
 			)
 			RETURNING `+eventColumns+`
 		`, slug, in.Name, in.Description, in.Location, in.StartsAt, in.EndsAt,
-			in.Discipline, courseJSON, rulesJSON, categoryIDs,
+			in.Discipline, format, courseJSON, rulesJSON, categoryIDs,
 			visibility, ownerID, in.ClubID,
-		).Scan(
-			&ev.ID, &ev.Slug, &ev.Name, &ev.Description, &ev.Location,
-			&ev.StartsAt, &ev.EndsAt, &ev.ArchiveAt,
-			&ev.Discipline, &courseJSON, &rulesJSON, &ev.CategoryIDs,
-			&ev.Visibility, &ev.State, &ev.OwnerUserID, &ev.ClubID,
-			&ev.CreatedAt, &ev.UpdatedAt,
+			requireVerify, requiredConfirmations, requireImage, lockAfterVerify,
 		)
+		err = scanEvent(row, &ev)
 		if err == nil {
-			_ = json.Unmarshal(courseJSON, &ev.Course)
-			_ = json.Unmarshal(rulesJSON, &ev.ScoringRules)
-			if ev.CategoryIDs == nil {
-				ev.CategoryIDs = []string{}
-			}
 			return &ev, nil
 		}
 		var pgErr *pgconn.PgError
@@ -130,6 +149,34 @@ func (r *EventRepository) Create(ctx context.Context, ownerID string, in *model.
 		return nil, fmt.Errorf("insert event: %w", err)
 	}
 	return nil, fmt.Errorf("insert event: slug collision after 3 attempts")
+}
+
+// scanEventWithCount scans an event row that has participant_count appended as
+// the trailing column. Used by GetBySlug / List / ListByClub.
+func scanEventWithCount(row pgx.Row, e *model.Event) error {
+	var courseRaw, rulesRaw []byte
+	if err := row.Scan(
+		&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
+		&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
+		&e.Discipline, &e.Format, &courseRaw, &rulesRaw, &e.CategoryIDs,
+		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
+		&e.RequireScoreVerification, &e.RequiredConfirmations,
+		&e.RequireImageUpload, &e.LockEditsAfterVerification,
+		&e.CreatedAt, &e.UpdatedAt,
+		&e.ParticipantCount,
+	); err != nil {
+		return err
+	}
+	if len(courseRaw) > 0 {
+		_ = json.Unmarshal(courseRaw, &e.Course)
+	}
+	if len(rulesRaw) > 0 {
+		_ = json.Unmarshal(rulesRaw, &e.ScoringRules)
+	}
+	if e.CategoryIDs == nil {
+		e.CategoryIDs = []string{}
+	}
+	return nil
 }
 
 // GetBySlug returns the event identified by slug along with its participant
@@ -142,28 +189,11 @@ func (r *EventRepository) GetBySlug(ctx context.Context, slug string) (*model.Ev
 		FROM events e
 		WHERE e.slug = $1
 	`, strings.ToLower(strings.TrimSpace(slug)))
-	var courseRaw, rulesRaw []byte
-	if err := row.Scan(
-		&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
-		&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
-		&e.Discipline, &courseRaw, &rulesRaw, &e.CategoryIDs,
-		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
-		&e.CreatedAt, &e.UpdatedAt,
-		&e.ParticipantCount,
-	); err != nil {
+	if err := scanEventWithCount(row, &e); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get event by slug: %w", err)
-	}
-	if len(courseRaw) > 0 {
-		_ = json.Unmarshal(courseRaw, &e.Course)
-	}
-	if len(rulesRaw) > 0 {
-		_ = json.Unmarshal(rulesRaw, &e.ScoringRules)
-	}
-	if e.CategoryIDs == nil {
-		e.CategoryIDs = []string{}
 	}
 	return &e, nil
 }
@@ -210,25 +240,8 @@ func (r *EventRepository) List(ctx context.Context, viewerID string, stateFilter
 	var items []*model.Event
 	for rows.Next() {
 		var e model.Event
-		var courseRaw, rulesRaw []byte
-		if err := rows.Scan(
-			&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
-			&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
-			&e.Discipline, &courseRaw, &rulesRaw, &e.CategoryIDs,
-			&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
-			&e.CreatedAt, &e.UpdatedAt,
-			&e.ParticipantCount,
-		); err != nil {
+		if err := scanEventWithCount(rows, &e); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
-		}
-		if len(courseRaw) > 0 {
-			_ = json.Unmarshal(courseRaw, &e.Course)
-		}
-		if len(rulesRaw) > 0 {
-			_ = json.Unmarshal(rulesRaw, &e.ScoringRules)
-		}
-		if e.CategoryIDs == nil {
-			e.CategoryIDs = []string{}
 		}
 		items = append(items, &e)
 	}
@@ -253,25 +266,8 @@ func (r *EventRepository) ListByClub(ctx context.Context, clubID string) ([]*mod
 	var items []*model.Event
 	for rows.Next() {
 		var e model.Event
-		var courseRaw, rulesRaw []byte
-		if err := rows.Scan(
-			&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
-			&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
-			&e.Discipline, &courseRaw, &rulesRaw, &e.CategoryIDs,
-			&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
-			&e.CreatedAt, &e.UpdatedAt,
-			&e.ParticipantCount,
-		); err != nil {
+		if err := scanEventWithCount(rows, &e); err != nil {
 			return nil, fmt.Errorf("scan event: %w", err)
-		}
-		if len(courseRaw) > 0 {
-			_ = json.Unmarshal(courseRaw, &e.Course)
-		}
-		if len(rulesRaw) > 0 {
-			_ = json.Unmarshal(rulesRaw, &e.ScoringRules)
-		}
-		if e.CategoryIDs == nil {
-			e.CategoryIDs = []string{}
 		}
 		items = append(items, &e)
 	}
@@ -303,17 +299,22 @@ func (r *EventRepository) Update(ctx context.Context, id string, in *model.Updat
 
 	row := r.db.QueryRow(ctx, `
 		UPDATE events AS e SET
-			name          = COALESCE($2, name),
-			description   = COALESCE($3, description),
-			location      = COALESCE($4, location),
-			starts_at     = COALESCE($5, starts_at),
-			ends_at       = COALESCE($6, ends_at),
-			discipline    = COALESCE($7, discipline),
-			course        = COALESCE($8::jsonb, course),
-			scoring_rules = COALESCE($9::jsonb, scoring_rules),
-			category_ids  = CASE WHEN $11::boolean THEN $10::uuid[] ELSE category_ids END,
-			visibility    = COALESCE($12, visibility),
-			updated_at    = NOW()
+			name                          = COALESCE($2, name),
+			description                   = COALESCE($3, description),
+			location                      = COALESCE($4, location),
+			starts_at                     = COALESCE($5, starts_at),
+			ends_at                       = COALESCE($6, ends_at),
+			discipline                    = COALESCE($7, discipline),
+			course                        = COALESCE($8::jsonb, course),
+			scoring_rules                 = COALESCE($9::jsonb, scoring_rules),
+			category_ids                  = CASE WHEN $11::boolean THEN $10::uuid[] ELSE category_ids END,
+			visibility                    = COALESCE($12, visibility),
+			format                        = COALESCE($13, format),
+			require_score_verification    = COALESCE($14, require_score_verification),
+			required_confirmations        = COALESCE($15, required_confirmations),
+			require_image_upload          = COALESCE($16, require_image_upload),
+			lock_edits_after_verification = COALESCE($17, lock_edits_after_verification),
+			updated_at                    = NOW()
 		WHERE id = $1
 		RETURNING `+eventColumns+`
 	`,
@@ -329,6 +330,11 @@ func (r *EventRepository) Update(ctx context.Context, id string, in *model.Updat
 		categoryIDs,
 		in.CategoryIDs != nil,
 		in.Visibility,
+		in.Format,
+		in.RequireScoreVerification,
+		in.RequiredConfirmations,
+		in.RequireImageUpload,
+		in.LockEditsAfterVerification,
 	)
 	var e model.Event
 	if err := scanEvent(row, &e); err != nil {
@@ -671,6 +677,98 @@ func (r *EventRepository) Standings(ctx context.Context, eventID string, rules m
 	return items, nil
 }
 
+// StandingsFromCards aggregates a leaderboard for card_submission events. Each
+// participant has at most one finalised score_card (enforced by the partial
+// unique index); rows with no submission appear with Points/HitCount=0 and
+// ShotsRecorded=0 so the UI can show "no card" rows alongside submissions.
+func (r *EventRepository) StandingsFromCards(ctx context.Context, eventID string) ([]*model.EventStandingRow, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			p.id,
+			p.user_id,
+			COALESCE(u.display_name, p.guest_name) AS display_name,
+			p.team,
+			p.category_id,
+			p.weapon_class,
+			COALESCE(sc.total_score, 0)::int AS points,
+			COALESCE(sc.x_count, 0)::int AS hit_count,
+			CASE WHEN sc.id IS NULL THEN 0 ELSE 25 END AS shots_recorded
+		FROM event_participants p
+		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN score_cards sc
+			ON sc.event_participant_id = p.id AND sc.is_draft = FALSE
+		WHERE p.event_id = $1
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("standings from cards query: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.EventStandingRow
+	for rows.Next() {
+		var row model.EventStandingRow
+		if err := rows.Scan(
+			&row.ParticipantID, &row.UserID, &row.DisplayName,
+			&row.Team, &row.CategoryID, &row.WeaponClass,
+			&row.Points, &row.HitCount, &row.ShotsRecorded,
+		); err != nil {
+			return nil, fmt.Errorf("scan card standings: %w", err)
+		}
+		items = append(items, &row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sortStandings(items)
+	for i := range items {
+		items[i].Position = i + 1
+	}
+	return items, nil
+}
+
+// ListEventCards returns one row per participant with their card status (none /
+// draft / submitted) for the GET /events/{slug}/cards endpoint.
+func (r *EventRepository) ListEventCards(ctx context.Context, eventID string) ([]*model.EventCardStatus, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			p.id,
+			COALESCE(u.display_name, p.guest_name) AS display_name,
+			p.user_id,
+			(p.user_id IS NULL) AS is_guest,
+			sc.id, sc.is_draft, sc.total_score, sc.x_count,
+			sc.card_image_url, sc.verification, sc.user_id AS submitted_by_user_id
+		FROM event_participants p
+		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN LATERAL (
+			SELECT id, is_draft, total_score, x_count, card_image_url,
+				verification::text AS verification, user_id
+			FROM score_cards
+			WHERE event_participant_id = p.id
+			ORDER BY is_draft ASC, created_at DESC
+			LIMIT 1
+		) sc ON TRUE
+		WHERE p.event_id = $1
+		ORDER BY p.lane_assignment NULLS LAST, p.created_at
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list event cards: %w", err)
+	}
+	defer rows.Close()
+	var items []*model.EventCardStatus
+	for rows.Next() {
+		var s model.EventCardStatus
+		if err := rows.Scan(
+			&s.ParticipantID, &s.DisplayName, &s.UserID, &s.IsGuest,
+			&s.CardID, &s.IsDraft, &s.TotalScore, &s.XCount,
+			&s.CardImageURL, &s.Verification, &s.SubmittedByUserID,
+		); err != nil {
+			return nil, fmt.Errorf("scan event card status: %w", err)
+		}
+		items = append(items, &s)
+	}
+	return items, rows.Err()
+}
+
 func sortStandings(items []*model.EventStandingRow) {
 	for i := 1; i < len(items); i++ {
 		for j := i; j > 0; j-- {
@@ -759,8 +857,10 @@ func (r *EventRepository) AdminListAll(ctx context.Context) ([]*AdminEventRow, e
 		if err := rows.Scan(
 			&row.ID, &row.Slug, &row.Name, &row.Description, &row.Location,
 			&row.StartsAt, &row.EndsAt, &row.ArchiveAt,
-			&row.Discipline, &courseRaw, &rulesRaw, &row.CategoryIDs,
+			&row.Discipline, &row.Format, &courseRaw, &rulesRaw, &row.CategoryIDs,
 			&row.Visibility, &row.State, &row.OwnerUserID, &row.ClubID,
+			&row.RequireScoreVerification, &row.RequiredConfirmations,
+			&row.RequireImageUpload, &row.LockEditsAfterVerification,
 			&row.CreatedAt, &row.UpdatedAt,
 			&row.ParticipantCount,
 			&row.ClubName,

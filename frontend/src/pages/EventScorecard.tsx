@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
 import { eventsApi, type EventDTO, type EventParticipantDTO } from '../api/events'
 import { enqueue, flush, installOnlineListener, newClientId } from '../offline/scoreOutbox'
@@ -45,6 +45,7 @@ function shotKey(participantId: string, lane: number, shot: number): string {
 export default function EventScorecard() {
   const { slug } = useParams({ from: '/app/events/$slug/scorecard' })
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [activeParticipantId, setActiveParticipantId] = useState<string | null>(null)
   const [local, setLocal] = useState<LocalState>(new Map())
 
@@ -88,6 +89,14 @@ export default function EventScorecard() {
       queryClient.invalidateQueries({ queryKey: ['event-scores', slug] })
     })
   }, [slug, queryClient])
+
+  // Card-submission events use the score-card flow on EventDetail; redirect
+  // bookmarked deep-links rather than rendering the per-shot tap UI.
+  useEffect(() => {
+    if (ev?.format === 'card_submission') {
+      navigate({ to: '/events/$slug', params: { slug }, replace: true })
+    }
+  }, [ev?.format, navigate, slug])
 
   const recordMutation = useMutation({
     mutationFn: async (item: { participantId: string; lane: number; shot: number; result: string }) => {
