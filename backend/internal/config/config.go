@@ -31,6 +31,9 @@ type Config struct {
 	JWTExpiryHours          int    `envconfig:"JWT_EXPIRY_HOURS" default:"24"`
 	PasswordResetTTLMinutes int    `envconfig:"PASSWORD_RESET_TTL_MINUTES" default:"60"`
 	PasswordResetURL        string `envconfig:"PASSWORD_RESET_URL" default:"http://localhost:5173/reset-password"`
+	// Base URL for event invitation accept pages. The token is appended as
+	// /{token}, e.g. http://localhost:5173/events/invitations/<token>.
+	EventInvitationURL      string `envconfig:"EVENT_INVITATION_URL" default:"http://localhost:5173/events/invitations"`
 
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`

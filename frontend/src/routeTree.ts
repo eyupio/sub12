@@ -75,6 +75,7 @@ import TermsOfUse from './pages/TermsOfUse'
 import CookiePolicy from './pages/CookiePolicy'
 import Events from './pages/Events'
 import EventCreate from './pages/EventCreate'
+import EventInvitationAccept from './pages/EventInvitationAccept'
 import EventDetail from './pages/EventDetail'
 import EventLive from './pages/EventLive'
 import EventScorecard from './pages/EventScorecard'
@@ -232,6 +233,12 @@ const eventCreateRoute = createRoute({
   validateSearch: (search: Record<string, unknown>): { clubId?: string } => ({
     clubId: typeof search.clubId === 'string' && search.clubId ? search.clubId : undefined,
   }),
+})
+
+const eventInvitationAcceptRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/events/invitations/$token',
+  component: EventInvitationAccept,
 })
 
 const eventDetailRoute = createRoute({
@@ -664,6 +671,7 @@ export const routeTree = rootRoute.addChildren([
     leagueReportsRoute,
     eventsRoute,
     eventCreateRoute,
+    eventInvitationAcceptRoute,
     eventDetailRoute,
     eventLiveRoute,
     eventScorecardRoute,

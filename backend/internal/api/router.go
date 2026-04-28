@@ -54,6 +54,7 @@ func NewRouter(
 	backupRepo *repository.BackupRepository,
 	categories *service.CategoryService,
 	events *service.EventService,
+	eventInvitations *service.EventInvitationService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -440,6 +441,15 @@ func NewRouter(
 			r.Post("/events/{slug}/cards/{cardId}/confirm", eh.ConfirmCard)
 			r.Post("/events/{slug}/cards/{cardId}/amend", eh.AmendCard)
 			r.Post("/events/{slug}/cards/{cardId}/reject", eh.RejectCard)
+
+			// Event invitations.
+			eih := handler.NewEventInvitation(eventInvitations, events)
+			r.Post("/events/{slug}/invitations", eih.CreateBatch)
+			r.Get("/events/{slug}/invitations", eih.List)
+			r.Get("/events/{slug}/potential-invitees", eih.PotentialInvitees)
+			r.Get("/events/invitations/{token}", eih.Get)
+			r.Post("/events/invitations/{token}/accept", eih.Accept)
+			r.Post("/events/invitations/{token}/decline", eih.Decline)
 
 			// Admin routes
 			r.Group(func(r chi.Router) {
