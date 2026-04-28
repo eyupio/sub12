@@ -23,5 +23,15 @@ VALUES
     'Platform administrator',
     'Yorkshire',
     NULL
+  ),
+  (
+    'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+    'userb@sub12.local',
+    'E2E User B',
+    '$2a$10$QhEUGN1nA5kRjb/J0zYQCuWY2KDnfemdmpDbfqSZPdXLbU63aN7x.',
+    'user',
+    'Non-admin account used by the e2e suite as User B',
+    'Yorkshire',
+    NULL
   )
 ON CONFLICT (email) DO NOTHING;
