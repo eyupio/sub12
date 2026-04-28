@@ -88,6 +88,21 @@ type Event struct {
 	IsScorer         bool `json:"is_scorer,omitempty"`
 }
 
+// MyEventSummary is a lightweight projection of an event for the dashboard
+// "My Events" section. Includes events the user owns or participates in.
+type MyEventSummary struct {
+	ID               string     `json:"id"`
+	Slug             string     `json:"slug"`
+	Name             string     `json:"name"`
+	StartsAt         *time.Time `json:"starts_at,omitempty"`
+	EndsAt           *time.Time `json:"ends_at,omitempty"`
+	State            string     `json:"state"`
+	Discipline       string     `json:"discipline"`
+	Format           string     `json:"format"`
+	ParticipantCount int        `json:"participant_count"`
+	IsOwner          bool       `json:"is_owner"`
+}
+
 // CreateEventInput is the payload for POST /api/v1/events.
 type CreateEventInput struct {
 	Name         string             `json:"name"`
