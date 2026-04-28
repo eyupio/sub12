@@ -274,6 +274,45 @@ func (r *EventRepository) ListByClub(ctx context.Context, clubID string) ([]*mod
 	return items, rows.Err()
 }
 
+// ListByUser returns events the user owns or is a participant in, excluding
+// archived events. Sorted with live/open events first, then by start date.
+func (r *EventRepository) ListByUser(ctx context.Context, userID string) ([]*model.MyEventSummary, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT e.id, e.slug, e.name, e.starts_at, e.ends_at, e.state, e.discipline, e.format,
+			(SELECT COUNT(*) FROM event_participants p WHERE p.event_id = e.id) AS participant_count,
+			(e.owner_user_id = $1) AS is_owner
+		FROM events e
+		WHERE e.state != 'archived'
+		  AND (e.owner_user_id = $1
+		       OR EXISTS (SELECT 1 FROM event_participants p WHERE p.event_id = e.id AND p.user_id = $1))
+		ORDER BY
+			CASE e.state
+				WHEN 'live' THEN 0
+				WHEN 'open_for_entries' THEN 1
+				WHEN 'draft' THEN 2
+				ELSE 3
+			END,
+			COALESCE(e.starts_at, e.created_at) DESC
+		LIMIT 50
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list events by user: %w", err)
+	}
+	defer rows.Close()
+	var items []*model.MyEventSummary
+	for rows.Next() {
+		var s model.MyEventSummary
+		if err := rows.Scan(
+			&s.ID, &s.Slug, &s.Name, &s.StartsAt, &s.EndsAt, &s.State, &s.Discipline, &s.Format,
+			&s.ParticipantCount, &s.IsOwner,
+		); err != nil {
+			return nil, fmt.Errorf("scan my event: %w", err)
+		}
+		items = append(items, &s)
+	}
+	return items, rows.Err()
+}
+
 // Update applies a partial update.
 func (r *EventRepository) Update(ctx context.Context, id string, in *model.UpdateEventInput) (*model.Event, error) {
 	var courseJSON, rulesJSON []byte

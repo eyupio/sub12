@@ -80,6 +80,24 @@ func (h *EventHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+// GET /api/v1/users/me/events
+func (h *EventHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := h.svc.ListByUser(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list events")
+		return
+	}
+	if items == nil {
+		items = []*model.MyEventSummary{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 // GET /api/v1/events/{slug}
 func (h *EventHandler) Get(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")

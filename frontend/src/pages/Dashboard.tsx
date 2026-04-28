@@ -3,13 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Plus, Users, Package, Target,
   TrendingUp, Crosshair, Trophy, MapPin,
-  FlaskConical, Sparkles, Bell,
+  FlaskConical, Sparkles, Bell, Calendar,
 } from 'lucide-react'
 import { statsApi, UserStats, RifleStats } from '../api/stats'
 import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
 import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
 import { clubsApi, Club } from '../api/clubs'
+import { eventsApi, MyEventSummary } from '../api/events'
 import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
 import { activityApi, ActivityItem as FeedItem } from '../api/activity'
 import { useAuthStore } from '../store/auth'
@@ -211,6 +212,11 @@ export default function Dashboard() {
     queryFn: () => clubsApi.listMine(),
   })
 
+  const { data: myEventsData } = useQuery({
+    queryKey: ['my-events'],
+    queryFn: () => eventsApi.listMine(),
+  })
+
   const { data: pelletTestStats } = useQuery({
     queryKey: ['pellet-test-stats'],
     queryFn: () => pelletTestApi.stats(),
@@ -231,6 +237,7 @@ export default function Dashboard() {
   const rifleStats = rifleStatsData?.items ?? []
   const myLeagues = myLeaguesData?.items ?? []
   const myClubs = myClubsData?.items ?? []
+  const myEvents = myEventsData?.items ?? []
   const feedItems = feedData?.items ?? []
 
   const rifleMap = new Map<string, Rifle>()
@@ -559,8 +566,8 @@ export default function Dashboard() {
         )}
       </Section>
 
-      {/* ── Leagues + Clubs (high-priority row) ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+      {/* ── Leagues + Clubs + Events (high-priority row) ─────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
         <Section
           title="My Leagues"
           icon={<Trophy size={11} className="text-gold" />}
@@ -611,6 +618,32 @@ export default function Dashboard() {
                   to="/clubs/$id"
                   params={{ id: c.id }}
                   thumbIcon={<Users size={16} />}
+                />
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="My Events"
+          icon={<Calendar size={11} className="text-gold" />}
+          actions={<SectionAction to="/events">Browse →</SectionAction>}
+        >
+          {myEvents.length === 0 ? (
+            <p className="text-[12px] text-muted text-center py-4">
+              Not in any events yet. <Link to="/events" className="text-gold hover:text-gold-2">Browse events →</Link>
+            </p>
+          ) : (
+            <div className="-mx-4 -my-2">
+              {myEvents.slice(0, 4).map((e: MyEventSummary) => (
+                <MiniEntityCard
+                  key={e.id}
+                  name={e.name}
+                  metaIcon={<Users size={10} />}
+                  metaLabel={`${e.participant_count}`}
+                  to="/events/$slug"
+                  params={{ slug: e.slug }}
+                  thumbIcon={<Calendar size={16} />}
                 />
               ))}
             </div>

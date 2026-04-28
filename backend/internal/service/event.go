@@ -257,6 +257,10 @@ func (s *EventService) List(ctx context.Context, viewerID, viewerRole, stateFilt
 	return s.events.List(ctx, viewerID, stateFilter)
 }
 
+func (s *EventService) ListByUser(ctx context.Context, userID string) ([]*model.MyEventSummary, error) {
+	return s.events.ListByUser(ctx, userID)
+}
+
 func (s *EventService) Update(ctx context.Context, slug, userID string, in *model.UpdateEventInput) (*model.Event, error) {
 	ev, err := s.events.GetBySlug(ctx, slug)
 	if errors.Is(err, repository.ErrNotFound) {

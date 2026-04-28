@@ -428,6 +428,7 @@ func NewRouter(
 
 			// Live Events (mutations + protected reads)
 			eh := handler.NewEvent(events)
+			r.Get("/users/me/events", eh.ListMine)
 			r.Post("/events", eh.Create)
 			r.Patch("/events/{slug}", eh.Update)
 			r.Post("/events/{slug}/promote", eh.Promote)
