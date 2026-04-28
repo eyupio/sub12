@@ -176,7 +176,7 @@ export default function EventDetail() {
             </Link>
           )}
           <Link to="/events/$slug/live" params={{ slug: ev.slug }} className="lc-action-ghost">
-            Live scoreboard <ChevronRight size={14} />
+            {ev.state === 'complete' ? 'View full results' : 'Live scoreboard'} <ChevronRight size={14} />
           </Link>
           {!ev.is_owner && (ev.state === 'open_for_entries' || ev.state === 'live') && (
             isParticipant ? (
@@ -231,6 +231,14 @@ export default function EventDetail() {
         </div>
 
         {ev.state === 'complete' && podium.winner && <PodiumSection podium={podium} />}
+        {ev.state === 'complete' && (scoreboardQuery.data?.items?.length ?? 0) > 0 && (
+          <ResultsTableSection
+            slug={ev.slug}
+            rows={scoreboardQuery.data?.items ?? []}
+            categoryLookup={categoryLookup}
+            isCardSubmission={ev.format === 'card_submission'}
+          />
+        )}
 
         {ev.format === 'card_submission' && (
           <CardSubmissionSection
@@ -486,6 +494,164 @@ function PodiumSection({ podium }: { podium: EventPodium }) {
           </div>
         )}
       </div>
+    </Section>
+  )
+}
+
+function ResultsTableSection({
+  slug,
+  rows,
+  categoryLookup,
+  isCardSubmission,
+}: {
+  slug: string
+  rows: EventStandingRow[]
+  categoryLookup: Map<string, { label: string }>
+  isCardSubmission: boolean
+}) {
+  const pointsLabel = isCardSubmission ? 'Score' : 'Pts'
+  const hitsLabel = isCardSubmission ? 'X' : 'Hits'
+  return (
+    <Section
+      title={`Results (${rows.length})`}
+      icon={<Trophy size={12} />}
+      actions={
+        <Link to="/events/$slug/live" params={{ slug }} className="lc-action-ghost">
+          Open full view <ChevronRight size={12} />
+        </Link>
+      }
+    >
+      <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: 'var(--bg-2)' }}>
+            <th
+              style={{
+                textAlign: 'left',
+                padding: '10px 14px',
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--muted)',
+                width: 50,
+              }}
+            >
+              #
+            </th>
+            <th
+              style={{
+                textAlign: 'left',
+                padding: '10px 14px',
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--muted)',
+              }}
+            >
+              Shooter
+            </th>
+            <th
+              style={{
+                textAlign: 'right',
+                padding: '10px 14px',
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--muted)',
+                width: 70,
+              }}
+            >
+              {pointsLabel}
+            </th>
+            <th
+              style={{
+                textAlign: 'right',
+                padding: '10px 14px',
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--muted)',
+                width: 70,
+              }}
+            >
+              {hitsLabel}
+            </th>
+            {!isCardSubmission && (
+              <th
+                style={{
+                  textAlign: 'right',
+                  padding: '10px 14px',
+                  fontSize: 11,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--muted)',
+                  width: 70,
+                }}
+              >
+                Shots
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const cat = r.category_id ? categoryLookup.get(r.category_id) : null
+            const label = r.category_label ?? cat?.label ?? ''
+            return (
+              <tr
+                key={r.participant_id}
+                style={{ borderTop: i === 0 ? 'none' : '1px solid var(--line)' }}
+              >
+                <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', color: 'var(--muted)' }}>
+                  {r.position}
+                </td>
+                <td style={{ padding: '12px 14px' }}>
+                  <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 500 }}>
+                    {r.display_name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {[label, r.team].filter(Boolean).join(' · ')}
+                  </div>
+                </td>
+                <td
+                  style={{
+                    padding: '12px 14px',
+                    textAlign: 'right',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 14,
+                    color: 'var(--gold)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {r.points}
+                </td>
+                <td
+                  style={{
+                    padding: '12px 14px',
+                    textAlign: 'right',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 13,
+                  }}
+                >
+                  {r.hit_count}
+                </td>
+                {!isCardSubmission && (
+                  <td
+                    style={{
+                      padding: '12px 14px',
+                      textAlign: 'right',
+                      fontFamily: 'var(--mono)',
+                      fontSize: 13,
+                      color: 'var(--muted)',
+                    }}
+                  >
+                    {r.shots_recorded}
+                  </td>
+                )}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </Section>
   )
 }
