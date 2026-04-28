@@ -174,12 +174,14 @@ export function DisciplineThumb({
   icon: ReactNode
 }) {
   const g = disciplineCover(type)
+  // For standard sizes the dimensions come from CSS so mobile breakpoints can
+  // shrink them; only override inline for non-standard sizes (e.g. 44).
+  const useClassSize = size === 48 || size === 64
   return (
     <div
       className={size <= 48 ? 'lc-detail-thumb' : 'lc-entity-thumb'}
       style={{
-        width: size,
-        height: size,
+        ...(useClassSize ? null : { width: size, height: size }),
         background: `linear-gradient(135deg, ${g.from}, ${g.to})`,
       }}
     >
