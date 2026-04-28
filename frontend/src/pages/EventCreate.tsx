@@ -59,10 +59,31 @@ export default function EventCreate() {
   const [lockEditsAfterVerification, setLockEditsAfterVerification] = useState(true)
   const [error, setError] = useState('')
 
+  const visibilityOptions = useMemo<{ value: EventVisibility; label: string }[]>(
+    () =>
+      clubId
+        ? [
+            { value: 'public', label: 'Public' },
+            { value: 'club_only', label: 'Club only' },
+          ]
+        : [
+            { value: 'public', label: 'Public' },
+            { value: 'unlisted', label: 'Private' },
+          ],
+    [clubId],
+  )
+
   // If the user navigated from a club, default visibility to club_only.
+  // If the current visibility isn't valid for the current context, snap back to 'public'.
   useEffect(() => {
-    if (clubId) setVisibility('club_only')
-  }, [clubId])
+    if (clubId) {
+      setVisibility('club_only')
+      return
+    }
+    setVisibility((cur) =>
+      visibilityOptions.some((o) => o.value === cur) ? cur : 'public',
+    )
+  }, [clubId, visibilityOptions])
 
   const { data: catsData } = useQuery({
     queryKey: ['categories', 'public'],
@@ -333,17 +354,22 @@ export default function EventCreate() {
 
               <Field label="Visibility">
                 <div className="flex gap-2">
-                  {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
+                  {visibilityOptions.map((o) => (
                     <button
-                      key={v}
+                      key={o.value}
                       type="button"
-                      onClick={() => setVisibility(v)}
-                      className={`${toggleCls(visibility === v)} flex-1`}
+                      onClick={() => setVisibility(o.value)}
+                      className={`${toggleCls(visibility === o.value)} flex-1`}
                     >
-                      {v === 'public' ? 'Public' : v === 'club_only' ? 'Club only' : 'Unlisted'}
+                      {o.label}
                     </button>
                   ))}
                 </div>
+                {!clubId && (
+                  <p className="text-xs text-muted mt-1.5">
+                    Private events aren't listed publicly — only people with the link can view.
+                  </p>
+                )}
               </Field>
             </div>
           </Section>

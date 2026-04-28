@@ -52,6 +52,40 @@ func TestValidateEventInput(t *testing.T) {
 		})
 		require.ErrorIs(t, err, ErrInvalidEvent)
 	})
+
+	t.Run("club_only without club_id", func(t *testing.T) {
+		v := model.EventVisibilityClubOnly
+		err := validateEventInput(&model.CreateEventInput{
+			Name:       "Orphan club event",
+			Discipline: "HFT",
+			Course:     model.EventCourse{Lanes: 25, ShotsPerTarget: 2},
+			Visibility: &v,
+		})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+
+		empty := ""
+		err = validateEventInput(&model.CreateEventInput{
+			Name:       "Orphan club event",
+			Discipline: "HFT",
+			Course:     model.EventCourse{Lanes: 25, ShotsPerTarget: 2},
+			Visibility: &v,
+			ClubID:     &empty,
+		})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+	})
+
+	t.Run("club_only with club_id", func(t *testing.T) {
+		v := model.EventVisibilityClubOnly
+		club := "11111111-1111-1111-1111-111111111111"
+		err := validateEventInput(&model.CreateEventInput{
+			Name:       "Club event",
+			Discipline: "HFT",
+			Course:     model.EventCourse{Lanes: 25, ShotsPerTarget: 2},
+			Visibility: &v,
+			ClubID:     &club,
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestAllowedTransitionsTopology(t *testing.T) {
