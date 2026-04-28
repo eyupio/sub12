@@ -177,6 +177,11 @@ func validateEventInput(in *model.CreateEventInput) error {
 		default:
 			return fmt.Errorf("%w: visibility must be 'public', 'club_only' or 'unlisted'", ErrInvalidEvent)
 		}
+		if *in.Visibility == model.EventVisibilityClubOnly {
+			if in.ClubID == nil || strings.TrimSpace(*in.ClubID) == "" {
+				return fmt.Errorf("%w: visibility 'club_only' requires a club_id", ErrInvalidEvent)
+			}
+		}
 	}
 	return nil
 }
