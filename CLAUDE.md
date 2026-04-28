@@ -155,6 +155,16 @@ Current migration count: **36** (000001–000036). Latest: `000036_measurement_m
 - **Charts:** Recharts (`recharts`)
 - **Static data:** Pellet and rifle catalogs in `src/catalog/`, target presets in `src/config/`
 
+### Outgoing public URLs
+
+Any link sent to a user via email, push, or other out-of-band channel **must** be built from a config field. Never hard-code a host, and never let one default to `localhost` in production.
+
+- Add new such config to `backend/internal/config/config.go` with an empty default.
+- Derive it from `SITE_URL` in `applyDerivedDefaults()` when the specific env var is unset, so a single `SITE_URL` change rolls out to every link type.
+- Add the new field name to the `Validate()` localhost guard so production refuses to boot with a localhost link.
+- Document the new env var in this file (and `AGENTS.md`), in `.env.example`, and in `docker-compose.yml`.
+- Existing examples to copy: `PasswordResetURL` (used in `backend/internal/service/auth.go` `buildResetLink`), `EventInvitationURL` (used in `backend/internal/service/event_invitation.go`).
+
 ### General
 
 - Don't add features, refactoring, or improvements beyond what is asked
@@ -221,7 +231,9 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `JWT_EXPIRY_HOURS` | `24` | JWT token expiry in hours |
 | `PASSWORD_RESET_TTL_MINUTES` | `60` | Password reset token TTL |
-| `PASSWORD_RESET_URL` | `http://localhost:5173/reset-password` | Frontend password reset page URL |
+| `SITE_URL` | `https://sub12.io` | Canonical public host. `PASSWORD_RESET_URL` and `EVENT_INVITATION_URL` are derived from this when unset. Override to `http://localhost:5173` in dev so emailed links open the local Vite server. |
+| `PASSWORD_RESET_URL` | *(derived from `SITE_URL`)* | Frontend password reset page URL. Production must not contain `localhost` — the backend refuses to start if it does. |
+| `EVENT_INVITATION_URL` | *(derived from `SITE_URL`)* | Base URL for event invitation accept pages; token is appended as `/{token}`. Production must not contain `localhost`. |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `SEED_ADMIN` | `false` | Auto-seed admin user on startup |
 | `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
