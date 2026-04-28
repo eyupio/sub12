@@ -9,9 +9,10 @@ import { pageHelp } from '../components/tooltips'
 import { PageGrid, Section } from '../components/leagues'
 
 // Tighten the cadence while the event is live so spectators see new shots
-// without manual refresh; relax once the event closes.
+// without manual refresh. When the event is not live (draft / open / complete /
+// archived), polling is disabled — the scoreboard fetches once and only
+// refreshes via the manual button or window focus.
 const LIVE_REFRESH_SECONDS = 5
-const IDLE_REFRESH_SECONDS = 30
 
 export default function EventLive() {
   const { slug } = useParams({ from: '/app/events/$slug/live' })
@@ -19,26 +20,28 @@ export default function EventLive() {
 
   const ev = useQuery({ queryKey: ['event', slug], queryFn: () => eventsApi.get(slug) })
   const cats = useQuery({ queryKey: ['categories', 'public'], queryFn: () => categoriesApi.listPublic() })
-  const refreshSeconds = ev.data?.state === 'live' ? LIVE_REFRESH_SECONDS : IDLE_REFRESH_SECONDS
+  const isLive = ev.data?.state === 'live'
+  const isComplete = ev.data?.state === 'complete'
   const board = useQuery({
     queryKey: ['event-scoreboard', slug],
     queryFn: () => eventsApi.scoreboard(slug),
-    refetchInterval: refreshSeconds * 1000,
+    refetchInterval: isLive ? LIVE_REFRESH_SECONDS * 1000 : false,
     refetchOnWindowFocus: true,
   })
 
-  const [countdown, setCountdown] = useState(refreshSeconds)
+  const [countdown, setCountdown] = useState(LIVE_REFRESH_SECONDS)
 
   const categoryLookup = useMemo(() => new Map((cats.data?.items ?? []).map((c) => [c.id, c])), [cats.data])
 
   useEffect(() => {
-    setCountdown(refreshSeconds)
-  }, [board.dataUpdatedAt, refreshSeconds])
+    setCountdown(LIVE_REFRESH_SECONDS)
+  }, [board.dataUpdatedAt, isLive])
 
   useEffect(() => {
-    const id = window.setInterval(() => setCountdown((c) => (c <= 1 ? refreshSeconds : c - 1)), 1000)
+    if (!isLive) return
+    const id = window.setInterval(() => setCountdown((c) => (c <= 1 ? LIVE_REFRESH_SECONDS : c - 1)), 1000)
     return () => window.clearInterval(id)
-  }, [refreshSeconds])
+  }, [isLive])
 
   const rows = useMemo(() => {
     const all = board.data?.items ?? []
@@ -64,11 +67,13 @@ export default function EventLive() {
         </Link>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 className="t-page-title" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {ev.data?.name ?? 'Live scoreboard'}
+            {ev.data?.name ?? (isComplete ? 'Final results' : 'Live scoreboard')}
             <HelpIcon content={pageHelp.eventLive} size={14} />
           </h1>
           <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-            {ev.data?.discipline ?? ''} · auto-refresh in {countdown}s
+            {ev.data?.discipline ?? ''}
+            {isLive && <> · auto-refresh in {countdown}s</>}
+            {isComplete && <> · final results</>}
           </p>
         </div>
         <button
