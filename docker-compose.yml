@@ -40,6 +40,13 @@ services:
       # frontend container at startup so per-page Open Graph tags can be
       # injected for shared links.
       FRONTEND_ORIGIN: http://frontend:8080
+      # Public URLs used in outgoing emails. SITE_URL is the canonical host;
+      # the specific URLs are derived from it in code if left unset, but we
+      # set them explicitly here so operators can see all the email-link
+      # knobs in one place. Never let these fall back to localhost in prod.
+      SITE_URL: ${SITE_URL:-https://sub12.io}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-https://sub12.io/reset-password}
+      EVENT_INVITATION_URL: ${EVENT_INVITATION_URL:-https://sub12.io/events/invitations}
     # No host port — the frontend nginx proxies /api/ to this container
     # internally. Expose 8080 here only if you need direct curl access.
     depends_on:

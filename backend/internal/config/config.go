@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -30,10 +32,17 @@ type Config struct {
 	JWTSecret               string `envconfig:"JWT_SECRET" required:"true"`
 	JWTExpiryHours          int    `envconfig:"JWT_EXPIRY_HOURS" default:"24"`
 	PasswordResetTTLMinutes int    `envconfig:"PASSWORD_RESET_TTL_MINUTES" default:"60"`
-	PasswordResetURL        string `envconfig:"PASSWORD_RESET_URL" default:"http://localhost:5173/reset-password"`
-	// Base URL for event invitation accept pages. The token is appended as
-	// /{token}, e.g. http://localhost:5173/events/invitations/<token>.
-	EventInvitationURL      string `envconfig:"EVENT_INVITATION_URL" default:"http://localhost:5173/events/invitations"`
+	// PasswordResetURL is the public URL of the frontend reset-password page.
+	// Leave empty to derive from SiteURL as {SiteURL}/reset-password. Any
+	// link emitted in an outgoing email must come from this kind of
+	// configurable URL — never hard-code or default to localhost in
+	// production. See AGENTS.md "Outgoing public URLs".
+	PasswordResetURL string `envconfig:"PASSWORD_RESET_URL" default:""`
+	// EventInvitationURL is the base URL for event invitation accept pages.
+	// The token is appended as /{token}, e.g.
+	// https://sub12.io/events/invitations/<token>. Leave empty to derive
+	// from SiteURL as {SiteURL}/events/invitations.
+	EventInvitationURL string `envconfig:"EVENT_INVITATION_URL" default:""`
 
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
@@ -113,5 +122,45 @@ func Load() (*Config, error) {
 	if err := envconfig.Process("", &cfg); err != nil {
 		return nil, err
 	}
+	cfg.applyDerivedDefaults()
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
+}
+
+// applyDerivedDefaults fills public URL fields from SiteURL when not
+// explicitly set. Keeps SITE_URL as the single source of truth so a new
+// "send a link in an email" feature inherits the correct host without
+// extra env wiring.
+func (c *Config) applyDerivedDefaults() {
+	base := strings.TrimRight(c.SiteURL, "/")
+	if c.PasswordResetURL == "" && base != "" {
+		c.PasswordResetURL = base + "/reset-password"
+	}
+	if c.EventInvitationURL == "" && base != "" {
+		c.EventInvitationURL = base + "/events/invitations"
+	}
+}
+
+// Validate enforces production-safe values for outgoing public URLs.
+// In production, refuses to start if any user-facing URL still points at
+// localhost — this is the guard rail against shipping emails that contain
+// `http://localhost:5173/...` links.
+func (c *Config) Validate() error {
+	if !strings.EqualFold(c.Env, "production") {
+		return nil
+	}
+	checks := map[string]string{
+		"SITE_URL":             c.SiteURL,
+		"PASSWORD_RESET_URL":   c.PasswordResetURL,
+		"EVENT_INVITATION_URL": c.EventInvitationURL,
+	}
+	for name, val := range checks {
+		lv := strings.ToLower(val)
+		if strings.Contains(lv, "localhost") || strings.Contains(lv, "127.0.0.1") {
+			return fmt.Errorf("config: %s must not contain localhost in production (got %q)", name, val)
+		}
+	}
+	return nil
 }
