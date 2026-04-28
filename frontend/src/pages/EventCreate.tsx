@@ -7,6 +7,8 @@ import { customPreset, disciplinePresets } from '../config/disciplinePresets'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader, Section } from '../components/leagues'
+import { PlaceSelector } from '../components/PlaceSelector'
+import type { LocationValue } from '../components/LocationField'
 import { toast } from '../store/toast'
 
 function parseLaneList(input: string): number[] {
@@ -43,7 +45,8 @@ export default function EventCreate() {
   const [presetId, setPresetId] = useState(disciplinePresets[0].id)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('')
+  const [locationId, setLocationId] = useState<string | null>(null)
+  const [location, setLocation] = useState<LocationValue>({ label: '' })
   const [discipline, setDiscipline] = useState(disciplinePresets[0].discipline)
   const [format, setFormat] = useState<EventFormat>(disciplinePresets[0].format)
   const [lanes, setLanes] = useState(disciplinePresets[0].course.lanes)
@@ -136,7 +139,7 @@ export default function EventCreate() {
     const payload: CreateEventPayload = {
       name: name.trim(),
       description: description.trim() || undefined,
-      location: location.trim() || undefined,
+      location: location.label.trim() || undefined,
       discipline,
       format,
       course: isCardSubmission
@@ -201,11 +204,12 @@ export default function EventCreate() {
                 />
               </Field>
               <Field label="Location (optional)">
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. North field range"
+                <PlaceSelector
+                  locationId={locationId}
+                  onLocationIdChange={setLocationId}
+                  location={location}
+                  onLocationChange={setLocation}
+                  inputClassName={inputCls}
                 />
               </Field>
             </div>
