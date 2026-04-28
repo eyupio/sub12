@@ -176,7 +176,7 @@ export default function EventCreate() {
       case 'basics':
         return <BasicsStep state={state} onChange={setState} />
       case 'format':
-        return <FormatStep state={state} onChange={setState} />
+        return <FormatStep state={state} onChange={setState} clubId={clubId} />
       case 'course':
         return <CourseStep state={state} onChange={setState} />
       case 'verification':

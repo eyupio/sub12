@@ -177,6 +177,19 @@ export interface EventScoreDTO {
   client_id: string
 }
 
+export interface MyEventSummary {
+  id: string
+  slug: string
+  name: string
+  starts_at?: string
+  ends_at?: string
+  state: EventState
+  discipline: string
+  format: EventFormat
+  participant_count: number
+  is_owner: boolean
+}
+
 export const eventsApi = {
   list: (params?: { state?: EventState; clubId?: string }) => {
     const q = new URLSearchParams()
@@ -185,6 +198,7 @@ export const eventsApi = {
     const qs = q.toString()
     return api.get<{ items: EventDTO[] }>(`/events${qs ? `?${qs}` : ''}`)
   },
+  listMine: () => api.get<{ items: MyEventSummary[] }>('/users/me/events'),
   get: (slug: string) => api.get<EventDTO>(`/events/${slug}`),
   create: (body: CreateEventPayload) => api.post<EventDTO>('/events', body),
   update: (slug: string, body: UpdateEventPayload) => api.patch<EventDTO>(`/events/${slug}`, body),

@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { categoriesApi } from '../../api/categories'
 import type { EventFormat, EventVisibility } from '../../api/events'
@@ -6,6 +7,7 @@ import { WIZARD_LABEL_CLS, toggleCls, type WizardState } from './wizardShared'
 interface Props {
   state: WizardState
   onChange: (next: WizardState) => void
+  clubId?: string
 }
 
 const FORMAT_LABELS: Record<EventFormat, string> = {
@@ -13,19 +15,40 @@ const FORMAT_LABELS: Record<EventFormat, string> = {
   card_submission: 'Card submission (25-shot card)',
 }
 
-const VISIBILITY_LABELS: Record<EventVisibility, string> = {
-  public: 'Public',
-  club_only: 'Club only',
-  unlisted: 'Unlisted',
-}
-
-export function FormatStep({ state, onChange }: Props) {
+export function FormatStep({ state, onChange, clubId }: Props) {
   const { format } = state
   const { data: catsData } = useQuery({
     queryKey: ['categories', 'public'],
     queryFn: () => categoriesApi.listPublic(),
   })
   const categories = catsData?.items ?? []
+
+  // Visibility options depend on whether the event is hosted by a club:
+  //   - club-owned: Public or Club only
+  //   - personal:   Public or Private (unlisted)
+  const visibilityOptions = useMemo<{ value: EventVisibility; label: string }[]>(
+    () =>
+      clubId
+        ? [
+            { value: 'public', label: 'Public' },
+            { value: 'club_only', label: 'Club only' },
+          ]
+        : [
+            { value: 'public', label: 'Public' },
+            { value: 'unlisted', label: 'Private' },
+          ],
+    [clubId],
+  )
+
+  // Snap visibility back to a valid value when the context changes (e.g. user
+  // entered the wizard with a clubId set, then navigated away from it).
+  useEffect(() => {
+    const isValid = visibilityOptions.some((o) => o.value === format.visibility)
+    if (!isValid) {
+      onChange({ ...state, format: { ...format, visibility: clubId ? 'club_only' : 'public' } })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubId, visibilityOptions])
 
   function toggleCategory(id: string) {
     const has = format.categoryIds.includes(id)
@@ -59,14 +82,14 @@ export function FormatStep({ state, onChange }: Props) {
       <div>
         <span className={WIZARD_LABEL_CLS}>Visibility</span>
         <div className="flex gap-2">
-          {(['public', 'club_only', 'unlisted'] as EventVisibility[]).map((v) => (
+          {visibilityOptions.map((o) => (
             <button
-              key={v}
+              key={o.value}
               type="button"
-              onClick={() => onChange({ ...state, format: { ...format, visibility: v } })}
-              className={`${toggleCls(format.visibility === v)} flex-1`}
+              onClick={() => onChange({ ...state, format: { ...format, visibility: o.value } })}
+              className={`${toggleCls(format.visibility === o.value)} flex-1`}
             >
-              {VISIBILITY_LABELS[v]}
+              {o.label}
             </button>
           ))}
         </div>
