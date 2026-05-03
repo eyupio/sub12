@@ -20,6 +20,7 @@ export default function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError(null)
     setLoading(true)
     try {
       const result = await authApi.login(email, password)
