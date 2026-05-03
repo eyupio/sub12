@@ -277,7 +277,7 @@ export default function ScoreEntry() {
       }
 
       let card
-      let imageFailed = false
+      let imageFailedReason: string | null = null
 
       if (draftId) {
         // Refine flow: PATCH the existing draft with the full shot grid,
@@ -287,8 +287,8 @@ export default function ScoreEntry() {
         if (imageFile) {
           try {
             await scoreCardApi.uploadImage(draftId, imageFile)
-          } catch {
-            imageFailed = true
+          } catch (err) {
+            imageFailedReason = err instanceof Error && err.message ? err.message : 'unknown error'
           }
         }
         card = await scoreCardApi.graduate(draftId)
@@ -297,19 +297,19 @@ export default function ScoreEntry() {
         if (imageFile) {
           try {
             await scoreCardApi.uploadImage(card.id, imageFile)
-          } catch {
-            imageFailed = true
+          } catch (err) {
+            imageFailedReason = err instanceof Error && err.message ? err.message : 'unknown error'
           }
         }
       }
-      return { card, imageFailed, wasDraft: !!draftId }
+      return { card, imageFailedReason, wasDraft: !!draftId }
     },
-    onSuccess: ({ card, imageFailed, wasDraft }) => {
+    onSuccess: ({ card, imageFailedReason, wasDraft }) => {
       qc.invalidateQueries({ queryKey: ['score-drafts'] })
       qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
       qc.invalidateQueries({ queryKey: ['event-cards'] })
-      if (imageFailed) {
-        toast('Score card saved, but image upload failed — try again from the card', 'error')
+      if (imageFailedReason) {
+        toast(`Score card saved, but image upload failed: ${imageFailedReason}. Try again from the card.`, 'error')
       } else {
         toast(wasDraft ? 'Draft refined and submitted' : 'Score card saved', 'success')
       }
