@@ -85,9 +85,9 @@ export default function SecuritySettings() {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        setDisableError(err.message || 'Could not disable 2FA')
+        setDisableError(err.message || 'Failed to disable 2FA')
       } else {
-        setDisableError('Could not disable 2FA')
+        setDisableError('Failed to disable 2FA')
       }
     },
   })
@@ -104,7 +104,7 @@ export default function SecuritySettings() {
       if (err instanceof ApiError) {
         setRegenError(err.message || 'Invalid code')
       } else {
-        setRegenError('Could not regenerate codes')
+        setRegenError('Failed to regenerate codes')
       }
     },
   })
@@ -136,7 +136,7 @@ export default function SecuritySettings() {
   function copyCodes(codes: string[]) {
     navigator.clipboard.writeText(codes.join('\n'))
       .then(() => toast('Backup codes copied to clipboard', 'success'))
-      .catch(() => toast('Could not copy to clipboard', 'error'))
+      .catch(() => toast('Failed to copy to clipboard', 'error'))
   }
 
   function downloadCodes(codes: string[]) {
