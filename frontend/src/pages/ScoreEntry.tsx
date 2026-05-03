@@ -374,7 +374,7 @@ export default function ScoreEntry() {
             <button
               type="button"
               onClick={() => setConfirmDeleteDraft(true)}
-              disabled={deleteDraftMutation.isPending}
+              disabled={deleteDraftMutation.isPending || mutation.isPending}
               className="flex items-center gap-1.5 t-section-title hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete draft"
             >
@@ -726,7 +726,7 @@ export default function ScoreEntry() {
       <div className="space-y-2">
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
+          disabled={mutation.isPending || deleteDraftMutation.isPending || !shotAt || (!!requireImage && !imageFile)}
           className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
         >
           {mutation.isPending
