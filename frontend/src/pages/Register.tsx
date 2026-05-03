@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
+import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { clearClientSession } from '../utils/clearSession'
 
@@ -28,8 +29,11 @@ export default function Register() {
       setAuth(user, tokens.access_token, tokens.refresh_token)
       navigate({ to: '/' })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : ''
-      setError(msg.includes('409') ? 'Email already registered.' : 'Registration failed. Please try again.')
+      if (err instanceof ApiError && err.status === 409) {
+        setError('Email already registered.')
+      } else {
+        setError('Registration failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -50,7 +54,7 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && (
-            <div className="bg-[var(--error-bg)] border border-[var(--error-border)] rounded px-4 py-3 text-sm text-[var(--error-text)] tracking-wide">
+            <div role="alert" className="bg-[var(--error-bg)] border border-[var(--error-border)] rounded px-4 py-3 text-sm text-[var(--error-text)] tracking-wide">
               {error}
             </div>
           )}

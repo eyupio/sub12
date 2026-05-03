@@ -1618,6 +1618,6 @@ function sharePost(post: FeedPost) {
   }
   navigator.clipboard?.writeText(url).then(
     () => toast('Feed link copied', 'success'),
-    () => toast('Unable to copy link', 'error'),
+    () => toast('Failed to copy link', 'error'),
   )
 }

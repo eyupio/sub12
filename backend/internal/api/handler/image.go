@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -13,10 +14,11 @@ import (
 
 type ImageHandler struct {
 	images *repository.ImageRepository
+	log    zerolog.Logger
 }
 
-func NewImage(images *repository.ImageRepository) *ImageHandler {
-	return &ImageHandler{images: images}
+func NewImage(images *repository.ImageRepository, log zerolog.Logger) *ImageHandler {
+	return &ImageHandler{images: images, log: log}
 }
 
 // POST /api/v1/images
@@ -76,5 +78,10 @@ func (h *ImageHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
-	w.Write(img.Data)
+	if _, err := w.Write(img.Data); err != nil {
+		// Headers are already on the wire; we can't change the status, but a
+		// truncated write (typically a client disconnect or broken pipe) is
+		// otherwise invisible to operators.
+		h.log.Warn().Err(err).Str("image_id", id).Msg("partial image write")
+	}
 }

@@ -277,7 +277,7 @@ export default function ScoreEntry() {
       }
 
       let card
-      let imageFailed = false
+      let imageFailedReason: string | null = null
 
       if (draftId) {
         // Refine flow: PATCH the existing draft with the full shot grid,
@@ -287,8 +287,8 @@ export default function ScoreEntry() {
         if (imageFile) {
           try {
             await scoreCardApi.uploadImage(draftId, imageFile)
-          } catch {
-            imageFailed = true
+          } catch (err) {
+            imageFailedReason = err instanceof Error && err.message ? err.message : 'unknown error'
           }
         }
         card = await scoreCardApi.graduate(draftId)
@@ -297,19 +297,19 @@ export default function ScoreEntry() {
         if (imageFile) {
           try {
             await scoreCardApi.uploadImage(card.id, imageFile)
-          } catch {
-            imageFailed = true
+          } catch (err) {
+            imageFailedReason = err instanceof Error && err.message ? err.message : 'unknown error'
           }
         }
       }
-      return { card, imageFailed, wasDraft: !!draftId }
+      return { card, imageFailedReason, wasDraft: !!draftId }
     },
-    onSuccess: ({ card, imageFailed, wasDraft }) => {
+    onSuccess: ({ card, imageFailedReason, wasDraft }) => {
       qc.invalidateQueries({ queryKey: ['score-drafts'] })
       qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
       qc.invalidateQueries({ queryKey: ['event-cards'] })
-      if (imageFailed) {
-        toast('Score card saved, but image upload failed — try again from the card', 'error')
+      if (imageFailedReason) {
+        toast(`Score card saved, but image upload failed: ${imageFailedReason}. Try again from the card.`, 'error')
       } else {
         toast(wasDraft ? 'Draft refined and submitted' : 'Score card saved', 'success')
       }
@@ -374,7 +374,7 @@ export default function ScoreEntry() {
             <button
               type="button"
               onClick={() => setConfirmDeleteDraft(true)}
-              disabled={deleteDraftMutation.isPending}
+              disabled={deleteDraftMutation.isPending || mutation.isPending}
               className="flex items-center gap-1.5 t-section-title hover:text-[var(--error-text)] border border-subtle hover:border-[var(--error-text)]/40 rounded px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Delete draft"
             >
@@ -726,7 +726,7 @@ export default function ScoreEntry() {
       <div className="space-y-2">
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || !shotAt || (!!requireImage && !imageFile)}
+          disabled={mutation.isPending || deleteDraftMutation.isPending || !shotAt || (!!requireImage && !imageFile)}
           className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
         >
           {mutation.isPending
