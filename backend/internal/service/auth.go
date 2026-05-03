@@ -374,8 +374,19 @@ func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPai
 	if err := s.redis.Set(ctx, refreshKeyPrefix+refreshToken, userID, refreshTokenTTL).Err(); err != nil {
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
-	s.redis.SAdd(ctx, userTokensPrefix+userID, refreshToken)
-	s.redis.Expire(ctx, userTokensPrefix+userID, refreshTokenTTL)
+	// The token must also live in the per-user set so InvalidateAllRefreshTokens
+	// can revoke it after a password reset or email change. If we can't add it
+	// to the set, drop the token we just stored rather than issue an
+	// unrevokable credential.
+	if err := s.redis.SAdd(ctx, userTokensPrefix+userID, refreshToken).Err(); err != nil {
+		s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
+		return nil, fmt.Errorf("track refresh token: %w", err)
+	}
+	if err := s.redis.Expire(ctx, userTokensPrefix+userID, refreshTokenTTL).Err(); err != nil {
+		s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
+		s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
+		return nil, fmt.Errorf("set refresh token ttl: %w", err)
+	}
 
 	return &TokenPair{
 		AccessToken:  accessToken,
