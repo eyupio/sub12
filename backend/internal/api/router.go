@@ -125,7 +125,7 @@ func NewRouter(
 		r.With(rl.Limit("auth")).Post("/auth/reset-password", authHandler.ResetPassword)
 
 		// Public image serving (no auth required)
-		ih := handler.NewImage(images)
+		ih := handler.NewImage(images, log)
 		r.Get("/images/{id}", ih.Serve)
 
 		// Public FAQ routes (no auth required)
