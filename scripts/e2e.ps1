@@ -163,6 +163,93 @@ function Wait-Url {
     throw "timeout waiting for $Name at $Url"
 }
 
+function Test-TcpPort {
+    param(
+        [string]$TargetHost,
+        [int]$Port,
+        [int]$TimeoutMs = 800
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $iar = $client.BeginConnect($TargetHost, $Port, $null, $null)
+        if (-not $iar.AsyncWaitHandle.WaitOne($TimeoutMs, $false)) {
+            return $false
+        }
+        $client.EndConnect($iar)
+        return $true
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
+
+function Wait-TcpPort {
+    param(
+        [string]$TargetHost,
+        [int]$Port,
+        [string]$Name,
+        [int]$TimeoutSec = 40
+    )
+
+    for ($i = 0; $i -lt $TimeoutSec; $i++) {
+        if (Test-TcpPort -TargetHost $TargetHost -Port $Port) {
+            Write-Host "$Name ready at ${TargetHost}:$Port"
+            return
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    throw "timeout waiting for $Name at ${TargetHost}:$Port"
+}
+
+function Get-WslIPv4 {
+    if ([string]::IsNullOrEmpty($WslExe)) {
+        return $null
+    }
+
+    $ipRaw = & $WslExe -e sh -lc "hostname -I 2>/dev/null | awk '{print `$1}'"
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+
+    $ip = ($ipRaw | Select-Object -First 1).ToString().Trim()
+    if ($ip -match '^\d{1,3}(\.\d{1,3}){3}$') {
+        return $ip
+    }
+
+    return $null
+}
+
+function Set-WslInfraHostEnv {
+    if (-not $script:UseWslDocker) {
+        return
+    }
+
+    # If localhost already works from Windows, keep existing env values.
+    if ((Test-TcpPort -TargetHost 'localhost' -Port 5432) -and (Test-TcpPort -TargetHost 'localhost' -Port 6379)) {
+        return
+    }
+
+    $wslIp = Get-WslIPv4
+    if ([string]::IsNullOrEmpty($wslIp)) {
+        return
+    }
+
+    if (-not (Test-TcpPort -TargetHost $wslIp -Port 5432 -TimeoutMs 1200)) {
+        return
+    }
+
+    [Environment]::SetEnvironmentVariable('DB_HOST', $wslIp, 'Process')
+
+    if ((-not $env:REDIS_URL) -or ($env:REDIS_URL -match '^redis://(localhost|127\.0\.0\.1)(:\d+)?/?$')) {
+        [Environment]::SetEnvironmentVariable('REDIS_URL', "redis://$wslIp:6379", 'Process')
+    }
+
+    Write-Host "infra host mapped to WSL IP $wslIp for DB/Redis connectivity"
+}
+
 function Get-ListeningProcess {
     param([int]$Port)
 
@@ -241,6 +328,12 @@ try {
     } else {
         Write-Warning 'Skipping infra startup: Docker not available. Ensure postgres and redis are running manually.'
     }
+
+    Set-WslInfraHostEnv
+
+    $dbHostForSeed = if ($env:DB_HOST) { $env:DB_HOST } else { 'localhost' }
+    $dbPortForSeed = if ($env:DB_PORT) { [int]$env:DB_PORT } else { 5432 }
+    Wait-TcpPort -TargetHost $dbHostForSeed -Port $dbPortForSeed -Name 'postgres' -TimeoutSec 50
 
     # 2. Seed (always, so test users exist even if backend was already up)
     Write-Host 'seeding test users...'
