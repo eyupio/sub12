@@ -41,6 +41,9 @@ $script:FrontendProc = $null
 
 $PowerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $BashExe = (Get-Command bash -ErrorAction SilentlyContinue).Source
+$WslExe = (Get-Command wsl -ErrorAction SilentlyContinue).Source
+
+$script:UseWslDocker = $false
 
 function Convert-ToBashPath {
     param([string]$Path)
@@ -75,6 +78,28 @@ function Test-BashCommand {
 
     & $BashExe -lc $Command *> $null
     return $LASTEXITCODE -eq 0
+}
+
+function Test-WslDocker {
+    if ([string]::IsNullOrEmpty($WslExe)) {
+        return $false
+    }
+
+    & $WslExe -e sh -lc 'docker info >/dev/null 2>&1'
+    return $LASTEXITCODE -eq 0
+}
+
+function Invoke-Compose {
+    param([string]$ComposeArgs)
+
+    if ($script:UseWslDocker) {
+        $repoWsl = Convert-ToWslPath $RepoRoot.Path
+        $cmd = "cd '$repoWsl' && docker compose $ComposeArgs"
+        & $WslExe -e sh -lc $cmd
+    } else {
+        $parts = $ComposeArgs -split ' '
+        & docker compose @parts
+    }
 }
 
 function Import-DotEnv {
@@ -176,22 +201,39 @@ try {
         $dockerOk = ($LASTEXITCODE -eq 0)
     } catch {}
 
+    if ($dockerOk) {
+        $script:UseWslDocker = $false
+    } elseif (Test-WslDocker) {
+        $dockerOk = $true
+        $script:UseWslDocker = $true
+        Write-Host 'docker: using WSL2 docker context'
+    }
+
     if (-not $dockerOk) {
-        $ans = Read-Host 'Docker daemon is not running. Start Docker Desktop now, then press Enter to retry, or type S to skip infra startup'
+        $ans = Read-Host 'Docker daemon is not running in PowerShell or WSL2. Start Docker now, then press Enter to retry, or type S to skip infra startup'
         if ($ans -notmatch '^[Ss]') {
             $dockerOk = $false
-            try { $null = & docker info 2>&1; $dockerOk = ($LASTEXITCODE -eq 0) } catch {}
-            if (-not $dockerOk) { throw 'Docker daemon is still not available. Start Docker Desktop and re-run the script.' }
+            $script:UseWslDocker = $false
+            try {
+                $null = & docker info 2>&1
+                $dockerOk = ($LASTEXITCODE -eq 0)
+            } catch {}
+            if (-not $dockerOk -and (Test-WslDocker)) {
+                $dockerOk = $true
+                $script:UseWslDocker = $true
+                Write-Host 'docker: using WSL2 docker context'
+            }
+            if (-not $dockerOk) { throw 'Docker daemon is still not available in PowerShell or WSL2. Start Docker and re-run the script.' }
         }
     }
 
     if ($dockerOk) {
-        $running = & docker compose -f docker-compose.dev.yml ps --status running 2>$null
+        $running = Invoke-Compose '-f docker-compose.dev.yml ps --status running'
         if ($running) {
             Write-Host 'postgres + redis: already running'
         } else {
             Write-Host 'starting postgres + redis...'
-            & docker compose -f docker-compose.dev.yml up -d
+            Invoke-Compose '-f docker-compose.dev.yml up -d'
             if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
             # Give postgres a moment to accept connections
             Start-Sleep -Seconds 3

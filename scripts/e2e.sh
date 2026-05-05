@@ -2,7 +2,7 @@
 # Interactive runner for the Playwright e2e suite.
 # Starts backend and frontend if they're not already up,
 # then offers a menu (UI / headed / headless / codegen / report).
-# Expects postgres/redis to be available locally.
+# Starts postgres/redis via Docker if a Docker CLI is available.
 #
 # Usage:
 #   ./scripts/e2e.sh              # interactive menu
@@ -41,6 +41,7 @@ FRONTEND_LOG="$LOG_DIR/sub12-e2e-frontend.log"
 
 BACKEND_PID=""
 FRONTEND_PID=""
+DOCKER_CMD=""
 
 cleanup() {
     local ec=$?
@@ -76,8 +77,36 @@ wait_for() {
     echo "$name ready at $url"
 }
 
+detect_docker_cli() {
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        DOCKER_CMD="docker"
+        return 0
+    fi
+
+    if command -v docker.exe >/dev/null 2>&1 && docker.exe info >/dev/null 2>&1; then
+        DOCKER_CMD="docker.exe"
+        return 0
+    fi
+
+    return 1
+}
+
+compose_cmd() {
+    "$DOCKER_CMD" compose "$@"
+}
+
 # 1. Infra
-echo "infra startup via docker is skipped; expecting local postgres/redis services"
+if detect_docker_cli; then
+    if compose_cmd -f docker-compose.dev.yml ps --status running >/dev/null 2>&1; then
+        echo "postgres + redis: already running"
+    else
+        echo "starting postgres + redis..."
+        compose_cmd -f docker-compose.dev.yml up -d
+        sleep 3
+    fi
+else
+    echo "warning: Docker is not available (docker/docker.exe). Ensure local postgres + redis are running." >&2
+fi
 
 # 2. Backend
 if check_url "http://localhost:8080/healthz"; then
