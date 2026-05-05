@@ -3,9 +3,9 @@
     Interactive runner for the Playwright e2e suite.
 
 .DESCRIPTION
-    Auto-starts infra (postgres + redis), backend, and frontend if they're not
-    already up, then offers a menu (UI / headed / headless / codegen / report).
-    Anything the script started, the script stops on exit.
+    Starts backend and frontend if they're not already up, then offers a menu
+    (UI / headed / headless / codegen / report). Expects postgres/redis to be
+    available locally. Anything the script started, the script stops on exit.
 
 .PARAMETER Mode
     Skip the interactive menu. One of: ui, headed, headless, codegen, report.
@@ -25,8 +25,10 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $RepoRoot
 
-$BackendLog  = Join-Path $env:TEMP 'sub12-e2e-backend.log'
-$FrontendLog = Join-Path $env:TEMP 'sub12-e2e-frontend.log'
+$BackendOutLog  = Join-Path $env:TEMP 'sub12-e2e-backend.out.log'
+$BackendErrLog  = Join-Path $env:TEMP 'sub12-e2e-backend.err.log'
+$FrontendOutLog = Join-Path $env:TEMP 'sub12-e2e-frontend.out.log'
+$FrontendErrLog = Join-Path $env:TEMP 'sub12-e2e-frontend.err.log'
 
 $script:BackendProc  = $null
 $script:FrontendProc = $null
@@ -64,29 +66,22 @@ function Stop-Started {
 
 try {
     # 1. Infra
-    $running = & docker compose -f docker-compose.dev.yml ps --status running 2>$null
-    if (-not $running) {
-        Write-Host 'starting postgres + redis (make dev)...'
-        & make dev
-        if ($LASTEXITCODE -ne 0) { throw 'make dev failed' }
-    } else {
-        Write-Host 'postgres + redis: already running'
-    }
+    Write-Host 'infra startup via docker is skipped; expecting local postgres/redis services'
 
     # 2. Backend
     if (Test-Url 'http://localhost:8080/healthz') {
         Write-Host 'backend: already running on :8080'
     } else {
-        Write-Host "seeding db + starting backend (logs: $BackendLog)..."
+        Write-Host "seeding db + starting backend (logs: $BackendOutLog, $BackendErrLog)..."
         $seed = Start-Process -FilePath 'make' -ArgumentList 'seed' `
             -WorkingDirectory (Join-Path $RepoRoot 'backend') `
-            -RedirectStandardOutput $BackendLog -RedirectStandardError $BackendLog `
+            -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
             -NoNewWindow -PassThru -Wait
-        if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendLog" }
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
 
         $script:BackendProc = Start-Process -FilePath 'make' -ArgumentList 'run' `
             -WorkingDirectory (Join-Path $RepoRoot 'backend') `
-            -RedirectStandardOutput $BackendLog -RedirectStandardError $BackendLog `
+            -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
             -NoNewWindow -PassThru
         Wait-Url 'http://localhost:8080/healthz' 'backend' 60
     }
@@ -95,10 +90,10 @@ try {
     if (Test-Url 'http://localhost:5173') {
         Write-Host 'frontend: already running on :5173'
     } else {
-        Write-Host "starting frontend (logs: $FrontendLog)..."
+        Write-Host "starting frontend (logs: $FrontendOutLog, $FrontendErrLog)..."
         $script:FrontendProc = Start-Process -FilePath 'npm' -ArgumentList 'run', 'dev' `
             -WorkingDirectory (Join-Path $RepoRoot 'frontend') `
-            -RedirectStandardOutput $FrontendLog -RedirectStandardError $FrontendLog `
+            -RedirectStandardOutput $FrontendOutLog -RedirectStandardError $FrontendErrLog `
             -NoNewWindow -PassThru
         Wait-Url 'http://localhost:5173' 'frontend' 60
     }

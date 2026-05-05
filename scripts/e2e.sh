@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Interactive runner for the Playwright e2e suite.
-# Auto-starts infra, backend, and frontend if they're not already up,
+# Starts backend and frontend if they're not already up,
 # then offers a menu (UI / headed / headless / codegen / report).
+# Expects postgres/redis to be available locally.
 #
 # Usage:
 #   ./scripts/e2e.sh              # interactive menu
@@ -76,12 +77,7 @@ wait_for() {
 }
 
 # 1. Infra
-if ! docker compose -f docker-compose.dev.yml ps --status running 2>/dev/null | grep -q .; then
-    echo "starting postgres + redis (make dev)..."
-    make dev
-else
-    echo "postgres + redis: already running"
-fi
+echo "infra startup via docker is skipped; expecting local postgres/redis services"
 
 # 2. Backend
 if check_url "http://localhost:8080/healthz"; then
