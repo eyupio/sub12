@@ -33,6 +33,34 @@ $FrontendErrLog = Join-Path $env:TEMP 'sub12-e2e-frontend.err.log'
 $script:BackendProc  = $null
 $script:FrontendProc = $null
 
+$PowerShellExe = (Get-Command powershell -ErrorAction Stop).Source
+
+function Import-DotEnv {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    foreach ($line in Get-Content -Path $Path) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed -or $trimmed.StartsWith('#')) {
+            continue
+        }
+
+        $idx = $trimmed.IndexOf('=')
+        if ($idx -le 0) {
+            continue
+        }
+
+        $key = $trimmed.Substring(0, $idx).Trim()
+        $value = $trimmed.Substring($idx + 1).Trim()
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+    }
+}
+
 function Test-Url {
     param([string]$Url)
     try {
@@ -65,6 +93,8 @@ function Stop-Started {
 }
 
 try {
+    Import-DotEnv (Join-Path $RepoRoot '.env')
+
     # 1. Infra
     Write-Host 'infra startup via docker is skipped; expecting local postgres/redis services'
 
@@ -73,14 +103,42 @@ try {
         Write-Host 'backend: already running on :8080'
     } else {
         Write-Host "seeding db + starting backend (logs: $BackendOutLog, $BackendErrLog)..."
-        $seed = Start-Process -FilePath 'make' -ArgumentList 'seed' `
-            -WorkingDirectory (Join-Path $RepoRoot 'backend') `
-            -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
-            -NoNewWindow -PassThru -Wait
-        if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
+        $hasMake = $null -ne (Get-Command make -ErrorAction SilentlyContinue)
+        $hasPsql = $null -ne (Get-Command psql -ErrorAction SilentlyContinue)
 
-        $script:BackendProc = Start-Process -FilePath 'make' -ArgumentList 'run' `
-            -WorkingDirectory (Join-Path $RepoRoot 'backend') `
+        if ($hasMake) {
+            $seedCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make seed"
+            $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
+                -NoNewWindow -PassThru -Wait
+            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
+        } elseif ($hasPsql) {
+            $dbUser = if ($env:DB_USER) { $env:DB_USER } else { 'sub12' }
+            $dbPassword = $env:DB_PASSWORD
+            if (-not $dbPassword) {
+                throw 'DB_PASSWORD is required to run seed without make'
+            }
+            $dbHost = if ($env:DB_HOST) { $env:DB_HOST } else { 'localhost' }
+            $dbPort = if ($env:DB_PORT) { $env:DB_PORT } else { '5432' }
+            $dbName = if ($env:DB_NAME) { $env:DB_NAME } else { 'sub12' }
+            $dbSSLMode = if ($env:DB_SSLMODE) { $env:DB_SSLMODE } else { 'disable' }
+            $seedSqlPath = Join-Path $RepoRoot 'backend\\internal\\db\\seed\\seed.sql'
+            $migrateUrl = "postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?sslmode=${dbSSLMode}"
+            $seedCommand = "`$env:PGPASSWORD='$dbPassword'; psql '$migrateUrl' -f '$seedSqlPath'"
+            $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
+                -NoNewWindow -PassThru -Wait
+            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
+        } else {
+            Write-Warning 'Skipping seed: neither make nor psql is available in PATH'
+        }
+
+        if ($hasMake) {
+            $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make run"
+        } else {
+            $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; go run ./cmd/api"
+        }
+        $script:BackendProc = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $runBackendCommand `
             -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
             -NoNewWindow -PassThru
         Wait-Url 'http://localhost:8080/healthz' 'backend' 60
@@ -91,8 +149,8 @@ try {
         Write-Host 'frontend: already running on :5173'
     } else {
         Write-Host "starting frontend (logs: $FrontendOutLog, $FrontendErrLog)..."
-        $script:FrontendProc = Start-Process -FilePath 'npm' -ArgumentList 'run', 'dev' `
-            -WorkingDirectory (Join-Path $RepoRoot 'frontend') `
+        $runFrontendCommand = "Set-Location '$($RepoRoot.Path)\\frontend'; npm run dev"
+        $script:FrontendProc = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $runFrontendCommand `
             -RedirectStandardOutput $FrontendOutLog -RedirectStandardError $FrontendErrLog `
             -NoNewWindow -PassThru
         Wait-Url 'http://localhost:5173' 'frontend' 60
