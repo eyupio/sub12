@@ -82,7 +82,7 @@ try {
             -WorkingDirectory (Join-Path $RepoRoot 'backend') `
             -RedirectStandardOutput $BackendLog -RedirectStandardError $BackendLog `
             -NoNewWindow -PassThru -Wait
-        if ($seed.ExitCode -ne 0) { throw "seed failed — see $BackendLog" }
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendLog" }
 
         $script:BackendProc = Start-Process -FilePath 'make' -ArgumentList 'run' `
             -WorkingDirectory (Join-Path $RepoRoot 'backend') `
