@@ -10,14 +10,19 @@
 .PARAMETER Mode
     Skip the interactive menu. One of: ui, headed, headless, codegen, report.
 
+.PARAMETER ForcePort
+    Kill any process already listening on :8080 or :5173 before starting services.
+
 .EXAMPLE
     .\scripts\e2e.ps1
     .\scripts\e2e.ps1 -Mode headless
+    .\scripts\e2e.ps1 -ForcePort
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('ui', 'headed', 'headless', 'codegen', 'report')]
-    [string]$Mode
+    [string]$Mode,
+    [switch]$ForcePort
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +39,42 @@ $script:BackendProc  = $null
 $script:FrontendProc = $null
 
 $PowerShellExe = (Get-Command powershell -ErrorAction Stop).Source
+$BashExe = (Get-Command bash -ErrorAction SilentlyContinue).Source
+
+function Convert-ToBashPath {
+    param([string]$Path)
+
+    $normalized = $Path -replace '\\', '/'
+    if ($normalized -match '^([A-Za-z]):/(.*)$') {
+        $drive = $Matches[1].ToLowerInvariant()
+        $rest = $Matches[2]
+        return "/$drive/$rest"
+    }
+    return $normalized
+}
+
+function Convert-ToWslPath {
+    param([string]$Path)
+
+    $normalized = $Path -replace '\\', '/'
+    if ($normalized -match '^([A-Za-z]):/(.*)$') {
+        $drive = $Matches[1].ToLowerInvariant()
+        $rest = $Matches[2]
+        return "/mnt/$drive/$rest"
+    }
+    return $normalized
+}
+
+function Test-BashCommand {
+    param([string]$Command)
+
+    if ([string]::IsNullOrEmpty($BashExe)) {
+        return $false
+    }
+
+    & $BashExe -lc $Command *> $null
+    return $LASTEXITCODE -eq 0
+}
 
 function Import-DotEnv {
     param([string]$Path)
@@ -72,15 +113,47 @@ function Test-Url {
 }
 
 function Wait-Url {
-    param([string]$Url, [string]$Name, [int]$TimeoutSec = 60)
+    param(
+        [string]$Url,
+        [string]$Name,
+        [int]$TimeoutSec = 60,
+        [System.Diagnostics.Process]$Process = $null,
+        [string]$LogPath = $null
+    )
+
     for ($i = 0; $i -lt $TimeoutSec; $i++) {
         if (Test-Url $Url) {
             Write-Host "$Name ready at $Url"
             return
         }
+
+        if ($null -ne $Process -and $Process.HasExited) {
+            $logHint = if ($LogPath) { " - see $LogPath" } else { '' }
+            throw "$Name process exited before becoming ready$logHint"
+        }
+
         Start-Sleep -Seconds 1
     }
     throw "timeout waiting for $Name at $Url"
+}
+
+function Get-ListeningProcess {
+    param([int]$Port)
+
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -First 1
+        if ($null -eq $conn) {
+            return $null
+        }
+
+        $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+        if ($null -eq $proc) {
+            return "PID $($conn.OwningProcess)"
+        }
+        return "PID $($conn.OwningProcess) ($($proc.ProcessName))"
+    } catch {
+        return $null
+    }
 }
 
 function Stop-Started {
@@ -102,13 +175,46 @@ try {
     if (Test-Url 'http://localhost:8080/healthz') {
         Write-Host 'backend: already running on :8080'
     } else {
+        $backendPortOwner = Get-ListeningProcess -Port 8080
+        if ($backendPortOwner) {
+            $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($ForcePort) {
+                Write-Host "killing process on :8080 ($backendPortOwner)..."
+                if ($null -ne $conn) {
+                    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 1
+                }
+            } else {
+                $answer = Read-Host "Port 8080 is in use by $backendPortOwner. Kill it? [Y/n]"
+                if ($answer -eq '' -or $answer -match '^[Yy]') {
+                    if ($null -ne $conn) {
+                        Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 1
+                    }
+                } else {
+                    throw "cannot start backend: port 8080 is in use by $backendPortOwner"
+                }
+            }
+        }
+
         Write-Host "seeding db + starting backend (logs: $BackendOutLog, $BackendErrLog)..."
         $hasMake = $null -ne (Get-Command make -ErrorAction SilentlyContinue)
+        $hasBash = -not [string]::IsNullOrEmpty($BashExe)
         $hasPsql = $null -ne (Get-Command psql -ErrorAction SilentlyContinue)
+        $hasBashPsql = Test-BashCommand 'command -v psql >/dev/null 2>&1'
+        $backendDir = Join-Path $RepoRoot 'backend'
+        $backendBashDir = Convert-ToBashPath $backendDir
+        $backendWslDir = Convert-ToWslPath $backendDir
 
-        if ($hasMake) {
+        if ($hasMake -and $hasPsql) {
             $seedCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make seed"
             $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
+                -NoNewWindow -PassThru -Wait
+            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
+        } elseif ($hasBash -and $hasBashPsql) {
+            $seedCommand = "(cd '$backendBashDir' 2>/dev/null || cd '$backendWslDir') && make seed"
+            $seed = Start-Process -FilePath $BashExe -ArgumentList '-lc', $seedCommand `
                 -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
                 -NoNewWindow -PassThru -Wait
             if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
@@ -130,18 +236,14 @@ try {
                 -NoNewWindow -PassThru -Wait
             if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
         } else {
-            Write-Warning 'Skipping seed: neither make nor psql is available in PATH'
+            Write-Warning 'Skipping seed: psql is unavailable in both PowerShell and bash (tests that require seeded users may fail)'
         }
 
-        if ($hasMake) {
-            $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make run"
-        } else {
-            $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; go run ./cmd/api"
-        }
+        $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; go run ./cmd/api"
         $script:BackendProc = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $runBackendCommand `
             -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
             -NoNewWindow -PassThru
-        Wait-Url 'http://localhost:8080/healthz' 'backend' 60
+        Wait-Url 'http://localhost:8080/healthz' 'backend' 60 $script:BackendProc $BackendErrLog
     }
 
     # 3. Frontend
@@ -153,7 +255,7 @@ try {
         $script:FrontendProc = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $runFrontendCommand `
             -RedirectStandardOutput $FrontendOutLog -RedirectStandardError $FrontendErrLog `
             -NoNewWindow -PassThru
-        Wait-Url 'http://localhost:5173' 'frontend' 60
+        Wait-Url 'http://localhost:5173' 'frontend' 60 $script:FrontendProc $FrontendErrLog
     }
 
     # 4. e2e deps
