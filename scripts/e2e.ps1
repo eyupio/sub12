@@ -3,9 +3,10 @@
     Interactive runner for the Playwright e2e suite.
 
 .DESCRIPTION
-    Starts backend and frontend if they're not already up, then offers a menu
-    (UI / headed / headless / codegen / report). Expects postgres/redis to be
-    available locally. Anything the script started, the script stops on exit.
+    Starts postgres + redis via docker compose (if not already running), then
+    starts backend and frontend if needed, seeds the DB, and offers a menu
+    (UI / headed / headless / codegen / report).
+    Anything the script started, the script stops on exit.
 
 .PARAMETER Mode
     Skip the interactive menu. One of: ui, headed, headless, codegen, report.
@@ -168,11 +169,91 @@ function Stop-Started {
 try {
     Import-DotEnv (Join-Path $RepoRoot '.env')
 
-    # 1. Infra
-    Write-Host 'infra startup via docker is skipped; expecting local postgres/redis services'
+    # 1. Infra (postgres + redis via docker compose)
+    $dockerOk = $false
+    try {
+        $null = & docker info 2>&1
+        $dockerOk = ($LASTEXITCODE -eq 0)
+    } catch {}
 
-    # 2. Backend
-    if (Test-Url 'http://localhost:8080/healthz') {
+    if (-not $dockerOk) {
+        $ans = Read-Host 'Docker daemon is not running. Start Docker Desktop now, then press Enter to retry, or type S to skip infra startup'
+        if ($ans -notmatch '^[Ss]') {
+            $dockerOk = $false
+            try { $null = & docker info 2>&1; $dockerOk = ($LASTEXITCODE -eq 0) } catch {}
+            if (-not $dockerOk) { throw 'Docker daemon is still not available. Start Docker Desktop and re-run the script.' }
+        }
+    }
+
+    if ($dockerOk) {
+        $running = & docker compose -f docker-compose.dev.yml ps --status running 2>$null
+        if ($running) {
+            Write-Host 'postgres + redis: already running'
+        } else {
+            Write-Host 'starting postgres + redis...'
+            & docker compose -f docker-compose.dev.yml up -d
+            if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
+            # Give postgres a moment to accept connections
+            Start-Sleep -Seconds 3
+        }
+    } else {
+        Write-Warning 'Skipping infra startup: Docker not available. Ensure postgres and redis are running manually.'
+    }
+
+    # 2. Seed (always, so test users exist even if backend was already up)
+    Write-Host 'seeding test users...'
+    $hasGo   = $null -ne (Get-Command go   -ErrorAction SilentlyContinue)
+    $hasMake = $null -ne (Get-Command make -ErrorAction SilentlyContinue)
+    $hasBash = -not [string]::IsNullOrEmpty($BashExe)
+    $hasPsql = $null -ne (Get-Command psql -ErrorAction SilentlyContinue)
+    $hasBashPsql = Test-BashCommand 'command -v psql >/dev/null 2>&1'
+    $backendDir = Join-Path $RepoRoot 'backend'
+    $backendBashDir = Convert-ToBashPath $backendDir
+    $backendWslDir  = Convert-ToWslPath $backendDir
+
+    $SeedOutLog = Join-Path $env:TEMP 'sub12-e2e-seed.out.log'
+    $SeedErrLog = Join-Path $env:TEMP 'sub12-e2e-seed.err.log'
+
+    if ($hasGo) {
+        $seedCommand = "Set-Location '$($RepoRoot.Path)\\backend'; go run ./cmd/seed"
+        $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+            -RedirectStandardOutput $SeedOutLog -RedirectStandardError $SeedErrLog `
+            -NoNewWindow -PassThru -Wait
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $SeedErrLog" }
+    } elseif ($hasMake -and $hasPsql) {
+        $seedCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make seed"
+        $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+            -RedirectStandardOutput $SeedOutLog -RedirectStandardError $SeedErrLog `
+            -NoNewWindow -PassThru -Wait
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $SeedErrLog" }
+    } elseif ($hasBash -and $hasBashPsql) {
+        $seedCommand = "(cd '$backendBashDir' 2>/dev/null || cd '$backendWslDir') && make seed"
+        $seed = Start-Process -FilePath $BashExe -ArgumentList '-lc', $seedCommand `
+            -RedirectStandardOutput $SeedOutLog -RedirectStandardError $SeedErrLog `
+            -NoNewWindow -PassThru -Wait
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $SeedErrLog" }
+    } elseif ($hasPsql) {
+        $dbUser     = if ($env:DB_USER)     { $env:DB_USER }     else { 'sub12' }
+        $dbPassword = $env:DB_PASSWORD
+        if (-not $dbPassword) { throw 'DB_PASSWORD is required to run seed without go/make' }
+        $dbHost    = if ($env:DB_HOST)    { $env:DB_HOST }    else { 'localhost' }
+        $dbPort    = if ($env:DB_PORT)    { $env:DB_PORT }    else { '5432' }
+        $dbName    = if ($env:DB_NAME)    { $env:DB_NAME }    else { 'sub12' }
+        $dbSSLMode = if ($env:DB_SSLMODE) { $env:DB_SSLMODE } else { 'disable' }
+        $seedSqlPath = Join-Path $RepoRoot 'backend\internal\db\seed\seed.sql'
+        $migrateUrl  = "postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?sslmode=${dbSSLMode}"
+        $seedCommand = "`$env:PGPASSWORD='$dbPassword'; psql '$migrateUrl' -f '$seedSqlPath'"
+        $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
+            -RedirectStandardOutput $SeedOutLog -RedirectStandardError $SeedErrLog `
+            -NoNewWindow -PassThru -Wait
+        if ($seed.ExitCode -ne 0) { throw "seed failed - see $SeedErrLog" }
+    } else {
+        Write-Warning 'Skipping seed: go, make+psql, and psql are all unavailable (tests that require seeded users may fail)'
+    }
+    Write-Host 'seed: done'
+
+    # 3. Backend
+    if (Test-Url 'http://localhost:8080/readyz') {
         Write-Host 'backend: already running on :8080'
     } else {
         $backendPortOwner = Get-ListeningProcess -Port 8080
@@ -197,53 +278,13 @@ try {
             }
         }
 
-        Write-Host "seeding db + starting backend (logs: $BackendOutLog, $BackendErrLog)..."
-        $hasMake = $null -ne (Get-Command make -ErrorAction SilentlyContinue)
-        $hasBash = -not [string]::IsNullOrEmpty($BashExe)
-        $hasPsql = $null -ne (Get-Command psql -ErrorAction SilentlyContinue)
-        $hasBashPsql = Test-BashCommand 'command -v psql >/dev/null 2>&1'
-        $backendDir = Join-Path $RepoRoot 'backend'
-        $backendBashDir = Convert-ToBashPath $backendDir
-        $backendWslDir = Convert-ToWslPath $backendDir
-
-        if ($hasMake -and $hasPsql) {
-            $seedCommand = "Set-Location '$($RepoRoot.Path)\\backend'; make seed"
-            $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
-                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
-                -NoNewWindow -PassThru -Wait
-            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
-        } elseif ($hasBash -and $hasBashPsql) {
-            $seedCommand = "(cd '$backendBashDir' 2>/dev/null || cd '$backendWslDir') && make seed"
-            $seed = Start-Process -FilePath $BashExe -ArgumentList '-lc', $seedCommand `
-                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
-                -NoNewWindow -PassThru -Wait
-            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
-        } elseif ($hasPsql) {
-            $dbUser = if ($env:DB_USER) { $env:DB_USER } else { 'sub12' }
-            $dbPassword = $env:DB_PASSWORD
-            if (-not $dbPassword) {
-                throw 'DB_PASSWORD is required to run seed without make'
-            }
-            $dbHost = if ($env:DB_HOST) { $env:DB_HOST } else { 'localhost' }
-            $dbPort = if ($env:DB_PORT) { $env:DB_PORT } else { '5432' }
-            $dbName = if ($env:DB_NAME) { $env:DB_NAME } else { 'sub12' }
-            $dbSSLMode = if ($env:DB_SSLMODE) { $env:DB_SSLMODE } else { 'disable' }
-            $seedSqlPath = Join-Path $RepoRoot 'backend\\internal\\db\\seed\\seed.sql'
-            $migrateUrl = "postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?sslmode=${dbSSLMode}"
-            $seedCommand = "`$env:PGPASSWORD='$dbPassword'; psql '$migrateUrl' -f '$seedSqlPath'"
-            $seed = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $seedCommand `
-                -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
-                -NoNewWindow -PassThru -Wait
-            if ($seed.ExitCode -ne 0) { throw "seed failed - see $BackendErrLog" }
-        } else {
-            Write-Warning 'Skipping seed: psql is unavailable in both PowerShell and bash (tests that require seeded users may fail)'
-        }
+        Write-Host "starting backend (logs: $BackendOutLog, $BackendErrLog)..."
 
         $runBackendCommand = "Set-Location '$($RepoRoot.Path)\\backend'; go run ./cmd/api"
         $script:BackendProc = Start-Process -FilePath $PowerShellExe -ArgumentList '-NoProfile', '-Command', $runBackendCommand `
             -RedirectStandardOutput $BackendOutLog -RedirectStandardError $BackendErrLog `
             -NoNewWindow -PassThru
-        Wait-Url 'http://localhost:8080/healthz' 'backend' 60 $script:BackendProc $BackendErrLog
+        Wait-Url 'http://localhost:8080/readyz' 'backend' 90 $script:BackendProc $BackendErrLog
     }
 
     # 3. Frontend
