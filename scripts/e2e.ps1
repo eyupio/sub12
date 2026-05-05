@@ -241,13 +241,44 @@ function Set-WslInfraHostEnv {
         return
     }
 
+    # Update both process env block and PowerShell's env provider view.
     [Environment]::SetEnvironmentVariable('DB_HOST', $wslIp, 'Process')
+    $env:DB_HOST = $wslIp
 
-    if ((-not $env:REDIS_URL) -or ($env:REDIS_URL -match '^redis://(localhost|127\.0\.0\.1)(:\d+)?/?$')) {
-        [Environment]::SetEnvironmentVariable('REDIS_URL', "redis://$wslIp:6379", 'Process')
+    $currentRedis = if ($env:REDIS_URL) { $env:REDIS_URL.Trim() } else { '' }
+    $redisMapped = $false
+
+    if ([string]::IsNullOrEmpty($currentRedis)) {
+        $currentRedis = "redis://$wslIp:6379"
+        $redisMapped = $true
+    } else {
+        try {
+            $uri = [Uri]$currentRedis
+            if (($uri.Scheme -eq 'redis') -and ($uri.Host -match '^(localhost|127\.0\.0\.1|::1)$')) {
+                $port = if ($uri.IsDefaultPort) { 6379 } else { $uri.Port }
+                $tail = $uri.PathAndQuery
+                if ([string]::IsNullOrEmpty($tail)) { $tail = '' }
+                $currentRedis = "redis://${wslIp}:$port$tail"
+                $redisMapped = $true
+            }
+        } catch {
+            if ($currentRedis -match '^redis://(localhost|127\.0\.0\.1|\[::1\]|::1)(:\d+)?(/.*)?$') {
+                $port = if ($Matches[2]) { $Matches[2] } else { ':6379' }
+                $tail = if ($Matches[3]) { $Matches[3] } else { '' }
+                $currentRedis = "redis://$wslIp$port$tail"
+                $redisMapped = $true
+            }
+        }
+    }
+
+    if ($redisMapped) {
+        [Environment]::SetEnvironmentVariable('REDIS_URL', $currentRedis, 'Process')
+        $env:REDIS_URL = $currentRedis
     }
 
     Write-Host "infra host mapped to WSL IP $wslIp for DB/Redis connectivity"
+    Write-Host "effective DB_HOST=$env:DB_HOST"
+    Write-Host "effective REDIS_URL=$env:REDIS_URL"
 }
 
 function Get-ListeningProcess {
