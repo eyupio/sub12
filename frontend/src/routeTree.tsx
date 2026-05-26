@@ -1,86 +1,97 @@
+import React, { lazy, Suspense } from 'react'
 import { createRootRoute, createRoute, redirect } from '@tanstack/react-router'
 import { useAuthStore } from './store/auth'
 import Layout from './components/Layout'
 import AuthLayout from './components/AuthLayout'
 import IndexPage from './pages/IndexPage'
-import ScoreEntry from './pages/ScoreEntry'
-import ScoreHistory from './pages/ScoreHistory'
-import ScoreCompare from './pages/ScoreCompare'
-import ScoreCardDetail from './pages/ScoreCardDetail'
-import Gear from './pages/Gear'
-import Locations from './pages/Locations'
-import Leagues from './pages/Leagues'
-import LeagueDetail from './pages/LeagueDetail'
-import LeagueSettings from './pages/LeagueSettings'
-import PelletTesting from './pages/PelletTesting'
-import PelletTestWizard from './pages/PelletTestWizard'
-import PelletTestDetail from './pages/PelletTestDetail'
-import PelletTestLeaderboard from './pages/PelletTestLeaderboard'
-import PelletComparison from './pages/PelletComparison'
-import BatchReport from './pages/BatchReport'
-import PublicPelletLeaderboard from './pages/PublicPelletLeaderboard'
-import {
-  SharedScoreCardView,
-  SharedPelletTestView,
-  SharedLeagueView,
-  SharedClubView,
-  SharedUserView,
-} from './pages/SharedView'
-import Profile from './pages/Profile'
-import FollowManagement from './pages/FollowManagement'
-import UserProfile from './pages/UserProfile'
-import Users from './pages/Users'
-import Feed from './pages/Feed'
 import Login from './pages/Login'
-import Register from './pages/Register'
-import AdminEmailSettings from './pages/AdminEmailSettings'
-import AdminEmailTemplates from './pages/AdminEmailTemplates'
-import AdminUsers from './pages/AdminUsers'
-import AdminUserDetail from './pages/AdminUserDetail'
-import AdminLeagues from './pages/AdminLeagues'
-import AdminLeagueDetail from './pages/AdminLeagueDetail'
-import AdminClubs from './pages/AdminClubs'
-import AdminClubDetail from './pages/AdminClubDetail'
-import AdminSitemap from './pages/AdminSitemap'
-import AdminBackup from './pages/AdminBackup'
-import AdminReportsQueue from './pages/AdminReportsQueue'
-import AdminSupportInbox from './pages/AdminSupportInbox'
-import ConfirmEmail from './pages/ConfirmEmail'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import Clubs from './pages/Clubs'
-import ClubDetail from './pages/ClubDetail'
-import ClubSettings from './pages/ClubSettings'
-import ScoreTrends from './pages/ScoreTrends'
-import ComboAnalytics from './pages/ComboAnalytics'
-import Notifications from './pages/Notifications'
-import PrivacyCenter from './pages/PrivacyCenter'
-import NotificationSettings from './pages/NotificationSettings'
-import SecuritySettings from './pages/SecuritySettings'
-import TwoFactorChallenge from './pages/TwoFactorChallenge'
-import { LeagueReportsPage, ClubReportsPage } from './pages/CommunityReports'
 import NotFound from './pages/NotFound'
-import FeatureBoard from './pages/FeatureBoard'
-import FeatureRequestDetail from './pages/FeatureRequestDetail'
-import SupportCenter from './pages/SupportCenter'
-import SupportTicketDetail from './pages/SupportTicketDetail'
-import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail'
-import Help from './pages/Help'
-import AdminFaqs from './pages/AdminFaqs'
-import PostDetail from './pages/PostDetail'
-import QuickCapture from './pages/QuickCapture'
-import Drafts from './pages/Drafts'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import TermsOfUse from './pages/TermsOfUse'
-import CookiePolicy from './pages/CookiePolicy'
-import Events from './pages/Events'
-import EventCreate from './pages/EventCreate'
-import EventInvitationAccept from './pages/EventInvitationAccept'
-import EventDetail from './pages/EventDetail'
-import EventLive from './pages/EventLive'
-import EventScorecard from './pages/EventScorecard'
-import EventSettings from './pages/EventSettings'
-import AdminEvents from './pages/AdminEvents'
+
+// All pages except the critical render-path ones are lazy-loaded so they split
+// into separate chunks, keeping the main entry below the 2 MiB Workbox
+// precache ceiling.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lz = (C: React.LazyExoticComponent<any>) => () => (
+  <Suspense fallback={<div className="p-6 text-sm text-muted">Loading…</div>}>
+    <C />
+  </Suspense>
+)
+
+const LazyScoreEntry = lazy(() => import('./pages/ScoreEntry'))
+const LazyScoreHistory = lazy(() => import('./pages/ScoreHistory'))
+const LazyScoreCompare = lazy(() => import('./pages/ScoreCompare'))
+const LazyScoreCardDetail = lazy(() => import('./pages/ScoreCardDetail'))
+const LazyScoreTrends = lazy(() => import('./pages/ScoreTrends'))
+const LazyGear = lazy(() => import('./pages/Gear'))
+const LazyLocations = lazy(() => import('./pages/Locations'))
+const LazyLeagues = lazy(() => import('./pages/Leagues'))
+const LazyLeagueDetail = lazy(() => import('./pages/LeagueDetail'))
+const LazyLeagueSettings = lazy(() => import('./pages/LeagueSettings'))
+const LazyPelletTesting = lazy(() => import('./pages/PelletTesting'))
+const LazyPelletTestWizard = lazy(() => import('./pages/PelletTestWizard'))
+const LazyPelletTestDetail = lazy(() => import('./pages/PelletTestDetail'))
+const LazyPelletTestLeaderboard = lazy(() => import('./pages/PelletTestLeaderboard'))
+const LazyPelletComparison = lazy(() => import('./pages/PelletComparison'))
+const LazyBatchReport = lazy(() => import('./pages/BatchReport'))
+const LazyPublicPelletLeaderboard = lazy(() => import('./pages/PublicPelletLeaderboard'))
+const LazySharedScoreCardView = lazy(() => import('./pages/SharedView').then(m => ({ default: m.SharedScoreCardView })))
+const LazySharedPelletTestView = lazy(() => import('./pages/SharedView').then(m => ({ default: m.SharedPelletTestView })))
+const LazySharedLeagueView = lazy(() => import('./pages/SharedView').then(m => ({ default: m.SharedLeagueView })))
+const LazySharedClubView = lazy(() => import('./pages/SharedView').then(m => ({ default: m.SharedClubView })))
+const LazySharedUserView = lazy(() => import('./pages/SharedView').then(m => ({ default: m.SharedUserView })))
+const LazyProfile = lazy(() => import('./pages/Profile'))
+const LazyFollowManagement = lazy(() => import('./pages/FollowManagement'))
+const LazyUserProfile = lazy(() => import('./pages/UserProfile'))
+const LazyUsers = lazy(() => import('./pages/Users'))
+const LazyFeed = lazy(() => import('./pages/Feed'))
+const LazyRegister = lazy(() => import('./pages/Register'))
+const LazyForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const LazyResetPassword = lazy(() => import('./pages/ResetPassword'))
+const LazyTwoFactorChallenge = lazy(() => import('./pages/TwoFactorChallenge'))
+const LazyAdminEmailSettings = lazy(() => import('./pages/AdminEmailSettings'))
+const LazyAdminEmailTemplates = lazy(() => import('./pages/AdminEmailTemplates'))
+const LazyAdminUsers = lazy(() => import('./pages/AdminUsers'))
+const LazyAdminUserDetail = lazy(() => import('./pages/AdminUserDetail'))
+const LazyAdminLeagues = lazy(() => import('./pages/AdminLeagues'))
+const LazyAdminLeagueDetail = lazy(() => import('./pages/AdminLeagueDetail'))
+const LazyAdminClubs = lazy(() => import('./pages/AdminClubs'))
+const LazyAdminClubDetail = lazy(() => import('./pages/AdminClubDetail'))
+const LazyAdminSitemap = lazy(() => import('./pages/AdminSitemap'))
+const LazyAdminBackup = lazy(() => import('./pages/AdminBackup'))
+const LazyAdminReportsQueue = lazy(() => import('./pages/AdminReportsQueue'))
+const LazyAdminSupportInbox = lazy(() => import('./pages/AdminSupportInbox'))
+const LazyAdminSupportTicketDetail = lazy(() => import('./pages/AdminSupportTicketDetail'))
+const LazyAdminFaqs = lazy(() => import('./pages/AdminFaqs'))
+const LazyAdminEvents = lazy(() => import('./pages/AdminEvents'))
+const LazyConfirmEmail = lazy(() => import('./pages/ConfirmEmail'))
+const LazyClubs = lazy(() => import('./pages/Clubs'))
+const LazyClubDetail = lazy(() => import('./pages/ClubDetail'))
+const LazyClubSettings = lazy(() => import('./pages/ClubSettings'))
+const LazyLeagueReportsPage = lazy(() => import('./pages/CommunityReports').then(m => ({ default: m.LeagueReportsPage })))
+const LazyClubReportsPage = lazy(() => import('./pages/CommunityReports').then(m => ({ default: m.ClubReportsPage })))
+const LazyComboAnalytics = lazy(() => import('./pages/ComboAnalytics'))
+const LazyNotifications = lazy(() => import('./pages/Notifications'))
+const LazyPrivacyCenter = lazy(() => import('./pages/PrivacyCenter'))
+const LazyNotificationSettings = lazy(() => import('./pages/NotificationSettings'))
+const LazySecuritySettings = lazy(() => import('./pages/SecuritySettings'))
+const LazyFeatureBoard = lazy(() => import('./pages/FeatureBoard'))
+const LazyFeatureRequestDetail = lazy(() => import('./pages/FeatureRequestDetail'))
+const LazySupportCenter = lazy(() => import('./pages/SupportCenter'))
+const LazySupportTicketDetail = lazy(() => import('./pages/SupportTicketDetail'))
+const LazyHelp = lazy(() => import('./pages/Help'))
+const LazyPostDetail = lazy(() => import('./pages/PostDetail'))
+const LazyQuickCapture = lazy(() => import('./pages/QuickCapture'))
+const LazyDrafts = lazy(() => import('./pages/Drafts'))
+const LazyPrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const LazyTermsOfUse = lazy(() => import('./pages/TermsOfUse'))
+const LazyCookiePolicy = lazy(() => import('./pages/CookiePolicy'))
+const LazyEvents = lazy(() => import('./pages/Events'))
+const LazyEventCreate = lazy(() => import('./pages/EventCreate'))
+const LazyEventInvitationAccept = lazy(() => import('./pages/EventInvitationAccept'))
+const LazyEventDetail = lazy(() => import('./pages/EventDetail'))
+const LazyEventLive = lazy(() => import('./pages/EventLive'))
+const LazyEventScorecard = lazy(() => import('./pages/EventScorecard'))
+const LazyEventSettings = lazy(() => import('./pages/EventSettings'))
 
 // Guard: redirect to /login if not authenticated.
 // A session exists when we have either a live access token (current tab) or
@@ -119,31 +130,31 @@ const indexRoute = createRoute({
 const privacyPolicyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/privacy',
-  component: PrivacyPolicy,
+  component: lz(LazyPrivacyPolicy),
 })
 
 const termsOfUseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/terms',
-  component: TermsOfUse,
+  component: lz(LazyTermsOfUse),
 })
 
 const cookiePolicyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/cookies',
-  component: CookiePolicy,
+  component: lz(LazyCookiePolicy),
 })
 
 const scoreHistoryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores',
-  component: ScoreHistory,
+  component: lz(LazyScoreHistory),
 })
 
 const scoreEntryRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/new',
-  component: ScoreEntry,
+  component: lz(LazyScoreEntry),
   validateSearch: (search: Record<string, unknown>): { leagueId?: string; roundId?: string; draftId?: string } => ({
     leagueId: (search.leagueId as string) || undefined,
     roundId: (search.roundId as string) || undefined,
@@ -154,7 +165,7 @@ const scoreEntryRoute = createRoute({
 const scoreCompareRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/compare',
-  component: ScoreCompare,
+  component: lz(LazyScoreCompare),
   validateSearch: (search: Record<string, unknown>): { a?: string; b?: string } => ({
     a: (search.a as string) || undefined,
     b: (search.b as string) || undefined,
@@ -164,7 +175,7 @@ const scoreCompareRoute = createRoute({
 const quickCaptureRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/quick-capture',
-  component: QuickCapture,
+  component: lz(LazyQuickCapture),
   validateSearch: (search: Record<string, unknown>): { type?: 'score' | 'pellet'; leagueId?: string; clubId?: string } => ({
     type: (search.type as 'score' | 'pellet') || undefined,
     leagueId: (search.leagueId as string) || undefined,
@@ -175,61 +186,61 @@ const quickCaptureRoute = createRoute({
 const draftsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/drafts',
-  component: Drafts,
+  component: lz(LazyDrafts),
 })
 
 const scoreCardDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/$id',
-  component: ScoreCardDetail,
+  component: lz(LazyScoreCardDetail),
 })
 
 const gearRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/gear',
-  component: Gear,
+  component: lz(LazyGear),
 })
 
 const locationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/locations',
-  component: Locations,
+  component: lz(LazyLocations),
 })
 
 const leaguesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues',
-  component: Leagues,
+  component: lz(LazyLeagues),
 })
 
 const leagueDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues/$id',
-  component: LeagueDetail,
+  component: lz(LazyLeagueDetail),
 })
 
 const leagueSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues/$id/settings',
-  component: LeagueSettings,
+  component: lz(LazyLeagueSettings),
 })
 
 const leagueReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/leagues/$id/reports',
-  component: LeagueReportsPage,
+  component: lz(LazyLeagueReportsPage),
 })
 
 const eventsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events',
-  component: Events,
+  component: lz(LazyEvents),
 })
 
 const eventCreateRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/new',
-  component: EventCreate,
+  component: lz(LazyEventCreate),
   validateSearch: (search: Record<string, unknown>): { clubId?: string } => ({
     clubId: typeof search.clubId === 'string' && search.clubId ? search.clubId : undefined,
   }),
@@ -238,43 +249,43 @@ const eventCreateRoute = createRoute({
 const eventInvitationAcceptRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/invitations/$token',
-  component: EventInvitationAccept,
+  component: lz(LazyEventInvitationAccept),
 })
 
 const eventDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/$slug',
-  component: EventDetail,
+  component: lz(LazyEventDetail),
 })
 
 const eventLiveRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/$slug/live',
-  component: EventLive,
+  component: lz(LazyEventLive),
 })
 
 const eventScorecardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/$slug/scorecard',
-  component: EventScorecard,
+  component: lz(LazyEventScorecard),
 })
 
 const eventSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/events/$slug/settings',
-  component: EventSettings,
+  component: lz(LazyEventSettings),
 })
 
 const adminEventsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/events',
-  component: AdminEvents,
+  component: lz(LazyAdminEvents),
 })
 
 const pelletTestingRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing',
-  component: PelletTesting,
+  component: lz(LazyPelletTesting),
   validateSearch: (search: Record<string, unknown>): { tab?: 'overview' | 'tests' | 'combos' | 'batches' } => {
     const t = search.tab
     if (t === 'tests' || t === 'combos' || t === 'batches' || t === 'overview') return { tab: t }
@@ -285,7 +296,7 @@ const pelletTestingRoute = createRoute({
 const newPelletTestRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/new',
-  component: PelletTestWizard,
+  component: lz(LazyPelletTestWizard),
   validateSearch: (search: Record<string, unknown>): { draftId?: string; step?: number; imageId?: string } => {
     const stepRaw = search.step
     const stepNum = typeof stepRaw === 'number' ? stepRaw : typeof stepRaw === 'string' ? parseInt(stepRaw, 10) : undefined
@@ -301,13 +312,13 @@ const newPelletTestRoute = createRoute({
 const pelletTestDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/$id',
-  component: PelletTestDetail,
+  component: lz(LazyPelletTestDetail),
 })
 
 const pelletTestLeaderboardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/leaderboard',
-  component: PelletTestLeaderboard,
+  component: lz(LazyPelletTestLeaderboard),
   beforeLoad: () => {
     throw redirect({ to: '/pellet-testing', search: { tab: 'combos' } })
   },
@@ -316,13 +327,13 @@ const pelletTestLeaderboardRoute = createRoute({
 const pelletComparisonRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/compare',
-  component: PelletComparison,
+  component: lz(LazyPelletComparison),
 })
 
 const batchReportRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/batch-report',
-  component: BatchReport,
+  component: lz(LazyBatchReport),
   beforeLoad: () => {
     throw redirect({ to: '/pellet-testing', search: { tab: 'batches' } })
   },
@@ -331,7 +342,7 @@ const batchReportRoute = createRoute({
 const publicPelletLeaderboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/pellet-leaderboard',
-  component: PublicPelletLeaderboard,
+  component: lz(LazyPublicPelletLeaderboard),
 })
 
 // Canonical public share URLs. The `ShareDialog` points at these paths when
@@ -342,97 +353,97 @@ const publicPelletLeaderboardRoute = createRoute({
 const sharedScoreCardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/score-cards/$id',
-  component: SharedScoreCardView,
+  component: lz(LazySharedScoreCardView),
 })
 
 const sharedPelletTestRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/pellet-tests/$id',
-  component: SharedPelletTestView,
+  component: lz(LazySharedPelletTestView),
 })
 
 const sharedLeagueRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/share/leagues/$id',
-  component: SharedLeagueView,
+  component: lz(LazySharedLeagueView),
 })
 
 const sharedClubRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/share/clubs/$id',
-  component: SharedClubView,
+  component: lz(LazySharedClubView),
 })
 
 const sharedUserRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/share/users/$id',
-  component: SharedUserView,
+  component: lz(LazySharedUserView),
 })
 
 const profileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile',
-  component: Profile,
+  component: lz(LazyProfile),
 })
 
 const profileFollowsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/profile/follows',
-  component: FollowManagement,
+  component: lz(LazyFollowManagement),
 })
 
 const userProfileRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/users/$id',
-  component: UserProfile,
+  component: lz(LazyUserProfile),
 })
 
 const usersRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/users',
-  component: Users,
+  component: lz(LazyUsers),
 })
 
 const feedRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feed',
-  component: Feed,
+  component: lz(LazyFeed),
 })
 
 const postDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/posts/$id',
-  component: PostDetail,
+  component: lz(LazyPostDetail),
 })
 
 const clubsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/clubs',
-  component: Clubs,
+  component: lz(LazyClubs),
 })
 
 const clubDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/clubs/$id',
-  component: ClubDetail,
+  component: lz(LazyClubDetail),
 })
 
 const clubSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/clubs/$id/settings',
-  component: ClubSettings,
+  component: lz(LazyClubSettings),
 })
 
 const clubReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/clubs/$id/reports',
-  component: ClubReportsPage,
+  component: lz(LazyClubReportsPage),
 })
 
 const scoreTrendsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/trends',
-  component: ScoreTrends,
+  component: lz(LazyScoreTrends),
   validateSearch: (search: Record<string, unknown>): { period?: 'week' | 'month'; rifleId?: string } => ({
     period: search.period === 'month' ? 'month' : search.period === 'week' ? 'week' : undefined,
     rifleId: (search.rifleId as string) || undefined,
@@ -442,7 +453,7 @@ const scoreTrendsRoute = createRoute({
 const comboAnalyticsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pellet-testing/combo-analytics',
-  component: ComboAnalytics,
+  component: lz(LazyComboAnalytics),
   beforeLoad: () => {
     throw redirect({ to: '/pellet-testing', search: { tab: 'combos' } })
   },
@@ -452,145 +463,145 @@ const comboAnalyticsRoute = createRoute({
 const adminEmailSettingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/email/settings',
-  component: AdminEmailSettings,
+  component: lz(LazyAdminEmailSettings),
 })
 
 const adminEmailTemplatesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/email/templates',
-  component: AdminEmailTemplates,
+  component: lz(LazyAdminEmailTemplates),
 })
 
 const adminUsersRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/users',
-  component: AdminUsers,
+  component: lz(LazyAdminUsers),
 })
 
 const adminUserDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/users/$id',
-  component: AdminUserDetail,
+  component: lz(LazyAdminUserDetail),
 })
 
 const adminLeaguesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/leagues',
-  component: AdminLeagues,
+  component: lz(LazyAdminLeagues),
 })
 
 const adminLeagueDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/leagues/$id',
-  component: AdminLeagueDetail,
+  component: lz(LazyAdminLeagueDetail),
 })
 
 const adminClubsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/clubs',
-  component: AdminClubs,
+  component: lz(LazyAdminClubs),
 })
 
 const adminClubDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/clubs/$id',
-  component: AdminClubDetail,
+  component: lz(LazyAdminClubDetail),
 })
 
 const adminSitemapRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/sitemap',
-  component: AdminSitemap,
+  component: lz(LazyAdminSitemap),
 })
 
 const adminBackupRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/backup',
-  component: AdminBackup,
+  component: lz(LazyAdminBackup),
 })
 
 const adminReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/reports',
-  component: AdminReportsQueue,
+  component: lz(LazyAdminReportsQueue),
 })
 
 const adminSupportRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/support',
-  component: AdminSupportInbox,
+  component: lz(LazyAdminSupportInbox),
 })
 
 const notificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/notifications',
-  component: Notifications,
+  component: lz(LazyNotifications),
 })
 
 const settingsPrivacyRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings/privacy',
-  component: PrivacyCenter,
+  component: lz(LazyPrivacyCenter),
 })
 
 const settingsNotificationsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings/notifications',
-  component: NotificationSettings,
+  component: lz(LazyNotificationSettings),
 })
 
 const settingsSecurityRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings/security',
-  component: SecuritySettings,
+  component: lz(LazySecuritySettings),
 })
 
 const featureBoardRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feature-requests',
-  component: FeatureBoard,
+  component: lz(LazyFeatureBoard),
 })
 
 const featureRequestDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/feature-requests/$id',
-  component: FeatureRequestDetail,
+  component: lz(LazyFeatureRequestDetail),
 })
 
 const supportCenterRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/support',
-  component: SupportCenter,
+  component: lz(LazySupportCenter),
 })
 
 const supportTicketDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/support/tickets/$id',
-  component: SupportTicketDetail,
+  component: lz(LazySupportTicketDetail),
 })
 
 const adminSupportTicketDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/support/tickets/$id',
-  component: AdminSupportTicketDetail,
+  component: lz(LazyAdminSupportTicketDetail),
 })
 
 const helpRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/help',
-  component: Help,
+  component: lz(LazyHelp),
 })
 
 const adminFaqsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/faqs',
-  component: AdminFaqs,
+  component: lz(LazyAdminFaqs),
 })
 
 const confirmEmailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/confirm-email',
-  component: ConfirmEmail,
+  component: lz(LazyConfirmEmail),
   validateSearch: (search: Record<string, unknown>): { token?: string } => ({
     token: (search.token as string) || undefined,
   }),
@@ -613,19 +624,19 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/register',
-  component: Register,
+  component: lz(LazyRegister),
 })
 
 const forgotPasswordRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/forgot-password',
-  component: ForgotPassword,
+  component: lz(LazyForgotPassword),
 })
 
 const resetPasswordRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/reset-password',
-  component: ResetPassword,
+  component: lz(LazyResetPassword),
   validateSearch: (search: Record<string, unknown>): { token?: string } => ({
     token: (search.token as string) || undefined,
   }),
@@ -634,7 +645,7 @@ const resetPasswordRoute = createRoute({
 const twoFactorChallengeRoute = createRoute({
   getParentRoute: () => authRoute,
   path: '/login/2fa',
-  component: TwoFactorChallenge,
+  component: lz(LazyTwoFactorChallenge),
 })
 
 export const routeTree = rootRoute.addChildren([
