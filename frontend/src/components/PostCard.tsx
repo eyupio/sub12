@@ -480,24 +480,37 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
                 e.preventDefault()
                 if (newComment.trim()) createCommentMutation.mutate()
               }}
-              className="flex gap-2 mt-2"
+              className="flex flex-col gap-1 mt-2"
             >
-              <input
-                type="text"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment…"
-                className="flex-1 rounded border border-subtle bg-surface px-2 py-1 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
-                maxLength={500}
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim() || createCommentMutation.isPending}
-                aria-label="Post comment"
-                className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send size={12} />
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment…"
+                  aria-label="Add a comment"
+                  aria-describedby={newComment.length > 420 ? 'comment-char-count' : undefined}
+                  className="flex-1 rounded border border-subtle bg-surface px-2 py-1 text-xs text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+                  maxLength={500}
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || createCommentMutation.isPending}
+                  aria-label="Post comment"
+                  className="p-1.5 rounded border border-subtle text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={12} />
+                </button>
+              </div>
+              {newComment.length > 420 && (
+                <p
+                  id="comment-char-count"
+                  aria-live="polite"
+                  className={`text-[10px] text-right tabular-nums ${newComment.length >= 490 ? 'text-[var(--error-text)]' : 'text-muted'}`}
+                >
+                  {500 - newComment.length} remaining
+                </p>
+              )}
             </form>
           )}
         </div>
