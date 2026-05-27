@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect, useState } from 'react'
+import { PropsWithChildren, useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -77,7 +77,14 @@ export default function Layout({ children }: PropsWithChildren) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [moreOpen, setMoreOpen] = useState(false)
   const isAdmin = user?.role === 'admin'
-  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems
+  // ⚡ Bolt: memoize navItems — the array spread allocates a new 24-item array on
+  // every render. Layout re-renders on every draft-count poll (60 s), route
+  // change, and online/offline toggle. isAdmin is stable for the entire session
+  // (changes at most once), so the spread cost is nearly always wasted work.
+  const navItems = useMemo(
+    () => (isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems),
+    [isAdmin]
+  )
 
   // Drafts badge: sum of score-card + pellet-test quick-capture drafts.
   // Low-frequency refetch keeps it cheap but accurate after users save new
@@ -150,7 +157,7 @@ export default function Layout({ children }: PropsWithChildren) {
       <CornerMark className="bottom-5 left-5 text-muted" />
       <CornerMark className="bottom-5 right-5 text-muted" />
 
-      {/* \u2500\u2500 Desktop sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-r border-subtle bg-nav backdrop-blur z-40">
         <div className="px-5 py-4 border-b border-subtle">
           <Tooltip content={tips.homeLogo} placement="right">
@@ -204,7 +211,7 @@ export default function Layout({ children }: PropsWithChildren) {
         </div>
       </aside>
 
-      {/* \u2500\u2500 Main content column \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ── Main content column ────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
         <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
@@ -231,7 +238,7 @@ export default function Layout({ children }: PropsWithChildren) {
         {!isOnline && (
           <div className="bg-amber-600/15 border-b border-amber-600/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 text-xs tracking-wide" role="status">
             <WifiOff size={14} />
-            <span>You're offline \u2014 some features may be limited</span>
+            <span>You're offline — some features may be limited</span>
           </div>
         )}
 
@@ -258,7 +265,7 @@ export default function Layout({ children }: PropsWithChildren) {
             duplicating their save button. */}
         <QuickCaptureFabWhenAppropriate />
 
-        {/* Mobile bottom nav \u2014 5 items max */}
+        {/* Mobile bottom nav — 5 items max */}
         <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
             {mobileNavItems.map(({ to, icon: Icon, label }) => (
