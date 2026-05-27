@@ -1,0 +1,5 @@
+# Palette Journal — sub12
+
+## 2026-05-27 - Comment input: placeholder ≠ label, silent maxLength is invisible
+**Learning:** This codebase has excellent ARIA hygiene on buttons (aria-label on every icon-only button, aria-pressed, aria-expanded, aria-haspopup) but the inline comment `<input>` inside `PostCard` relied solely on `placeholder` — no `aria-label`. The pattern recurs wherever a text input appears *inside a form that already has a labelled submit button*; devs may assume the button context implies the input's purpose, but screen readers don't share that assumption. Also: `maxLength` on an input is completely invisible to users — the browser just silently stops accepting characters. Always pair `maxLength` with a visible counter (show when < 80 remaining, turn red at < 10).
+**Action:** When reviewing inline comment/reply boxes in this app, check for (1) `aria-label` on the `<input>`, and (2) a visible `"{n} remaining"` counter linked via `aria-describedby` + `aria-live="polite"`.
