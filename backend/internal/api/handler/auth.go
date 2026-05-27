@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/mail"
@@ -73,7 +72,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"display_name"`
 		Password    string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -125,7 +124,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -163,7 +162,7 @@ func (h *AuthHandler) LoginVerify2FA(w http.ResponseWriter, r *http.Request) {
 		ChallengeToken string `json:"challenge_token"`
 		Code           string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -216,7 +215,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			RefreshToken string `json:"refresh_token"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+		if err := decodeJSON(r, &body); err == nil {
 			token = body.RefreshToken
 		}
 	}
@@ -244,7 +243,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			RefreshToken string `json:"refresh_token"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+		if err := decodeJSON(r, &body); err == nil {
 			token = body.RefreshToken
 		}
 	}
@@ -260,7 +259,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
+	if err := decodeJSON(r, &body); err != nil || body.Email == "" {
 		writeError(w, http.StatusBadRequest, "email is required")
 		return
 	}
@@ -281,7 +280,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		Token       string `json:"token"`
 		NewPassword string `json:"new_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
