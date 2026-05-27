@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useId } from 'react'
 import { Search } from 'lucide-react'
 
 interface CatalogSearchProps<T> {
@@ -32,6 +32,8 @@ export function CatalogSearch<T>({
   const [activeIndex, setActiveIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  // Stable id pair linking the combobox input to its listbox popup.
+  const listboxId = useId()
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items.slice(0, 8)
@@ -95,8 +97,15 @@ export function CatalogSearch<T>({
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
         <input
+          type="search"
           className={inputCls}
           placeholder={placeholder}
+          aria-label={placeholder}
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-controls={listboxId}
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
@@ -106,7 +115,10 @@ export function CatalogSearch<T>({
 
       {open && (
         <ul
+          id={listboxId}
           ref={listRef}
+          role="listbox"
+          aria-label={placeholder}
           className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded border border-subtle bg-surface shadow-lg"
         >
           {filtered.map((item, i) => {
@@ -114,6 +126,8 @@ export function CatalogSearch<T>({
             return (
               <li
                 key={i}
+                role="option"
+                aria-selected={i === activeIndex}
                 className={[
                   'px-3 py-2 cursor-pointer text-sm transition-colors flex items-center gap-2',
                   i === activeIndex
@@ -154,6 +168,8 @@ export function CatalogSearch<T>({
             <li className="px-3 py-2 text-sm text-muted">No matches found</li>
           )}
           <li
+            role="option"
+            aria-selected={activeIndex === filtered.length}
             className={[
               'px-3 py-2 cursor-pointer text-sm border-t border-subtle transition-colors',
               activeIndex === filtered.length
