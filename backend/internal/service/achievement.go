@@ -8,6 +8,25 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/model"
 )
 
+// Scoring constants for EvaluateForScoreCard.
+// These reflect the rules for a standard 10m Air Pistol / 25m Precision Pistol
+// card: 50 shots fired at a 10-point ring target, giving a maximum total score
+// of 250. The X-ring is a smaller inner zone inside the 10-ring; hitting it
+// scores the same 10 points but is tracked separately as a precision metric.
+const (
+	maxScorePerCard = 250 // 50 shots × 10-point maximum ring
+
+	// Score-based achievement thresholds.
+	scoreCentury		= 100 // ~40 % of max; approachable entry milestone
+	scoreDoubleCentury	= 200 // ~80 % of max; accomplished shooter
+	scorePerfect		= maxScorePerCard // every shot placed in the 10-ring
+
+	// X-ring hit thresholds (inner bull within the 10-ring).
+	xCountSharpEye		= 5  // entry tier — consistent inner-ring accuracy
+	xCountSharpshooter	= 10 // second tier
+	xCountXMachine		= 15 // top tier — majority of shots land in the X-ring
+)
+
 type AchievementRepo interface {
 	Award(ctx context.Context, userID, achievementID string) (bool, error)
 	ListForUser(ctx context.Context, userID string) ([]*model.UserAchievement, error)
@@ -67,18 +86,18 @@ type StarLevelRepo interface {
 }
 
 type AchievementService struct {
-	achievements    AchievementRepo
-	cards           CardCountRepo
-	follows         FollowCountRepo
-	comments        CommentCountRepo
-	clubs           ClubMembershipCountRepo
-	pelletTests     PelletTestCountRepo
-	likes           LikeCountRepo
-	communityReview CommunityReviewCountRepo
-	events          EventCountRepo
-	starLevel       StarLevelRepo
-	activity        *ActivityService // nil disables feed ingestion
-	social          *SocialService   // nil disables privacy enforcement
+	achievements		AchievementRepo
+	cards			CardCountRepo
+	follows			FollowCountRepo
+	comments		CommentCountRepo
+	clubs			ClubMembershipCountRepo
+	pelletTests		PelletTestCountRepo
+	likes			LikeCountRepo
+	communityReview		CommunityReviewCountRepo
+	events			EventCountRepo
+	starLevel		StarLevelRepo
+	activity		*ActivityService // nil disables feed ingestion
+	social			*SocialService   // nil disables privacy enforcement
 }
 
 func NewAchievementService(
@@ -164,22 +183,22 @@ func (s *AchievementService) EvaluateForScoreCard(ctx context.Context, userID st
 	if cardCount == 1 {
 		s.award(ctx, userID, "first_card")
 	}
-	if card.TotalScore >= 100 {
+	if card.TotalScore >= scoreCentury {
 		s.award(ctx, userID, "century")
 	}
-	if card.TotalScore >= 200 {
+	if card.TotalScore >= scoreDoubleCentury {
 		s.award(ctx, userID, "double_century")
 	}
-	if card.TotalScore == 250 {
+	if card.TotalScore == scorePerfect {
 		s.award(ctx, userID, "perfect_score")
 	}
-	if card.XCount >= 5 {
+	if card.XCount >= xCountSharpEye {
 		s.award(ctx, userID, "sharp_eye")
 	}
-	if card.XCount >= 10 {
+	if card.XCount >= xCountSharpshooter {
 		s.award(ctx, userID, "sharpshooter")
 	}
-	if card.XCount >= 15 {
+	if card.XCount >= xCountXMachine {
 		s.award(ctx, userID, "x_machine")
 	}
 	if cardCount >= 10 {
