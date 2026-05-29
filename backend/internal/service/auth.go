@@ -28,12 +28,12 @@ var (
 )
 
 const (
-	refreshTokenTTL          = 30 * 24 * time.Hour
-	refreshKeyPrefix         = "refresh:"
-	userTokensPrefix         = "user_refresh:"
-	challengeTokenTTL        = 5 * time.Minute
-	challengeTokenPurpose    = "2fa_challenge"
-	purposeClaim             = "purpose"
+	refreshTokenTTL       = 30 * 24 * time.Hour
+	refreshKeyPrefix      = "refresh:"
+	userTokensPrefix      = "user_refresh:"
+	challengeTokenTTL     = 5 * time.Minute
+	challengeTokenPurpose = "2fa_challenge"
+	purposeClaim          = "purpose"
 )
 
 type AuthService struct {
@@ -272,18 +272,25 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
 	}
 }
 
+// jwtKeyFunc returns the JWT key function shared between ValidateAccessToken
+// and ValidateChallengeToken. Centralising it ensures that any change to
+// the accepted signing algorithm or key applies to both token types at once.
+func (s *AuthService) jwtKeyFunc() jwt.Keyfunc {
+	return func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return s.jwtSecret, nil
+	}
+}
+
 // ValidateAccessToken parses and validates a JWT, returning the user ID.
 // Tokens carrying a non-empty `purpose` claim (e.g. 2FA challenge tokens) are
 // rejected — only true access tokens, which omit the claim, may authenticate
 // API calls.
 func (s *AuthService) ValidateAccessToken(tokenStr string) (*AuthPrincipal, error) {
 	claims := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return s.jwtSecret, nil
-	}, jwt.WithExpirationRequired())
+	token, err := jwt.ParseWithClaims(tokenStr, claims, s.jwtKeyFunc(), jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
 		return nil, ErrInvalidToken
 	}
@@ -329,12 +336,7 @@ func (s *AuthService) issueChallengeToken(userID string) (string, error) {
 // so an access token cannot be replayed against the verify-2fa endpoint.
 func (s *AuthService) ValidateChallengeToken(tokenStr string) (string, error) {
 	claims := jwt.MapClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return s.jwtSecret, nil
-	}, jwt.WithExpirationRequired())
+	token, err := jwt.ParseWithClaims(tokenStr, claims, s.jwtKeyFunc(), jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
 		return "", ErrInvalidToken
 	}
