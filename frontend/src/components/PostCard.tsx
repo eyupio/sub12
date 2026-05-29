@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageSquare, Target, TestTube2, Globe, Users as UsersIcon, UserCheck, Lock, EyeOff, MoreHorizontal, Flag, Send, AlertTriangle, Edit3, Trash2 } from 'lucide-react'
@@ -76,7 +76,10 @@ function VisibilityBadge({ visibility }: { visibility: PostVisibility }) {
   )
 }
 
-export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?: () => void }) {
+// ⚡ Bolt: memo prevents re-renders when the parent (Layout) updates due to
+// draft-count polling, route changes, or online/offline toggling — the post
+// prop is stable for the lifetime of a list view render, so skip is safe.
+export const PostCard = memo(function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?: () => void }) {
   const currentUser = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -536,4 +539,4 @@ export function PostCard({ post, onCommentClick }: { post: Post; onCommentClick?
       />
     </article>
   )
-}
+})
