@@ -128,6 +128,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	// Enforce the same length bounds as Register so attacker-controlled
+	// oversized inputs cannot waste DB or bcrypt CPU on the login path.
+	// Use the generic "invalid email or password" error to avoid leaking
+	// which field tripped the check.
+	if len(body.Email) > 254 || len(body.Password) > 128 {
+		writeError(w, http.StatusUnauthorized, "invalid email or password")
+		return
+	}
 
 	user, tokens, challenge, err := h.auth.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
@@ -261,6 +269,10 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decodeJSON(r, &body); err != nil || body.Email == "" {
 		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if len(body.Email) > 254 {
+		writeError(w, http.StatusBadRequest, "email is too long")
 		return
 	}
 	if _, err := mail.ParseAddress(body.Email); err != nil {
