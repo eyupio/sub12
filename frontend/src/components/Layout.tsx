@@ -281,6 +281,8 @@ export default function Layout({ children }: PropsWithChildren) {
             ))}
             <button
               onClick={() => setMoreOpen(prev => !prev)}
+              aria-label="More navigation options"
+              aria-expanded={moreOpen}
               className={`h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 transition-colors ${moreOpen ? 'text-[var(--brass)]' : 'text-muted hover:text-[var(--brass)]'}`}
             >
               <MoreHorizontal size={22} />
