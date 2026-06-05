@@ -17,14 +17,14 @@ const (
 	maxScorePerCard = 250 // 50 shots × 10-point maximum ring
 
 	// Score-based achievement thresholds.
-	scoreCentury		= 100 // ~40 % of max; approachable entry milestone
-	scoreDoubleCentury	= 200 // ~80 % of max; accomplished shooter
-	scorePerfect		= maxScorePerCard // every shot placed in the 10-ring
+	scoreCentury       = 100             // ~40 % of max; approachable entry milestone
+	scoreDoubleCentury = 200             // ~80 % of max; accomplished shooter
+	scorePerfect       = maxScorePerCard // every shot placed in the 10-ring
 
 	// X-ring hit thresholds (inner bull within the 10-ring).
-	xCountSharpEye		= 5  // entry tier — consistent inner-ring accuracy
-	xCountSharpshooter	= 10 // second tier
-	xCountXMachine		= 15 // top tier — majority of shots land in the X-ring
+	xCountSharpEye     = 5  // entry tier — consistent inner-ring accuracy
+	xCountSharpshooter = 10 // second tier
+	xCountXMachine     = 15 // top tier — majority of shots land in the X-ring
 )
 
 type AchievementRepo interface {
@@ -86,18 +86,18 @@ type StarLevelRepo interface {
 }
 
 type AchievementService struct {
-	achievements		AchievementRepo
-	cards			CardCountRepo
-	follows			FollowCountRepo
-	comments		CommentCountRepo
-	clubs			ClubMembershipCountRepo
-	pelletTests		PelletTestCountRepo
-	likes			LikeCountRepo
-	communityReview		CommunityReviewCountRepo
-	events			EventCountRepo
-	starLevel		StarLevelRepo
-	activity		*ActivityService // nil disables feed ingestion
-	social			*SocialService   // nil disables privacy enforcement
+	achievements    AchievementRepo
+	cards           CardCountRepo
+	follows         FollowCountRepo
+	comments        CommentCountRepo
+	clubs           ClubMembershipCountRepo
+	pelletTests     PelletTestCountRepo
+	likes           LikeCountRepo
+	communityReview CommunityReviewCountRepo
+	events          EventCountRepo
+	starLevel       StarLevelRepo
+	activity        *ActivityService // nil disables feed ingestion
+	social          *SocialService   // nil disables privacy enforcement
 }
 
 func NewAchievementService(
@@ -242,6 +242,7 @@ func (s *AchievementService) EvaluateForPersonalBest(ctx context.Context, userID
 // EvaluateForFollow awards achievements triggered by a successful follow:
 //   - first_follow to the follower on their first follow
 //   - social_butterfly to the target when they cross 10 followers
+//   - well_known to the target when they cross 25 followers
 func (s *AchievementService) EvaluateForFollow(ctx context.Context, followerID, followedID string) {
 	if s.follows == nil {
 		return
@@ -252,11 +253,15 @@ func (s *AchievementService) EvaluateForFollow(ctx context.Context, followerID, 
 	if count, err := s.follows.CountFollowing(ctx, followerID); err == nil && count == 1 {
 		s.award(ctx, followerID, "first_follow")
 	}
-	if count, err := s.follows.CountFollowers(ctx, followedID); err == nil && count >= 10 {
-		s.award(ctx, followedID, "social_butterfly")
-	}
-	if count, err := s.follows.CountFollowers(ctx, followedID); err == nil && count >= 25 {
-		s.award(ctx, followedID, "well_known")
+	// Both follower-count thresholds share one DB call so the tiers are evaluated
+	// against the same snapshot and never disagree mid-function.
+	if followers, err := s.follows.CountFollowers(ctx, followedID); err == nil {
+		if followers >= 10 {
+			s.award(ctx, followedID, "social_butterfly")
+		}
+		if followers >= 25 {
+			s.award(ctx, followedID, "well_known")
+		}
 	}
 }
 
@@ -403,6 +408,7 @@ func (s *AchievementService) EvaluateForCommunityReview(ctx context.Context, rev
 //   - event_podium: top 3 by points (across all categories) for registered
 //     participants only.
 //   - event_host_{1,5,25}: the owner crossing those lifetime tiers.
+//
 // Guests never receive achievements (they have no account).
 func (s *AchievementService) EvaluateForEventCompletion(ctx context.Context, ev *model.Event, standings []*model.EventStandingRow) {
 	if s == nil || s.events == nil {
