@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -65,7 +64,7 @@ func (h *TwoFactorHandler) EnrollConfirm(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		Code string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+	if err := decodeJSON(r, &body); err != nil || body.Code == "" {
 		writeError(w, http.StatusBadRequest, "code is required")
 		return
 	}
@@ -95,7 +94,7 @@ func (h *TwoFactorHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Code     string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -127,7 +126,7 @@ func (h *TwoFactorHandler) RegenerateBackupCodes(w http.ResponseWriter, r *http.
 	var body struct {
 		Code string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+	if err := decodeJSON(r, &body); err != nil || body.Code == "" {
 		writeError(w, http.StatusBadRequest, "code is required")
 		return
 	}
