@@ -13,6 +13,9 @@ import (
 var ErrInvalidPelletTest = errors.New("invalid pellet test")
 var ErrInvalidMeasurement = errors.New("invalid measurement")
 
+// yardsToMeters is the exact conversion factor (1 yd = 0.9144 m per NIST).
+const yardsToMeters = 0.9144
+
 type PelletTestService struct {
 	repo         *repository.PelletTestRepository
 	users        UserProfileReader   // nil skips owner-privacy checks
@@ -51,7 +54,7 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 
 	distanceM := in.DistanceValue
 	if in.DistanceUnit == "yards" {
-		distanceM = in.DistanceValue * 0.9144
+		distanceM = in.DistanceValue * yardsToMeters
 	}
 
 	session, err := s.repo.Create(ctx, userID, in, distanceM)
@@ -145,7 +148,7 @@ func (s *PelletTestService) QuickCreate(ctx context.Context, userID string, in *
 	if in.DistanceValue != nil && *in.DistanceValue >= 0 {
 		distanceM = *in.DistanceValue
 		if unit == "yards" {
-			distanceM = distanceM * 0.9144
+			distanceM = distanceM * yardsToMeters
 		}
 	}
 	return s.repo.CreateDraft(ctx, userID, in, distanceM)
@@ -195,7 +198,7 @@ func (s *PelletTestService) Update(ctx context.Context, id, userID string, in *m
 		}
 		d := *in.DistanceValue
 		if unit == "yards" {
-			d = d * 0.9144
+			d = d * yardsToMeters
 		}
 		distanceM = &d
 	}
