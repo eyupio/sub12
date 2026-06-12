@@ -1,3 +1,7 @@
+## 2026-06-12 - PostgreSQL UNIQUE Constraint Already Creates an Index
+**Learning:** Adding `UNIQUE (col_a, col_b, col_c)` to a table implicitly creates a B-tree index on those columns in PostgreSQL. A separate `CREATE INDEX` on the exact same columns is redundant — both indexes are maintained on every write with no additional read benefit.
+**Action:** When auditing schema migrations, check whether explicit `CREATE INDEX` statements duplicate any `UNIQUE` or `PRIMARY KEY` constraint on the same columns. If so, drop the explicit index — it cuts write overhead proportionally and saves disk space.
+
 ## 2026-05-27 - Memoize navItems in Layout to prevent per-render array spread
 **Learning:** `Layout` is one of the most-rendered components in the app — it re-renders on every draft-count poll (60 s interval), route change, online/offline toggle, and keyboard viewport change. The `navItems` array was reconstructed on every render via `[...baseNavItems, ...adminNavItems]` for admin users. The admin flag (`isAdmin = user?.role === 'admin'`) changes at most once per session, so nearly every array spread was wasted work. Wrapping with `useMemo([isAdmin])` eliminates the allocation on all subsequent renders.
 **Action:** Any expensive expression in a component render body that depends only on stable or rarely-changing values (user role, feature flags, static config) is a candidate for `useMemo`. Check component re-render frequency first — the higher the rate, the more valuable memoization becomes.
