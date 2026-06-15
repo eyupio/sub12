@@ -705,7 +705,7 @@ export default function ImageMeasurement({
     <div className={chromeless ? 'flex flex-col bg-page rounded-lg border border-line overflow-hidden h-[calc(100vh-12rem)] min-h-[520px]' : 'fixed inset-0 z-50 flex flex-col bg-page'}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-subtle">
-        <button onClick={goBack} className="text-primary p-1"><ArrowLeft size={20} /></button>
+        <button onClick={goBack} className="text-primary p-1" aria-label="Go back"><ArrowLeft size={20} /></button>
         <span className="text-primary font-medium text-sm tracking-wide">{stepTitles[step]}</span>
         <div className="flex items-center gap-2">
           <button
@@ -715,7 +715,7 @@ export default function ImageMeasurement({
             Reset
           </button>
           {!chromeless && (
-            <button onClick={onClose} className="text-primary p-1"><XIcon size={20} /></button>
+            <button onClick={onClose} className="text-primary p-1" aria-label="Close"><XIcon size={20} /></button>
           )}
         </div>
       </div>
