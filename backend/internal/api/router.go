@@ -329,7 +329,7 @@ func NewRouter(
 			// admins. Flagged comments stay visible with a banner and clear
 			// automatically when the author edits them.
 			r.With(rl.Limit("report")).Post("/comments/{id}/flag", commentH.Flag)
-			r.Post("/comments/{id}/unflag", commentH.Unflag)
+			r.With(rl.Limit("report")).Post("/comments/{id}/unflag", commentH.Unflag)
 
 			// Likes
 			lkh := handler.NewLike(likes)
@@ -352,7 +352,7 @@ func NewRouter(
 			r.Patch("/posts/{id}", postH.Update)
 			r.Delete("/posts/{id}", postH.Delete)
 			r.With(rl.Limit("report")).Post("/posts/{id}/flag", postH.Flag)
-			r.Post("/posts/{id}/unflag", postH.Unflag)
+			r.With(rl.Limit("report")).Post("/posts/{id}/unflag", postH.Unflag)
 			r.With(rl.Limit("comment")).Post("/posts/{id}/comments", commentH.CreateOnPost)
 			r.Get("/posts/{id}/comments", commentH.ListOnPost)
 
