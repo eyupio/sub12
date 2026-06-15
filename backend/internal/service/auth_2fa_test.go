@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"testing"
 	"time"
@@ -114,5 +116,64 @@ func TestValidateAccessToken_RejectsAnyPurposeClaim(t *testing.T) {
 	_, err = s.ValidateAccessToken(tok)
 	if !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("ValidateAccessToken must reject tokens with any purpose claim, got %v", err)
+	}
+}
+
+// TestValidateAccessToken_RejectsAlgorithmSubstitution verifies that
+// ValidateAccessToken rejects tokens signed with a non-HMAC algorithm.
+// Both validators share an HMAC secret; the signing-method guard in each
+// key function is the only thing that stops an attacker from forging a token
+// with RS256 (or any other algorithm) signed by an attacker-controlled key.
+// Removing that guard must cause this test to fail.
+func TestValidateAccessToken_RejectsAlgorithmSubstitution(t *testing.T) {
+	s := newTestAuthService(t)
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub": "attacker",
+		"iat": now.Unix(),
+		"exp": now.Add(time.Hour).Unix(),
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+	if err != nil {
+		t.Fatalf("sign RS256 token: %v", err)
+	}
+
+	_, err = s.ValidateAccessToken(tok)
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("ValidateAccessToken must reject non-HMAC tokens, got: %v", err)
+	}
+}
+
+// TestValidateChallengeToken_RejectsAlgorithmSubstitution applies the same
+// algorithm-guard check to the 2FA challenge token path.
+func TestValidateChallengeToken_RejectsAlgorithmSubstitution(t *testing.T) {
+	s := newTestAuthService(t)
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":        "attacker",
+		purposeClaim: challengeTokenPurpose,
+		"iat":        now.Unix(),
+		"exp":        now.Add(time.Hour).Unix(),
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(privKey)
+	if err != nil {
+		t.Fatalf("sign RS256 challenge token: %v", err)
+	}
+
+	_, err = s.ValidateChallengeToken(tok)
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("ValidateChallengeToken must reject non-HMAC tokens, got: %v", err)
 	}
 }
