@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -103,12 +102,7 @@ func (h *EventInvitationHandler) PotentialInvitees(w http.ResponseWriter, r *htt
 	}
 	source := r.URL.Query().Get("source")
 	q := r.URL.Query().Get("q")
-	limit := 50
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	items, err := h.svc.PotentialInvitees(r.Context(), slug, userID, source, q, limit)
 	if err != nil {
 		switch {

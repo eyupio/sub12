@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -24,12 +23,7 @@ func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 20
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 20, 100)
 	cursor := r.URL.Query().Get("cursor")
 	items, next, err := h.svc.List(r.Context(), userID, limit, cursor)
 	if err != nil {

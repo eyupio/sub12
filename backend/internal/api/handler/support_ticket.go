@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -47,12 +46,7 @@ func (h *SupportTicketHandler) ListMine(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 50
-	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	in := &model.ListSupportTicketsInput{
 		ViewerID:      userID,
 		ParticipantID: &userID,
@@ -196,12 +190,7 @@ func (h *SupportTicketHandler) AdminList(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 50
-	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	in := &model.ListSupportTicketsInput{
 		ViewerID:  userID,
 		Status:    r.URL.Query().Get("status"),

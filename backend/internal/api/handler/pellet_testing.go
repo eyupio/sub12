@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -55,18 +54,7 @@ func (h *PelletTestHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 20
-	offset := 0
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
-	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			offset = n
-		}
-	}
+	limit, offset := parsePagination(r, 20, 100)
 	scope := r.URL.Query().Get("scope")
 
 	sessions, err := h.svc.List(r.Context(), userID, limit, offset, scope)
@@ -847,18 +835,7 @@ func (h *PelletTestHandler) Export(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/pellet-tests/public-leaderboard
 func (h *PelletTestHandler) PublicLeaderboard(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-	offset := 0
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
-	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			offset = n
-		}
-	}
+	limit, offset := parsePagination(r, 50, 100)
 
 	entries, err := h.svc.GetPublicLeaderboard(r.Context(), limit, offset)
 	if err != nil {

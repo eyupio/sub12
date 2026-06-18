@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -29,12 +28,7 @@ func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
 	q := r.URL.Query().Get("q")
 
-	limit := 20
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			limit = n
-		}
-	}
+	limit, _ := parsePagination(r, 20, 100)
 
 	results, err := h.svc.SearchUsers(r.Context(), q, viewerID, limit)
 	if err != nil {
