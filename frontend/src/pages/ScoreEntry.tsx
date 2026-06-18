@@ -560,9 +560,9 @@ export default function ScoreEntry() {
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Equipment</p>
             <div className="space-y-1.5">
-              <label className={sidebarLabelCls}>Rifle</label>
+              <label htmlFor="score-rifle" className={sidebarLabelCls}>Rifle</label>
               {rifles.length > 0 ? (
-                <select value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
+                <select id="score-rifle" value={rifleId} onChange={e => setRifleId(e.target.value)} className={inputCls}>
                   <option value="">— none —</option>
                   {rifles.map(r => (
                     <option key={r.id} value={r.id}>{r.make} {r.model} ({r.calibre})</option>
@@ -573,9 +573,9 @@ export default function ScoreEntry() {
               )}
             </div>
             <div className="space-y-1.5">
-              <label className={sidebarLabelCls}>Pellet</label>
+              <label htmlFor="score-pellet" className={sidebarLabelCls}>Pellet</label>
               {pellets.length > 0 ? (
-                <select value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
+                <select id="score-pellet" value={pelletId} onChange={e => setPelletId(e.target.value)} className={inputCls}>
                   <option value="">— none —</option>
                   {pellets.map(p => (
                     <option key={p.id} value={p.id}>{p.brand} {p.model}{p.head_size_mm ? ` ${p.head_size_mm}mm` : ''}</option>
@@ -602,8 +602,9 @@ export default function ScoreEntry() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className={sidebarLabelCls}>Wind (mph)</label>
+                <label htmlFor="score-wind" className={sidebarLabelCls}>Wind (mph)</label>
                 <input
+                  id="score-wind"
                   type="number"
                   step="0.1"
                   min="0"
@@ -614,8 +615,9 @@ export default function ScoreEntry() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className={sidebarLabelCls}>Temp (°C)</label>
+                <label htmlFor="score-temp" className={sidebarLabelCls}>Temp (°C)</label>
                 <input
+                  id="score-temp"
                   type="number"
                   step="0.1"
                   value={tempCelsius}
