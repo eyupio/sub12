@@ -23,6 +23,7 @@ type mockScoreCardRepo struct {
 	lastTotal            int16
 	lastXCount           int16
 	lastRotation         int16
+	submitToLeagueCalled bool
 	// card is returned from GetByID; if nil, a placeholder is returned.
 	card *model.ScoreCard
 	// priorStats overrides the GetPriorScoreStats response when non-nil.
@@ -96,6 +97,7 @@ func (m *mockScoreCardRepo) GetGearLabels(_ context.Context, _ string) (string, 
 	return m.rifleLabel, m.pelletLabel, nil
 }
 func (m *mockScoreCardRepo) SubmitToLeague(_ context.Context, _, _, _ string) (*model.ScoreCard, error) {
+	m.submitToLeagueCalled = true
 	if m.card != nil {
 		return m.card, nil
 	}
@@ -108,15 +110,16 @@ func (m *mockScoreCardRepo) GetExistingCardForParticipant(_ context.Context, _ s
 
 // mockLeagueRepo implements LeagueConfigRepo for lock-policy tests.
 type mockLeagueRepo struct {
-	cfg      *model.LeagueConfig
-	isMember bool
+	cfg             *model.LeagueConfig
+	isMember        bool
+	submissionCount int
 }
 
 func (m *mockLeagueRepo) GetConfigByRoundID(_ context.Context, _ string) (*model.LeagueConfig, error) {
 	return m.cfg, nil
 }
 func (m *mockLeagueRepo) CountUserSubmissionsForRound(_ context.Context, _, _ string) (int, error) {
-	return 0, nil
+	return m.submissionCount, nil
 }
 func (m *mockLeagueRepo) GetLeagueIDByRoundID(_ context.Context, _ string) (string, error) {
 	return "league-1", nil
@@ -538,4 +541,83 @@ func TestCreate_LeagueSubmission_MemberSucceeds(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.True(t, repo.createCalled)
+}
+
+// --- SubmitToLeague tests ---
+// SubmitToLeague is a parallel submission path that re-enforces the same
+// business rules as Create (membership, max submissions, image required) plus
+// two guards unique to the post-hoc path (no drafts, no double-submission).
+// These tests pin each rule independently so a refactor that removes any one
+// guard will surface immediately.
+
+func TestSubmitToLeague_DraftCardRejected(t *testing.T) {
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "draft-1", IsDraft: true}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
+
+	_, err := svc.SubmitToLeague(context.Background(), "draft-1", "user1", "round-1")
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_AlreadySubmittedRejected(t *testing.T) {
+	existing := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false, LeagueRoundID: &existing}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-2")
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_RequiresMembership(t *testing.T) {
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: false}}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
+	assert.ErrorIs(t, err, ErrNotLeagueMember)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_MaxSubmissionsEnforced(t *testing.T) {
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false}}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{
+			isMember:        true,
+			submissionCount: 2,
+			cfg:             &model.LeagueConfig{MaxSubmissionsPerRound: 2},
+		},
+	}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
+	assert.ErrorIs(t, err, ErrMaxSubmissions)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_ImageRequiredNoImageRejected(t *testing.T) {
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false}}
+	svc := &ScoreCardService{
+		cards:      repo,
+		leagueRepo: &mockLeagueRepo{isMember: true, cfg: &model.LeagueConfig{RequireImageUpload: true}},
+	}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_MemberWithImageSucceeds(t *testing.T) {
+	url := "https://example.com/card.jpg"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false, CardImageURL: &url}}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{
+			isMember: true,
+			cfg:      &model.LeagueConfig{MaxSubmissionsPerRound: 3, RequireImageUpload: true},
+		},
+	}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
+	require.NoError(t, err)
+	assert.True(t, repo.submitToLeagueCalled)
 }

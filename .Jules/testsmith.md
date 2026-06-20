@@ -20,6 +20,14 @@ required.
 pin the security contract: token in fragment, not query; sensible default URL; stripping
 of any pre-existing fragment to prevent double-# URLs.
 
+## 2026-06-19 - Parallel submission path guards untested
+
+**Learning:** `SubmitToLeague` re-implements five business rules (membership, max submissions, image required, no drafts, no double-submission) independently from `Create`. The existing tests only covered the `Create` path for league membership — `SubmitToLeague` had zero direct test coverage. Any of its five guards could be silently removed in a refactor.
+
+**Risk:** A user could submit a draft card, attach a card to a second league round, or bypass the submission cap via the `SubmitToLeague` endpoint while `Create` tests remained green. The double-submission guard and draft guard in particular have no analogue in `Create`, so they are especially easy to forget.
+
+**Action:** Added six tests in `score_card_test.go` — one per guard plus one happy path. Extended `mockLeagueRepo` with `submissionCount` and `mockScoreCardRepo` with `submitToLeagueCalled` so each test can assert the repo layer was never reached on rejection.
+
 ## 2026-06-05 - JWT algorithm substitution guard untested
 
 **Learning:** Both `ValidateAccessToken` and `ValidateChallengeToken` contain an explicit
