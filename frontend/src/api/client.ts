@@ -49,6 +49,18 @@ async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
+// Reads the response body and extracts the human-readable error message.
+// The backend wraps errors as `{ "error": "..." }` JSON; for non-JSON bodies
+// (e.g. plain-text gateway errors) the raw text is used as-is.
+async function parseErrorMessage(res: Response): Promise<string> {
+  const text = await res.text()
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed.error) return parsed.error
+  } catch { /* not JSON */ }
+  return text
+}
+
 async function handleUnauthorized(): Promise<boolean> {
   // Deduplicate concurrent refresh attempts
   if (!refreshPromise) {
@@ -96,10 +108,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   }
 
   if (!res.ok) {
-    const text = await res.text()
-    let msg = text
-    try { const parsed = JSON.parse(text); if (parsed.error) msg = parsed.error } catch { /* not JSON */ }
-    throw new ApiError(res.status, msg)
+    throw new ApiError(res.status, await parseErrorMessage(res))
   }
 
   if (res.status === 204) return undefined as T
@@ -139,10 +148,7 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
   }
 
   if (!res.ok) {
-    const text = await res.text()
-    let msg = text
-    try { const parsed = JSON.parse(text); if (parsed.error) msg = parsed.error } catch { /* not JSON */ }
-    throw new ApiError(res.status, msg)
+    throw new ApiError(res.status, await parseErrorMessage(res))
   }
 
   if (res.status === 204) return undefined as T
