@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -195,11 +194,6 @@ func (h *ReportHandler) writeDecideError(w http.ResponseWriter, err error) {
 
 func parseListParams(r *http.Request) (string, int) {
 	status := r.URL.Query().Get("status")
-	limit := 50
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	return status, limit
 }

@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -27,12 +26,7 @@ func (h *FeatureRequestHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 50
-	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	items, err := h.svc.List(r.Context(), userID, &model.ListFeatureRequestsInput{
 		ViewerID:  userID,
 		ScopeType: r.URL.Query().Get("scope_type"),
@@ -52,12 +46,7 @@ func (h *FeatureRequestHandler) Rank(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	limit := 50
-	if s := r.URL.Query().Get("limit"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil && v > 0 {
-			limit = v
-		}
-	}
+	limit, _ := parsePagination(r, 50, 100)
 	items, err := h.svc.Rank(r.Context(), userID, &model.ListFeatureRequestsInput{
 		ViewerID:  userID,
 		ScopeType: r.URL.Query().Get("scope_type"),
