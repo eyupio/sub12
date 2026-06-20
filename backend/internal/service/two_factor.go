@@ -114,7 +114,9 @@ func (s *TwoFactorService) ConfirmEnroll(ctx context.Context, userID, code strin
 		return nil, err
 	}
 
-	s.redis.Del(ctx, pendingEnrollPrefix+userID)
+	if err := s.redis.Del(ctx, pendingEnrollPrefix+userID).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "pending_enroll_cleanup_failed").Str("user_id", userID).Msg("audit")
+	}
 	s.log.Info().Str("event", "totp_enabled").Str("user_id", userID).Msg("audit")
 	return plain, nil
 }
