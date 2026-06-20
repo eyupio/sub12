@@ -52,7 +52,7 @@ export function PickerModal({ open, title, items, loading, emptyMessage, onSelec
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {loading && <p className="text-center text-sm text-muted p-6">Loading...</p>}
+          {loading && <p className="text-center text-sm text-muted p-6">Loading…</p>}
           {!loading && items.length === 0 && (
             <p className="text-center text-sm text-muted p-6">{emptyMessage ?? 'Nothing to show.'}</p>
           )}

@@ -44,7 +44,7 @@ export default function ForgotPassword() {
               to="/login"
               className="inline-block text-[var(--brass)] hover:opacity-80 transition-opacity text-[11px] tracking-widest uppercase"
             >
-              Back to Sign In
+              Back to sign in
             </Link>
             <p className="t-section-title">
               <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
@@ -87,7 +87,7 @@ export default function ForgotPassword() {
             <p className="text-center t-section-title">
               Remember your password?{' '}
               <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
-                Sign In
+                Sign in
               </Link>
             </p>
 

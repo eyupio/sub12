@@ -189,7 +189,7 @@ export default function AdminEmailTemplates() {
         </aside>
 
         <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
-          {templateQuery.isLoading && <p className="text-sm text-muted">Loading template...</p>}
+          {templateQuery.isLoading && <p className="text-sm text-muted">Loading template…</p>}
 
           {templateQuery.data && (
             <form onSubmit={handleSubmit} className="space-y-4">

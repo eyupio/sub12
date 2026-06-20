@@ -44,7 +44,7 @@ export default function ConfirmEmail() {
             to="/login"
             className="mt-2 px-4 py-2 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors"
           >
-            Sign In
+            Sign in
           </Link>
         </div>
       )}

@@ -51,7 +51,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 			return false, ErrLikeTargetNotFound
 		}
 		if card.UserID != userID {
-			blocked, _ := s.blocks.IsBlocked(ctx, card.UserID, userID)
+			blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
+			if err != nil {
+				return false, err
+			}
 			if blocked {
 				return false, ErrLikeTargetNotFound
 			}
@@ -67,7 +70,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 			return false, err
 		}
 		if post.UserID != userID {
-			blocked, _ := s.blocks.IsBlocked(ctx, post.UserID, userID)
+			blocked, err := s.blocks.IsBlocked(ctx, post.UserID, userID)
+			if err != nil {
+				return false, err
+			}
 			if blocked {
 				return false, ErrLikeTargetNotFound
 			}
@@ -85,7 +91,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 			return false, err
 		}
 		if act.UserID != userID {
-			blocked, _ := s.blocks.IsBlocked(ctx, act.UserID, userID)
+			blocked, err := s.blocks.IsBlocked(ctx, act.UserID, userID)
+			if err != nil {
+				return false, err
+			}
 			if blocked {
 				return false, ErrLikeTargetNotFound
 			}

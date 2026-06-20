@@ -253,9 +253,15 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 		return nil, err
 	}
 
-	// Revoke old token only after the new one is safely stored.
-	s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
-	s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
+	// Revoke old token only after the new one is safely stored. A failure here
+	// leaves the old refresh token valid until its TTL; log it so the lapse is
+	// visible rather than silently swallowed.
+	if err := s.redis.Del(ctx, refreshKeyPrefix+refreshToken).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "refresh_token_revoke_failed").Str("user_id", userID).Msg("audit")
+	}
+	if err := s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "refresh_token_revoke_failed").Str("user_id", userID).Msg("audit")
+	}
 
 	return tokens, nil
 }
@@ -266,9 +272,13 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
 		return
 	}
 	userID, _ := s.validateRefreshToken(ctx, refreshToken)
-	s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
+	if err := s.redis.Del(ctx, refreshKeyPrefix+refreshToken).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "logout_token_revoke_failed").Str("user_id", userID).Msg("audit")
+	}
 	if userID != "" {
-		s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
+		if err := s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken).Err(); err != nil {
+			s.log.Error().Err(err).Str("event", "logout_token_revoke_failed").Str("user_id", userID).Msg("audit")
+		}
 	}
 }
 

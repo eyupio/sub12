@@ -216,7 +216,7 @@ export default function Feed() {
                 disabled={isFetchingNextPage}
               >
                 <RefreshCw size={13} className={isFetchingNextPage ? 'feed-spin' : ''} />
-                {isFetchingNextPage ? 'Loading...' : 'Load more'}
+                {isFetchingNextPage ? 'Loading…' : 'Load more'}
               </button>
             </div>
           )}
