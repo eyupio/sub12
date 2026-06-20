@@ -205,25 +205,36 @@ export default function Drafts() {
   }
 
   const deleteMutation = useMutation({
+    // Use allSettled so one failed delete doesn't abort the rest: drafts that
+    // succeeded server-side must still be reflected in the UI, and the user
+    // needs to know exactly how many were removed.
     mutationFn: async (drafts: DraftRow[]) => {
-      await Promise.all(drafts.map(row =>
+      const results = await Promise.allSettled(drafts.map(row =>
         row.kind === 'score'
           ? scoreCardApi.remove(row.id)
           : pelletTestApi.delete(row.id)
       ))
-      return drafts.length
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      return { succeeded, failed: results.length - succeeded }
     },
-    onSuccess: (count) => {
+    onSuccess: ({ succeeded, failed }) => {
+      if (failed === 0) {
+        toast(succeeded === 1 ? 'Draft deleted' : `${succeeded} drafts deleted`, 'success')
+      } else if (succeeded === 0) {
+        toast('Failed to delete drafts', 'error')
+      } else {
+        toast(`Deleted ${succeeded} of ${succeeded + failed} drafts`, 'error')
+      }
+    },
+    // Always refresh the lists and clear selection, even on partial failure, so
+    // the UI never shows drafts that were already deleted on the server.
+    onSettled: () => {
       setSelected(new Set())
       setPendingDelete(null)
       qc.invalidateQueries({ queryKey: ['score-drafts'] })
       qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
       qc.invalidateQueries({ queryKey: ['pellet-drafts'] })
       qc.invalidateQueries({ queryKey: ['pellet-drafts-count'] })
-      toast(count === 1 ? 'Draft deleted' : `${count} drafts deleted`, 'success')
-    },
-    onError: (err) => {
-      toast(err instanceof Error ? err.message : 'Failed to delete drafts', 'error')
     },
   })
 
