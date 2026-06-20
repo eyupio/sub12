@@ -477,7 +477,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <Link to="/login" className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-[var(--brass)]/40 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--brass)] transition-colors hover:border-[var(--brass)] hover:bg-[var(--brass)]/10 sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.16em]">
-              Sign In
+              Sign in
             </Link>
             <Link to="/register" className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-[var(--brass)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-inverse transition-all hover:-translate-y-0.5 hover:opacity-90 sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.16em]">
               Start Tracking
@@ -1083,7 +1083,7 @@ export default function LandingPage() {
                     <ArrowRight size={16} />
                   </Link>
                   <Link to="/login" className="inline-flex items-center justify-center rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
-                    Sign In
+                    Sign in
                   </Link>
                 </div>
 

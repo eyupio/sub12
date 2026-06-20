@@ -132,7 +132,7 @@ export default function FeatureRequestDetail() {
                 </div>
               </form>
             ) : (
-              <p className="text-sm text-muted">Log in to join the discussion.</p>
+              <p className="text-sm text-muted">Sign in to join the discussion.</p>
             )}
           </section>
         </>

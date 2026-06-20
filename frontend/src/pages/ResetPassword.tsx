@@ -103,7 +103,7 @@ export default function ResetPassword() {
               to="/login"
               className="inline-block mt-2 px-4 py-2 rounded bg-[var(--brass)]/20 border border-[var(--brass)]/30 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:bg-[var(--brass)]/30 transition-colors"
             >
-              Sign In
+              Sign in
             </Link>
           </div>
         ) : (
@@ -154,7 +154,7 @@ export default function ResetPassword() {
 
             <p className="text-center t-section-title">
               <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
-                Back to Sign In
+                Back to sign in
               </Link>
             </p>
           </>
