@@ -62,13 +62,22 @@ export function LikeButton({ targetId, targetType, initialLiked, initialCount, s
     }
   }
 
+  const ariaLabel = likeMutation.isPending
+    ? 'Liking…'
+    : unlikeMutation.isPending
+    ? 'Unliking…'
+    : liked
+    ? 'Unlike'
+    : 'Like'
+
   return (
     <button
       onClick={toggle}
       disabled={pending}
+      aria-busy={pending}
       className="flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       aria-pressed={liked}
-      aria-label={liked ? 'Unlike' : 'Like'}
+      aria-label={ariaLabel}
     >
       <Heart
         size={size}
