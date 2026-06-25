@@ -403,7 +403,9 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	// Cap the upstream response so a misbehaving or compromised frontend
+	// container can't OOM the backend by serving an oversized index.html.
+	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 }
 
 // Regexes scoped to tag attributes; all anchored to the beginning of an
