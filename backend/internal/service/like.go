@@ -50,14 +50,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 		if card.Visibility == "private" && card.UserID != userID {
 			return false, ErrLikeTargetNotFound
 		}
-		if card.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
-			if err != nil {
-				return false, err
-			}
-			if blocked {
-				return false, ErrLikeTargetNotFound
-			}
+		if blocked, err := s.ownerHasBlocked(ctx, card.UserID, userID); err != nil {
+			return false, err
+		} else if blocked {
+			return false, ErrLikeTargetNotFound
 		}
 		ownerID = card.UserID
 	case model.LikeTargetPost:
@@ -69,14 +65,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 			}
 			return false, err
 		}
-		if post.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, post.UserID, userID)
-			if err != nil {
-				return false, err
-			}
-			if blocked {
-				return false, ErrLikeTargetNotFound
-			}
+		if blocked, err := s.ownerHasBlocked(ctx, post.UserID, userID); err != nil {
+			return false, err
+		} else if blocked {
+			return false, ErrLikeTargetNotFound
 		}
 		ownerID = post.UserID
 	case model.LikeTargetComment:
@@ -90,14 +82,10 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 			}
 			return false, err
 		}
-		if act.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, act.UserID, userID)
-			if err != nil {
-				return false, err
-			}
-			if blocked {
-				return false, ErrLikeTargetNotFound
-			}
+		if blocked, err := s.ownerHasBlocked(ctx, act.UserID, userID); err != nil {
+			return false, err
+		} else if blocked {
+			return false, ErrLikeTargetNotFound
 		}
 		ownerID = act.UserID
 	default:
@@ -118,6 +106,16 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 		}()
 	}
 	return created, nil
+}
+
+// ownerHasBlocked reports whether ownerID has blocked viewerID.
+// Short-circuits to false when the two are the same user so the caller never
+// needs a separate identity guard before calling this.
+func (s *LikeService) ownerHasBlocked(ctx context.Context, ownerID, viewerID string) (bool, error) {
+	if ownerID == viewerID {
+		return false, nil
+	}
+	return s.blocks.IsBlocked(ctx, ownerID, viewerID)
 }
 
 // Unlike removes a like. Returns true if a like was removed.
