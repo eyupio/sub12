@@ -14,11 +14,11 @@ ALTER TABLE simulation_settings
 DO $$ BEGIN
     ALTER TABLE simulation_settings
         ADD CONSTRAINT simulation_settings_unfollow_weight_chk CHECK (unfollow_weight >= 0);
-EXCEPTION WHEN duplicate_constraint THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
     ALTER TABLE simulation_settings
         ADD CONSTRAINT simulation_settings_share_weight_chk CHECK (share_weight >= 0);
-EXCEPTION WHEN duplicate_constraint THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

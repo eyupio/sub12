@@ -888,11 +888,11 @@ func (s *SimulationService) SetPersonaAvatar(ctx context.Context, id, avatarURL,
 // interact with league content (posts, rounds). Verifies the persona is
 // simulated before joining. Idempotent (already-a-member is not an error).
 func (s *SimulationService) JoinPersonaToLeague(ctx context.Context, personaID, leagueID, actorID string) error {
-	if s.leagues == nil {
-		return errors.New("league service not configured")
-	}
 	if err := s.requireSimulated(ctx, personaID); err != nil {
 		return err
+	}
+	if s.leagues == nil {
+		return errors.New("league service not configured")
 	}
 	if err := s.leagues.AdminAddMember(ctx, leagueID, personaID); err != nil {
 		return err
@@ -907,11 +907,11 @@ func (s *SimulationService) JoinPersonaToLeague(ctx context.Context, personaID, 
 // with club content (posts, club leagues). Verifies the persona is simulated.
 // Idempotent.
 func (s *SimulationService) JoinPersonaToClub(ctx context.Context, personaID, clubID, actorID string) error {
-	if s.clubs == nil {
-		return errors.New("club service not configured")
-	}
 	if err := s.requireSimulated(ctx, personaID); err != nil {
 		return err
+	}
+	if s.clubs == nil {
+		return errors.New("club service not configured")
 	}
 	if err := s.clubs.AdminAddMember(ctx, clubID, personaID); err != nil {
 		return err

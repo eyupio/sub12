@@ -154,6 +154,10 @@ export const adminSimulationApi = {
     api.patch<AdminUser>(`/admin/simulation/personas/${id}`, payload),
   uploadPersonaAvatar: (id: string, formData: FormData) =>
     api.upload<AdminUser>(`/admin/simulation/personas/${id}/avatar`, formData),
+  joinPersonaToLeague: (id: string, leagueId: string) =>
+    api.post<{ ok: boolean }>(`/admin/simulation/personas/${id}/join-league`, { league_id: leagueId }),
+  joinPersonaToClub: (id: string, clubId: string) =>
+    api.post<{ ok: boolean }>(`/admin/simulation/personas/${id}/join-club`, { club_id: clubId }),
   deletePersona: (id: string) => api.del<void>(`/admin/simulation/personas/${id}`),
   purgeAll: () => api.del<SimulationPurgeResponse>('/admin/simulation/personas'),
   cleanup: (target?: number) =>
