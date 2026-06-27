@@ -7,6 +7,7 @@ const labelCls = 't-section-title'
 
 export interface PersonaEditState extends UpdateSimulatedPersonaInput {
   avatarFile?: File | null
+  removeAvatar?: boolean
 }
 
 interface PersonaEditDialogProps {
@@ -69,6 +70,7 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
       location,
       club,
       avatarFile,
+      removeAvatar: avatarPreview === null && !!persona.avatar_url,
     })
   }
 
@@ -98,13 +100,32 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
             )}
           </div>
           <div className="space-y-1">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-xs text-[var(--brass)] hover:opacity-80 transition-opacity"
-            >
-              {persona.avatar_url ? 'Change avatar' : 'Upload avatar'}
-            </button>
+            {persona.avatar_url ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="block text-xs text-[var(--brass)] hover:opacity-80 transition-opacity"
+                >
+                  Change avatar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                  className="block text-xs text-muted hover:text-secondary transition-colors"
+                >
+                  Remove avatar
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs text-[var(--brass)] hover:opacity-80 transition-opacity"
+              >
+                Upload avatar
+              </button>
+            )}
             {avatarFile && (
               <button
                 type="button"

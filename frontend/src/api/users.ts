@@ -80,6 +80,7 @@ export const usersApi = {
     formData.append('image', file)
     return api.upload<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string }>('/users/me/avatar', formData)
   },
+  removeAvatar: () => api.del<{ id: string; email: string; display_name: string; bio?: string; location?: string; club?: string; avatar_url?: string }>('/users/me/avatar'),
   requestEmailChange: (email: string) => api.post<{ message: string }>('/users/me/email', { email }),
   confirmEmailChange: (token: string) => api.post<{ id: string; email: string; display_name: string }>('/users/me/email/confirm', { token }),
 

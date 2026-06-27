@@ -82,6 +82,13 @@ function AvatarUpload() {
     },
   })
 
+  const removeAvatarMutation = useMutation({
+    mutationFn: () => usersApi.removeAvatar(),
+    onSuccess: (updated) => {
+      updateUser({ avatar_url: updated.avatar_url })
+    },
+  })
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -123,6 +130,15 @@ function AvatarUpload() {
           <Camera size={20} className="text-white" />
         </div>
       </button>
+      {user?.avatar_url && (
+        <button
+          onClick={() => removeAvatarMutation.mutate()}
+          disabled={removeAvatarMutation.isPending}
+          className="block mx-auto text-[10px] text-muted hover:text-secondary transition-colors disabled:opacity-50 mt-1"
+        >
+          {removeAvatarMutation.isPending ? 'Removing…' : 'Remove avatar'}
+        </button>
+      )}
       {avatarMutation.isPending && (
         <p className="text-[10px] text-muted mt-1 text-center">Uploading…</p>
       )}
