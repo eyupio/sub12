@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronRight, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { identiconDataUri } from '../../utils/identicon'
 
 // ─── Avatar slots ────────────────────────────────────────────────────────────
 
@@ -34,37 +35,19 @@ export function Avatar({
   name,
   imageUrl,
   size = 28,
-  slot,
 }: {
   name?: string
   imageUrl?: string | null
   size?: 22 | 28 | 36 | 40 | 44 | number
   slot?: AvatarSlot
 }) {
-  const resolvedSlot = slot ?? pickSlot(name)
-  if (imageUrl) {
-    return (
-      <img
-        src={imageUrl}
-        alt={name ?? ''}
-        className="rounded-full object-cover border border-line shrink-0"
-        style={{ width: size, height: size }}
-      />
-    )
-  }
   return (
-    <span
-      aria-label={name ?? ''}
-      className="inline-flex items-center justify-center rounded-full text-white font-medium select-none shrink-0"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.max(9, Math.round(size * 0.36)),
-        background: slotGradients[resolvedSlot],
-      }}
-    >
-      {initialsOf(name)}
-    </span>
+    <img
+      src={imageUrl || identiconDataUri(name ?? '')}
+      alt={name ?? ''}
+      className="rounded-full object-cover border border-line shrink-0"
+      style={{ width: size, height: size }}
+    />
   )
 }
 

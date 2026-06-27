@@ -10,6 +10,7 @@ import { clubsApi } from '../api/clubs'
 import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { identiconDataUri } from '../utils/identicon'
 import { ShareDialog, ShareTargetType } from '../components/ShareDialog'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { Share2 } from 'lucide-react'
@@ -310,7 +311,6 @@ function PublicAuthorHeader({
   author: ScoreCardAuthor
   achievements: ScoreCardAchievement[]
 }) {
-  const initials = author.display_name[0]?.toUpperCase() ?? '?'
   const top = achievements.slice(0, 6)
   const remaining = achievements.length - top.length
   return (
@@ -320,17 +320,11 @@ function PublicAuthorHeader({
         params={{ id: author.id }}
         className="flex items-center gap-3 group"
       >
-        {author.avatar_url ? (
-          <img
-            src={author.avatar_url}
-            alt={author.display_name}
-            className="w-12 h-12 rounded-full object-cover border border-subtle"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-surface-hover border border-subtle flex items-center justify-center text-muted text-lg font-medium">
-            {initials}
-          </div>
-        )}
+        <img
+          src={author.avatar_url || identiconDataUri(author.id || author.display_name || '')}
+          alt={author.display_name}
+          className="w-12 h-12 rounded-full object-cover border border-subtle"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-secondary group-hover:text-[var(--brass)] transition-colors truncate">
             {author.display_name}
@@ -609,17 +603,11 @@ function PublicUser({ id }: { id: string }) {
     <Shell title="Profile">
       <article className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
         <div className="flex items-start gap-3">
-          {profile.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.display_name}
-              className="w-14 h-14 rounded-full object-cover border border-subtle"
-            />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-surface-hover border border-subtle flex items-center justify-center text-muted text-lg font-medium">
-              {profile.display_name[0]?.toUpperCase() ?? '?'}
-            </div>
-          )}
+          <img
+            src={profile.avatar_url || identiconDataUri(profile.id || profile.display_name || '')}
+            alt={profile.display_name}
+            className="w-14 h-14 rounded-full object-cover border border-subtle"
+          />
           <div className="flex-1">
             <p className="text-base font-medium text-secondary">{profile.display_name}</p>
             {profile.location && (

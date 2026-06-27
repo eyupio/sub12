@@ -7,6 +7,7 @@ import {
   type PotentialInviteeSource,
 } from '../../api/eventInvitations'
 import { toast } from '../../store/toast'
+import { identiconDataUri } from '../../utils/identicon'
 import { WIZARD_INPUT_CLS, WIZARD_LABEL_CLS, toggleCls } from './wizardShared'
 
 interface Props {
@@ -202,19 +203,5 @@ export function InviteStep({ slug, hasClub }: Props) {
 }
 
 function Avatar({ url, name }: { url?: string; name: string }) {
-  const initials = name
-    .split(/\s+/)
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-  if (url) {
-    return <img src={url} alt="" className="w-8 h-8 rounded-full object-cover" />
-  }
-  return (
-    <span className="w-8 h-8 rounded-full bg-bg border border-line flex items-center justify-center text-[11px] text-muted">
-      {initials || '?'}
-    </span>
-  )
+  return <img src={url || identiconDataUri(name)} alt="" className="w-8 h-8 rounded-full object-cover" />
 }
