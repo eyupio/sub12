@@ -27,6 +27,33 @@ interface AvatarBlockProps {
   alt?: string
 }
 
+const AVATAR_GRADIENTS: Array<{ from: string; to: string }> = [
+  { from: '#a07b2c', to: '#b88a35' },
+  { from: '#4a5a3a', to: '#6a7a4a' },
+  { from: '#3a3a42', to: '#555560' },
+  { from: '#7a3a3a', to: '#a85040' },
+  { from: '#3a5a7a', to: '#4a6a8a' },
+  { from: '#5a3a6a', to: '#7a5a8a' },
+]
+
+function hashName(name: string): number {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function avatarGradient(name: string) {
+  return AVATAR_GRADIENTS[hashName(name) % AVATAR_GRADIENTS.length]
+}
+
+function initialsOf(name?: string): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function AvatarBlock(
   { user, size, variant, className, alt },
   ref,
@@ -44,17 +71,29 @@ const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function Avata
 
   const altText = alt ?? user.display_name ?? ''
 
+  if (user.avatar_url) {
+    return (
+      <span
+        ref={ref}
+        style={dim}
+        className={`${baseWrap} ${variantWrap} ${className}`.trim()}
+      >
+        <img src={user.avatar_url} alt={altText} className="w-full h-full object-cover" />
+      </span>
+    )
+  }
+
+  const name = user.display_name ?? ''
+  const g = avatarGradient(name)
   return (
     <span
       ref={ref}
-      style={dim}
-      className={`${baseWrap} ${variantWrap} ${className}`.trim()}
+      style={{ ...dim, background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
+      className={`${baseWrap} text-white ${className}`.trim()}
+      aria-label={altText}
+      role="img"
     >
-      {user.avatar_url ? (
-        <img src={user.avatar_url} alt={altText} className="w-full h-full object-cover" />
-      ) : (
-        <img src="/default-avatar.svg" alt={altText} className="w-full h-full object-cover" />
-      )}
+      {initialsOf(name)}
     </span>
   )
 })
