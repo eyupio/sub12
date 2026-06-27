@@ -312,8 +312,9 @@ func (s *UserService) ConfirmEmailChange(ctx context.Context, token string) (*mo
 }
 
 // AdminListUsers returns a paginated list of all users with a total count.
-func (s *UserService) AdminListUsers(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
-	return s.users.ListAll(ctx, limit, offset)
+// When hideSimulated is true, simulated (bot) accounts are excluded.
+func (s *UserService) AdminListUsers(ctx context.Context, limit, offset int, hideSimulated bool) ([]*model.AdminUser, int, error) {
+	return s.users.ListAll(ctx, limit, offset, hideSimulated)
 }
 
 // AdminGetUser returns the full user record (including email) by ID.

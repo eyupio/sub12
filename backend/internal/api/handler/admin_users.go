@@ -20,7 +20,7 @@ func NewAdminUsers(svc *service.UserService) *AdminUsersHandler {
 	return &AdminUsersHandler{svc: svc}
 }
 
-// GET /api/v1/admin/users?limit=50&offset=0
+// GET /api/v1/admin/users?limit=50&offset=0&hide_simulated=1
 func (h *AdminUsersHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := 0
@@ -34,8 +34,10 @@ func (h *AdminUsersHandler) List(w http.ResponseWriter, r *http.Request) {
 			offset = n
 		}
 	}
+	hideSimulated := r.URL.Query().Get("hide_simulated") == "1" ||
+		r.URL.Query().Get("hide_simulated") == "true"
 
-	users, total, err := h.svc.AdminListUsers(r.Context(), limit, offset)
+	users, total, err := h.svc.AdminListUsers(r.Context(), limit, offset, hideSimulated)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return

@@ -9,6 +9,7 @@ export interface AdminUser {
   location?: string
   club?: string
   avatar_url?: string
+  is_simulated: boolean
   created_at: string
   updated_at: string
 }
@@ -21,8 +22,10 @@ export interface AdminUsersListResponse {
 }
 
 export const adminUsersApi = {
-  list: (limit = 50, offset = 0) =>
-    api.get<AdminUsersListResponse>(`/admin/users?limit=${limit}&offset=${offset}`),
+  list: (limit = 50, offset = 0, hideSimulated = false) =>
+    api.get<AdminUsersListResponse>(
+      `/admin/users?limit=${limit}&offset=${offset}${hideSimulated ? '&hide_simulated=1' : ''}`,
+    ),
 
   get: (id: string) =>
     api.get<AdminUser>(`/admin/users/${id}`),

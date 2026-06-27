@@ -234,16 +234,21 @@ func (r *UserRepository) UpdateStarLevel(ctx context.Context, userID string) err
 // admin use, plus the total count. Soft-deleted rows are retained in the
 // database for referential integrity but must not appear in admin listings,
 // where they would surface scrubbed tombstone emails alongside live users.
-func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*model.AdminUser, int, error) {
+// When hideSimulated is true, simulated (bot) accounts are excluded.
+func (r *UserRepository) ListAll(ctx context.Context, limit, offset int, hideSimulated bool) ([]*model.AdminUser, int, error) {
+	where := "deleted_at IS NULL"
+	if hideSimulated {
+		where += " AND NOT is_simulated"
+	}
 	var total int
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE deleted_at IS NULL`).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE `+where).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count users: %w", err)
 	}
 
 	rows, err := r.db.Query(ctx, `
-		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+		SELECT id, email, role, display_name, bio, location, club, avatar_url, is_simulated, created_at, updated_at
 		FROM users
-		WHERE deleted_at IS NULL
+		WHERE `+where+`
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
 	`, limit, offset)
@@ -256,7 +261,7 @@ func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*mod
 	for rows.Next() {
 		var u model.AdminUser
 		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
-			&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+			&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.IsSimulated,
 			&u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan admin user: %w", err)
 		}
@@ -269,10 +274,10 @@ func (r *UserRepository) ListAll(ctx context.Context, limit, offset int) ([]*mod
 func (r *UserRepository) GetAdminByID(ctx context.Context, id string) (*model.AdminUser, error) {
 	var u model.AdminUser
 	err := r.db.QueryRow(ctx, `
-		SELECT id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+		SELECT id, email, role, display_name, bio, location, club, avatar_url, is_simulated, created_at, updated_at
 		FROM users WHERE id = $1 AND deleted_at IS NULL
 	`, id).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
-		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.IsSimulated,
 		&u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -289,9 +294,9 @@ func (r *UserRepository) UpdateRole(ctx context.Context, id, role string) (*mode
 	err := r.db.QueryRow(ctx, `
 		UPDATE users SET role = $2, updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
-		RETURNING id, email, role, display_name, bio, location, club, avatar_url, created_at, updated_at
+		RETURNING id, email, role, display_name, bio, location, club, avatar_url, is_simulated, created_at, updated_at
 	`, id, role).Scan(&u.ID, &u.Email, &u.Role, &u.DisplayName,
-		&u.Bio, &u.Location, &u.Club, &u.AvatarURL,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.IsSimulated,
 		&u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

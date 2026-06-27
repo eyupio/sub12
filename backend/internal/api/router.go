@@ -544,12 +544,19 @@ func NewRouter(
 				r.Get("/admin/events", adminEH.List)
 				r.Delete("/admin/events/{id}", adminEH.Delete)
 
-				// Activity simulation engine.
-				asimh := handler.NewAdminSimulation(simulation)
-				r.Get("/admin/simulation/settings", asimh.GetSettings)
-				r.Patch("/admin/simulation/settings", asimh.PatchSettings)
-				r.Get("/admin/simulation/status", asimh.GetStatus)
-				r.Post("/admin/simulation/run-now", asimh.RunNow)
+			// Activity simulation engine.
+			asimh := handler.NewAdminSimulation(simulation, images)
+			r.Get("/admin/simulation/settings", asimh.GetSettings)
+			r.Patch("/admin/simulation/settings", asimh.PatchSettings)
+			r.Get("/admin/simulation/status", asimh.GetStatus)
+			r.Post("/admin/simulation/run-now", asimh.RunNow)
+			r.Get("/admin/simulation/personas", asimh.ListPersonas)
+			r.Patch("/admin/simulation/personas/{id}", asimh.PatchPersona)
+			r.Post("/admin/simulation/personas/{id}/avatar", asimh.UploadPersonaAvatar)
+			r.Delete("/admin/simulation/personas", asimh.PurgeAll)
+			r.Delete("/admin/simulation/personas/{id}", asimh.DeletePersona)
+			r.Post("/admin/simulation/cleanup", asimh.Cleanup)
+			r.Get("/admin/simulation/audit", asimh.ListAudit)
 			})
 		})
 

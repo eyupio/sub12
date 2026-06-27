@@ -13,6 +13,7 @@ type AdminUser struct {
 	Location    *string   `json:"location,omitempty"`
 	Club        *string   `json:"club,omitempty"`
 	AvatarURL   *string   `json:"avatar_url,omitempty"`
+	IsSimulated bool      `json:"is_simulated"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
