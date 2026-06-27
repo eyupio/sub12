@@ -351,6 +351,9 @@ export default function AdminSimulation() {
         fd.append('image', avatarFile)
         await adminSimulationApi.uploadPersonaAvatar(persona.id, fd)
       }
+      if (state.removeAvatar) {
+        await adminSimulationApi.removePersonaAvatar(persona.id)
+      }
     },
     onSuccess: () => {
       setEditingPersona(null)
