@@ -103,7 +103,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **36** (000001–000036). Latest: `000036_measurement_manual_fields`.
+Current migration count: **100** (000001–000100). Latest: `000100_activity_simulation`.
 
 ## Critical Migration Rules
 
@@ -207,6 +207,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Users:** List, get, update role, delete
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List, get, update, delete, members management
+- **Activity simulation:** Settings (get/patch), status, run-now. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow via the normal service paths; paced by a background runner, disabled by default.
 
 ## Environment Variables
 
