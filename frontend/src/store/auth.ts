@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -48,15 +49,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sub12-auth',
-      // Persist only the user record. Both tokens stay out of localStorage:
-      // the access token is in-memory only, and the refresh token now lives
-      // exclusively in an httpOnly cookie set by the backend (Path=/api/v1/auth).
-      // Persisting the user lets us rehydrate identity on reload and trigger a
-      // cookie-based refresh; an XSS payload reading localStorage gets nothing
-      // it can replay against the API.
-      partialize: (s) => ({
-        user: s.user,
-      }),
+      // Web/PWA: persist only the user record. Both tokens stay out of
+      // localStorage — the access token is in-memory only, and the refresh token
+      // lives exclusively in an httpOnly cookie set by the backend
+      // (Path=/api/v1/auth). Persisting the user lets us rehydrate identity on
+      // reload and trigger a cookie-based refresh; an XSS payload reading
+      // localStorage gets nothing it can replay against the API.
+      //
+      // Native: the SameSite=Lax cookie is not delivered cross-site to the API
+      // host, so the refresh token must be persisted to survive an app restart.
+      // A native WebView has no shared/scriptable localStorage with the web
+      // origin, so this is the standard mobile trade-off.
+      partialize: (s) =>
+        Capacitor.isNativePlatform()
+          ? { user: s.user, refreshToken: s.refreshToken }
+          : { user: s.user },
     },
   ),
 )

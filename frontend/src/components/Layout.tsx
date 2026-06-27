@@ -215,7 +215,7 @@ export default function Layout({ children }: PropsWithChildren) {
       {/* ── Main content column ────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
-        <header className={`lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
+        <header className={`app-mobile-header lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
           <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
             <Sub12BrandLockup variant="compact" />
           </Link>
@@ -267,7 +267,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <QuickCaptureFabWhenAppropriate />
 
         {/* Mobile bottom nav — 5 items max */}
-        <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
+        <nav aria-label="Primary mobile" className={`app-mobile-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
             {mobileNavItems.map(({ to, icon: Icon, label }) => (
               <Link
