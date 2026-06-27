@@ -309,3 +309,79 @@ func (h *AdminSimulationHandler) UploadPersonaAvatar(w http.ResponseWriter, r *h
 	}
 	writeJSON(w, http.StatusOK, updated)
 }
+
+// POST /api/v1/admin/simulation/personas/{id}/join-league
+// Body: {"league_id": "..."}
+func (h *AdminSimulationHandler) JoinPersonaToLeague(w http.ResponseWriter, r *http.Request) {
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	personaID := chi.URLParam(r, "id")
+	if personaID == "" {
+		writeError(w, http.StatusBadRequest, "missing persona id")
+		return
+	}
+	var body struct {
+		LeagueID string `json:"league_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.LeagueID == "" {
+		writeError(w, http.StatusBadRequest, "league_id is required")
+		return
+	}
+	if err := h.svc.JoinPersonaToLeague(r.Context(), personaID, body.LeagueID, actorID); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			writeError(w, http.StatusNotFound, "persona or league not found")
+		case errors.Is(err, service.ErrLeagueNotFound):
+			writeError(w, http.StatusNotFound, "league not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to join persona to league")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// POST /api/v1/admin/simulation/personas/{id}/join-club
+// Body: {"club_id": "..."}
+func (h *AdminSimulationHandler) JoinPersonaToClub(w http.ResponseWriter, r *http.Request) {
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	personaID := chi.URLParam(r, "id")
+	if personaID == "" {
+		writeError(w, http.StatusBadRequest, "missing persona id")
+		return
+	}
+	var body struct {
+		ClubID string `json:"club_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.ClubID == "" {
+		writeError(w, http.StatusBadRequest, "club_id is required")
+		return
+	}
+	if err := h.svc.JoinPersonaToClub(r.Context(), personaID, body.ClubID, actorID); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			writeError(w, http.StatusNotFound, "persona or club not found")
+		case errors.Is(err, service.ErrClubNotFound):
+			writeError(w, http.StatusNotFound, "club not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to join persona to club")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}

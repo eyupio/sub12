@@ -553,6 +553,8 @@ func NewRouter(
 			r.Get("/admin/simulation/personas", asimh.ListPersonas)
 			r.Patch("/admin/simulation/personas/{id}", asimh.PatchPersona)
 			r.Post("/admin/simulation/personas/{id}/avatar", asimh.UploadPersonaAvatar)
+			r.Post("/admin/simulation/personas/{id}/join-league", asimh.JoinPersonaToLeague)
+			r.Post("/admin/simulation/personas/{id}/join-club", asimh.JoinPersonaToClub)
 			r.Delete("/admin/simulation/personas", asimh.PurgeAll)
 			r.Delete("/admin/simulation/personas/{id}", asimh.DeletePersona)
 			r.Post("/admin/simulation/cleanup", asimh.Cleanup)

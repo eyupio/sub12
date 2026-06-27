@@ -43,6 +43,7 @@ type simulationRepo interface {
 	TouchTick(ctx context.Context) error
 	CreateSimulatedUser(ctx context.Context, email, displayName string, bio, location *string, passwordHash string) (string, error)
 	CountSimulatedUsers(ctx context.Context) (int, error)
+	IsSimulatedUser(ctx context.Context, userID string) (bool, error)
 	CountSimulatedCards(ctx context.Context) (int, error)
 	ListSimulatedUserIDs(ctx context.Context, limit int) ([]string, error)
 	ListSimulatedPersonas(ctx context.Context, limit, offset int) ([]*model.SimulatedPersona, int, error)
@@ -92,6 +93,8 @@ type SimulationService struct {
 	rifles     *RifleService
 	pellets    *PelletService
 	posts      *PostService
+	leagues    *LeagueService
+	clubs      *ClubService
 	log        zerolog.Logger
 
 	// mu serializes the action loop so ticks/run-now don't overlap. Provisioning
@@ -121,6 +124,8 @@ func NewSimulationService(
 	rifles *RifleService,
 	pellets *PelletService,
 	posts *PostService,
+	leagues *LeagueService,
+	clubs *ClubService,
 	log zerolog.Logger,
 ) *SimulationService {
 	s := &SimulationService{
@@ -132,6 +137,8 @@ func NewSimulationService(
 		rifles:     rifles,
 		pellets:    pellets,
 		posts:      posts,
+		leagues:    leagues,
+		clubs:      clubs,
 		log:        log,
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		skills:     map[string]float64{},
@@ -875,6 +882,57 @@ func (s *SimulationService) SetPersonaAvatar(ctx context.Context, id, avatarURL,
 		s.log.Warn().Err(err).Msg("simulation: audit persona_avatar failed")
 	}
 	return updated, nil
+}
+
+// JoinPersonaToLeague enrols a simulated account into a league so it can
+// interact with league content (posts, rounds). Verifies the persona is
+// simulated before joining. Idempotent (already-a-member is not an error).
+func (s *SimulationService) JoinPersonaToLeague(ctx context.Context, personaID, leagueID, actorID string) error {
+	if s.leagues == nil {
+		return errors.New("league service not configured")
+	}
+	if err := s.requireSimulated(ctx, personaID); err != nil {
+		return err
+	}
+	if err := s.leagues.AdminAddMember(ctx, leagueID, personaID); err != nil {
+		return err
+	}
+	if err := s.repo.RecordAudit(ctx, "persona_joined_league", actorID, fmt.Sprintf(`{"persona":%q,"league":%q}`, personaID, leagueID)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_joined_league failed")
+	}
+	return nil
+}
+
+// JoinPersonaToClub enrols a simulated account into a club so it can interact
+// with club content (posts, club leagues). Verifies the persona is simulated.
+// Idempotent.
+func (s *SimulationService) JoinPersonaToClub(ctx context.Context, personaID, clubID, actorID string) error {
+	if s.clubs == nil {
+		return errors.New("club service not configured")
+	}
+	if err := s.requireSimulated(ctx, personaID); err != nil {
+		return err
+	}
+	if err := s.clubs.AdminAddMember(ctx, clubID, personaID); err != nil {
+		return err
+	}
+	if err := s.repo.RecordAudit(ctx, "persona_joined_club", actorID, fmt.Sprintf(`{"persona":%q,"club":%q}`, personaID, clubID)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_joined_club failed")
+	}
+	return nil
+}
+
+// requireSimulated returns ErrNotFound when the user does not exist or is not a
+// flagged simulated account, guarding admin enrolment endpoints.
+func (s *SimulationService) requireSimulated(ctx context.Context, userID string) error {
+	ok, err := s.repo.IsSimulatedUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 // --- random content helpers ---

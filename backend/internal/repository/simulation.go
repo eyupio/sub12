@@ -248,6 +248,19 @@ func (r *SimulationRepository) CountSimulatedUsers(ctx context.Context) (int, er
 	return n, nil
 }
 
+// IsSimulatedUser reports whether the given user id is a flagged simulated
+// account. Used to guard admin operations that should only target personas.
+func (r *SimulationRepository) IsSimulatedUser(ctx context.Context, userID string) (bool, error) {
+	var ok bool
+	if err := r.db.QueryRow(ctx, `SELECT is_simulated FROM users WHERE id = $1`, userID).Scan(&ok); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrNotFound
+		}
+		return false, fmt.Errorf("check is_simulated: %w", err)
+	}
+	return ok, nil
+}
+
 func (r *SimulationRepository) CountSimulatedCards(ctx context.Context) (int, error) {
 	var n int
 	if err := r.db.QueryRow(ctx, `

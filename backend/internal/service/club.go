@@ -437,6 +437,22 @@ func (s *ClubService) AdminRemoveMember(ctx context.Context, clubID, userID stri
 	return s.repo.RemoveMember(ctx, clubID, userID)
 }
 
+// AdminAddMember adds a user to a club directly, bypassing the join policy.
+// Used to enrol simulated accounts so they can interact with club content.
+// Already-a-member is treated as success (idempotent).
+func (s *ClubService) AdminAddMember(ctx context.Context, clubID, userID string) error {
+	if err := s.repo.Join(ctx, clubID, userID); err != nil {
+		if errors.Is(err, repository.ErrAlreadyMember) {
+			return nil
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrClubNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 // AdminListMembers lists members for a club without the private-club viewer gate.
 func (s *ClubService) AdminListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
 	return s.repo.ListMembers(ctx, clubID)
