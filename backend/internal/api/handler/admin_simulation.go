@@ -106,12 +106,18 @@ func (h *AdminSimulationHandler) RunNow(w http.ResponseWriter, r *http.Request) 
 		n = runNowMaxActions
 	}
 
-	performed, err := h.svc.RunNow(r.Context(), n, actorID)
+	performed, counts, err := h.svc.RunNow(r.Context(), n, actorID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to run simulation")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"performed": performed})
+	if counts == nil {
+		counts = map[string]int{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"performed": performed,
+		"counts":    counts,
+	})
 }
 
 // GET /api/v1/admin/simulation/personas?limit=50&offset=0

@@ -103,7 +103,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **101** (000001–000101). Latest: `000101_simulation_counters_audit`.
+Current migration count: **102** (000001–000102). Latest: `000102_simulation_extended_actions`.
 
 ## Critical Migration Rules
 
@@ -207,7 +207,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Users:** List, get, update role, delete
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List, get, update, delete, members management
-- **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow via the normal service paths; paced by a background runner, disabled by default. Per-action counters and last-error surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter).
+- **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Each persona gets a rifle + pellet and a stable personality that biases action selection. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.
 
 ## Environment Variables
 

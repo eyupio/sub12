@@ -71,10 +71,15 @@ func TestWithinActiveHours(t *testing.T) {
 }
 
 func newTestSimService() *SimulationService {
-	return &SimulationService{
-		log: zerolog.Nop(),
-		rng: rand.New(rand.NewSource(1)),
+	s := &SimulationService{
+		log:     zerolog.Nop(),
+		rng:     rand.New(rand.NewSource(1)),
+		skills:  map[string]float64{},
+		gear:    map[string]gearIDs{},
+		profiles: map[string]personaProfile{},
 	}
+	s.includePublic.Store(true)
+	return s
 }
 
 func TestRandomShotsAreValid(t *testing.T) {
@@ -98,14 +103,15 @@ func TestRandomShotsAreValid(t *testing.T) {
 func TestPickActionRespectsWeights(t *testing.T) {
 	s := newTestSimService()
 
-	// Only follow has weight: every pick must be follow.
+	// Only follow has weight: every pick must be follow (personality scales the
+	// weight but cannot zero it out, so follow still wins).
 	settings := &model.SimulationSettings{FollowWeight: 1}
 	for i := 0; i < 50; i++ {
-		assert.Equal(t, "follow", s.pickAction(settings))
+		assert.Equal(t, "follow", s.pickAction(settings, "user-1"))
 	}
 
 	// Zero total weight falls back to like (never panics).
-	assert.Equal(t, "like", s.pickAction(&model.SimulationSettings{}))
+	assert.Equal(t, "like", s.pickAction(&model.SimulationSettings{}, "user-1"))
 }
 
 func TestPickActionCoversAllWeightedActions(t *testing.T) {
@@ -113,7 +119,7 @@ func TestPickActionCoversAllWeightedActions(t *testing.T) {
 	settings := &model.SimulationSettings{PostWeight: 1, LikeWeight: 1, CommentWeight: 1, FollowWeight: 1}
 	seen := map[string]bool{}
 	for i := 0; i < 500; i++ {
-		seen[s.pickAction(settings)] = true
+		seen[s.pickAction(settings, "user-1")] = true
 	}
 	for _, action := range []string{"post", "like", "comment", "follow"} {
 		assert.True(t, seen[action], "expected to see action %q", action)
@@ -220,6 +226,7 @@ func (m *mockSimulationRepo) UpsertSettings(context.Context, *model.UpsertSimula
 func (m *mockSimulationRepo) IncrementCounts(context.Context, map[string]int, string, string) error {
 	return nil
 }
+func (m *mockSimulationRepo) TouchTick(context.Context) error { return nil }
 func (m *mockSimulationRepo) CreateSimulatedUser(context.Context, string, string, *string, *string, string) (string, error) {
 	return "new-id", nil
 }
@@ -241,6 +248,15 @@ func (m *mockSimulationRepo) RandomPublicCard(context.Context, string, bool) (st
 	return "", "", nil
 }
 func (m *mockSimulationRepo) RandomFollowTarget(context.Context, string, bool) (string, error) {
+	return "", nil
+}
+func (m *mockSimulationRepo) RandomPublicPost(context.Context, string, bool) (string, error) {
+	return "", nil
+}
+func (m *mockSimulationRepo) RandomActivity(context.Context, string, bool) (string, error) {
+	return "", nil
+}
+func (m *mockSimulationRepo) RandomFollowedUser(context.Context, string, bool) (string, error) {
 	return "", nil
 }
 func (m *mockSimulationRepo) RecordAudit(_ context.Context, event, _ string, _ string) error {
@@ -301,4 +317,77 @@ func TestSetPersonaAvatarAudits(t *testing.T) {
 	_, err := s.SetPersonaAvatar(context.Background(), "id", "/api/v1/images/1", "admin")
 	require.NoError(t, err)
 	assert.Contains(t, repo.auditEvents, "persona_avatar")
+}
+
+func TestHourlyMultiplier(t *testing.T) {
+	// Default all-1.0 slice yields 1.0 for every hour.
+	mults := make([]float64, 24)
+	for i := range mults {
+		mults[i] = 1.0
+	}
+	for h := 0; h < 24; h++ {
+		assert.Equal(t, 1.0, hourlyMultiplier(mults, h))
+	}
+	// A quiet hour (0) and a busy hour (20).
+	mults[0] = 0
+	mults[20] = 2.5
+	assert.Equal(t, 0.0, hourlyMultiplier(mults, 0))
+	assert.Equal(t, 2.5, hourlyMultiplier(mults, 20))
+	// Out-of-range / missing fall back to 1.0.
+	assert.Equal(t, 1.0, hourlyMultiplier(nil, 12))
+	assert.Equal(t, 1.0, hourlyMultiplier([]float64{1, 2}, 10))
+	assert.Equal(t, 1.0, hourlyMultiplier(mults, 24))
+}
+
+func TestExcludeSimulatedFromPublicDefault(t *testing.T) {
+	s := newTestSimService()
+	// Default includePublic = true -> exclude = false.
+	assert.False(t, s.ExcludeSimulatedFromPublic())
+}
+
+func TestExcludeSimulatedFromPublicAfterSettings(t *testing.T) {
+	repo := &mockSimulationRepo{settings: &model.SimulationSettings{IncludeInPublicStats: false}}
+	s := newTestSimService()
+	s.repo = repo
+	_, _ = s.GetSettings(context.Background())
+	assert.True(t, s.ExcludeSimulatedFromPublic(), "should exclude when include_in_public_stats is false")
+}
+
+func TestValidateSimulationSettingsNewWeights(t *testing.T) {
+	in := validInput()
+	in.UnfollowWeight = -1
+	assert.ErrorIs(t, validateSimulationSettings(in), ErrInvalidSimulationSettings)
+	in = validInput()
+	in.ShareWeight = -1
+	assert.ErrorIs(t, validateSimulationSettings(in), ErrInvalidSimulationSettings)
+	// All-zero including new weights still rejected.
+	in = validInput()
+	in.PostWeight, in.LikeWeight, in.CommentWeight, in.FollowWeight = 0, 0, 0, 0
+	in.UnfollowWeight, in.ShareWeight = 0, 0
+	assert.ErrorIs(t, validateSimulationSettings(in), ErrInvalidSimulationSettings)
+	// Unfollow alone is enough.
+	in = validInput()
+	in.PostWeight, in.LikeWeight, in.CommentWeight, in.FollowWeight, in.ShareWeight = 0, 0, 0, 0, 0
+	in.UnfollowWeight = 1
+	assert.NoError(t, validateSimulationSettings(in))
+}
+
+func TestPickActionIncludesUnfollowAndShare(t *testing.T) {
+	s := newTestSimService()
+	settings := &model.SimulationSettings{UnfollowWeight: 50, ShareWeight: 50}
+	seen := map[string]bool{}
+	for i := 0; i < 200; i++ {
+		seen[s.pickAction(settings, "user-1")] = true
+	}
+	assert.True(t, seen["unfollow"], "expected unfollow to be picked")
+	assert.True(t, seen["share"], "expected share to be picked")
+}
+
+func TestPersonaProfileIsStable(t *testing.T) {
+	s := newTestSimService()
+	a := s.personaProfile("user-abc")
+	b := s.personaProfile("user-abc")
+	assert.Equal(t, a, b)
+	assert.GreaterOrEqual(t, a.loquacious, 0.0)
+	assert.LessOrEqual(t, a.loquacious, 1.0)
 }

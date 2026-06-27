@@ -10,6 +10,7 @@ export interface PublicProfile {
   profile_visibility: string
   show_follower_counts: boolean
   star_level: number
+  is_simulated: boolean
   created_at: string
 }
 

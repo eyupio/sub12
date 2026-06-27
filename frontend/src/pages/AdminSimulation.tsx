@@ -32,10 +32,14 @@ interface FormState {
   like_weight: string
   comment_weight: string
   follow_weight: string
+  unfollow_weight: string
+  share_weight: string
   active_start_hour: string
   active_end_hour: string
   interact_with_real_users: boolean
   max_cards_per_persona: string
+  include_in_public_stats: boolean
+  hourly_multipliers: string[] // 24 entries
 }
 
 function validate(values: FormState): string[] {
@@ -56,6 +60,8 @@ function validate(values: FormState): string[] {
     ['Like', 'like_weight'],
     ['Comment', 'comment_weight'],
     ['Follow', 'follow_weight'],
+    ['Unfollow', 'unfollow_weight'],
+    ['Share', 'share_weight'],
   ] as const) {
     const w = num(values[key])
     if (!isInt(values[key]) || w < 0) {
@@ -64,7 +70,8 @@ function validate(values: FormState): string[] {
   }
   if (
     num(values.post_weight) + num(values.like_weight) +
-    num(values.comment_weight) + num(values.follow_weight) === 0
+    num(values.comment_weight) + num(values.follow_weight) +
+    num(values.unfollow_weight) + num(values.share_weight) === 0
   ) {
     errors.push('At least one action weight must be greater than 0.')
   }
@@ -80,7 +87,27 @@ function validate(values: FormState): string[] {
   if (!isInt(values.max_cards_per_persona) || maxCards < 0) {
     errors.push('Max cards per persona must be 0 or more.')
   }
+  for (let i = 0; i < values.hourly_multipliers.length; i++) {
+    const m = Number(values.hourly_multipliers[i])
+    if (!Number.isFinite(m) || m < 0) {
+      errors.push(`Hourly multiplier ${i} must be a number of 0 or more.`)
+      break
+    }
+  }
   return errors
+}
+
+function defaultMultipliers(): string[] {
+  return Array.from({ length: 24 }, () => '1')
+}
+
+// "Evening" preset: quiet overnight, baseline daytime, busier evenings.
+function eveningPreset(): string[] {
+  return [
+    '0.2', '0.1', '0.1', '0.1', '0.1', '0.2', '0.4', '0.6',
+    '0.8', '1.0', '1.0', '1.0', '1.0', '1.0', '1.0', '1.2',
+    '1.6', '2.0', '2.0', '1.6', '1.2', '0.8', '0.4', '0.2',
+  ]
 }
 
 // Formats an hour (0-24) as a local-time label for the active-window helper.
@@ -116,10 +143,14 @@ export default function AdminSimulation() {
     like_weight: '5',
     comment_weight: '2',
     follow_weight: '1',
+    unfollow_weight: '0',
+    share_weight: '0',
     active_start_hour: '0',
     active_end_hour: '24',
     interact_with_real_users: false,
     max_cards_per_persona: '30',
+    include_in_public_stats: true,
+    hourly_multipliers: defaultMultipliers(),
   })
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [serverError, setServerError] = useState<string | null>(null)
@@ -183,16 +214,35 @@ export default function AdminSimulation() {
       like_weight: String(data.like_weight),
       comment_weight: String(data.comment_weight),
       follow_weight: String(data.follow_weight),
+      unfollow_weight: String(data.unfollow_weight),
+      share_weight: String(data.share_weight),
       active_start_hour: String(data.active_start_hour),
       active_end_hour: String(data.active_end_hour),
       interact_with_real_users: data.interact_with_real_users,
       max_cards_per_persona: String(data.max_cards_per_persona),
+      include_in_public_stats: data.include_in_public_stats,
+      hourly_multipliers: (data.hourly_multipliers?.length === 24
+        ? data.hourly_multipliers
+        : Array.from({ length: 24 }, () => 1)
+      ).map(String),
     }
     setForm(next)
     setSavedSnapshot(JSON.stringify(next))
   }, [data])
 
   const isDirty = useMemo(() => JSON.stringify(form) !== savedSnapshot, [form, savedSnapshot])
+
+  // activeNow reports whether the current UTC hour falls inside the configured
+  // active window (supports wrap-around). Recomputed on each render; the 10s
+  // status poll keeps it reasonably fresh.
+  const activeNow = useMemo(() => {
+    const hour = new Date().getUTCHours()
+    const start = Number(form.active_start_hour)
+    const end = Number(form.active_end_hour)
+    if (start === end) return true
+    if (start < end) return hour >= start && hour < end
+    return hour >= start || hour < end
+  }, [form.active_start_hour, form.active_end_hour])
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ['admin-simulation-status'] })
@@ -211,10 +261,17 @@ export default function AdminSimulation() {
         like_weight: String(updated.like_weight),
         comment_weight: String(updated.comment_weight),
         follow_weight: String(updated.follow_weight),
+        unfollow_weight: String(updated.unfollow_weight),
+        share_weight: String(updated.share_weight),
         active_start_hour: String(updated.active_start_hour),
         active_end_hour: String(updated.active_end_hour),
         interact_with_real_users: updated.interact_with_real_users,
         max_cards_per_persona: String(updated.max_cards_per_persona),
+        include_in_public_stats: updated.include_in_public_stats,
+        hourly_multipliers: (updated.hourly_multipliers?.length === 24
+          ? updated.hourly_multipliers
+          : Array.from({ length: 24 }, () => 1)
+        ).map(String),
       }
       setForm(next)
       setSavedSnapshot(JSON.stringify(next))
@@ -233,13 +290,22 @@ export default function AdminSimulation() {
   const runMutation = useMutation({
     mutationFn: (n: number) => adminSimulationApi.runNow(n),
     onSuccess: (res) => {
-      setRunResult(`Performed ${res.performed} action${res.performed === 1 ? '' : 's'}.`)
+      const parts = res.counts
+        ? Object.entries(res.counts)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ')
+        : ''
+      setRunResult(
+        `Performed ${res.performed} action${res.performed === 1 ? '' : 's'}${parts ? ` (${parts})` : ''}.`,
+      )
       setServerError(null)
       setSaveOk(null)
       invalidateAll()
     },
     onError: (err) => {
       setRunResult(null)
+      setSaveOk(null)
       setServerError(parseError(err))
     },
   })
@@ -346,10 +412,14 @@ export default function AdminSimulation() {
       like_weight: Number(form.like_weight),
       comment_weight: Number(form.comment_weight),
       follow_weight: Number(form.follow_weight),
+      unfollow_weight: Number(form.unfollow_weight),
+      share_weight: Number(form.share_weight),
       active_start_hour: Number(form.active_start_hour),
       active_end_hour: Number(form.active_end_hour),
       interact_with_real_users: form.interact_with_real_users,
       max_cards_per_persona: Number(form.max_cards_per_persona),
+      include_in_public_stats: form.include_in_public_stats,
+      hourly_multipliers: form.hourly_multipliers.map(Number),
     })
   }
 
@@ -380,7 +450,12 @@ export default function AdminSimulation() {
       <div className="bg-surface border border-subtle rounded-lg p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <div className={labelCls}>Status</div>
-          <div className="text-sm text-primary mt-1">{status?.enabled ? 'Enabled' : 'Disabled'}</div>
+          <div className="text-sm text-primary mt-1 flex items-center gap-2">
+            {status?.enabled ? 'Enabled' : 'Disabled'}
+            {status?.enabled && activeNow && (
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Within active window" />
+            )}
+          </div>
         </div>
         <div>
           <div className={labelCls}>Simulated Users</div>
@@ -418,7 +493,21 @@ export default function AdminSimulation() {
             <div className={labelCls}>Follows</div>
             <div className="text-sm text-primary mt-1">{status?.follow_count ?? '—'}</div>
           </div>
-          <div className="col-span-3">
+          <div>
+            <div className={labelCls}>Unfollows</div>
+            <div className="text-sm text-primary mt-1">{status?.unfollow_count ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Shares</div>
+            <div className="text-sm text-primary mt-1">{status?.share_count ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Last Tick</div>
+            <div className="text-sm text-primary mt-1">
+              {status?.last_tick_at ? new Date(status.last_tick_at).toLocaleTimeString() : '—'}
+            </div>
+          </div>
+          <div className="col-span-2 sm:col-span-4">
             <div className={labelCls}>Last Error</div>
             <div className="text-sm text-primary mt-1">
               {status?.last_error ? (
@@ -473,8 +562,8 @@ export default function AdminSimulation() {
 
         <div>
           <div className={labelCls}>Action Weights</div>
-          <p className="text-xs text-muted mb-2">Relative likelihood of each action type.</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <p className="text-xs text-muted mb-2">Relative likelihood of each action type. Personalities further bias these per persona.</p>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-secondary" htmlFor="post-weight">Post</label>
               <input id="post-weight" value={form.post_weight} onChange={(e) => updateField('post_weight', e.target.value)} className={inputCls} inputMode="numeric" />
@@ -490,6 +579,14 @@ export default function AdminSimulation() {
             <div className="space-y-1">
               <label className="text-xs text-secondary" htmlFor="follow-weight">Follow</label>
               <input id="follow-weight" value={form.follow_weight} onChange={(e) => updateField('follow_weight', e.target.value)} className={inputCls} inputMode="numeric" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-secondary" htmlFor="unfollow-weight">Unfollow</label>
+              <input id="unfollow-weight" value={form.unfollow_weight} onChange={(e) => updateField('unfollow_weight', e.target.value)} className={inputCls} inputMode="numeric" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-secondary" htmlFor="share-weight">Share</label>
+              <input id="share-weight" value={form.share_weight} onChange={(e) => updateField('share_weight', e.target.value)} className={inputCls} inputMode="numeric" />
             </div>
           </div>
         </div>
@@ -509,6 +606,41 @@ export default function AdminSimulation() {
           Active window: {localWindowLabel(Number(form.active_start_hour), Number(form.active_end_hour))}
         </p>
 
+        {/* Time-of-day shaping */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className={labelCls}>Hourly Multipliers (UTC)</div>
+              <p className="text-xs text-muted">Scales the action budget per hour. 1 = baseline, 0 = quiet, 2 = double.</p>
+            </div>
+            <button
+              type="button"
+              className="text-[11px] tracking-widest uppercase text-secondary border border-subtle rounded px-2 py-1 hover:border-strong transition-colors"
+              onClick={() => updateField('hourly_multipliers', eveningPreset())}
+            >
+              Evening preset
+            </button>
+          </div>
+          <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+            {form.hourly_multipliers.map((m, i) => (
+              <div key={i} className="space-y-0.5">
+                <input
+                  aria-label={`multiplier hour ${i}`}
+                  value={m}
+                  onChange={(e) => {
+                    const next = [...form.hourly_multipliers]
+                    next[i] = e.target.value
+                    updateField('hourly_multipliers', next)
+                  }}
+                  className={`${inputCls} px-1 py-1 text-xs`}
+                  inputMode="decimal"
+                />
+                <div className="text-[9px] text-muted text-center">{i}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="space-y-1">
           <label className={labelCls} htmlFor="max-cards">Max Cards Per Persona</label>
           <input id="max-cards" value={form.max_cards_per_persona} onChange={(e) => updateField('max_cards_per_persona', e.target.value)} className={inputCls} inputMode="numeric" />
@@ -525,6 +657,18 @@ export default function AdminSimulation() {
         </label>
         <p className="text-xs text-muted -mt-2">
           When off, simulated accounts only interact with each other's content.
+        </p>
+
+        <label className="text-sm text-secondary inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.include_in_public_stats}
+            onChange={(e) => updateField('include_in_public_stats', e.target.checked)}
+          />
+          Include simulated content in public feed and leaderboards
+        </label>
+        <p className="text-xs text-muted -mt-2">
+          When off, simulated activity is hidden from the public feed and pellet leaderboard.
         </p>
 
         <div className="flex flex-wrap gap-2 items-center">

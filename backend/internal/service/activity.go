@@ -25,16 +25,30 @@ type AchievementCounter interface {
 	CountEarners(ctx context.Context, ids []string) (map[string]int, error)
 }
 
+// SimulatedContentFilter is satisfied by the simulation service. When the admin
+// has disabled including simulated content in public surfaces, the feed
+// excludes activities produced by simulated accounts.
+type SimulatedContentFilter interface {
+	ExcludeSimulatedFromPublic() bool
+}
+
 type ActivityService struct {
 	repo               *repository.ActivityRepository
 	log                zerolog.Logger
 	leagueMembers      MemberChecker      // nil disables league feed
 	clubMembers        MemberChecker      // nil disables club feed
 	achievementCounter AchievementCounter // nil disables earner-count enrichment
+	simFilter          SimulatedContentFilter // nil = include simulated
 }
 
 func NewActivityService(repo *repository.ActivityRepository, log zerolog.Logger, leagueMembers, clubMembers MemberChecker, achievementCounter AchievementCounter) *ActivityService {
 	return &ActivityService{repo: repo, log: log, leagueMembers: leagueMembers, clubMembers: clubMembers, achievementCounter: achievementCounter}
+}
+
+// SetSimulatedContentFilter wires the simulation public-content toggle so the
+// feed can exclude simulated activity when the admin has disabled it.
+func (s *ActivityService) SetSimulatedContentFilter(f SimulatedContentFilter) {
+	s.simFilter = f
 }
 
 // SyncPostEdit patches the feed's post_created metadata after a post edit.
@@ -117,13 +131,21 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 		}
 	}
 
+	// Exclude simulated content from the public and for_you feeds when the
+	// admin toggle is off. League/club feeds are left untouched since
+	// simulated accounts are not members of those groups.
+	if s.simFilter != nil && s.simFilter.ExcludeSimulatedFromPublic() {
+		if req.Filter == model.FeedPublic || req.Filter == model.FeedForYou {
+			req.ExcludeSimulated = true
+		}
+	}
+
 	items, err := s.repo.GetFeedFiltered(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	s.enrichAchievementCounts(ctx, items)
-
 	var nextCursor string
 	if len(items) == req.Limit {
 		nextCursor = items[len(items)-1].CreatedAt.UTC().Format(time.RFC3339Nano)

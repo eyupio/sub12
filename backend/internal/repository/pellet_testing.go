@@ -1228,7 +1228,11 @@ func (r *PelletTestRepository) SetAnnotatedImage(ctx context.Context, measuremen
 
 // ── Public Leaderboard ──────────────────────────────────────────────────────────
 
-func (r *PelletTestRepository) GetPublicLeaderboard(ctx context.Context, limit, offset int) ([]*model.PublicLeaderboardEntry, error) {
+func (r *PelletTestRepository) GetPublicLeaderboard(ctx context.Context, limit, offset int, excludeSimulated bool) ([]*model.PublicLeaderboardEntry, error) {
+	simFilter := ""
+	if excludeSimulated {
+		simFilter = " AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id AND u.is_simulated)"
+	}
 	rows, err := r.db.Query(ctx, `
 		WITH ranked AS (
 			SELECT
@@ -1243,7 +1247,7 @@ func (r *PelletTestRepository) GetPublicLeaderboard(ctx context.Context, limit, 
 				SUM(s.group_count)::int      AS total_groups
 			FROM pellet_test_sessions s
 			JOIN pellets p ON p.id = s.pellet_id
-			WHERE s.is_public = true AND s.group_count > 0 AND s.is_draft = FALSE
+			WHERE s.is_public = true AND s.group_count > 0 AND s.is_draft = FALSE`+simFilter+`
 			GROUP BY p.brand, p.model, p.head_size_mm, p.weight_grains
 		)
 		SELECT pellet_brand, pellet_model, head_size_mm, weight_grains,

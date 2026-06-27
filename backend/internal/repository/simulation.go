@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -21,6 +22,7 @@ func NewSimulationRepository(db *pgxpool.Pool) *SimulationRepository {
 
 func scanSimulationSettings(row pgx.Row) (*model.SimulationSettings, error) {
 	var s model.SimulationSettings
+	var hourlyRaw []byte
 	if err := row.Scan(
 		&s.ID,
 		&s.Enabled,
@@ -30,12 +32,17 @@ func scanSimulationSettings(row pgx.Row) (*model.SimulationSettings, error) {
 		&s.LikeWeight,
 		&s.CommentWeight,
 		&s.FollowWeight,
+		&s.UnfollowWeight,
+		&s.ShareWeight,
 		&s.ActiveStartHour,
 		&s.ActiveEndHour,
 		&s.InteractWithRealUsers,
 		&s.MaxCardsPerPersona,
+		&hourlyRaw,
+		&s.IncludeInPublicStats,
 		&s.LastRunAt,
 		&s.LastAction,
+		&s.LastTickAt,
 		&s.UpdatedBy,
 		&s.UpdatedAt,
 		&s.TotalActions,
@@ -43,10 +50,19 @@ func scanSimulationSettings(row pgx.Row) (*model.SimulationSettings, error) {
 		&s.LikeCount,
 		&s.CommentCount,
 		&s.FollowCount,
+		&s.UnfollowCount,
+		&s.ShareCount,
 		&s.LastError,
 		&s.LastErrorAt,
 	); err != nil {
 		return nil, err
+	}
+	if len(hourlyRaw) > 0 {
+		var mults []float64
+		if err := json.Unmarshal(hourlyRaw, &mults); err != nil {
+			return nil, fmt.Errorf("decode hourly_multipliers: %w", err)
+		}
+		s.HourlyMultipliers = mults
 	}
 	return &s, nil
 }
@@ -54,9 +70,12 @@ func scanSimulationSettings(row pgx.Row) (*model.SimulationSettings, error) {
 const simulationSettingsColumns = `
 	id, enabled, persona_count, actions_per_hour,
 	post_weight, like_weight, comment_weight, follow_weight,
+	unfollow_weight, share_weight,
 	active_start_hour, active_end_hour, interact_with_real_users,
-	max_cards_per_persona, last_run_at, last_action, updated_by::text, updated_at,
+	max_cards_per_persona, hourly_multipliers, include_in_public_stats,
+	last_run_at, last_action, last_tick_at, updated_by::text, updated_at,
 	total_actions, post_count, like_count, comment_count, follow_count,
+	unfollow_count, share_count,
 	last_error, last_error_at
 `
 
@@ -76,14 +95,21 @@ func (r *SimulationRepository) GetSettings(ctx context.Context) (*model.Simulati
 }
 
 func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.UpsertSimulationSettingsInput, updatedBy string) (*model.SimulationSettings, error) {
+	mults := normalizeHourlyMultipliers(input.HourlyMultipliers)
+	multsJSON, err := json.Marshal(mults)
+	if err != nil {
+		return nil, fmt.Errorf("encode hourly_multipliers: %w", err)
+	}
 	s, err := scanSimulationSettings(r.db.QueryRow(ctx, `
 		INSERT INTO simulation_settings (
 			id, enabled, persona_count, actions_per_hour,
 			post_weight, like_weight, comment_weight, follow_weight,
+			unfollow_weight, share_weight,
 			active_start_hour, active_end_hour, interact_with_real_users,
-			max_cards_per_persona, updated_by, updated_at
+			max_cards_per_persona, hourly_multipliers, include_in_public_stats,
+			updated_by, updated_at
 		)
-		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid, NOW())
+		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16::uuid, NOW())
 		ON CONFLICT (id) DO UPDATE
 		SET
 			enabled = EXCLUDED.enabled,
@@ -93,21 +119,51 @@ func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.
 			like_weight = EXCLUDED.like_weight,
 			comment_weight = EXCLUDED.comment_weight,
 			follow_weight = EXCLUDED.follow_weight,
+			unfollow_weight = EXCLUDED.unfollow_weight,
+			share_weight = EXCLUDED.share_weight,
 			active_start_hour = EXCLUDED.active_start_hour,
 			active_end_hour = EXCLUDED.active_end_hour,
 			interact_with_real_users = EXCLUDED.interact_with_real_users,
 			max_cards_per_persona = EXCLUDED.max_cards_per_persona,
+			hourly_multipliers = EXCLUDED.hourly_multipliers,
+			include_in_public_stats = EXCLUDED.include_in_public_stats,
 			updated_by = EXCLUDED.updated_by,
 			updated_at = NOW()
 		RETURNING `+simulationSettingsColumns+`
 	`, input.Enabled, input.PersonaCount, input.ActionsPerHour,
 		input.PostWeight, input.LikeWeight, input.CommentWeight, input.FollowWeight,
+		input.UnfollowWeight, input.ShareWeight,
 		input.ActiveStartHour, input.ActiveEndHour, input.InteractWithRealUsers,
-		input.MaxCardsPerPersona, updatedBy))
+		input.MaxCardsPerPersona, multsJSON, input.IncludeInPublicStats, updatedBy))
 	if err != nil {
 		return nil, fmt.Errorf("upsert simulation settings: %w", err)
 	}
 	return s, nil
+}
+
+// normalizeHourlyMultipliers returns a 24-element slice of multipliers, padding
+// or truncating the input and defaulting to all 1.0 when empty/invalid.
+func normalizeHourlyMultipliers(in []float64) []float64 {
+	const n = 24
+	if len(in) == 0 {
+		out := make([]float64, n)
+		for i := range out {
+			out[i] = 1.0
+		}
+		return out
+	}
+	out := make([]float64, n)
+	for i := 0; i < n; i++ {
+		v := 1.0
+		if i < len(in) {
+			v = in[i]
+		}
+		if v < 0 {
+			v = 0
+		}
+		out[i] = v
+	}
+	return out
 }
 
 // TouchRun records the latest engine activity for status reporting.
@@ -125,30 +181,43 @@ func (r *SimulationRepository) TouchRun(ctx context.Context, lastAction string) 
 
 // IncrementCounts bumps the per-action counters, total_actions, and the
 // last-run metadata in a single update. counts maps action labels ("post",
-// "like", "comment", "follow") to how many of that action were performed. When
-// lastErr is non-empty it is also recorded.
+// "like", "comment", "follow", "unfollow", "share") to how many of that action
+// were performed. When lastErr is non-empty it is also recorded.
 func (r *SimulationRepository) IncrementCounts(ctx context.Context, counts map[string]int, lastAction, lastErr string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE simulation_settings
 		SET
-			last_run_at  = NOW(),
-			last_action  = $1,
+			last_run_at   = NOW(),
+			last_action   = $1,
 			total_actions = total_actions + $2,
 			post_count    = post_count + $3,
 			like_count    = like_count + $4,
 			comment_count = comment_count + $5,
 			follow_count  = follow_count + $6,
-			last_error    = NULLIF($7, ''),
-			last_error_at = CASE WHEN $7 <> '' THEN NOW() ELSE last_error_at END
+			unfollow_count = unfollow_count + $7,
+			share_count   = share_count + $8,
+			last_error    = NULLIF($9, ''),
+			last_error_at = CASE WHEN $9 <> '' THEN NOW() ELSE last_error_at END
 		WHERE id = 1
 	`,
 		lastAction,
-		counts["post"]+counts["like"]+counts["comment"]+counts["follow"],
+		counts["post"]+counts["like"]+counts["comment"]+counts["follow"]+counts["unfollow"]+counts["share"],
 		counts["post"], counts["like"], counts["comment"], counts["follow"],
+		counts["unfollow"], counts["share"],
 		lastErr,
 	)
 	if err != nil {
 		return fmt.Errorf("increment simulation counts: %w", err)
+	}
+	return nil
+}
+
+// TouchTick records that the background runner woke, so operators can tell a
+// live-but-idle runner (disabled / outside active hours) from a stuck one.
+func (r *SimulationRepository) TouchTick(ctx context.Context) error {
+	_, err := r.db.Exec(ctx, `UPDATE simulation_settings SET last_tick_at = NOW() WHERE id = 1`)
+	if err != nil {
+		return fmt.Errorf("touch simulation tick: %w", err)
 	}
 	return nil
 }
@@ -491,4 +560,112 @@ func (r *SimulationRepository) UpdateSimulatedAvatarURL(ctx context.Context, id,
 		return nil, fmt.Errorf("update simulated avatar: %w", err)
 	}
 	return u, nil
+}
+
+// eligiblePostWhere returns the WHERE clause for RandomPublicPost.
+func eligiblePostWhere(simulatedOnly bool) string {
+	q := `p.visibility = 'public' AND p.hidden_at IS NULL AND p.user_id <> $1`
+	if simulatedOnly {
+		q += ` AND u.is_simulated`
+	}
+	return q
+}
+
+// RandomPublicPost picks a random public, non-hidden post not owned by
+// excludeUserID. When simulatedOnly is true, only posts by simulated accounts
+// are eligible. ErrNotFound when no eligible post exists.
+func (r *SimulationRepository) RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
+	var n int
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM posts p JOIN users u ON u.id = p.user_id
+		WHERE `+eligiblePostWhere(simulatedOnly)+`
+	`, excludeUserID).Scan(&n); err != nil {
+		return "", fmt.Errorf("count random public post: %w", err)
+	}
+	if n == 0 {
+		return "", ErrNotFound
+	}
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT p.id::text FROM posts p JOIN users u ON u.id = p.user_id
+		WHERE `+eligiblePostWhere(simulatedOnly)+`
+		OFFSET floor(random() * $2) LIMIT 1
+	`, excludeUserID, n).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("random public post: %w", err)
+	}
+	return id, nil
+}
+
+// eligibleActivityWhere returns the WHERE clause for RandomActivity.
+func eligibleActivityWhere(simulatedOnly bool) string {
+	q := `a.visibility = 'public' AND a.hidden_at IS NULL AND a.user_id <> $1`
+	if simulatedOnly {
+		q += ` AND u.is_simulated`
+	}
+	return q
+}
+
+// RandomActivity picks a random public, non-hidden activity not owned by
+// excludeUserID. When simulatedOnly is true, only activities by simulated
+// accounts are eligible. ErrNotFound when none exists.
+func (r *SimulationRepository) RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
+	var n int
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM activities a JOIN users u ON u.id = a.user_id
+		WHERE `+eligibleActivityWhere(simulatedOnly)+`
+	`, excludeUserID).Scan(&n); err != nil {
+		return "", fmt.Errorf("count random activity: %w", err)
+	}
+	if n == 0 {
+		return "", ErrNotFound
+	}
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT a.id::text FROM activities a JOIN users u ON u.id = a.user_id
+		WHERE `+eligibleActivityWhere(simulatedOnly)+`
+		OFFSET floor(random() * $2) LIMIT 1
+	`, excludeUserID, n).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("random activity: %w", err)
+	}
+	return id, nil
+}
+
+// RandomFollowedUser picks a random user that followerID currently follows.
+// When simulatedOnly is true, only simulated followees are eligible.
+// ErrNotFound when the actor follows no one eligible.
+func (r *SimulationRepository) RandomFollowedUser(ctx context.Context, followerID string, simulatedOnly bool) (string, error) {
+	where := `f.follower_id = $1 AND u.id <> $1 AND u.profile_visibility = 'public'`
+	if simulatedOnly {
+		where += ` AND u.is_simulated`
+	}
+	var n int
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM user_follows f JOIN users u ON u.id = f.following_id
+		WHERE `+where, followerID).Scan(&n); err != nil {
+		return "", fmt.Errorf("count random followed user: %w", err)
+	}
+	if n == 0 {
+		return "", ErrNotFound
+	}
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT u.id::text FROM user_follows f JOIN users u ON u.id = f.following_id
+		WHERE `+where+`
+		OFFSET floor(random() * $2) LIMIT 1
+	`, followerID, n).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("random followed user: %w", err)
+	}
+	return id, nil
 }

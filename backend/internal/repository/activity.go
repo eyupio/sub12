@@ -160,6 +160,18 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 	)
 
 	cols := activityColumnsViewer("$1")
+	// simFilter is injected into the public feed when the admin has disabled
+	// including simulated content in public surfaces.
+	simFilter := ""
+	if req.ExcludeSimulated {
+		simFilter = " AND NOT u.is_simulated"
+	}
+	// simFilterForYou keeps the viewer's own activities but drops simulated
+	// accounts the viewer follows.
+	simFilterForYou := ""
+	if req.ExcludeSimulated {
+		simFilterForYou = " AND (a.user_id = $1 OR NOT u.is_simulated)"
+	}
 
 	switch req.Filter {
 	case model.FeedPublic:
@@ -171,7 +183,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 			WHERE a.visibility = 'public'
 			  AND a.hidden_at IS NULL
 			  AND u.feed_opt_out = FALSE
-			  AND u.profile_visibility <> 'private'
+			  AND u.profile_visibility <> 'private'`+simFilter+`
 			  AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			  AND (a.target_type <> 'post' OR p.id IS NOT NULL)
 			  AND a.user_id NOT IN (
@@ -241,7 +253,7 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 				SELECT blocked_id FROM user_blocks WHERE blocker_id = $1
 			)
 			AND (u.feed_opt_out = FALSE OR a.user_id = $1)
-			AND (a.visibility IN ('public', 'followers') OR a.user_id = $1)
+			AND (a.visibility IN ('public', 'followers') OR a.user_id = $1)`+simFilterForYou+`
 			AND (a.target_type <> 'score_card' OR sc.id IS NOT NULL)
 			AND (a.target_type <> 'post' OR p.id IS NOT NULL)
 			AND ($3 = '' OR a.created_at < $3::timestamptz)

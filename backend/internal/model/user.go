@@ -40,6 +40,7 @@ type PublicProfile struct {
 	ProfileVisibility  string    `json:"profile_visibility"`
 	ShowFollowerCounts bool      `json:"show_follower_counts"`
 	StarLevel          int       `json:"star_level"`
+	IsSimulated        bool      `json:"is_simulated"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 

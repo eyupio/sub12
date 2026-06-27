@@ -234,6 +234,11 @@ export default function UserProfile() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-lg font-medium text-primary">{profile.display_name}</p>
+                    {profile.is_simulated && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-surface-hover border border-subtle text-[9px] tracking-widest uppercase text-muted">
+                        Simulated
+                      </span>
+                    )}
                     {profile.profile_visibility === 'private' && (
                       <span title="Private profile"><Lock size={14} className="text-muted" /></span>
                     )}

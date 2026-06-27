@@ -9,12 +9,17 @@ export interface SimulationSettings {
   like_weight: number
   comment_weight: number
   follow_weight: number
+  unfollow_weight: number
+  share_weight: number
   active_start_hour: number
   active_end_hour: number
   interact_with_real_users: boolean
   max_cards_per_persona: number
+  hourly_multipliers: number[]
+  include_in_public_stats: boolean
   last_run_at?: string
   last_action?: string
+  last_tick_at?: string
   updated_by?: string
   updated_at: string
   total_actions: number
@@ -22,6 +27,8 @@ export interface SimulationSettings {
   like_count: number
   comment_count: number
   follow_count: number
+  unfollow_count: number
+  share_count: number
   last_error?: string
   last_error_at?: string
 }
@@ -34,10 +41,14 @@ export interface UpdateSimulationSettingsInput {
   like_weight: number
   comment_weight: number
   follow_weight: number
+  unfollow_weight: number
+  share_weight: number
   active_start_hour: number
   active_end_hour: number
   interact_with_real_users: boolean
   max_cards_per_persona: number
+  hourly_multipliers: number[]
+  include_in_public_stats: boolean
 }
 
 export interface SimulationStatus {
@@ -47,17 +58,21 @@ export interface SimulationStatus {
   simulated_card_count: number
   last_run_at?: string
   last_action?: string
+  last_tick_at?: string
   total_actions: number
   post_count: number
   like_count: number
   comment_count: number
   follow_count: number
+  unfollow_count: number
+  share_count: number
   last_error?: string
   last_error_at?: string
 }
 
 export interface SimulationRunResponse {
   performed: number
+  counts?: Record<string, number>
 }
 
 export interface SimulatedPersona {
