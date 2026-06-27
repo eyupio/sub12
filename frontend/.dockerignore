@@ -6,3 +6,7 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# Capacitor native projects — the frontend image is web-only.
+android/
+ios/
