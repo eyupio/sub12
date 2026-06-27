@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import type { SimulatedPersona, UpdateSimulatedPersonaInput } from '../api/adminSimulation'
-import { identiconDataUri } from '../utils/identicon'
+import { identiconDataUri, identiconPngFile, randomIdenticonSeed } from '../utils/identicon'
+import { toast } from '../store/toast'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -61,6 +62,17 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
       reader.readAsDataURL(f)
     } else {
       setAvatarPreview(persona?.avatar_url ?? null)
+    }
+  }
+
+  async function regenerate() {
+    const seed = randomIdenticonSeed()
+    try {
+      const file = await identiconPngFile(seed)
+      setAvatarFile(file)
+      setAvatarPreview(identiconDataUri(seed))
+    } catch {
+      toast('Could not generate an avatar — please try again.', 'error')
     }
   }
 
@@ -125,6 +137,13 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
                 Upload avatar
               </button>
             )}
+            <button
+              type="button"
+              onClick={regenerate}
+              className="block text-xs text-muted hover:text-secondary transition-colors"
+            >
+              Regenerate avatar
+            </button>
             {avatarFile && (
               <button
                 type="button"
