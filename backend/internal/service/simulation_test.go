@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -433,4 +434,28 @@ func TestIsSimulatedEmail(t *testing.T) {
 	assert.True(t, isSimulatedEmail("SIM@SIMULATED.LOCAL"))
 	assert.False(t, isSimulatedEmail("real@example.com"))
 	assert.False(t, isSimulatedEmail(""))
+}
+
+func TestSpreadOffsetsWithinWindowAndSorted(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	window := time.Minute
+
+	for _, n := range []int{1, 2, 10, 250} {
+		offsets := spreadOffsets(window, n, rng)
+		require.Len(t, offsets, n)
+		var prev time.Duration
+		for i, off := range offsets {
+			assert.GreaterOrEqual(t, off, time.Duration(0))
+			assert.Less(t, off, window)
+			if i > 0 {
+				assert.GreaterOrEqual(t, off, prev, "offsets must be ascending")
+			}
+			prev = off
+		}
+	}
+}
+
+func TestSpreadOffsetsEmptyForZero(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	assert.Empty(t, spreadOffsets(time.Minute, 0, rng))
 }
