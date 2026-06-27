@@ -1,15 +1,6 @@
 name: e2e
 
-on:
-  pull_request:
-    paths:
-      - 'frontend/**'
-      - 'backend/**'
-      - 'e2e/**'
-      - '.github/workflows/e2e.yml'
-  schedule:
-    - cron: '0 3 * * *' # nightly at 03:00 UTC
-  workflow_dispatch: {}
+on: workflow_dispatch: {}
 
 concurrency:
   group: e2e-${{ github.ref }}
