@@ -70,7 +70,7 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
       location,
       club,
       avatarFile,
-      removeAvatar: avatarPreview === null && !!persona.avatar_url,
+      removeAvatar: avatarPreview === null && !!persona?.avatar_url,
     })
   }
 
