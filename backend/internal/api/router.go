@@ -488,12 +488,13 @@ func NewRouter(
 				r.Post("/admin/activities/{id}/unhide", adminActivityH.Unhide)
 
 				// League management
-				alh := handler.NewAdminLeagues(leagues)
+				alh := handler.NewAdminLeagues(leagues, simulation)
 				r.Get("/admin/leagues", alh.List)
 				r.Get("/admin/leagues/{id}", alh.Get)
 				r.Patch("/admin/leagues/{id}", alh.Update)
 				r.Delete("/admin/leagues/{id}", alh.Delete)
 				r.Get("/admin/leagues/{id}/members", alh.ListMembers)
+				r.Post("/admin/leagues/{id}/members", alh.AddMember)
 				r.Delete("/admin/leagues/{id}/members/{userId}", alh.RemoveMember)
 
 				// Club management

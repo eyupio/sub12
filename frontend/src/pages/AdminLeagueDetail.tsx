@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Trash2, X } from 'lucide-react'
+import { ChevronLeft, Trash2, UserPlus, X } from 'lucide-react'
 import { adminLeaguesApi } from '../api/adminLeagues'
+import { adminSimulationApi, type SimulatedPersona } from '../api/adminSimulation'
 import type { League } from '../api/leagues'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 
@@ -56,6 +57,95 @@ function ConfirmDeleteModal({ league, onConfirm, onCancel, isPending }: {
   )
 }
 
+function AddSimulatedMemberDialog({ leagueId, pending, onAdd, onCancel }: {
+  leagueId: string
+  pending: boolean
+  onAdd: (personaId: string) => void
+  onCancel: () => void
+}) {
+  const [selected, setSelected] = useState('')
+
+  const { data: personasData, isLoading } = useQuery({
+    queryKey: ['simulation-personas-for-league', leagueId],
+    queryFn: () => adminSimulationApi.listPersonas(100, 0),
+    retry: false,
+  })
+
+  useEffect(() => { setSelected('') }, [leagueId])
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onCancel])
+
+  const personas: SimulatedPersona[] = personasData?.items ?? []
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UserPlus size={18} className="text-[var(--brass)]" />
+            <h2 className="t-section-title">Add Simulated Account</h2>
+          </div>
+          <button onClick={onCancel} aria-label="Close" className="text-muted hover:text-secondary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          Enrol a simulated persona directly, bypassing the join policy, so it can interact with the league's content.
+        </p>
+        {isLoading ? (
+          <p className="text-sm text-muted">Loading personas…</p>
+        ) : personas.length === 0 ? (
+          <p className="text-sm text-muted">No simulated personas available.</p>
+        ) : (
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {personas.map(p => (
+              <label
+                key={p.id}
+                className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                  selected === p.id ? 'border-[var(--brass)]/50 bg-[var(--brass)]/5' : 'border-subtle hover:border-strong'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="sim-persona"
+                  checked={selected === p.id}
+                  onChange={() => setSelected(p.id)}
+                  className="accent-[var(--brass)]"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-primary truncate">{p.display_name}</div>
+                  {p.location && <div className="text-xs text-muted truncate">{p.location}</div>}
+                </div>
+                <span className="text-xs text-muted">{p.card_count} cards</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-3 justify-end pt-1">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded border border-subtle text-sm text-muted hover:text-secondary transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => selected && onAdd(selected)}
+            disabled={pending || !selected}
+            className="px-4 py-2 rounded bg-[var(--brass)] text-inverse text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {pending ? 'Adding…' : 'Add to League'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminLeagueDetail() {
   const { id } = useParams({ from: '/app/admin/leagues/$id' })
   const navigate = useNavigate()
@@ -68,6 +158,7 @@ export default function AdminLeagueDetail() {
   const [saveOk, setSaveOk] = useState<string | null>(null)
   const [saveErr, setSaveErr] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
 
   const { data: league, isLoading, error } = useQuery({
     queryKey: ['admin-league', id],
@@ -121,6 +212,14 @@ export default function AdminLeagueDetail() {
     mutationFn: (userId: string) => adminLeaguesApi.removeMember(id, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-league-members', id] })
+    },
+  })
+
+  const addMemberMutation = useMutation({
+    mutationFn: (userId: string) => adminLeaguesApi.addMember(id, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-league-members', id] })
+      setShowAddMemberModal(false)
     },
   })
 
@@ -219,7 +318,16 @@ export default function AdminLeagueDetail() {
 
       {/* Members */}
       <div className={sectionCls}>
-        <h2 className="t-section-title">Members ({members.length})</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="t-section-title">Members ({members.length})</h2>
+          <button
+            onClick={() => setShowAddMemberModal(true)}
+            className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+          >
+            <UserPlus size={14} />
+            Add
+          </button>
+        </div>
         {members.length === 0 ? (
           <p className="text-sm text-muted">No members.</p>
         ) : (
@@ -274,6 +382,15 @@ export default function AdminLeagueDetail() {
           onConfirm={() => deleteMutation.mutate()}
           onCancel={() => setShowDeleteModal(false)}
           isPending={deleteMutation.isPending}
+        />
+      )}
+
+      {showAddMemberModal && (
+        <AddSimulatedMemberDialog
+          leagueId={id}
+          pending={addMemberMutation.isPending}
+          onAdd={(personaId) => addMemberMutation.mutate(personaId)}
+          onCancel={() => setShowAddMemberModal(false)}
         />
       )}
     </div>
