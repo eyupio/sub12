@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 
@@ -11,7 +12,13 @@ export class ApiError extends Error {
   }
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+// Native builds load the SPA from a local WebView origin (capacitor://localhost
+// on iOS, https://localhost on Android), so a relative '/api/v1' can never reach
+// the backend. Point native apps at the canonical production host. VITE_API_URL
+// still wins when set, so a staging/beta build can be retargeted at build time.
+const isNative = Capacitor.isNativePlatform()
+const NATIVE_API_URL = 'https://sub12.io/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL ?? (isNative ? NATIVE_API_URL : '/api/v1')
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
@@ -21,15 +28,26 @@ let refreshPromise: Promise<boolean> | null = null
 const AUTH_PATH_PREFIX = '/auth/'
 
 async function tryRefreshToken(): Promise<boolean> {
-  // Refresh now uses the httpOnly `sub12_refresh` cookie set by the backend
-  // on login. The browser attaches it automatically because we send the
-  // request with credentials:'include'; we never see or send the value
-  // ourselves, so an XSS payload reading localStorage cannot mint tokens.
-  const { setAuth, clearAuth } = useAuthStore.getState()
+  // Web/PWA: refresh uses the httpOnly `sub12_refresh` cookie set by the backend
+  // on login. The browser attaches it automatically because we send the request
+  // with credentials:'include'; we never see or send the value ourselves, so an
+  // XSS payload reading localStorage cannot mint tokens.
+  //
+  // Native: the cookie is SameSite=Lax and the request is cross-site (local
+  // WebView origin → sub12.io), so the cookie is not attached. We instead pass
+  // the persisted refresh token explicitly; the backend accepts it as a JSON
+  // body fallback on /auth/refresh.
+  const { setAuth, clearAuth, refreshToken } = useAuthStore.getState()
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      ...(isNative
+        ? {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken ?? '' }),
+          }
+        : {}),
     })
     if (!res.ok) {
       // No valid refresh cookie (expired / revoked / never set). Drop the

@@ -1,4 +1,6 @@
+import { Capacitor } from '@capacitor/core'
 import { api } from './client'
+import { useAuthStore } from '../store/auth'
 
 export interface AuthTokens {
   access_token: string
@@ -57,12 +59,26 @@ export const authApi = {
 
   // Refresh and logout rely on the httpOnly `sub12_refresh` cookie that the
   // backend set on login. The token is never visible to JS; we only need to
-  // tell fetch to attach the cookie via credentials:'include'.
+  // tell fetch to attach the cookie via credentials:'include'. Native builds
+  // can't deliver the SameSite=Lax cookie cross-site, so they pass the persisted
+  // refresh token explicitly — the backend accepts it as a JSON body fallback.
   refresh: () =>
-    api.post<AuthTokens>('/auth/refresh', undefined, { credentials: 'include' }),
+    api.post<AuthTokens>(
+      '/auth/refresh',
+      Capacitor.isNativePlatform()
+        ? { refresh_token: useAuthStore.getState().refreshToken ?? '' }
+        : undefined,
+      { credentials: 'include' },
+    ),
 
   logout: () =>
-    api.post<void>('/auth/logout', undefined, { credentials: 'include' }),
+    api.post<void>(
+      '/auth/logout',
+      Capacitor.isNativePlatform()
+        ? { refresh_token: useAuthStore.getState().refreshToken ?? '' }
+        : undefined,
+      { credentials: 'include' },
+    ),
 
   forgotPassword: (email: string) =>
     api.post<{ message: string }>('/auth/forgot-password', { email }),

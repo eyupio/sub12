@@ -20,8 +20,13 @@ frontend/dist/
 frontend/.vite/
 frontend/**/*.tsbuildinfo
 frontend/coverage/
-frontend/ios/
-frontend/android/
+
+# Capacitor — native projects are committed, but the web bundle and config that
+# `cap sync` copies in from dist are generated build output, so keep them out of git.
+frontend/android/app/src/main/assets/public/
+frontend/android/app/src/main/assets/capacitor.config.json
+frontend/ios/App/App/public/
+frontend/ios/App/App/capacitor.config.json
 
 # Docker bind-mount data directories
 data/

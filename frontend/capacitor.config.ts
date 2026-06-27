@@ -5,9 +5,24 @@ const config: CapacitorConfig = {
   appName: 'sub-12',
   webDir: 'dist',
   plugins: {
+    // Route fetch/XHR through the native HTTP stack. This lets the WebView talk
+    // to https://sub12.io without browser CORS preflight and lets the native
+    // cookie manager handle Set-Cookie, which a sandboxed WebView origin
+    // (capacitor://localhost / https://localhost) otherwise can't persist.
+    CapacitorHttp: {
+      enabled: true,
+    },
+    CapacitorCookies: {
+      enabled: true,
+    },
     Keyboard: {
       resize: 'body',
       resizeOnFullScreen: true,
+    },
+    SplashScreen: {
+      launchShowDuration: 0,
+      backgroundColor: '#0f172a',
+      showSpinner: false,
     },
   },
   server: {

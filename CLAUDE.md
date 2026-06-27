@@ -74,7 +74,18 @@ cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
 cd frontend && npm run lint     # ESLint
 cd frontend && npm test         # Vitest (vitest run)
 cd frontend && npm run build    # Production build (tsc -b && vite build)
+
+# Mobile (Capacitor) — wraps the dist/ bundle as native Android/iOS apps.
+# Native apps target https://sub12.io/api/v1 (relative /api won't resolve in a
+# WebView); see frontend/README.md for prerequisites and the full workflow.
+cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
+cd frontend && npm run run:android    # build + launch on emulator/device
+cd frontend && npm run run:ios         # macOS + Xcode only
 ```
+
+The `android/` project is committed; the `ios/` project must be generated on a Mac
+(`npx cap add ios`) and committed. The web assets `cap sync` copies into the native
+projects are git-ignored (regenerated from `dist/`).
 
 ### Production
 
