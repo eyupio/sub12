@@ -60,6 +60,7 @@ type simulationRepo interface {
 	ListAudit(ctx context.Context, limit, offset int) ([]*model.SimulationAudit, int, error)
 	UpdateSimulatedProfile(ctx context.Context, id string, in *model.UpdateSimulatedPersonaInput) (*model.AdminUser, error)
 	UpdateSimulatedAvatarURL(ctx context.Context, id, avatarURL string) (*model.AdminUser, error)
+	DeleteSimulatedAvatarURL(ctx context.Context, id string) (*model.AdminUser, error)
 }
 
 // Compile-time assertion that the concrete repository satisfies the interface.
@@ -880,6 +881,20 @@ func (s *SimulationService) SetPersonaAvatar(ctx context.Context, id, avatarURL,
 	s.InvalidatePersonas()
 	if err := s.repo.RecordAudit(ctx, "persona_avatar", actorID, fmt.Sprintf(`{"id":%q}`, id)); err != nil {
 		s.log.Warn().Err(err).Msg("simulation: audit persona_avatar failed")
+	}
+	return updated, nil
+}
+
+// RemovePersonaAvatar clears the avatar_url on a simulated account. actorID is
+// the admin, for audit.
+func (s *SimulationService) RemovePersonaAvatar(ctx context.Context, id, actorID string) (*model.AdminUser, error) {
+	updated, err := s.repo.DeleteSimulatedAvatarURL(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "persona_avatar_remove", actorID, fmt.Sprintf(`{"id":%q}`, id)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_avatar_remove failed")
 	}
 	return updated, nil
 }

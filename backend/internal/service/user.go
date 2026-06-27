@@ -222,6 +222,11 @@ func (s *UserService) UpdateAvatarURL(ctx context.Context, id, avatarURL string)
 	return s.users.UpdateAvatarURL(ctx, id, avatarURL)
 }
 
+// RemoveAvatar clears the avatar_url for a user.
+func (s *UserService) RemoveAvatar(ctx context.Context, id string) (*model.User, error) {
+	return s.users.DeleteAvatarURL(ctx, id)
+}
+
 // RequestEmailChange creates a token and sends a confirmation email to the new address.
 func (s *UserService) RequestEmailChange(ctx context.Context, userID, newEmail string) error {
 	newEmail = strings.ToLower(strings.TrimSpace(newEmail))

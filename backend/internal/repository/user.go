@@ -137,6 +137,27 @@ func (r *UserRepository) UpdateAvatarURL(ctx context.Context, id, avatarURL stri
 	return &u, nil
 }
 
+func (r *UserRepository) DeleteAvatarURL(ctx context.Context, id string) (*model.User, error) {
+	var u model.User
+	err := r.db.QueryRow(ctx, `
+		UPDATE users
+		SET avatar_url = NULL, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+	`, id).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
+		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("delete avatar url: %w", err)
+	}
+	return &u, nil
+}
+
 func (r *UserRepository) UpdatePasswordHash(ctx context.Context, id, passwordHash string) error {
 	ct, err := r.db.Exec(ctx, `
 		UPDATE users

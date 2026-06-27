@@ -292,6 +292,12 @@ func (m *mockSimulationRepo) UpdateSimulatedAvatarURL(_ context.Context, id, _ s
 	m.updatedID = id
 	return &model.AdminUser{ID: id, IsSimulated: true}, nil
 }
+func (m *mockSimulationRepo) DeleteSimulatedAvatarURL(_ context.Context, id string) (*model.AdminUser, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &model.AdminUser{ID: id, IsSimulated: true}, nil
+}
 
 func TestUpdatePersonaRejectsBlankName(t *testing.T) {
 	repo := &mockSimulationRepo{}

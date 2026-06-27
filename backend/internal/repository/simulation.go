@@ -575,6 +575,24 @@ func (r *SimulationRepository) UpdateSimulatedAvatarURL(ctx context.Context, id,
 	return u, nil
 }
 
+// DeleteSimulatedAvatarURL clears the avatar_url on a simulated account. Returns
+// ErrNotFound when the target is missing or is not a simulated account.
+func (r *SimulationRepository) DeleteSimulatedAvatarURL(ctx context.Context, id string) (*model.AdminUser, error) {
+	u, err := scanAdminUser(r.db.QueryRow(ctx, `
+		UPDATE users
+		SET avatar_url = NULL, updated_at = NOW()
+		WHERE id = $1 AND is_simulated
+		RETURNING `+adminUserColumns+`
+	`, id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("delete simulated avatar: %w", err)
+	}
+	return u, nil
+}
+
 // eligiblePostWhere returns the WHERE clause for RandomPublicPost.
 func eligiblePostWhere(simulatedOnly bool) string {
 	q := `p.visibility = 'public' AND p.hidden_at IS NULL AND p.user_id <> $1`
