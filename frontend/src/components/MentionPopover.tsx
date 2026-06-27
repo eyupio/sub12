@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { usersApi, type PublicProfile } from '../api/users'
+import { identiconDataUri } from '../utils/identicon'
 
 interface MentionPopoverProps {
   query: string
@@ -72,11 +73,11 @@ export function MentionPopover({ query, onSelect, onClose }: MentionPopoverProps
           className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition ${idx === highlight ? 'bg-[var(--hover-bg,rgba(0,0,0,0.06))]' : ''}`}
         >
           <div className="w-7 h-7 rounded-full bg-[var(--muted-bg,rgba(0,0,0,0.05))] overflow-hidden flex items-center justify-center shrink-0">
-            {u.avatar_url ? (
-              <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[10px] text-muted">{u.display_name.slice(0, 1).toUpperCase()}</span>
-            )}
+            <img
+              src={u.avatar_url || identiconDataUri(u.id || u.display_name || '')}
+              alt=""
+              className="w-full h-full object-cover"
+            />
           </div>
           <span className="text-primary truncate">{u.display_name}</span>
         </button>

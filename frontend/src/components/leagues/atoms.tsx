@@ -1,23 +1,19 @@
 import { ReactNode } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { avatarGradient, initials, disciplineTagClass, type Discipline } from './tokens'
+import { disciplineTagClass, type Discipline } from './tokens'
+import { identiconDataUri } from '../../utils/identicon'
 
 type Size = 'sm' | 'md' | 'lg'
 
 export function Avatar({ name, size = 'md', src }: { name: string; size?: Size; src?: string | null }) {
   const cls = `lc-avatar lc-avatar-${size}`
-  if (src) {
-    return <img src={src} alt={name} className={cls} style={{ objectFit: 'cover' }} />
-  }
-  const g = avatarGradient(name)
   return (
-    <span
+    <img
+      src={src || identiconDataUri(name)}
+      alt={name}
       className={cls}
-      style={{ background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
-      aria-label={name}
-    >
-      {initials(name)}
-    </span>
+      style={{ objectFit: 'cover' }}
+    />
   )
 }
 

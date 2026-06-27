@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import type { SimulatedPersona, UpdateSimulatedPersonaInput } from '../api/adminSimulation'
+import { identiconDataUri } from '../utils/identicon'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -91,13 +92,11 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
 
         <div className="flex items-center gap-3">
           <div className="w-16 h-16 rounded-full overflow-hidden border border-subtle bg-surface-hover shrink-0">
-            {avatarPreview ? (
-              <img src={avatarPreview} alt={displayName} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted text-xs">
-                {displayName?.[0]?.toUpperCase() ?? '?'}
-              </div>
-            )}
+            <img
+              src={avatarPreview || identiconDataUri(persona.id || displayName || '')}
+              alt={displayName}
+              className="w-full h-full object-cover"
+            />
           </div>
           <div className="space-y-1">
             {persona.avatar_url ? (

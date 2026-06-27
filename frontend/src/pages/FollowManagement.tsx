@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { identiconDataUri } from '../utils/identicon'
 
 type Tab = 'following' | 'followers'
 
@@ -232,17 +233,11 @@ export default function FollowManagement() {
                   params={{ id: item.user_id }}
                   className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
                 >
-                  {item.avatar_url ? (
-                    <img
-                      src={item.avatar_url}
-                      alt={item.display_name}
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-surface-hover flex items-center justify-center text-muted text-xs font-medium flex-shrink-0">
-                      {item.display_name[0]?.toUpperCase() ?? '?'}
-                    </div>
-                  )}
+                  <img
+                    src={item.avatar_url || identiconDataUri(item.user_id || item.display_name || '')}
+                    alt={item.display_name}
+                    className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                  />
                   <span className="text-sm text-secondary truncate">
                     {item.display_name}
                   </span>

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Star } from 'lucide-react'
 import { achievementApi } from '../api/achievements'
 import { iconForAchievement } from '../utils/achievementIcons'
+import { identiconDataUri } from '../utils/identicon'
 
 type Placement = 'top' | 'bottom' | 'left' | 'right'
 
@@ -20,16 +21,6 @@ interface UserHoverCardProps {
 const STAR_STEP = 3 // backend: star_level = floor(achievement_count / 3), capped at 5
 const MAX_LEVEL = 5
 const MAX_VISIBLE = 12
-
-function initialsOf(name?: string) {
-  if (!name) return '?'
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
 
 export function UserHoverCard({
   userId,
@@ -66,11 +57,11 @@ export function UserHoverCard({
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-subtle">
         <div className="w-9 h-9 rounded-full overflow-hidden border border-subtle bg-surface-hover flex items-center justify-center text-[11px] font-medium text-muted shrink-0">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName ?? ''} className="w-full h-full object-cover" />
-          ) : (
-            initialsOf(displayName)
-          )}
+          <img
+            src={avatarUrl || identiconDataUri(userId || displayName || '')}
+            alt={displayName ?? ''}
+            className="w-full h-full object-cover"
+          />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-primary truncate">{displayName ?? 'Member'}</p>

@@ -5,6 +5,7 @@ import { adminSimulationApi, SimulatedPersona, UpdateSimulationSettingsInput } f
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PersonaEditDialog, PersonaEditState } from '../components/PersonaEditDialog'
 import { PersonaJoinDialog } from '../components/PersonaJoinDialog'
+import { identiconDataUri } from '../utils/identicon'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -745,13 +746,11 @@ export default function AdminSimulation() {
             {personas.map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-2 rounded border border-subtle">
                 <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle bg-surface-hover shrink-0">
-                  {p.avatar_url ? (
-                    <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted text-[10px]">
-                      {p.display_name?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                  )}
+                  <img
+                    src={p.avatar_url || identiconDataUri(p.id || p.display_name || '')}
+                    alt={p.display_name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-primary truncate">{p.display_name}</div>

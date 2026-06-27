@@ -26,6 +26,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
+import { identiconDataUri } from '../utils/identicon'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader } from '../components/leagues'
@@ -1358,13 +1359,11 @@ function SocialTabContent() {
                       </button>
                     )}
                     <Link to="/users/$id" params={{ id: item.user_id }} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
-                      {item.avatar_url ? (
-                        <img src={item.avatar_url} alt={item.display_name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-surface-hover flex items-center justify-center text-muted text-xs font-medium flex-shrink-0">
-                          {item.display_name[0]?.toUpperCase() ?? '?'}
-                        </div>
-                      )}
+                      <img
+                        src={item.avatar_url || identiconDataUri(item.user_id || item.display_name || '')}
+                        alt={item.display_name}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                      />
                       <span className="text-sm text-secondary truncate">{item.display_name}</span>
                     </Link>
                     {tab === 'following' && (
