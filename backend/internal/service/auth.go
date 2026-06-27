@@ -28,12 +28,20 @@ var (
 )
 
 const (
-	refreshTokenTTL       = 30 * 24 * time.Hour
-	refreshKeyPrefix      = "refresh:"
-	userTokensPrefix      = "user_refresh:"
-	challengeTokenTTL     = 5 * time.Minute
-	challengeTokenPurpose = "2fa_challenge"
-	purposeClaim          = "purpose"
+	refreshTokenTTL = 30 * 24 * time.Hour
+	// refreshTokenGracePeriod is how long a just-rotated refresh token stays
+	// valid after a successful Refresh. It covers the window where a hard page
+	// reload (Ctrl+F5) aborts the refresh response after the server has rotated
+	// the token but before the browser commits the new cookie, leaving the
+	// browser to re-present the old token on the next load. Without it, that
+	// stale token is rejected and the user is spuriously logged out.
+	refreshTokenGracePeriod = 30 * time.Second
+	refreshKeyPrefix        = "refresh:"
+	userTokensPrefix        = "user_refresh:"
+	userGraceTokensPrefix   = "user_refresh_grace:"
+	challengeTokenTTL       = 5 * time.Minute
+	challengeTokenPurpose   = "2fa_challenge"
+	purposeClaim            = "purpose"
 )
 
 type AuthService struct {
@@ -253,14 +261,23 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 		return nil, err
 	}
 
-	// Revoke old token only after the new one is safely stored. A failure here
-	// leaves the old refresh token valid until its TTL; log it so the lapse is
-	// visible rather than silently swallowed.
-	if err := s.redis.Del(ctx, refreshKeyPrefix+refreshToken).Err(); err != nil {
-		s.log.Error().Err(err).Str("event", "refresh_token_revoke_failed").Str("user_id", userID).Msg("audit")
+	// Demote the old token to a short grace TTL instead of deleting it outright.
+	// A hard page reload (Ctrl+F5) can abort the refresh response after the new
+	// pair is issued but before the browser commits the new cookie, so the next
+	// load re-presents this old token; the grace window lets that retry succeed
+	// instead of forcing a logout. The token is moved out of the active set into
+	// a self-expiring grace set, which InvalidateAllRefreshTokens also revokes,
+	// so a password reset still terminates the session during the window and the
+	// active set never accumulates dead entries. Failures here leave the old
+	// token valid until its original TTL; log them rather than swallow them.
+	if err := s.redis.Expire(ctx, refreshKeyPrefix+refreshToken, refreshTokenGracePeriod).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "refresh_token_grace_failed").Str("user_id", userID).Msg("audit")
 	}
-	if err := s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken).Err(); err != nil {
-		s.log.Error().Err(err).Str("event", "refresh_token_revoke_failed").Str("user_id", userID).Msg("audit")
+	if err := s.redis.SMove(ctx, userTokensPrefix+userID, userGraceTokensPrefix+userID, refreshToken).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "refresh_token_grace_failed").Str("user_id", userID).Msg("audit")
+	}
+	if err := s.redis.Expire(ctx, userGraceTokensPrefix+userID, refreshTokenGracePeriod).Err(); err != nil {
+		s.log.Error().Err(err).Str("event", "refresh_token_grace_failed").Str("user_id", userID).Msg("audit")
 	}
 
 	return tokens, nil
@@ -423,6 +440,14 @@ func (s *AuthService) InvalidateAllRefreshTokens(ctx context.Context, userID str
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return fmt.Errorf("load user refresh tokens: %w", err)
 	}
+	// Recently rotated tokens linger in the grace set for refreshTokenGracePeriod
+	// (see Refresh). Revoke those too so a password reset or email change can't
+	// be undone by a still-valid graced token re-minting a fresh pair.
+	graceTokens, err := s.redis.SMembers(ctx, userGraceTokensPrefix+userID).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return fmt.Errorf("load user grace refresh tokens: %w", err)
+	}
+	tokens = append(tokens, graceTokens...)
 
 	if len(tokens) > 0 {
 		keys := make([]string, 0, len(tokens))
@@ -431,7 +456,7 @@ func (s *AuthService) InvalidateAllRefreshTokens(ctx context.Context, userID str
 		}
 		s.redis.Del(ctx, keys...)
 	}
-	s.redis.Del(ctx, userTokensPrefix+userID)
+	s.redis.Del(ctx, userTokensPrefix+userID, userGraceTokensPrefix+userID)
 	return nil
 }
 
