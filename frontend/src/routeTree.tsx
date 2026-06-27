@@ -58,6 +58,7 @@ const LazyAdminClubs = lazy(() => import('./pages/AdminClubs'))
 const LazyAdminClubDetail = lazy(() => import('./pages/AdminClubDetail'))
 const LazyAdminSitemap = lazy(() => import('./pages/AdminSitemap'))
 const LazyAdminBackup = lazy(() => import('./pages/AdminBackup'))
+const LazyAdminSimulation = lazy(() => import('./pages/AdminSimulation'))
 const LazyAdminReportsQueue = lazy(() => import('./pages/AdminReportsQueue'))
 const LazyAdminSupportInbox = lazy(() => import('./pages/AdminSupportInbox'))
 const LazyAdminSupportTicketDetail = lazy(() => import('./pages/AdminSupportTicketDetail'))
@@ -520,6 +521,12 @@ const adminBackupRoute = createRoute({
   component: lz(LazyAdminBackup),
 })
 
+const adminSimulationRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/simulation',
+  component: lz(LazyAdminSimulation),
+})
+
 const adminReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/reports',
@@ -708,6 +715,7 @@ export const routeTree = rootRoute.addChildren([
     adminClubDetailRoute,
     adminSitemapRoute,
     adminBackupRoute,
+    adminSimulationRoute,
     adminReportsRoute,
     adminSupportRoute,
     adminSupportTicketDetailRoute,

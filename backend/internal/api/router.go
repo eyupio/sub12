@@ -55,6 +55,7 @@ func NewRouter(
 	categories *service.CategoryService,
 	events *service.EventService,
 	eventInvitations *service.EventInvitationService,
+	simulation *service.SimulationService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -542,6 +543,13 @@ func NewRouter(
 				adminEH := handler.NewAdminEvents(events)
 				r.Get("/admin/events", adminEH.List)
 				r.Delete("/admin/events/{id}", adminEH.Delete)
+
+				// Activity simulation engine.
+				asimh := handler.NewAdminSimulation(simulation)
+				r.Get("/admin/simulation/settings", asimh.GetSettings)
+				r.Patch("/admin/simulation/settings", asimh.PatchSettings)
+				r.Get("/admin/simulation/status", asimh.GetStatus)
+				r.Post("/admin/simulation/run-now", asimh.RunNow)
 			})
 		})
 
