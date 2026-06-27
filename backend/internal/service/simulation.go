@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"strings"
 	"sync"
@@ -25,12 +26,45 @@ var ErrInvalidSimulationSettings = errors.New("invalid simulation settings")
 // blocks a request (or a single tick) for too long.
 const maxPersonasPerProvision = 25
 
+// actionRetries is how many times performBatch re-picks an action for a slot
+// when the previous attempt was a no-op (e.g. a persona hit its card cap, or
+// no eligible like/comment/follow target existed). Keeps the effective action
+// rate close to the configured budget instead of silently decaying.
+const actionRetries = 3
+
+// simulationRepo is the subset of repository methods the service depends on.
+// Declared as an interface so the service can be unit-tested with a mock,
+// matching the mockScoreCardRepo convention used elsewhere.
+type simulationRepo interface {
+	GetSettings(ctx context.Context) (*model.SimulationSettings, error)
+	UpsertSettings(ctx context.Context, input *model.UpsertSimulationSettingsInput, updatedBy string) (*model.SimulationSettings, error)
+	IncrementCounts(ctx context.Context, counts map[string]int, lastAction, lastErr string) error
+	CreateSimulatedUser(ctx context.Context, email, displayName string, bio, location *string, passwordHash string) (string, error)
+	CountSimulatedUsers(ctx context.Context) (int, error)
+	CountSimulatedCards(ctx context.Context) (int, error)
+	ListSimulatedUserIDs(ctx context.Context, limit int) ([]string, error)
+	ListSimulatedPersonas(ctx context.Context, limit, offset int) ([]*model.SimulatedPersona, int, error)
+	DeleteSimulatedUser(ctx context.Context, id string) error
+	DeleteAllSimulated(ctx context.Context) (int, error)
+	TrimSimulatedTo(ctx context.Context, target int) (int, error)
+	CountCardsForUser(ctx context.Context, userID string) (int, error)
+	RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, string, error)
+	RandomFollowTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
+	RecordAudit(ctx context.Context, event, actorID string, detail string) error
+	ListAudit(ctx context.Context, limit, offset int) ([]*model.SimulationAudit, int, error)
+	UpdateSimulatedProfile(ctx context.Context, id string, in *model.UpdateSimulatedPersonaInput) (*model.AdminUser, error)
+	UpdateSimulatedAvatarURL(ctx context.Context, id, avatarURL string) (*model.AdminUser, error)
+}
+
+// Compile-time assertion that the concrete repository satisfies the interface.
+var _ simulationRepo = (*repository.SimulationRepository)(nil)
+
 // SimulationService drives the admin-controlled "activity simulation" feature:
 // it provisions flagged simulated accounts and has them post score cards, like,
 // comment and follow using the same service paths real users use (so activity
 // feeds, achievements and counters all update naturally).
 type SimulationService struct {
-	repo       *repository.SimulationRepository
+	repo       simulationRepo
 	scoreCards *ScoreCardService
 	likes      *LikeService
 	comments   *CommentService
@@ -39,7 +73,8 @@ type SimulationService struct {
 
 	mu       sync.Mutex // serializes RunOnce so ticks/run-now don't overlap
 	rng      *rand.Rand
-	personas []string // cached simulated user ids
+	personas []string         // cached simulated user ids
+	skills   map[string]float64 // cached per-persona skill bias in [0,1]
 }
 
 func NewSimulationService(
@@ -58,6 +93,7 @@ func NewSimulationService(
 		social:     social,
 		log:        log,
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		skills:     map[string]float64{},
 	}
 }
 
@@ -69,7 +105,41 @@ func (s *SimulationService) UpdateSettings(ctx context.Context, input *model.Ups
 	if err := validateSimulationSettings(input); err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertSettings(ctx, input, updatedBy)
+
+	// Capture the previous state so we can audit what changed.
+	prev, _ := s.repo.GetSettings(ctx)
+
+	updated, err := s.repo.UpsertSettings(ctx, input, updatedBy)
+	if err != nil {
+		return nil, err
+	}
+
+	// Settings changes can alter which personas are eligible, so drop the
+	// cached persona list. The next batch reloads at the new persona_count.
+	s.InvalidatePersonas()
+
+	// Audit the high-impact toggles. prev may be nil on the very first save.
+	if prev != nil {
+		if prev.Enabled != updated.Enabled || prev.InteractWithRealUsers != updated.InteractWithRealUsers {
+			detail := fmt.Sprintf(
+				`{"enabled":{"from":%t,"to":%t},"interact_with_real_users":{"from":%t,"to":%t}}`,
+				prev.Enabled, updated.Enabled,
+				prev.InteractWithRealUsers, updated.InteractWithRealUsers,
+			)
+			if err := s.repo.RecordAudit(ctx, "settings_updated", updatedBy, detail); err != nil {
+				s.log.Warn().Err(err).Msg("simulation: audit settings_updated failed")
+			}
+		}
+	}
+
+	return updated, nil
+}
+
+// InvalidatePersonas clears the cached persona id list and skill map so the
+// next batch reloads them from the database at the current persona_count.
+func (s *SimulationService) InvalidatePersonas() {
+	s.personas = nil
+	s.skills = map[string]float64{}
 }
 
 func validateSimulationSettings(in *model.UpsertSimulationSettingsInput) error {
@@ -125,6 +195,13 @@ func (s *SimulationService) Status(ctx context.Context) (*model.SimulationStatus
 		SimulatedCardCount: cardCount,
 		LastRunAt:          settings.LastRunAt,
 		LastAction:         settings.LastAction,
+		TotalActions:       settings.TotalActions,
+		PostCount:          settings.PostCount,
+		LikeCount:          settings.LikeCount,
+		CommentCount:       settings.CommentCount,
+		FollowCount:        settings.FollowCount,
+		LastError:          settings.LastError,
+		LastErrorAt:        settings.LastErrorAt,
 	}, nil
 }
 
@@ -151,8 +228,9 @@ func (s *SimulationService) EnsurePersonas(ctx context.Context, target int) (int
 		email := fmt.Sprintf("sim-%d-%d@simulated.local", time.Now().UnixNano(), s.rng.Intn(1_000_000))
 
 		// Simulated accounts are not meant to be logged into; give them an
-		// unguessable password hash so the row satisfies NOT NULL.
-		hash, err := bcrypt.GenerateFromPassword([]byte(fmt.Sprintf("sim-%d-%d", time.Now().UnixNano(), s.rng.Int63())), bcrypt.DefaultCost)
+		// unguessable password hash at minimum cost so the row satisfies
+		// NOT NULL without burning CPU under the simulation mutex.
+		hash, err := bcrypt.GenerateFromPassword([]byte(fmt.Sprintf("sim-%d-%d", time.Now().UnixNano(), s.rng.Int63())), bcrypt.MinCost)
 		if err != nil {
 			return created, fmt.Errorf("hash simulated password: %w", err)
 		}
@@ -166,7 +244,7 @@ func (s *SimulationService) EnsurePersonas(ctx context.Context, target int) (int
 		created++
 	}
 	if created > 0 {
-		s.personas = nil // invalidate cache so the new personas are picked up
+		s.InvalidatePersonas()
 	}
 	return created, nil
 }
@@ -191,7 +269,7 @@ func (s *SimulationService) RunOnce(ctx context.Context, n int) (int, error) {
 // RunNow provisions personas and performs up to n actions immediately,
 // regardless of the enabled flag. Backs the admin "run now" button so changes
 // can be previewed without waiting for the next tick.
-func (s *SimulationService) RunNow(ctx context.Context, n int) (int, error) {
+func (s *SimulationService) RunNow(ctx context.Context, n int, actorID string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -199,11 +277,18 @@ func (s *SimulationService) RunNow(ctx context.Context, n int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return s.performBatch(ctx, settings, n)
+	performed, err := s.performBatch(ctx, settings, n)
+	if err == nil {
+		if auditErr := s.repo.RecordAudit(ctx, "run_now", actorID, fmt.Sprintf(`{"actions":%d,"performed":%d}`, n, performed)); auditErr != nil {
+			s.log.Warn().Err(auditErr).Msg("simulation: audit run_now failed")
+		}
+	}
+	return performed, err
 }
 
 // performBatch provisions personas up to persona_count and performs up to n
-// weighted actions. The caller must hold s.mu.
+// weighted actions. The caller must hold s.mu. Per-action counts and the last
+// error are persisted via IncrementCounts.
 func (s *SimulationService) performBatch(ctx context.Context, settings *model.SimulationSettings, n int) (int, error) {
 	if _, err := s.EnsurePersonas(ctx, settings.PersonaCount); err != nil {
 		s.log.Warn().Err(err).Msg("simulation: ensure personas failed")
@@ -218,37 +303,71 @@ func (s *SimulationService) performBatch(ctx context.Context, settings *model.Si
 	}
 
 	performed := 0
-	var lastAction string
+	counts := map[string]int{"post": 0, "like": 0, "comment": 0, "follow": 0}
+	var lastAction, firstErr string
 	for i := 0; i < n; i++ {
-		action := s.pickAction(settings)
-		actor := personas[s.rng.Intn(len(personas))]
-		if s.execute(ctx, settings, action, actor) {
-			performed++
-			lastAction = action
+		// Retry a slot a few times so a no-op (card cap, no eligible target)
+		// doesn't silently discard the action budget.
+		for attempt := 0; attempt < actionRetries; attempt++ {
+			action := s.pickAction(settings)
+			actor := personas[s.rng.Intn(len(personas))]
+			res := s.execute(ctx, settings, action, actor)
+			if res.ok {
+				performed++
+				counts[action]++
+				lastAction = action
+				break
+			}
+			if res.err != "" && firstErr == "" {
+				firstErr = res.err
+			}
 		}
 	}
 
-	if performed > 0 {
-		if err := s.repo.TouchRun(ctx, lastAction); err != nil {
-			s.log.Warn().Err(err).Msg("simulation: touch run failed")
+	if performed > 0 || firstErr != "" {
+		if err := s.repo.IncrementCounts(ctx, counts, lastAction, firstErr); err != nil {
+			s.log.Warn().Err(err).Msg("simulation: increment counts failed")
 		}
 	}
 	return performed, nil
 }
 
+// loadPersonas returns the cached persona id list, reloading from the database
+// when the cache is empty. When the cached list is longer than limit (because
+// persona_count was lowered), it is truncated to the oldest limit entries so
+// the engine stops acting on behalf of surplus accounts.
 func (s *SimulationService) loadPersonas(ctx context.Context, limit int) ([]string, error) {
-	if len(s.personas) > 0 {
-		return s.personas, nil
-	}
 	if limit <= 0 {
 		limit = 1
 	}
-	ids, err := s.repo.ListSimulatedUserIDs(ctx, limit)
-	if err != nil {
-		return nil, err
+	if len(s.personas) == 0 {
+		ids, err := s.repo.ListSimulatedUserIDs(ctx, limit)
+		if err != nil {
+			return nil, err
+		}
+		s.personas = ids
+		s.skills = map[string]float64{}
+		return ids, nil
 	}
-	s.personas = ids
-	return ids, nil
+	if len(s.personas) > limit {
+		s.personas = s.personas[:limit]
+	}
+	return s.personas, nil
+}
+
+// personaSkill returns a stable skill bias in [0,1] for a persona, derived from
+// a hash of its id so the same account always shoots to the same standard.
+func (s *SimulationService) personaSkill(id string) float64 {
+	if v, ok := s.skills[id]; ok {
+		return v
+	}
+	h := fnv.New64a()
+	h.Write([]byte(id))
+	v := float64(h.Sum64()%1000) / 1000.0
+	if s.skills != nil {
+		s.skills[id] = v
+	}
+	return v
 }
 
 // pickAction selects an action label by weighted random choice.
@@ -280,35 +399,44 @@ func (s *SimulationService) pickAction(settings *model.SimulationSettings) strin
 	return "like"
 }
 
-// execute performs a single action as actor. Returns true if something
-// observable happened. Failures are logged and treated as no-ops.
-func (s *SimulationService) execute(ctx context.Context, settings *model.SimulationSettings, action, actor string) bool {
+// actionResult reports the outcome of a single simulated action.
+type actionResult struct {
+	ok  bool
+	err string // short error description when ok is false
+}
+
+// execute performs a single action as actor.
+func (s *SimulationService) execute(ctx context.Context, settings *model.SimulationSettings, action, actor string) actionResult {
 	simulatedOnly := !settings.InteractWithRealUsers
 	switch action {
 	case "post":
 		return s.doPost(ctx, settings, actor)
 	case "comment":
-		return s.doComment(ctx, actor, simulatedOnly)
+		ok := s.doComment(ctx, actor, simulatedOnly)
+		return actionResult{ok: ok}
 	case "follow":
-		return s.doFollow(ctx, actor, simulatedOnly)
+		ok := s.doFollow(ctx, actor, simulatedOnly)
+		return actionResult{ok: ok}
 	default:
-		return s.doLike(ctx, actor, simulatedOnly)
+		ok := s.doLike(ctx, actor, simulatedOnly)
+		return actionResult{ok: ok}
 	}
 }
 
-func (s *SimulationService) doPost(ctx context.Context, settings *model.SimulationSettings, actor string) bool {
+func (s *SimulationService) doPost(ctx context.Context, settings *model.SimulationSettings, actor string) actionResult {
 	if settings.MaxCardsPerPersona > 0 {
 		count, err := s.repo.CountCardsForUser(ctx, actor)
 		if err != nil {
 			s.log.Warn().Err(err).Msg("simulation: count cards failed")
-			return false
+			return actionResult{err: "count cards failed"}
 		}
 		if count >= settings.MaxCardsPerPersona {
-			return false
+			return actionResult{err: "persona at card cap"}
 		}
 	}
 
-	scores, xs := s.randomShots()
+	skill := s.personaSkill(actor)
+	scores, xs := s.randomShots(skill)
 	visibility := "public"
 	shotAt := time.Now().UTC().Format("2006-01-02")
 	input := &model.CreateScoreCardInput{
@@ -320,11 +448,21 @@ func (s *SimulationService) doPost(ctx context.Context, settings *model.Simulati
 	if notes := s.randomNote(); notes != "" {
 		input.Notes = &notes
 	}
+	if discipline := s.randomDiscipline(); discipline != "" {
+		input.Discipline = &discipline
+	}
+	if loc := s.randomLocation(); loc != "" {
+		l := loc
+		input.Location = &l
+	}
+	if d := s.randomDistance(); d > 0 {
+		input.DistanceM = &d
+	}
 	if _, err := s.scoreCards.Create(ctx, actor, input); err != nil {
 		s.log.Warn().Err(err).Msg("simulation: post score card failed")
-		return false
+		return actionResult{err: "post failed"}
 	}
-	return true
+	return actionResult{ok: true}
 }
 
 func (s *SimulationService) doLike(ctx context.Context, actor string, simulatedOnly bool) bool {
@@ -364,6 +502,95 @@ func (s *SimulationService) doFollow(ctx context.Context, actor string, simulate
 	return true
 }
 
+// --- admin management methods ---
+
+// ListPersonas returns a paginated list of simulated accounts.
+func (s *SimulationService) ListPersonas(ctx context.Context, limit, offset int) ([]*model.SimulatedPersona, int, error) {
+	return s.repo.ListSimulatedPersonas(ctx, limit, offset)
+}
+
+// DeletePersona removes a single simulated account (and, via cascade, all of
+// its content). actorID is the admin performing the deletion, for audit.
+func (s *SimulationService) DeletePersona(ctx context.Context, id, actorID string) error {
+	if err := s.repo.DeleteSimulatedUser(ctx, id); err != nil {
+		return err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "persona_deleted", actorID, fmt.Sprintf(`{"id":%q}`, id)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_deleted failed")
+	}
+	return nil
+}
+
+// PurgeAll removes every simulated account and all of its content. Returns the
+// number of accounts deleted.
+func (s *SimulationService) PurgeAll(ctx context.Context, actorID string) (int, error) {
+	n, err := s.repo.DeleteAllSimulated(ctx)
+	if err != nil {
+		return 0, err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "purged", actorID, fmt.Sprintf(`{"deleted":%d}`, n)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit purged failed")
+	}
+	return n, nil
+}
+
+// Cleanup trims the simulated account roster down to target, removing the
+// newest excess accounts first. Returns the number deleted.
+func (s *SimulationService) Cleanup(ctx context.Context, target int, actorID string) (int, error) {
+	n, err := s.repo.TrimSimulatedTo(ctx, target)
+	if err != nil {
+		return 0, err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "cleanup", actorID, fmt.Sprintf(`{"target":%d,"deleted":%d}`, target, n)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit cleanup failed")
+	}
+	return n, nil
+}
+
+// ListAudit returns the most recent audit entries.
+func (s *SimulationService) ListAudit(ctx context.Context, limit, offset int) ([]*model.SimulationAudit, int, error) {
+	return s.repo.ListAudit(ctx, limit, offset)
+}
+
+// UpdatePersona applies a partial profile update to a simulated account. Only
+// simulated accounts can be edited through this path. actorID is the admin
+// performing the change, for audit.
+func (s *SimulationService) UpdatePersona(ctx context.Context, id, actorID string, in *model.UpdateSimulatedPersonaInput) (*model.AdminUser, error) {
+	if in.DisplayName != nil && strings.TrimSpace(*in.DisplayName) == "" {
+		return nil, fmt.Errorf("%w: display_name cannot be blank", ErrInvalidSimulationSettings)
+	}
+	if in.DisplayName != nil && len(*in.DisplayName) > 64 {
+		return nil, fmt.Errorf("%w: display_name must be 64 characters or fewer", ErrInvalidSimulationSettings)
+	}
+	updated, err := s.repo.UpdateSimulatedProfile(ctx, id, in)
+	if err != nil {
+		return nil, err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "persona_updated", actorID, fmt.Sprintf(`{"id":%q}`, id)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_updated failed")
+	}
+	return updated, nil
+}
+
+// SetPersonaAvatar records an avatar URL on a simulated account. The image
+// bytes are stored by the handler (via the image repository); this method only
+// persists the resulting URL. actorID is the admin, for audit.
+func (s *SimulationService) SetPersonaAvatar(ctx context.Context, id, avatarURL, actorID string) (*model.AdminUser, error) {
+	updated, err := s.repo.UpdateSimulatedAvatarURL(ctx, id, avatarURL)
+	if err != nil {
+		return nil, err
+	}
+	s.InvalidatePersonas()
+	if err := s.repo.RecordAudit(ctx, "persona_avatar", actorID, fmt.Sprintf(`{"id":%q}`, id)); err != nil {
+		s.log.Warn().Err(err).Msg("simulation: audit persona_avatar failed")
+	}
+	return updated, nil
+}
+
 // --- random content helpers ---
 
 var (
@@ -401,6 +628,8 @@ var (
 		"Cracking effort.",
 		"That X count though! 🔥",
 	}
+	simDisciplines = []string{"benchrest", "hft", "ft", "sporter", "field"}
+	simDistances   = []int{10, 15, 20, 25, 30, 40, 50}
 )
 
 func (s *SimulationService) randomDisplayName() string {
@@ -423,26 +652,42 @@ func (s *SimulationService) randomComment() string {
 	return simComments[s.rng.Intn(len(simComments))]
 }
 
-// randomShots produces a plausible 25-shot card biased toward good scores, with
-// X-ring hits only on 10s.
-func (s *SimulationService) randomShots() ([]int16, []bool) {
+func (s *SimulationService) randomDiscipline() string {
+	return simDisciplines[s.rng.Intn(len(simDisciplines))]
+}
+
+func (s *SimulationService) randomDistance() int {
+	return simDistances[s.rng.Intn(len(simDistances))]
+}
+
+// randomShots produces a plausible 25-shot card biased toward good scores,
+// with X-ring hits only on 10s. skill in [0,1] shifts the roll table: higher
+// skill yields more 10s and fewer low shots; lower skill introduces occasional
+// misses (0-3). 0.5 is the baseline.
+func (s *SimulationService) randomShots(skill float64) ([]int16, []bool) {
 	scores := make([]int16, 25)
 	xs := make([]bool, 25)
+	// skill shifts the 10-band and the low-shot band.
+	tenBand := 45 + int(skill*25)        // 45..70
+	nineBand := tenBand + 30             // 9s take a fixed-ish 30
+	lowBand := 100 - (5 + int(skill*10)) // lower skill -> wider low band
+	if lowBand < 95 {
+		lowBand = 95
+	}
 	for i := 0; i < 25; i++ {
-		// Bias toward 8-10 with the occasional lower shot.
 		roll := s.rng.Intn(100)
 		var score int16
 		switch {
-		case roll < 55:
+		case roll < tenBand:
 			score = 10
-		case roll < 80:
+		case roll < nineBand:
 			score = 9
-		case roll < 93:
+		case roll < lowBand:
 			score = 8
 		case roll < 98:
 			score = 7
 		default:
-			score = int16(4 + s.rng.Intn(3)) // 4-6
+			score = int16(s.rng.Intn(4)) // 0-3, includes rare misses
 		}
 		scores[i] = score
 		if score == 10 && s.rng.Intn(100) < 40 {

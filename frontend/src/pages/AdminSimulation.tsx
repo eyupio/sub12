@@ -1,11 +1,15 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminSimulationApi, UpdateSimulationSettingsInput } from '../api/adminSimulation'
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { adminSimulationApi, SimulatedPersona, UpdateSimulationSettingsInput } from '../api/adminSimulation'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PersonaEditDialog, PersonaEditState } from '../components/PersonaEditDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
 const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
+const btnDanger = 'border border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-bg)] text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
 function parseError(error: unknown) {
   if (!(error instanceof Error)) return 'Request failed.'
@@ -79,6 +83,29 @@ function validate(values: FormState): string[] {
   return errors
 }
 
+// Formats an hour (0-24) as a local-time label for the active-window helper.
+function localWindowLabel(start: number, end: number): string {
+  if (start === end) return 'all day (local time)'
+  const fmt = (h: number) => {
+    const hh = h % 24
+    const ampm = hh < 12 ? 'AM' : 'PM'
+    const display = hh % 12 === 0 ? 12 : hh % 12
+    return `${display} ${ampm}`
+  }
+  if (start < end) return `${fmt(start)} – ${fmt(end)} (local time)`
+  return `${fmt(start)} – ${fmt(end)} next day (local time)`
+}
+
+const AUDIT_LABELS: Record<string, string> = {
+  settings_updated: 'Settings updated',
+  purged: 'Purged all',
+  cleanup: 'Cleanup',
+  persona_deleted: 'Persona deleted',
+  persona_updated: 'Persona profile updated',
+  persona_avatar: 'Persona avatar updated',
+  run_now: 'Run now',
+}
+
 export default function AdminSimulation() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<FormState>({
@@ -98,7 +125,28 @@ export default function AdminSimulation() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState<string | null>(null)
   const [runResult, setRunResult] = useState<string | null>(null)
+  const [runActions, setRunActions] = useState('10')
   const [savedSnapshot, setSavedSnapshot] = useState('')
+
+  // Pending high-impact toggle changes awaiting confirmation.
+  const [pendingToggle, setPendingToggle] = useState<'enabled' | 'interact' | null>(null)
+  const [pendingForm, setPendingForm] = useState<FormState | null>(null)
+
+  // Danger-zone confirmations.
+  const [confirmPurge, setConfirmPurge] = useState(false)
+  const [confirmCleanup, setConfirmCleanup] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  // Persona edit dialog.
+  const [editingPersona, setEditingPersona] = useState<SimulatedPersona | null>(null)
+
+  // Persona list pagination.
+  const [personaOffset, setPersonaOffset] = useState(0)
+  const personaLimit = 20
+
+  // Audit list pagination.
+  const [auditOffset, setAuditOffset] = useState(0)
+  const auditLimit = 20
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-simulation-settings'],
@@ -111,6 +159,18 @@ export default function AdminSimulation() {
     queryFn: adminSimulationApi.getStatus,
     retry: false,
     refetchInterval: 10000,
+  })
+
+  const { data: personasData } = useQuery({
+    queryKey: ['admin-simulation-personas', personaOffset],
+    queryFn: () => adminSimulationApi.listPersonas(personaLimit, personaOffset),
+    retry: false,
+  })
+
+  const { data: auditData } = useQuery({
+    queryKey: ['admin-simulation-audit', auditOffset],
+    queryFn: () => adminSimulationApi.listAudit(auditLimit, auditOffset),
+    retry: false,
   })
 
   useEffect(() => {
@@ -134,6 +194,12 @@ export default function AdminSimulation() {
 
   const isDirty = useMemo(() => JSON.stringify(form) !== savedSnapshot, [form, savedSnapshot])
 
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: ['admin-simulation-status'] })
+    queryClient.invalidateQueries({ queryKey: ['admin-simulation-personas', personaOffset] })
+    queryClient.invalidateQueries({ queryKey: ['admin-simulation-audit', auditOffset] })
+  }
+
   const saveMutation = useMutation({
     mutationFn: (payload: UpdateSimulationSettingsInput) => adminSimulationApi.patchSettings(payload),
     onSuccess: (updated) => {
@@ -154,7 +220,8 @@ export default function AdminSimulation() {
       setSavedSnapshot(JSON.stringify(next))
       setSaveOk('Saved simulation settings.')
       setServerError(null)
-      queryClient.invalidateQueries({ queryKey: ['admin-simulation-status'] })
+      setRunResult(null)
+      invalidateAll()
       setTimeout(() => setSaveOk(null), 2500)
     },
     onError: (err) => {
@@ -164,11 +231,12 @@ export default function AdminSimulation() {
   })
 
   const runMutation = useMutation({
-    mutationFn: adminSimulationApi.runNow,
+    mutationFn: (n: number) => adminSimulationApi.runNow(n),
     onSuccess: (res) => {
       setRunResult(`Performed ${res.performed} action${res.performed === 1 ? '' : 's'}.`)
       setServerError(null)
-      queryClient.invalidateQueries({ queryKey: ['admin-simulation-status'] })
+      setSaveOk(null)
+      invalidateAll()
     },
     onError: (err) => {
       setRunResult(null)
@@ -176,14 +244,96 @@ export default function AdminSimulation() {
     },
   })
 
+  const deletePersonaMutation = useMutation({
+    mutationFn: (id: string) => adminSimulationApi.deletePersona(id),
+    onSuccess: () => {
+      setConfirmDeleteId(null)
+      invalidateAll()
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const savePersonaMutation = useMutation({
+    mutationFn: async ({ persona, state }: { persona: SimulatedPersona; state: PersonaEditState }) => {
+      const { avatarFile, ...fields } = state
+      // Only send fields that changed from the persona's current value, so we
+      // don't clobber untouched nullable columns with empty strings.
+      const payload: Record<string, string> = {}
+      if (fields.display_name != null && fields.display_name !== persona.display_name) {
+        payload.display_name = fields.display_name
+      }
+      if (fields.bio != null && fields.bio !== (persona.bio ?? '')) {
+        payload.bio = fields.bio
+      }
+      if (fields.location != null && fields.location !== (persona.location ?? '')) {
+        payload.location = fields.location
+      }
+      if (fields.club != null && fields.club !== (persona.club ?? '')) {
+        payload.club = fields.club
+      }
+      if (Object.keys(payload).length > 0) {
+        await adminSimulationApi.updatePersona(persona.id, payload)
+      }
+      if (avatarFile) {
+        const fd = new FormData()
+        fd.append('image', avatarFile)
+        await adminSimulationApi.uploadPersonaAvatar(persona.id, fd)
+      }
+    },
+    onSuccess: () => {
+      setEditingPersona(null)
+      setRunResult('Persona updated.')
+      setServerError(null)
+      invalidateAll()
+      setTimeout(() => setRunResult(null), 2500)
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const purgeMutation = useMutation({
+    mutationFn: () => adminSimulationApi.purgeAll(),
+    onSuccess: (res) => {
+      setConfirmPurge(false)
+      setRunResult(`Purged ${res.deleted} simulated account${res.deleted === 1 ? '' : 's'}.`)
+      setPersonaOffset(0)
+      invalidateAll()
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const cleanupMutation = useMutation({
+    mutationFn: () => adminSimulationApi.cleanup(),
+    onSuccess: (res) => {
+      setConfirmCleanup(false)
+      setRunResult(`Trimmed ${res.deleted} account${res.deleted === 1 ? '' : 's'} (target ${res.target}).`)
+      setPersonaOffset(0)
+      invalidateAll()
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  // High-impact toggles (enable, interact-with-real-users) require confirmation.
+  function attemptToggle<K extends 'enabled' | 'interact_with_real_users'>(key: K, value: boolean) {
+    const next = { ...form, [key]: value }
+    setPendingForm(next)
+    setPendingToggle(key === 'interact_with_real_users' ? 'interact' : 'enabled')
+  }
+
+  function confirmToggle() {
+    if (!pendingForm) return
+    setForm(pendingForm)
+    setPendingToggle(null)
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setServerError(null)
     setRunResult(null)
+    setSaveOk(null)
     const errors = validate(form)
     setFormErrors(errors)
     if (errors.length > 0) return
@@ -210,6 +360,11 @@ export default function AdminSimulation() {
     return <div className="p-6 text-sm text-[var(--error-text)]">{parseError(error)}</div>
   }
 
+  const personas = personasData?.items ?? []
+  const personaTotal = personasData?.total ?? 0
+  const auditEntries = auditData?.items ?? []
+  const auditTotal = auditData?.total ?? 0
+
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-5">
       <div>
@@ -221,6 +376,7 @@ export default function AdminSimulation() {
         </p>
       </div>
 
+      {/* Status snapshot */}
       <div className="bg-surface border border-subtle rounded-lg p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <div className={labelCls}>Status</div>
@@ -241,8 +397,42 @@ export default function AdminSimulation() {
             {status?.last_action ? ` (${status.last_action})` : ''}
           </div>
         </div>
+        <div className="lg:col-span-4 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-subtle">
+          <div>
+            <div className={labelCls}>Total Actions</div>
+            <div className="text-sm text-primary mt-1">{status?.total_actions ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Posts</div>
+            <div className="text-sm text-primary mt-1">{status?.post_count ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Likes</div>
+            <div className="text-sm text-primary mt-1">{status?.like_count ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Comments</div>
+            <div className="text-sm text-primary mt-1">{status?.comment_count ?? '—'}</div>
+          </div>
+          <div>
+            <div className={labelCls}>Follows</div>
+            <div className="text-sm text-primary mt-1">{status?.follow_count ?? '—'}</div>
+          </div>
+          <div className="col-span-3">
+            <div className={labelCls}>Last Error</div>
+            <div className="text-sm text-primary mt-1">
+              {status?.last_error ? (
+                <span className="text-[var(--error-text)]">
+                  {status.last_error}
+                  {status.last_error_at ? ` · ${new Date(status.last_error_at).toLocaleString()}` : ''}
+                </span>
+              ) : 'None'}
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Settings form */}
       <form onSubmit={handleSubmit} className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
         {formErrors.length > 0 && (
           <div className="bg-[var(--error-bg)] border border-[var(--error-border)] text-[var(--error-text)] text-sm rounded p-3">
@@ -260,7 +450,11 @@ export default function AdminSimulation() {
         {runResult && <p className="text-sm text-secondary">{runResult}</p>}
 
         <label className="text-sm text-secondary inline-flex items-center gap-2">
-          <input type="checkbox" checked={form.enabled} onChange={(e) => updateField('enabled', e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(e) => attemptToggle('enabled', e.target.checked)}
+          />
           Enable simulation engine
         </label>
 
@@ -311,6 +505,9 @@ export default function AdminSimulation() {
             <p className="text-xs text-muted">Set start = end for all-day activity.</p>
           </div>
         </div>
+        <p className="text-xs text-muted -mt-2">
+          Active window: {localWindowLabel(Number(form.active_start_hour), Number(form.active_end_hour))}
+        </p>
 
         <div className="space-y-1">
           <label className={labelCls} htmlFor="max-cards">Max Cards Per Persona</label>
@@ -319,23 +516,232 @@ export default function AdminSimulation() {
         </div>
 
         <label className="text-sm text-secondary inline-flex items-center gap-2">
-          <input type="checkbox" checked={form.interact_with_real_users} onChange={(e) => updateField('interact_with_real_users', e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={form.interact_with_real_users}
+            onChange={(e) => attemptToggle('interact_with_real_users', e.target.checked)}
+          />
           Allow simulated accounts to like, comment on and follow real users
         </label>
         <p className="text-xs text-muted -mt-2">
           When off, simulated accounts only interact with each other's content.
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <button type="submit" className={btnPrimary} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
           </button>
-          <button type="button" className={btnSecondary} disabled={runMutation.isPending} onClick={() => runMutation.mutate()}>
-            {runMutation.isPending ? 'Running…' : 'Run Now'}
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="actions"
+              value={runActions}
+              onChange={(e) => setRunActions(e.target.value)}
+              className={`${inputCls} w-20`}
+              inputMode="numeric"
+            />
+            <button
+              type="button"
+              className={btnSecondary}
+              disabled={runMutation.isPending}
+              onClick={() => {
+                const n = Number(runActions)
+                runMutation.mutate(Number.isInteger(n) && n > 0 ? Math.min(n, 100) : 10)
+              }}
+            >
+              {runMutation.isPending ? 'Running…' : 'Run Now'}
+            </button>
+          </div>
           {isDirty && <span className="text-xs text-amber-400 self-center">You have unsaved changes.</span>}
         </div>
       </form>
+
+      {/* Personas */}
+      <div className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className={labelCls}>Simulated Personas</h2>
+          <span className="text-xs text-muted">{personaTotal} total</span>
+        </div>
+        {personas.length === 0 ? (
+          <p className="text-sm text-muted">No simulated accounts yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {personas.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 p-2 rounded border border-subtle">
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-subtle bg-surface-hover shrink-0">
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted text-[10px]">
+                      {p.display_name?.[0]?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-primary truncate">{p.display_name}</div>
+                  <div className="text-xs text-muted truncate">{p.email} · {p.card_count} cards</div>
+                </div>
+                <button
+                  type="button"
+                  className="text-muted hover:text-[var(--brass)] transition-colors p-1"
+                  aria-label="Edit persona"
+                  onClick={() => setEditingPersona(p)}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="text-muted hover:text-[var(--error-text)] transition-colors p-1"
+                  aria-label="Delete persona"
+                  onClick={() => setConfirmDeleteId(p.id)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {(personaOffset > 0 || personaOffset + personaLimit < personaTotal) && (
+          <div className="flex items-center justify-between pt-1">
+            <button
+              onClick={() => setPersonaOffset(o => Math.max(0, o - personaLimit))}
+              disabled={personaOffset <= 0}
+              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-secondary disabled:text-muted transition-colors"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+            <span className="text-xs text-muted">
+              {personaOffset + 1}–{Math.min(personaOffset + personaLimit, personaTotal)} of {personaTotal}
+            </span>
+            <button
+              onClick={() => setPersonaOffset(o => o + personaLimit)}
+              disabled={personaOffset + personaLimit >= personaTotal}
+              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-secondary disabled:text-muted transition-colors"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Danger zone */}
+      <div className="bg-surface border border-[var(--error-border)]/40 rounded-lg p-4 space-y-3">
+        <h2 className={labelCls}>Danger Zone</h2>
+        <p className="text-xs text-muted">
+          Purge removes every simulated account and all of its content (cards, comments, likes, follows).
+          Cleanup trims the roster down to the configured persona count, removing the newest accounts first.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={btnDanger} onClick={() => setConfirmCleanup(true)} disabled={cleanupMutation.isPending}>
+            {cleanupMutation.isPending ? 'Trimming…' : 'Trim to Persona Count'}
+          </button>
+          <button type="button" className={btnDanger} onClick={() => setConfirmPurge(true)} disabled={purgeMutation.isPending}>
+            {purgeMutation.isPending ? 'Purging…' : 'Purge All'}
+          </button>
+        </div>
+      </div>
+
+      {/* Audit log */}
+      <div className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className={labelCls}>Audit Log</h2>
+          <span className="text-xs text-muted">{auditTotal} entries</span>
+        </div>
+        {auditEntries.length === 0 ? (
+          <p className="text-sm text-muted">No admin operations logged yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {auditEntries.map((a) => (
+              <div key={a.id} className="flex items-start gap-3 p-2 rounded border border-subtle">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-primary">{AUDIT_LABELS[a.event] ?? a.event}</div>
+                  <div className="text-xs text-muted truncate">
+                    {new Date(a.created_at).toLocaleString()}
+                    {a.detail ? ` · ${a.detail}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {(auditOffset > 0 || auditOffset + auditLimit < auditTotal) && (
+          <div className="flex items-center justify-between pt-1">
+            <button
+              onClick={() => setAuditOffset(o => Math.max(0, o - auditLimit))}
+              disabled={auditOffset <= 0}
+              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-secondary disabled:text-muted transition-colors"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+            <span className="text-xs text-muted">
+              {auditOffset + 1}–{Math.min(auditOffset + auditLimit, auditTotal)} of {auditTotal}
+            </span>
+            <button
+              onClick={() => setAuditOffset(o => o + auditLimit)}
+              disabled={auditOffset + auditLimit >= auditTotal}
+              className="flex items-center gap-1 text-[11px] tracking-widest uppercase text-secondary disabled:text-muted transition-colors"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Confirm dialogs */}
+      <ConfirmDialog
+        open={pendingToggle === 'enabled'}
+        title={pendingForm?.enabled ? 'Enable simulation?' : 'Disable simulation?'}
+        message={
+          pendingForm?.enabled
+            ? 'Simulated accounts will start posting, liking, commenting and following on the configured schedule.'
+            : 'The simulation engine will stop. Existing simulated accounts and content are kept.'
+        }
+        confirmLabel="Confirm"
+        onConfirm={confirmToggle}
+        onCancel={() => { setPendingToggle(null); setPendingForm(null) }}
+      />
+      <ConfirmDialog
+        open={pendingToggle === 'interact'}
+        title={pendingForm?.interact_with_real_users ? 'Allow interaction with real users?' : 'Restrict to simulated-only?'}
+        message={
+          pendingForm?.interact_with_real_users
+            ? 'Simulated accounts will be able to like, comment on and follow real users\' content.'
+            : 'Simulated accounts will only interact with each other\'s content.'
+        }
+        confirmLabel="Confirm"
+        onConfirm={confirmToggle}
+        onCancel={() => { setPendingToggle(null); setPendingForm(null) }}
+      />
+      <ConfirmDialog
+        open={confirmPurge}
+        title="Purge all simulated accounts?"
+        message="This permanently deletes every simulated user and all of their content. This cannot be undone."
+        confirmLabel="Purge All"
+        onConfirm={() => purgeMutation.mutate()}
+        onCancel={() => setConfirmPurge(false)}
+      />
+      <ConfirmDialog
+        open={confirmCleanup}
+        title="Trim simulated accounts?"
+        message={`Removes the newest excess accounts so only the configured persona count remains. This cannot be undone.`}
+        confirmLabel="Trim"
+        onConfirm={() => cleanupMutation.mutate()}
+        onCancel={() => setConfirmCleanup(false)}
+      />
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this persona?"
+        message="The account and all of its content will be permanently removed. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => confirmDeleteId && deletePersonaMutation.mutate(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
+      <PersonaEditDialog
+        open={editingPersona !== null}
+        persona={editingPersona}
+        pending={savePersonaMutation.isPending}
+        onSave={(state) => editingPersona && savePersonaMutation.mutate({ persona: editingPersona, state })}
+        onCancel={() => setEditingPersona(null)}
+      />
     </div>
   )
 }

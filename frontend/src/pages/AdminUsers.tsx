@@ -22,10 +22,11 @@ function parseError(error: unknown) {
 
 export default function AdminUsers() {
   const [offset, setOffset] = useState(0)
+  const [hideSimulated, setHideSimulated] = useState(false)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-users', offset],
-    queryFn: () => adminUsersApi.list(PAGE_SIZE, offset),
+    queryKey: ['admin-users', offset, hideSimulated],
+    queryFn: () => adminUsersApi.list(PAGE_SIZE, offset, hideSimulated),
   })
 
   const items = data?.items ?? []
@@ -47,6 +48,15 @@ export default function AdminUsers() {
       {error && (
         <p className="text-[var(--error-text)] text-sm">{parseError(error)}</p>
       )}
+
+      <label className="text-sm text-secondary inline-flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={hideSimulated}
+          onChange={(e) => { setHideSimulated(e.target.checked); setOffset(0) }}
+        />
+        Hide simulated accounts
+      </label>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -75,6 +85,11 @@ export default function AdminUsers() {
                   {u.role === 'admin' && (
                     <span className="text-[9px] tracking-widest uppercase bg-[var(--brass)]/10 text-[var(--brass)] px-1.5 py-0.5 rounded shrink-0">
                       Admin
+                    </span>
+                  )}
+                  {u.is_simulated && (
+                    <span className="text-[9px] tracking-widest uppercase bg-surface border border-subtle text-muted px-1.5 py-0.5 rounded shrink-0">
+                      Sim
                     </span>
                   )}
                 </div>

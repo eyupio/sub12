@@ -17,6 +17,13 @@ export interface SimulationSettings {
   last_action?: string
   updated_by?: string
   updated_at: string
+  total_actions: number
+  post_count: number
+  like_count: number
+  comment_count: number
+  follow_count: number
+  last_error?: string
+  last_error_at?: string
 }
 
 export interface UpdateSimulationSettingsInput {
@@ -40,10 +47,81 @@ export interface SimulationStatus {
   simulated_card_count: number
   last_run_at?: string
   last_action?: string
+  total_actions: number
+  post_count: number
+  like_count: number
+  comment_count: number
+  follow_count: number
+  last_error?: string
+  last_error_at?: string
 }
 
 export interface SimulationRunResponse {
   performed: number
+}
+
+export interface SimulatedPersona {
+  id: string
+  display_name: string
+  email: string
+  bio?: string
+  location?: string
+  club?: string
+  avatar_url?: string
+  card_count: number
+  created_at: string
+}
+
+export interface SimulatedPersonasListResponse {
+  items: SimulatedPersona[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface SimulationAudit {
+  id: number
+  event: string
+  actor_id?: string
+  detail?: string
+  created_at: string
+}
+
+export interface SimulationAuditListResponse {
+  items: SimulationAudit[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface SimulationCleanupResponse {
+  deleted: number
+  target: number
+}
+
+export interface SimulationPurgeResponse {
+  deleted: number
+}
+
+export interface UpdateSimulatedPersonaInput {
+  display_name?: string
+  bio?: string
+  location?: string
+  club?: string
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  role: 'user' | 'admin'
+  display_name: string
+  bio?: string
+  location?: string
+  club?: string
+  avatar_url?: string
+  is_simulated: boolean
+  created_at: string
+  updated_at: string
 }
 
 export const adminSimulationApi = {
@@ -51,5 +129,25 @@ export const adminSimulationApi = {
   patchSettings: (payload: UpdateSimulationSettingsInput) =>
     api.patch<SimulationSettings>('/admin/simulation/settings', payload),
   getStatus: () => api.get<SimulationStatus>('/admin/simulation/status'),
-  runNow: () => api.post<SimulationRunResponse>('/admin/simulation/run-now', {}),
+  runNow: (actions?: number) =>
+    api.post<SimulationRunResponse>('/admin/simulation/run-now', actions ? { actions } : {}),
+  listPersonas: (limit = 50, offset = 0) =>
+    api.get<SimulatedPersonasListResponse>(
+      `/admin/simulation/personas?limit=${limit}&offset=${offset}`,
+    ),
+  updatePersona: (id: string, payload: UpdateSimulatedPersonaInput) =>
+    api.patch<AdminUser>(`/admin/simulation/personas/${id}`, payload),
+  uploadPersonaAvatar: (id: string, formData: FormData) =>
+    api.upload<AdminUser>(`/admin/simulation/personas/${id}/avatar`, formData),
+  deletePersona: (id: string) => api.del<void>(`/admin/simulation/personas/${id}`),
+  purgeAll: () => api.del<SimulationPurgeResponse>('/admin/simulation/personas'),
+  cleanup: (target?: number) =>
+    api.post<SimulationCleanupResponse>(
+      `/admin/simulation/cleanup${target != null ? `?target=${target}` : ''}`,
+      {},
+    ),
+  listAudit: (limit = 50, offset = 0) =>
+    api.get<SimulationAuditListResponse>(
+      `/admin/simulation/audit?limit=${limit}&offset=${offset}`,
+    ),
 }
