@@ -49,6 +49,12 @@ type Config struct {
 
 	// Public site URL used for sitemap generation and SEO pings.
 	SiteURL string `envconfig:"SITE_URL" default:"https://sub12.io"`
+	// DefaultAvatarURL is the public URL of the default user avatar image.
+	// Leave empty to derive from SiteURL as {SiteURL}/default-avatar.svg.
+	// Any link emitted in an outgoing email must come from this kind of
+	// configurable URL — never hard-code or default to localhost in
+	// production. See AGENTS.md "Outgoing public URLs".
+	DefaultAvatarURL string `envconfig:"DEFAULT_AVATAR_URL" default:""`
 	// IndexNow key used to authenticate URL submission requests.
 	IndexNowKey string `envconfig:"INDEXNOW_KEY" default:""`
 	// Public URL where the IndexNow key file can be fetched.
@@ -141,6 +147,9 @@ func (c *Config) applyDerivedDefaults() {
 	if c.EventInvitationURL == "" && base != "" {
 		c.EventInvitationURL = base + "/events/invitations"
 	}
+	if c.DefaultAvatarURL == "" && base != "" {
+		c.DefaultAvatarURL = base + "/default-avatar.svg"
+	}
 }
 
 // Validate enforces production-safe values for outgoing public URLs.
@@ -155,6 +164,7 @@ func (c *Config) Validate() error {
 		"SITE_URL":             c.SiteURL,
 		"PASSWORD_RESET_URL":   c.PasswordResetURL,
 		"EVENT_INVITATION_URL": c.EventInvitationURL,
+		"DEFAULT_AVATAR_URL":   c.DefaultAvatarURL,
 	}
 	for name, val := range checks {
 		lv := strings.ToLower(val)

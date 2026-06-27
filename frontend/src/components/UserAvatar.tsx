@@ -19,13 +19,6 @@ interface UserAvatarProps {
   alt?: string
 }
 
-function initialsOf(name?: string) {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  return parts.map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-}
-
 interface AvatarBlockProps {
   user: UserLike
   size: number
@@ -38,7 +31,6 @@ const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function Avata
   { user, size, variant, className, alt },
   ref,
 ) {
-  const initials = initialsOf(user.display_name)
   const fontSize = Math.max(8, Math.round(size * 0.34))
   const dim: CSSProperties = { width: size, height: size, fontSize }
 
@@ -61,7 +53,7 @@ const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function Avata
       {user.avatar_url ? (
         <img src={user.avatar_url} alt={altText} className="w-full h-full object-cover" />
       ) : (
-        <span style={{ fontSize }}>{initials}</span>
+        <img src="/default-avatar.svg" alt={altText} className="w-full h-full object-cover" />
       )}
     </span>
   )
