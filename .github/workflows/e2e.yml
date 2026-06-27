@@ -1,6 +1,6 @@
 name: e2e
 
-on: workflow_dispatch: {}
+on: {}
 
 concurrency:
   group: e2e-${{ github.ref }}
