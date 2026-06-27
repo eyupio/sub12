@@ -26,7 +26,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { toast } from '../store/toast'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, type DateFormat, type TimeFormat } from '../utils/date'
-import { identiconDataUri } from '../utils/identicon'
+import { identiconDataUri, identiconPngFile, randomIdenticonSeed } from '../utils/identicon'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader } from '../components/leagues'
@@ -90,6 +90,19 @@ function AvatarUpload() {
     },
   })
 
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      const file = await identiconPngFile(randomIdenticonSeed())
+      return usersApi.uploadAvatar(file)
+    },
+    onSuccess: (updated) => {
+      updateUser({ avatar_url: updated.avatar_url })
+    },
+    onError: () => {
+      toast('Could not regenerate avatar — please try again.', 'error')
+    },
+  })
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -117,7 +130,7 @@ function AvatarUpload() {
       />
       <button
         onClick={() => fileInputRef.current?.click()}
-        disabled={avatarMutation.isPending}
+        disabled={avatarMutation.isPending || regenerateMutation.isPending}
         className="relative rounded-full overflow-hidden hover:ring-2 hover:ring-[var(--brass)]/50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Change profile picture"
       >
@@ -130,6 +143,13 @@ function AvatarUpload() {
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
           <Camera size={20} className="text-white" />
         </div>
+      </button>
+      <button
+        onClick={() => regenerateMutation.mutate()}
+        disabled={regenerateMutation.isPending || avatarMutation.isPending}
+        className="block mx-auto text-[10px] text-muted hover:text-secondary transition-colors disabled:opacity-50 mt-1"
+      >
+        {regenerateMutation.isPending ? 'Generating…' : 'Regenerate avatar'}
       </button>
       {user?.avatar_url && (
         <button
