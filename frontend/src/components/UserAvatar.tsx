@@ -1,4 +1,4 @@
-import { CSSProperties, forwardRef } from 'react'
+import { CSSProperties, forwardRef, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { UserHoverCard } from './UserHoverCard'
 
@@ -71,14 +71,27 @@ const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function Avata
 
   const altText = alt ?? user.display_name ?? ''
 
-  if (user.avatar_url) {
+  // Track failed avatar loads so a removed or otherwise unreachable image
+  // (the URL lingers but the file is gone, or a stale 404 is cached) falls
+  // back to the generated initials avatar instead of a broken-image icon.
+  const [imgFailed, setImgFailed] = useState(false)
+  useEffect(() => {
+    setImgFailed(false)
+  }, [user.avatar_url])
+
+  if (user.avatar_url && !imgFailed) {
     return (
       <span
         ref={ref}
         style={dim}
         className={`${baseWrap} ${variantWrap} ${className}`.trim()}
       >
-        <img src={user.avatar_url} alt={altText} className="w-full h-full object-cover" />
+        <img
+          src={user.avatar_url}
+          alt={altText}
+          className="w-full h-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
       </span>
     )
   }
