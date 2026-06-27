@@ -310,6 +310,31 @@ func (h *AdminSimulationHandler) UploadPersonaAvatar(w http.ResponseWriter, r *h
 	writeJSON(w, http.StatusOK, updated)
 }
 
+// DELETE /api/v1/admin/simulation/personas/{id}/avatar
+func (h *AdminSimulationHandler) DeletePersonaAvatar(w http.ResponseWriter, r *http.Request) {
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "missing persona id")
+		return
+	}
+
+	updated, err := h.svc.RemovePersonaAvatar(r.Context(), id, actorID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "simulated persona not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to remove avatar")
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 // POST /api/v1/admin/simulation/personas/{id}/join-league
 // Body: {"league_id": "..."}
 func (h *AdminSimulationHandler) JoinPersonaToLeague(w http.ResponseWriter, r *http.Request) {
