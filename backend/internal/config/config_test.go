@@ -14,6 +14,9 @@ func TestApplyDerivedDefaultsFromSiteURL(t *testing.T) {
 	if c.EventInvitationURL != "https://sub12.io/events/invitations" {
 		t.Errorf("EventInvitationURL = %q, want derived from SiteURL", c.EventInvitationURL)
 	}
+	if c.DefaultAvatarURL != "https://sub12.io/default-avatar.svg" {
+		t.Errorf("DefaultAvatarURL = %q, want derived from SiteURL", c.DefaultAvatarURL)
+	}
 }
 
 func TestApplyDerivedDefaultsRespectsExplicitValues(t *testing.T) {
@@ -44,10 +47,10 @@ func TestValidateProductionRejectsLocalhost(t *testing.T) {
 		name string
 		cfg  Config
 	}{
-		{"site url", Config{Env: "production", SiteURL: "http://localhost:5173", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "https://sub12.io/e"}},
-		{"reset url", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "http://localhost:5173/reset", EventInvitationURL: "https://sub12.io/e"}},
-		{"invitation url", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "http://localhost:5173/events/invitations"}},
-		{"127.0.0.1", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "http://127.0.0.1/e"}},
+		{"site url", Config{Env: "production", SiteURL: "http://localhost:5173", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "https://sub12.io/e", DefaultAvatarURL: "https://sub12.io/default-avatar.svg"}},
+		{"reset url", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "http://localhost:5173/reset", EventInvitationURL: "https://sub12.io/e", DefaultAvatarURL: "https://sub12.io/default-avatar.svg"}},
+		{"invitation url", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "http://localhost:5173/events/invitations", DefaultAvatarURL: "https://sub12.io/default-avatar.svg"}},
+		{"127.0.0.1", Config{Env: "production", SiteURL: "https://sub12.io", PasswordResetURL: "https://sub12.io/r", EventInvitationURL: "https://sub12.io/e", DefaultAvatarURL: "http://127.0.0.1/avatar.svg"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -68,6 +71,7 @@ func TestValidateProductionAcceptsPublicURLs(t *testing.T) {
 		SiteURL:            "https://sub12.io",
 		PasswordResetURL:   "https://sub12.io/reset-password",
 		EventInvitationURL: "https://sub12.io/events/invitations",
+		DefaultAvatarURL:   "https://sub12.io/default-avatar.svg",
 	}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -80,6 +84,7 @@ func TestValidateDevelopmentAllowsLocalhost(t *testing.T) {
 		SiteURL:            "http://localhost:5173",
 		PasswordResetURL:   "http://localhost:5173/reset-password",
 		EventInvitationURL: "http://localhost:5173/events/invitations",
+		DefaultAvatarURL:   "http://localhost:5173/default-avatar.svg",
 	}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("expected no error in development, got %v", err)
