@@ -6,13 +6,13 @@
 
 /* Native (Capacitor) safe-area insets. The `native-app` class is set on <html>
    only inside the native shell (see main.tsx), so mobile-web/PWA layout is
-   untouched. The mobile top bar and bottom nav are pushed clear of the device
-   notch and home indicator; insets are 0 on hardware without them. */
+   untouched. The mobile top bar is pushed clear of the device notch; the inset
+   is 0 on hardware without one. The bottom nav already clears the home
+   indicator: `--mobile-nav-offset` (used for both the nav height and the main
+   content's padding-bottom) bakes in `env(safe-area-inset-bottom)`, so adding
+   it again here would double-count and hide content behind the nav. */
 .native-app .app-mobile-header {
   padding-top: calc(0.5rem + env(safe-area-inset-top));
-}
-.native-app .app-mobile-bottom-nav {
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @layer base {

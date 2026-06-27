@@ -11,6 +11,7 @@ import { usersApi } from '../api/users'
 import { ApiError } from '../api/client'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { identiconDataUri } from '../utils/identicon'
+import { useDocumentMeta } from '../utils/useDocumentMeta'
 import { ShareDialog, ShareTargetType } from '../components/ShareDialog'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { Share2 } from 'lucide-react'
@@ -213,6 +214,23 @@ function PublicScoreCard({ id }: { id: string }) {
     retry: false,
   })
 
+  const scoreLabel = card
+    ? card.x_count > 0
+      ? `${card.total_score} (${card.x_count}X)`
+      : String(card.total_score)
+    : ''
+  useDocumentMeta({
+    title: card
+      ? card.author?.display_name
+        ? `${card.author.display_name} — ${scoreLabel}`
+        : `Score card — ${scoreLabel}`
+      : 'Score card',
+    type: 'article',
+    description: card
+      ? `${card.author?.display_name ? `${card.author.display_name} shot ` : ''}${scoreLabel}${card.location ? ` at ${card.location}` : ''} on sub-12`
+      : undefined,
+  })
+
   if (isLoading) return <LoadingShell type="score_card" />
   if (error) {
     if (isNotFound(error)) return <NotFoundOrPrivate type="score_card" />
@@ -370,6 +388,22 @@ function PublicPelletTest({ id }: { id: string }) {
     retry: false,
   })
 
+  useDocumentMeta({
+    title: session?.pellet
+      ? `${session.pellet.brand} ${session.pellet.model}`.trim()
+      : 'Pellet test',
+    type: 'article',
+    description: session
+      ? [
+          session.pellet ? `${session.pellet.brand} ${session.pellet.model}`.trim() : 'Pellet test',
+          session.best_group_size_mm != null ? `best ${session.best_group_size_mm.toFixed(2)}mm` : null,
+          session.distance_m > 0 ? `${session.distance_m.toFixed(1)}m` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') + ' on sub-12'
+      : undefined,
+  })
+
   if (isLoading) return <LoadingShell type="pellet_test" />
   if (error) {
     if (isNotFound(error)) return <NotFoundOrPrivate type="pellet_test" />
@@ -473,6 +507,15 @@ function PublicLeague({ id }: { id: string }) {
     retry: false,
   })
 
+  useDocumentMeta({
+    title: league ? league.name : 'League',
+    description: league
+      ? league.description?.trim()
+        ? league.description.trim().slice(0, 200)
+        : `${league.name} — ${league.member_count} member${league.member_count === 1 ? '' : 's'} on sub-12`
+      : undefined,
+  })
+
   if (isLoading) return <LoadingShell type="league" />
   if (error) {
     if (isNotFound(error)) return <NotFoundOrPrivate type="league" />
@@ -531,6 +574,15 @@ function PublicClub({ id }: { id: string }) {
     retry: false,
   })
 
+  useDocumentMeta({
+    title: club ? club.name : 'Club',
+    description: club
+      ? club.description?.trim()
+        ? club.description.trim().slice(0, 200)
+        : `${club.name} — ${club.member_count} member${club.member_count === 1 ? '' : 's'} on sub-12`
+      : undefined,
+  })
+
   if (isLoading) return <LoadingShell type="club" />
   if (error) {
     if (isNotFound(error)) return <NotFoundOrPrivate type="club" />
@@ -587,6 +639,20 @@ function PublicUser({ id }: { id: string }) {
     queryKey: ['public-user', id],
     queryFn: () => usersApi.getProfile(id),
     retry: false,
+  })
+
+  // Only expose identifying metadata for profiles that are actually public, so a
+  // private profile's name/bio never leaks into the page title or share tags.
+  const publicProfile =
+    profile && !profile.is_private && profile.profile_visibility !== 'private' ? profile : null
+  useDocumentMeta({
+    title: publicProfile ? publicProfile.display_name : 'Profile',
+    type: 'profile',
+    description: publicProfile
+      ? publicProfile.bio?.trim()
+        ? publicProfile.bio.trim().slice(0, 200)
+        : `${publicProfile.display_name}${publicProfile.location ? ` · ${publicProfile.location}` : ''} on sub-12`
+      : undefined,
   })
 
   if (isLoading) return <LoadingShell type="user" />
