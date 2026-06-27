@@ -13,39 +13,50 @@ type SimulationSettings struct {
 	LikeWeight            int        `json:"like_weight"`
 	CommentWeight         int        `json:"comment_weight"`
 	FollowWeight          int        `json:"follow_weight"`
+	UnfollowWeight        int        `json:"unfollow_weight"`
+	ShareWeight           int        `json:"share_weight"`
 	ActiveStartHour       int        `json:"active_start_hour"`
 	ActiveEndHour         int        `json:"active_end_hour"`
 	InteractWithRealUsers bool       `json:"interact_with_real_users"`
 	MaxCardsPerPersona    int        `json:"max_cards_per_persona"`
+	HourlyMultipliers     []float64 `json:"hourly_multipliers"`
+	IncludeInPublicStats  bool       `json:"include_in_public_stats"`
 	LastRunAt             *time.Time `json:"last_run_at,omitempty"`
 	LastAction            *string    `json:"last_action,omitempty"`
+	LastTickAt            *time.Time `json:"last_tick_at,omitempty"`
 	UpdatedBy             *string    `json:"updated_by,omitempty"`
 	UpdatedAt             time.Time  `json:"updated_at"`
 
 	// Cumulative counters and last-error tracking, surfaced in the admin
 	// status snapshot so operators can see what the engine has done.
-	TotalActions int        `json:"total_actions"`
-	PostCount    int        `json:"post_count"`
-	LikeCount    int        `json:"like_count"`
-	CommentCount int        `json:"comment_count"`
-	FollowCount  int        `json:"follow_count"`
-	LastError    *string    `json:"last_error,omitempty"`
-	LastErrorAt  *time.Time `json:"last_error_at,omitempty"`
+	TotalActions  int        `json:"total_actions"`
+	PostCount     int        `json:"post_count"`
+	LikeCount     int        `json:"like_count"`
+	CommentCount  int        `json:"comment_count"`
+	FollowCount   int        `json:"follow_count"`
+	UnfollowCount int        `json:"unfollow_count"`
+	ShareCount    int        `json:"share_count"`
+	LastError     *string    `json:"last_error,omitempty"`
+	LastErrorAt   *time.Time `json:"last_error_at,omitempty"`
 }
 
 // UpsertSimulationSettingsInput carries the admin-editable fields.
 type UpsertSimulationSettingsInput struct {
-	Enabled               bool `json:"enabled"`
-	PersonaCount          int  `json:"persona_count"`
-	ActionsPerHour        int  `json:"actions_per_hour"`
-	PostWeight            int  `json:"post_weight"`
-	LikeWeight            int  `json:"like_weight"`
-	CommentWeight         int  `json:"comment_weight"`
-	FollowWeight          int  `json:"follow_weight"`
-	ActiveStartHour       int  `json:"active_start_hour"`
-	ActiveEndHour         int  `json:"active_end_hour"`
-	InteractWithRealUsers bool `json:"interact_with_real_users"`
-	MaxCardsPerPersona    int  `json:"max_cards_per_persona"`
+	Enabled               bool      `json:"enabled"`
+	PersonaCount          int       `json:"persona_count"`
+	ActionsPerHour        int       `json:"actions_per_hour"`
+	PostWeight            int       `json:"post_weight"`
+	LikeWeight            int       `json:"like_weight"`
+	CommentWeight         int       `json:"comment_weight"`
+	FollowWeight          int       `json:"follow_weight"`
+	UnfollowWeight        int       `json:"unfollow_weight"`
+	ShareWeight           int       `json:"share_weight"`
+	ActiveStartHour       int       `json:"active_start_hour"`
+	ActiveEndHour         int       `json:"active_end_hour"`
+	InteractWithRealUsers bool      `json:"interact_with_real_users"`
+	MaxCardsPerPersona    int       `json:"max_cards_per_persona"`
+	HourlyMultipliers     []float64 `json:"hourly_multipliers"`
+	IncludeInPublicStats  bool      `json:"include_in_public_stats"`
 }
 
 // SimulationStatus is a read-only snapshot of the simulation's live state,
@@ -58,15 +69,18 @@ type SimulationStatus struct {
 	SimulatedCardCount int        `json:"simulated_card_count"`
 	LastRunAt          *time.Time `json:"last_run_at,omitempty"`
 	LastAction         *string    `json:"last_action,omitempty"`
+	LastTickAt         *time.Time `json:"last_tick_at,omitempty"`
 
 	// Cumulative counters and last error.
-	TotalActions int        `json:"total_actions"`
-	PostCount    int        `json:"post_count"`
-	LikeCount    int        `json:"like_count"`
-	CommentCount int        `json:"comment_count"`
-	FollowCount  int        `json:"follow_count"`
-	LastError    *string    `json:"last_error,omitempty"`
-	LastErrorAt  *time.Time `json:"last_error_at,omitempty"`
+	TotalActions  int        `json:"total_actions"`
+	PostCount     int        `json:"post_count"`
+	LikeCount     int        `json:"like_count"`
+	CommentCount  int        `json:"comment_count"`
+	FollowCount   int        `json:"follow_count"`
+	UnfollowCount int        `json:"unfollow_count"`
+	ShareCount    int        `json:"share_count"`
+	LastError     *string    `json:"last_error,omitempty"`
+	LastErrorAt   *time.Time `json:"last_error_at,omitempty"`
 }
 
 // SimulatedPersona is a single simulated account row surfaced to admins.

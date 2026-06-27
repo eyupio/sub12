@@ -21,6 +21,7 @@ type PelletTestService struct {
 	users        UserProfileReader   // nil skips owner-privacy checks
 	activity     *ActivityService    // nil disables feed ingestion
 	achievements *AchievementService // nil disables achievement evaluation
+	simFilter    SimulatedContentFilter // nil = include simulated in public leaderboard
 }
 
 func NewPelletTestService(repo *repository.PelletTestRepository, activity *ActivityService, achievements *AchievementService) *PelletTestService {
@@ -31,6 +32,12 @@ func NewPelletTestService(repo *repository.PelletTestRepository, activity *Activ
 // profile_visibility when deciding whether to expose a public session.
 func (s *PelletTestService) SetUserReader(users UserProfileReader) {
 	s.users = users
+}
+
+// SetSimulatedContentFilter wires the simulation public-content toggle so the
+// public pellet leaderboard can exclude simulated users' test sessions.
+func (s *PelletTestService) SetSimulatedContentFilter(f SimulatedContentFilter) {
+	s.simFilter = f
 }
 
 // ── Session ─────────────────────────────────────────────────────────────────────
@@ -625,7 +632,8 @@ func (s *PelletTestService) GetPublicLeaderboard(ctx context.Context, limit, off
 	if limit > 200 {
 		limit = 200
 	}
-	return s.repo.GetPublicLeaderboard(ctx, limit, offset)
+	excludeSimulated := s.simFilter != nil && s.simFilter.ExcludeSimulatedFromPublic()
+	return s.repo.GetPublicLeaderboard(ctx, limit, offset, excludeSimulated)
 }
 
 // ── Batch Report ────────────────────────────────────────────────────────────────

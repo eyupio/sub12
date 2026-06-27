@@ -19,8 +19,10 @@ const maxActionsPerTick = 250
 
 // SimulationRunner is the background goroutine that paces the activity
 // simulation engine. Each tick it converts actions_per_hour into a per-tick
-// budget (carrying the fractional remainder forward) and asks the service to
-// perform that many actions, but only inside the configured active hours.
+// budget (carrying the fractional remainder forward), applies the hourly
+// multiplier for time-of-day shaping, and asks the service to perform that many
+// actions, but only inside the configured active hours. It also records a tick
+// heartbeat so operators can distinguish a live-but-idle runner from a stuck one.
 type SimulationRunner struct {
 	svc      *SimulationService
 	log      zerolog.Logger
@@ -53,16 +55,25 @@ func (r *SimulationRunner) tick(ctx context.Context) {
 		}
 		return
 	}
+
+	// Always record a heartbeat so admins can see the runner is alive even
+	// when idle (disabled / outside active hours).
+	if err := r.svc.repo.TouchTick(ctx); err != nil {
+		r.log.Warn().Err(err).Msg("simulation: touch tick failed")
+	}
+
 	if !settings.Enabled || settings.ActionsPerHour <= 0 {
 		r.leftover = 0
 		return
 	}
-	if !withinActiveHours(time.Now().UTC().Hour(), settings.ActiveStartHour, settings.ActiveEndHour) {
+	hour := time.Now().UTC().Hour()
+	if !withinActiveHours(hour, settings.ActiveStartHour, settings.ActiveEndHour) {
 		r.leftover = 0
 		return
 	}
 
-	budget := float64(settings.ActionsPerHour)*r.interval.Hours() + r.leftover
+	mult := hourlyMultiplier(settings.HourlyMultipliers, hour)
+	budget := float64(settings.ActionsPerHour)*r.interval.Hours()*mult + r.leftover
 	n := int(budget)
 	r.leftover = budget - float64(n)
 	if n <= 0 {
@@ -72,14 +83,30 @@ func (r *SimulationRunner) tick(ctx context.Context) {
 		n = maxActionsPerTick
 	}
 
-	performed, err := r.svc.RunOnce(ctx, n)
+	performed, _, err := r.svc.RunOnce(ctx, n)
 	if err != nil {
 		r.log.Warn().Err(err).Msg("simulation: run failed")
 		return
 	}
 	if performed > 0 {
-		r.log.Info().Int("performed", performed).Msg("simulation tick")
+		r.log.Info().Int("performed", performed).Float64("mult", mult).Msg("simulation tick")
 	}
+}
+
+// hourlyMultiplier returns the time-of-day shaping factor for hour (0-23) from
+// the settings slice. Falls back to 1.0 when the slice is missing/short.
+func hourlyMultiplier(mults []float64, hour int) float64 {
+	if hour < 0 || hour > 23 || len(mults) == 0 {
+		return 1.0
+	}
+	if hour >= len(mults) {
+		return 1.0
+	}
+	v := mults[hour]
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
 // withinActiveHours reports whether hour (0-23) falls in [start, end). end is

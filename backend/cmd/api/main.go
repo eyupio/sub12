@@ -255,10 +255,14 @@ func main() {
 	go backupScheduler.Run(ctx)
 
 	// Activity simulation engine — admin-controlled. Provisions flagged
-	// simulated accounts and has them post/like/comment/follow through the
+	// simulated accounts and has them post/like/comment/follow/share through the
 	// normal service paths. Paced by a background runner; disabled by default.
 	simulationRepo := repository.NewSimulationRepository(pool)
-	simulationSvc := service.NewSimulationService(simulationRepo, scoreCardSvc, likeSvc, commentSvc, socialSvc, log.Logger)
+	simulationSvc := service.NewSimulationService(simulationRepo, scoreCardSvc, likeSvc, commentSvc, socialSvc, rifleSvc, pelletSvc, postSvc, log.Logger)
+	// Wire the simulation public-content toggle into the feed and public pellet
+	// leaderboard so simulated content can be excluded when the admin disables it.
+	activitySvc.SetSimulatedContentFilter(simulationSvc)
+	pelletTestSvc.SetSimulatedContentFilter(simulationSvc)
 	go service.NewSimulationRunner(simulationSvc, log.Logger).Run(ctx)
 
 	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc)

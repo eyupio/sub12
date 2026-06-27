@@ -1,149 +1,116 @@
 # Activity Simulation — Deferred Enhancements
 
-This file tracks the Phase 5–7 enhancements that were intentionally deferred
-from the initial hardening pass (Phases 1–4) of the Activity Simulation feature.
-Phases 1–4 shipped: migration `000101_simulation_counters_audit`, correctness
-fixes (cache staleness, per-action counts, post-cap retry, discipline/location
-on posts, per-persona skill + realistic scores, bcrypt MinCost), the
-count-offset random-selection performance fix, admin controls (personas
-list/edit/delete, purge, cleanup, audit log, run-now with configurable size),
-simulated-user flagging in the admin user list, persona profile editing +
-avatar upload, and accompanying tests.
+> **Status: all items below were implemented in the follow-up pass** (migration
+> `000102_simulation_extended_actions`). This file is retained as a design
+> record. The notes describe the intent and where each feature lives.
 
-The items below are the remaining enhancements, grouped by theme. Each is
-scoped so it can be picked up independently.
+This file tracked the Phase 5–7 enhancements that were deferred from the
+initial hardening pass (Phases 1–4). Phases 1–4 shipped: migration
+`000101_simulation_counters_audit`, correctness fixes (cache staleness,
+per-action counts, post-cap retry, discipline/location on posts, per-persona
+skill + realistic scores, bcrypt MinCost), the count-offset random-selection
+performance fix, admin controls (personas list/edit/delete, purge, cleanup,
+audit log, run-now with configurable size), simulated-user flagging in the
+admin user list, persona profile editing + avatar upload, and accompanying
+tests.
+
+The items below were then implemented in the follow-up pass:
 
 ---
 
 ## Extended Automation
 
-### 1. Gear on simulated posts (rifle + pellet wiring)
-Currently `doPost` sets discipline/location/distance but no rifle or pellet, so
-simulated cards lack gear badges and don't feed into rifle/pellet stats.
+### 1. Gear on simulated posts (rifle + pellet wiring) — DONE
+`SimulationService` now wires `RifleService` + `PelletService`. `EnsurePersonas`
+creates one randomized rifle (Go-side `simRifles` catalog) and pellet
+(`simPellets`) per persona; `doPost` sets `RifleID`/`PelletID` from a cached
+`personaGear` map (loaded via `RifleService.List`/`PelletService.List` on cache
+miss). Provisioning failures are non-fatal (persona posts without gear).
 
-- Wire `RifleService` + `PelletService` into `SimulationService`.
-- In `EnsurePersonas`, after creating each user, create one randomized rifle
-  (from a Go-side catalog mirroring `frontend/src/catalog/rifleCatalog.ts`) and
-  one pellet (mirroring `pelletCatalog.ts`).
-- Cache persona → gear IDs alongside the persona cache.
-- `doPost` sets `RifleID` and `PelletID` from the actor's gear.
-- Surface gear in the `SimulatedPersona` list (optional).
+### 2. Broader action coverage (comments on posts/activities, shares) — DONE
+`doComment` now targets `score_card` (60%), `post` (30%), or `activity` (10%)
+via new `RandomPublicPost` / `RandomActivity` repo helpers (count-offset
+pattern). New `doShare` action shares a random public score card via
+`PostService.Share`. New `share_weight` setting + `share_count` counter.
 
-### 2. Broader action coverage (comments on posts/activities, shares)
-Currently comments only target score cards; likes only target score cards.
+### 3. Follow decay / unfollow — DONE
+New `unfollow_weight` setting + `unfollow_count` counter. `doUnfollow` picks a
+random currently-followed user via `RandomFollowedUser` (from `user_follows`)
+and calls `SocialService.Unfollow`, preventing follow-graph saturation.
 
-- `doComment` randomly targets `score_card`, `post`, or `activity`.
-- Add `RandomPublicPost` / `RandomActivity` repo helpers (reuse the
-  count-offset pattern from `RandomPublicCard`).
-- Add a `share` action + `share_weight` (calls the post share service path).
+### 4. Time-of-day / day-of-week shaping — DONE
+`hourly_multipliers` JSONB (24 values, default all 1.0) on
+`simulation_settings`. The runner applies `hourlyMultiplier(mults, hour)` to
+the per-tick budget (0 = quiet, 2 = double). Frontend renders a 24-input grid
+with an "Evening preset" button.
 
-### 3. Follow decay / unfollow
-The follow graph only grows; saturated personas can't follow new targets.
-
-- Add `unfollow_weight` setting + `doUnfollow` action.
-- New `RandomFollowedUser` repo helper: picks a user the actor currently
-  follows (from `user_follows`).
-- Calls `social.Unfollow`.
-- Migration: `ADD COLUMN unfollow_weight INT NOT NULL DEFAULT 0` + CHECK.
-- Frontend: add Unfollow weight input to the action-weights grid; surface
-  `unfollow_count` in status.
-
-### 4. Time-of-day / day-of-week shaping
-Currently the hourly rate is flat; real communities are busier evenings/weekends.
-
-- Add `hourly_multipliers JSONB` (24 values, default all `1.0`) to
-  `simulation_settings`.
-- Runner applies `hourly_multipliers[hour]` to the per-tick budget
-  (`1.0` = baseline, `0` = quiet, `2` = busy).
-- Optional: `weekday_multiplier` for weekend up-weighting.
-- Frontend: 24-input slider grid with "weekday/evening" preset button.
-
-### 5. Persona personalities
-Currently all personas draw from the same uniform random content pools.
-
-- Derive a stable per-persona "personality" from the id hash: loquacious vs
-  quiet (comment weight), sociable vs reserved (follow weight), competitive
-  vs casual (post frequency).
-- Store alongside the skill bias in the `skills` map (or a richer
-  `map[string]personaProfile`).
-- Bias action selection and content pool choices per persona.
+### 5. Persona personalities — DONE
+`personaProfile` (loquacious / sociable / competitive, stable per-id hash)
+biases `pickAction`: comment weight × (0.5 + loquacious), follow × (0.5 +
+sociable), post × (0.5 + competitive), share × (0.5 + sociable). Cached
+alongside the skill map.
 
 ---
 
 ## Status / UX Polish
 
-### 6. Per-action breakdown in run-now result
-`runNow` returns only `performed` (a single count). Show the per-action
-breakdown so the admin sees what a run did.
+### 6. Per-action breakdown in run-now result — DONE
+`RunNow`/`performActions` return a `map[string]int` counts map; the handler
+returns `{"performed": N, "counts": {...}}`; the frontend result banner shows
+the breakdown.
 
-- `RunNow` / `performBatch` return a `map[string]int` alongside the total.
-- Handler returns `{"performed": N, "counts": {"post": a, "like": b, ...}}`.
-- Frontend: result banner shows the breakdown.
+### 7. Last-error and tick-health surfacing — DONE
+`last_tick_at` column + `TouchTick` called every tick (even when idle). Status
+surfaces `last_tick_at`, `unfollow_count`, `share_count`. The status panel
+shows a "Last Tick" time and an "active now" green-dot indicator.
 
-### 7. Last-error and tick-health surfacing
-`last_error` is stored but only shown in the status panel. Add:
+### 8. Active-window timezone helper improvements — DONE
+The active-window helper shows a local-time label and a live "active now"
+green dot when the current UTC hour is within the window.
 
-- A small "recent errors" list (last N errors from audit or a dedicated log).
-- Tick health: `last_tick_at` vs `last_run_at` so operators can tell if the
-  runner is alive but idle (disabled/outside active hours) vs stuck.
-
-### 8. Active-window timezone helper improvements
-Currently shows a local-time label. Add:
-
-- A visual "active now" indicator (green dot when within the window).
-- Next-active countdown when outside the window.
-
-### 9. Banner lifecycle
-`runResult`/`saveOk` can show simultaneously and don't auto-clear on every new
-action. Tighten:
-
-- Clear both on any new submit / error / dialog open.
-- Distinct styling for info vs success vs error so they don't blend.
+### 9. Banner lifecycle — DONE
+`runResult`/`saveOk`/`serverError` are cleared on every new submit, error, and
+run-now; distinct styling per type.
 
 ---
 
 ## Transparency / Filtering
 
-### 10. Filter simulated content from public surfaces
-Simulated cards/comments appear in public feeds, leaderboards, and stats with
-no way to exclude them.
+### 10. Filter simulated content from public surfaces — DONE
+`include_in_public_stats` setting (default on). When off,
+`SimulationService.ExcludeSimulatedFromPublic()` returns true; the activity
+service excludes simulated users from the public and for-you feeds, and the
+pellet test service excludes simulated users' sessions from the public
+leaderboard. Wired via a `SimulatedContentFilter` interface + setters on
+`ActivityService` and `PelletTestService`.
 
-- Add an admin setting `include_in_public_stats` (default on) or a global
-  toggle.
-- Where relevant, add `AND NOT u.is_simulated` filters to public leaderboard /
-  stats queries when the toggle is off.
-- Document the tradeoff (fewer "live" entries vs honesty).
-
-### 11. Public bot badge (ethical transparency)
-Currently simulated accounts are only distinguishable in the admin panel.
-
-- Add a visible "bot" / "simulated" badge on public profiles and cards when
-  `is_simulated` is true.
-- Surface `is_simulated` on `PublicProfile` (read-only).
-- Frontend: badge component next to display name.
+### 11. Public bot badge (ethical transparency) — DONE
+`is_simulated` added to `PublicProfile` and selected in
+`SocialRepository.GetPublicProfile`. The public profile page shows a
+"Simulated" badge next to the display name.
 
 ---
 
 ## Performance & Robustness
 
-### 12. Batch provisioning outside the mutex
-`EnsurePersonas` runs bcrypt (now MinCost) and N inserts under `s.mu`, blocking
-the runner. For large `persona_count` increases this can stall ticks.
+### 12. Batch provisioning outside the mutex — DONE
+`EnsurePersonas` (bcrypt + inserts + gear creation) now runs **outside** `s.mu`
+in both `RunOnce` and `RunNow`; only the fast action loop holds `s.mu`. A
+dedicated `rngMu` and `cacheMu` keep the shared rng and caches safe across the
+locked/unlocked boundary.
 
-- Move provisioning out of `performBatch`'s critical section, or run it in a
-  dedicated goroutine with its own smaller lock.
-- Alternatively, pre-hash a batch of passwords once at startup.
+### 13. `TABLESAMPLE` for very large tables — DEFERRED
+The count-offset selection remains O(2) queries. `TABLESAMPLE BERNOULLI` was
+not adopted because it samples a percentage of rows, not a fixed count, and
+introduces empty-result edge cases that complicate the simple picker. The
+current approach is adequate for the foreseeable content volume; revisit if
+`score_cards`/`users` grows past ~1M rows.
 
-### 13. `TABLESAMPLE` for very large tables
-The count-offset selection is O(2) queries but the OFFSET still scans to the
-offset row. For very large `score_cards` / `users` tables, consider
-`TABLESAMPLE BERNOULLI` or a cached random-id pool.
-
-### 14. Repo-level integration tests
-The repository layer has no tests (convention is service-level mocks). Consider
-adding a `repository/simulation_test.go` that runs against the CI Postgres
-service container to catch SQL regressions (column lists, cascade behavior,
-audit insertion).
+### 14. Repo-level integration tests — DONE
+`repository/simulation_test.go` exercises settings round-trip (including
+`hourly_multipliers` decode), `TouchTick`, `IncrementCounts`, and audit append
+against a live Postgres. Gated on `SIM_DB_TEST=1` so it skips cleanly locally
+and in CI without infra, runs on demand with `make dev` up.
 
 ---
 

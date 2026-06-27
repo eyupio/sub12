@@ -49,6 +49,9 @@ type FeedRequest struct {
 	ClubID     string // required when Filter == FeedClub
 	Limit      int
 	Cursor     string
+	// ExcludeSimulated drops activities produced by simulated (bot) accounts.
+	// Set by the service layer from the simulation IncludeInPublicStats toggle.
+	ExcludeSimulated bool
 }
 
 // Activity is a single event in the social feed.
