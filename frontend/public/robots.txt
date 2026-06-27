@@ -1,4 +1,30 @@
 User-agent: *
 Allow: /
 
+# Authenticated-only paths
+Disallow: /scores/
+Disallow: /pellet-testing/
+Disallow: /gear/
+Disallow: /locations/
+Disallow: /profile
+Disallow: /users/
+Disallow: /feed/
+Disallow: /notifications/
+Disallow: /drafts/
+Disallow: /quick-capture/
+
+# Admin paths
+Disallow: /admin/
+
+# Settings paths
+Disallow: /settings/
+
+# Event management
+Disallow: /events/new
+Disallow: /events/*/settings
+
+# League/Club management
+Disallow: /leagues/*/settings
+Disallow: /clubs/*/settings
+
 Sitemap: https://sub12.io/sitemap.xml
