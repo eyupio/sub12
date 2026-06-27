@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -277,6 +278,14 @@ func (s *ShareMeta) defaultOG(r *http.Request) openGraph {
 		URL:         s.absoluteFromRequest(r),
 		Type:        "website",
 	}
+}
+
+// isValidUUID reports whether s parses as a UUID. Used to short-circuit
+// share-meta lookups for non-UUID path segments (e.g. /pellet-tests/leaderboard)
+// so they don't reach the DB and log invalid-input errors.
+func isValidUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }
 
 // absolute turns a relative path into an absolute URL rooted at siteURL.

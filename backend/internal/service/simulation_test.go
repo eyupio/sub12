@@ -231,6 +231,12 @@ func (m *mockSimulationRepo) CreateSimulatedUser(context.Context, string, string
 	return "new-id", nil
 }
 func (m *mockSimulationRepo) CountSimulatedUsers(context.Context) (int, error) { return 0, nil }
+func (m *mockSimulationRepo) IsSimulatedUser(_ context.Context, _ string) (bool, error) {
+	return true, nil
+}
+func (m *mockSimulationRepo) IsSimulatedUser(context.Context, string) (bool, error) {
+	return false, nil
+}
 func (m *mockSimulationRepo) CountSimulatedCards(context.Context) (int, error) { return 0, nil }
 func (m *mockSimulationRepo) ListSimulatedUserIDs(context.Context, int) ([]string, error) {
 	return nil, nil

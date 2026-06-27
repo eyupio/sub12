@@ -735,6 +735,22 @@ func (s *LeagueService) AdminRemoveMember(ctx context.Context, leagueID, userID 
 	return s.leagues.AdminRemoveMember(ctx, leagueID, userID)
 }
 
+// AdminAddMember adds a user to a league directly, bypassing the join policy.
+// Used to enrol simulated accounts so they can interact with league content.
+// Already-a-member is treated as success (idempotent).
+func (s *LeagueService) AdminAddMember(ctx context.Context, leagueID, userID string) error {
+	if err := s.leagues.Join(ctx, leagueID, userID); err != nil {
+		if errors.Is(err, repository.ErrAlreadyMember) {
+			return nil
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrLeagueNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 // SummaryByID returns a minimal public summary of a league regardless of
 // visibility so the UI can render a members-only banner with a join CTA
 // without leaking members, standings or posts.

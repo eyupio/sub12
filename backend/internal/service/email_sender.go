@@ -280,6 +280,14 @@ func (s *EmailSenderService) sendTicketTemplate(ctx context.Context, toEmail, ke
 }
 
 func (s *EmailSenderService) sendRenderedTemplate(ctx context.Context, toEmail, subject, textBody, htmlBody string) error {
+	// Simulated accounts use @simulated.local mailboxes that cannot receive
+	// mail. Silently skip delivery so notification fan-out (likes, comments,
+	// follows, ticket/reports where the recipient happens to be a persona)
+	// never attempts an SMTP send to a non-existent address.
+	if isSimulatedEmail(toEmail) {
+		s.log.Debug().Str("to", toEmail).Msg("email: skipping simulated recipient")
+		return nil
+	}
 	settings, err := s.smtpRepo.GetSMTPSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("load smtp settings: %w", err)
@@ -294,6 +302,12 @@ func (s *EmailSenderService) sendRenderedTemplate(ctx context.Context, toEmail, 
 		return err
 	}
 	return s.sendSMTP(settings.Host, settings.Port, settings.Username, settings.PasswordEncrypted, settings.UseTLS, settings.UseSTARTTLS, settings.FromEmail, toEmail, msg)
+}
+
+// isSimulatedEmail reports whether an address belongs to a simulated account.
+// Simulated personas are provisioned with @simulated.local mailboxes.
+func isSimulatedEmail(email string) bool {
+	return strings.HasSuffix(strings.ToLower(email), "@simulated.local")
 }
 
 // sanitizeHeader rejects SMTP header values containing CR or LF to prevent
