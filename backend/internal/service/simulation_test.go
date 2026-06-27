@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
 
 func validInput() *model.UpsertSimulationSettingsInput {
@@ -211,6 +212,7 @@ type mockSimulationRepo struct {
 	updatedIn   *model.UpdateSimulatedPersonaInput
 	updatedID   string
 	auditEvents []string
+	simulated   bool // IsSimulatedUser return value (default true)
 	err         error
 }
 
@@ -232,10 +234,13 @@ func (m *mockSimulationRepo) CreateSimulatedUser(context.Context, string, string
 }
 func (m *mockSimulationRepo) CountSimulatedUsers(context.Context) (int, error) { return 0, nil }
 func (m *mockSimulationRepo) IsSimulatedUser(_ context.Context, _ string) (bool, error) {
+	if m.err != nil {
+		return false, m.err
+	}
+	if !m.simulated {
+		return false, nil
+	}
 	return true, nil
-}
-func (m *mockSimulationRepo) IsSimulatedUser(context.Context, string) (bool, error) {
-	return false, nil
 }
 func (m *mockSimulationRepo) CountSimulatedCards(context.Context) (int, error) { return 0, nil }
 func (m *mockSimulationRepo) ListSimulatedUserIDs(context.Context, int) ([]string, error) {
@@ -396,4 +401,30 @@ func TestPersonaProfileIsStable(t *testing.T) {
 	assert.Equal(t, a, b)
 	assert.GreaterOrEqual(t, a.loquacious, 0.0)
 	assert.LessOrEqual(t, a.loquacious, 1.0)
+}
+
+func TestJoinPersonaRejectsNonSimulated(t *testing.T) {
+	repo := &mockSimulationRepo{simulated: false}
+	s := newTestSimService()
+	s.repo = repo
+	// leagues/clubs are nil -> would error with "not configured", but the
+	// simulated guard runs first and returns ErrNotFound.
+	err := s.JoinPersonaToLeague(context.Background(), "real-user", "lig", "admin")
+	assert.ErrorIs(t, err, repository.ErrNotFound)
+}
+
+func TestJoinLeagueRequiresService(t *testing.T) {
+	repo := &mockSimulationRepo{simulated: true}
+	s := newTestSimService()
+	s.repo = repo
+	// simulated guard passes, but no league service wired -> error.
+	err := s.JoinPersonaToLeague(context.Background(), "sim", "lig", "admin")
+	assert.Error(t, err)
+}
+
+func TestIsSimulatedEmail(t *testing.T) {
+	assert.True(t, isSimulatedEmail("sim-1-2@simulated.local"))
+	assert.True(t, isSimulatedEmail("SIM@SIMULATED.LOCAL"))
+	assert.False(t, isSimulatedEmail("real@example.com"))
+	assert.False(t, isSimulatedEmail(""))
 }

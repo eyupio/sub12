@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Trash2, UsersRound } from 'lucide-react'
 import { adminSimulationApi, SimulatedPersona, UpdateSimulationSettingsInput } from '../api/adminSimulation'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PersonaEditDialog, PersonaEditState } from '../components/PersonaEditDialog'
+import { PersonaJoinDialog } from '../components/PersonaJoinDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -130,6 +131,8 @@ const AUDIT_LABELS: Record<string, string> = {
   persona_deleted: 'Persona deleted',
   persona_updated: 'Persona profile updated',
   persona_avatar: 'Persona avatar updated',
+  persona_joined_league: 'Persona joined league',
+  persona_joined_club: 'Persona joined club',
   run_now: 'Run now',
 }
 
@@ -170,6 +173,9 @@ export default function AdminSimulation() {
 
   // Persona edit dialog.
   const [editingPersona, setEditingPersona] = useState<SimulatedPersona | null>(null)
+
+  // Persona join-to-league/club dialog.
+  const [joinTarget, setJoinTarget] = useState<{ persona: SimulatedPersona; kind: 'league' | 'club' } | null>(null)
 
   // Persona list pagination.
   const [personaOffset, setPersonaOffset] = useState(0)
@@ -351,6 +357,30 @@ export default function AdminSimulation() {
       setRunResult('Persona updated.')
       setServerError(null)
       invalidateAll()
+      setTimeout(() => setRunResult(null), 2500)
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const joinLeagueMutation = useMutation({
+    mutationFn: ({ persona, targetId }: { persona: SimulatedPersona; targetId: string }) =>
+      adminSimulationApi.joinPersonaToLeague(persona.id, targetId),
+    onSuccess: () => {
+      setJoinTarget(null)
+      setRunResult('Persona added to league.')
+      setServerError(null)
+      setTimeout(() => setRunResult(null), 2500)
+    },
+    onError: (err) => setServerError(parseError(err)),
+  })
+
+  const joinClubMutation = useMutation({
+    mutationFn: ({ persona, targetId }: { persona: SimulatedPersona; targetId: string }) =>
+      adminSimulationApi.joinPersonaToClub(persona.id, targetId),
+    onSuccess: () => {
+      setJoinTarget(null)
+      setRunResult('Persona added to club.')
+      setServerError(null)
       setTimeout(() => setRunResult(null), 2500)
     },
     onError: (err) => setServerError(parseError(err)),
@@ -727,6 +757,15 @@ export default function AdminSimulation() {
                 <button
                   type="button"
                   className="text-muted hover:text-[var(--brass)] transition-colors p-1"
+                  aria-label="Add to league or club"
+                  title="Add to league / club"
+                  onClick={() => setJoinTarget({ persona: p, kind: 'league' })}
+                >
+                  <UsersRound size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="text-muted hover:text-[var(--brass)] transition-colors p-1"
                   aria-label="Edit persona"
                   onClick={() => setEditingPersona(p)}
                 >
@@ -886,6 +925,23 @@ export default function AdminSimulation() {
         onSave={(state) => editingPersona && savePersonaMutation.mutate({ persona: editingPersona, state })}
         onCancel={() => setEditingPersona(null)}
       />
+      {joinTarget && (
+        <PersonaJoinDialog
+          open={joinTarget !== null}
+          persona={joinTarget.persona}
+          kind={joinTarget.kind}
+          pending={joinTarget.kind === 'league' ? joinLeagueMutation.isPending : joinClubMutation.isPending}
+          onJoin={(targetId) => {
+            if (joinTarget.kind === 'league') {
+              joinLeagueMutation.mutate({ persona: joinTarget.persona, targetId })
+            } else {
+              joinClubMutation.mutate({ persona: joinTarget.persona, targetId })
+            }
+          }}
+          onKindChange={(k) => setJoinTarget({ persona: joinTarget.persona, kind: k })}
+          onCancel={() => setJoinTarget(null)}
+        />
+      )}
     </div>
   )
 }
