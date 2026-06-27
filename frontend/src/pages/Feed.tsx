@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -126,11 +128,37 @@ function countByName(posts: FeedPost[], type: 'league' | 'club') {
   return counts
 }
 
+// Memoized per-post row: stable onToggleComments ref prevents the whole list
+// from re-rendering when a single post's comment panel opens or closes.
+const FeedPostItem = memo(function FeedPostItem({
+  post,
+  commentsOpen,
+  onToggle,
+}: {
+  post: FeedPost
+  commentsOpen: boolean
+  onToggle: (postId: string) => void
+}) {
+  const handleToggle = useCallback(() => onToggle(post.id), [onToggle, post.id])
+  return (
+    <FeedPostArticle
+      post={post}
+      muted={false}
+      commentsOpen={commentsOpen}
+      onToggleComments={handleToggle}
+    />
+  )
+})
+
 export default function Feed() {
   const currentUser = useAuthStore((s) => s.user)
   const [activeFilter, setActiveFilter] = useStoredState<FeedScope>(STORAGE.filter, 'for_you')
   const [sort, setSort] = useStoredState<FeedSort>(STORAGE.sort, 'latest')
   const [expandedComments, setExpandedComments] = useState<string | null>(null)
+  // Stable identity across renders; empty deps because setExpandedComments is always stable.
+  const handleToggleComments = useCallback((postId: string) => {
+    setExpandedComments((open) => open === postId ? null : postId)
+  }, [])
 
   const queryFilter = feedApiFilter(activeFilter)
   const {
@@ -197,12 +225,11 @@ export default function Feed() {
 
           <div className="feed-stream" id="feed-panel">
             {visiblePosts.map((post) => (
-              <FeedPostArticle
+              <FeedPostItem
                 key={post.id}
                 post={post}
-                muted={false}
                 commentsOpen={expandedComments === post.id}
-                onToggleComments={() => setExpandedComments((open) => open === post.id ? null : post.id)}
+                onToggle={handleToggleComments}
               />
             ))}
           </div>
