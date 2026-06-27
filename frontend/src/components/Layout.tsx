@@ -267,7 +267,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <QuickCaptureFabWhenAppropriate />
 
         {/* Mobile bottom nav — 5 items max */}
-        <nav aria-label="Primary mobile" className={`app-mobile-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
+        <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
             {mobileNavItems.map(({ to, icon: Icon, label }) => (
               <Link

@@ -1,6 +1,6 @@
 # sub-12 — Development Tracker
 
-> Last updated: 2026-04-12 (session 11)
+> Last updated: 2026-06-27 (session 12)
 
 ---
 
@@ -184,7 +184,7 @@
 - [x] Primary meta tags (title, description, keywords, robots)
 - [x] Open Graph tags (`og:type`, `og:title`, `og:description`, `og:image`, `og:site_name`)
 - [x] Twitter/X card tags
-- [ ] Dynamic per-page OG tags (needs `react-helmet-async` or SSR)
+- [~] Dynamic per-page OG tags — `useDocumentMeta` hook drives per-page title/description/OG/Twitter/canonical on the public share routes (`SharedView`). Covers crawlers that run JS; full coverage for non-JS unfurlers still needs SSR/prerender, and the hook can be extended to the remaining public pages.
 
 ---
 
