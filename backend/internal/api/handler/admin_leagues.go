@@ -6,16 +6,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
 type AdminLeaguesHandler struct {
-	svc *service.LeagueService
+	svc        *service.LeagueService
+	simulation *service.SimulationService
 }
 
-func NewAdminLeagues(svc *service.LeagueService) *AdminLeaguesHandler {
-	return &AdminLeaguesHandler{svc: svc}
+func NewAdminLeagues(svc *service.LeagueService, simulation *service.SimulationService) *AdminLeaguesHandler {
+	return &AdminLeaguesHandler{svc: svc, simulation: simulation}
 }
 
 // GET /api/v1/admin/leagues
@@ -102,4 +105,41 @@ func (h *AdminLeaguesHandler) RemoveMember(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /api/v1/admin/leagues/{id}/members
+// Adds a simulated account to a league directly, bypassing the join policy.
+// Only simulated accounts may be enrolled this way.
+func (h *AdminLeaguesHandler) AddMember(w http.ResponseWriter, r *http.Request) {
+	actorID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	leagueID := chi.URLParam(r, "id")
+
+	var body struct {
+		UserID string `json:"user_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.UserID == "" {
+		writeError(w, http.StatusBadRequest, "user_id is required")
+		return
+	}
+
+	if err := h.simulation.JoinPersonaToLeague(r.Context(), body.UserID, leagueID, actorID); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			writeError(w, http.StatusNotFound, "simulated account or league not found")
+		case errors.Is(err, service.ErrLeagueNotFound):
+			writeError(w, http.StatusNotFound, "league not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to add member")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
