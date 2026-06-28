@@ -44,11 +44,21 @@ function setupNative() {
 
   // Universal Links (iOS) / App Links (Android): when the OS hands a
   // https://sub12.io/... link to the app, route the SPA to the matching in-app
-  // path via the router's own history (fires for warm and cold starts).
-  CapApp.addListener('appUrlOpen', ({ url }) => {
+  // path via the router's own history.
+  let lastDeepLink: string | null = null
+  const openDeepLink = (url: string | undefined) => {
+    if (!url || url === lastDeepLink) return
+    lastDeepLink = url
     const path = deepLinkToPath(url)
     if (path) router.history.push(path)
-  })
+  }
+  // Warm starts: the OS delivers the link to this listener.
+  CapApp.addListener('appUrlOpen', ({ url }) => openDeepLink(url))
+  // Cold starts: the launch URL is often delivered before any JS listener is
+  // attached, so addListener alone silently drops it. Read the launch URL
+  // explicitly; the lastDeepLink guard keeps it from double-navigating if the
+  // listener does also fire.
+  CapApp.getLaunchUrl().then((res) => openDeepLink(res?.url)).catch(() => {})
 
   // Push notifications: register the device once the user is authenticated (the
   // token POST requires auth) and tear down on logout.
