@@ -33,6 +33,14 @@ export async function initPushNotifications(): Promise<void> {
   if (import.meta.env.VITE_FCM_ENABLED !== 'true') return
   started = true
   try {
+    // Ask for permission before attaching any listeners: on denial we bail
+    // without leaving listeners behind, so a later grant (or re-login) doesn't
+    // stack a second set and double-register the device token.
+    const perm = await PushNotifications.requestPermissions()
+    if (perm.receive !== 'granted') {
+      started = false
+      return
+    }
     await PushNotifications.addListener('registration', (token) => {
       currentToken = token.value
       devicesApi.register(token.value, platform()).catch(() => {})
@@ -41,16 +49,12 @@ export async function initPushNotifications(): Promise<void> {
     await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       router.history.push(pathFromData(action.notification.data as Record<string, unknown> | undefined))
     })
-
-    const perm = await PushNotifications.requestPermissions()
-    if (perm.receive === 'granted') {
-      await PushNotifications.register()
-    } else {
-      started = false
-    }
+    await PushNotifications.register()
   } catch {
-    // No native push support / transport not configured — leave push disabled.
+    // No native push support / transport not configured — leave push disabled
+    // and drop any listeners we managed to attach before failing.
     started = false
+    await PushNotifications.removeAllListeners().catch(() => {})
   }
 }
 
