@@ -24,6 +24,13 @@ The native apps load the production build and talk to the live API at
 `VITE_API_URL` (if set) → `https://sub12.io/api/v1` on native → relative `/api/v1`
 on web. Set `VITE_API_URL` at build time to retarget a staging/beta build.
 
+User-facing share links are built from a canonical public origin
+(`src/utils/site.ts`): `VITE_SITE_URL` (if set) → `https://sub12.io` on native →
+`window.location.origin` on web. Native must not use the WebView origin
+(`capacitor://localhost` / `https://localhost`), or copied/sent links would be
+dead outside the app. Set `VITE_SITE_URL` to retarget share links for a
+staging/beta build.
+
 ### Prerequisites
 
 - **Android:** Android Studio + Android SDK, JDK 17, and an emulator or a device
@@ -85,5 +92,10 @@ npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
 - **Networking:** `CapacitorHttp`/`CapacitorCookies` are enabled in
   `capacitor.config.ts` so requests go through the native HTTP stack (no browser
   CORS preflight; native cookie handling).
+- **Sharing:** the share sheet uses the `@capacitor/share` plugin on native
+  (Android WebViews don't expose `navigator.share`) and the Web Share API on web,
+  behind one helper (`src/utils/share.ts`). Shareable URLs come from the canonical
+  host helper (`src/utils/site.ts`) so a link copied or sent from the app resolves
+  to `https://sub12.io`, not the local WebView origin.
 - The Workbox service worker is skipped on native (`main.tsx`) to avoid serving a
   stale app shell after an app update.

@@ -6,6 +6,8 @@ import { postApi, SharePayload } from '../api/posts'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
 import { toast } from '../store/toast'
+import { siteOrigin } from '../utils/site'
+import { shareExternally, hasSystemShare } from '../utils/share'
 
 type Destination = 'personal' | 'league' | 'club'
 
@@ -70,11 +72,14 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
   const manualCopyRef = useRef<HTMLInputElement>(null)
 
   const canPostInternal = isInternalShareType(targetType)
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  // Build the link from the canonical public host, not window.location.origin —
+  // on native the latter is capacitor://localhost / https://localhost, which is
+  // useless once the link leaves the app.
+  const origin = siteOrigin()
   const shareUrl = `${origin}${publicPathByType[targetType]}/${targetId}`
   const shareText = shareTextProp?.trim() || `${targetLabel} on sub-12`
   const effectiveTitle = shareTitle?.trim() || targetLabel
-  const hasWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const systemShare = hasSystemShare()
 
   const { data: leagues } = useQuery({
     queryKey: ['my-leagues'],
@@ -187,24 +192,20 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
     window.open(href, '_blank', 'noopener,noreferrer')
   }
 
-  // Primary external share: delegate to the OS share sheet where available,
-  // fall back to an inline grid of explicit channels otherwise. Keeps the
-  // dialog uncluttered on modern mobile while still working on desktop Chrome
-  // and platforms that haven't shipped the Web Share API.
+  // Primary external share: delegate to the OS share sheet where available
+  // (Capacitor Share plugin on native, Web Share API on web), falling back to an
+  // inline grid of explicit channels otherwise. Keeps the dialog uncluttered on
+  // modern mobile while still working on desktop Chrome and platforms that
+  // haven't shipped a system share sheet.
   async function primaryShare() {
-    if (hasWebShare) {
-      try {
-        await navigator.share({ title: effectiveTitle, text: shareText, url: shareUrl })
-      } catch {
-        // Native share was dismissed or errored. A dismissal is a cancel,
-        // not a failure, so no toast — but reveal the fallback channels in
-        // case the user wanted a specific destination the OS sheet didn't
-        // offer (common for desktop browsers and locked-down work phones).
-        setShowChannels(true)
-      }
-      return
+    const result = await shareExternally({ title: effectiveTitle, text: shareText, url: shareUrl })
+    if (result !== 'shared') {
+      // No system sheet, or the user dismissed it. A dismissal is a cancel, not a
+      // failure, so no toast — but reveal the fallback channels in case the user
+      // wanted a specific destination the OS sheet didn't offer (common for
+      // desktop browsers and locked-down work phones).
+      setShowChannels(true)
     }
-    setShowChannels(true)
   }
 
   const twitterHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`
@@ -351,7 +352,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
               <LinkIcon size={14} />
               Copy link
             </button>
-            {hasWebShare && !showChannels && (
+            {systemShare && !showChannels && (
               <button
                 onClick={() => setShowChannels(true)}
                 className="ml-auto t-section-title hover:text-secondary transition-colors"
@@ -361,9 +362,9 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
             )}
           </div>
 
-          {/* Fallback channel grid: rendered automatically on browsers without
-              navigator.share, revealed on demand otherwise. */}
-          {(!hasWebShare || showChannels) && (
+          {/* Fallback channel grid: rendered automatically when there's no system
+              share sheet, revealed on demand otherwise. */}
+          {(!systemShare || showChannels) && (
             <div className="flex flex-wrap gap-2 pt-1">
               <ExternalButton
                 onClick={() => openExternal(twitterHref)}
