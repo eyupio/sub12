@@ -114,7 +114,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **102** (000001–000102). Latest: `000102_simulation_extended_actions`.
+Current migration count: **103** (000001–000103). Latest: `000103_device_tokens`.
 
 ## Critical Migration Rules
 
@@ -207,6 +207,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Clubs:** Create, join, members, image upload
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users
+- **Devices:** Register/unregister push-notification tokens (`POST`/`DELETE /devices`)
 - **Activity:** `GET /feed`
 - **Achievements:** List own + list for user
 - **Stats:** User stats, rifle stats, score trends

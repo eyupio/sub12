@@ -5,6 +5,7 @@ import type { Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { toast } from '../store/toast'
+import { requestPosition } from '../utils/geolocation'
 
 export interface PickedLocation {
   label: string
@@ -118,24 +119,15 @@ export function MapLocationPicker({
   }, [open, onCancel])
 
   function useMyLocation() {
-    if (!navigator.geolocation) {
-      toast('Geolocation unavailable on this device', 'error')
-      return
-    }
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const next: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+    requestPosition()
+      .then(({ lat, lng }) => {
+        const next: [number, number] = [lat, lng]
         setCenter(next)
         mapRef.current?.setView(next, FOCUSED_ZOOM)
-        setLocating(false)
-      },
-      () => {
-        toast("Couldn't get location — pan the map instead", 'error')
-        setLocating(false)
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
-    )
+      })
+      .catch(() => toast("Couldn't get location — pan the map instead", 'error'))
+      .finally(() => setLocating(false))
   }
 
   function handleSave() {

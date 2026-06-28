@@ -5,6 +5,7 @@ import { LocationField, type LocationValue } from './LocationField'
 import { SavePlaceDialog } from './SavePlaceDialog'
 import { toast } from '../store/toast'
 import { findNearbyPlace } from '../utils/geo'
+import { requestPosition } from '../utils/geolocation'
 
 interface PlaceSelectorProps {
   locationId: string | null
@@ -69,27 +70,17 @@ export function PlaceSelector({
   }
 
   const handleDetectForPicker = () => {
-    if (!navigator.geolocation) {
-      toast('Geolocation unavailable on this device', 'error')
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const match = findNearbyPlace(pos.coords.latitude, pos.coords.longitude, places)
+    requestPosition()
+      .then(({ lat, lng }) => {
+        const match = findNearbyPlace(lat, lng, places)
         if (match) {
           applyPlace(match)
           return
         }
         if (locationId) onLocationIdChange(null)
-        onLocationChange({
-          label: location.label,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        })
-      },
-      () => toast("Couldn't get location — skip or type it in", 'error'),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
-    )
+        onLocationChange({ label: location.label, lat, lng })
+      })
+      .catch(() => toast("Couldn't get location — skip or type it in", 'error'))
   }
 
   // Resolve incoming coords against saved places — covers loading an existing

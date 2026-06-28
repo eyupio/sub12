@@ -12,6 +12,7 @@ import { ImageEditor } from '../components/ImageEditor'
 import { type LocationValue } from '../components/LocationField'
 import { PlaceSelector } from '../components/PlaceSelector'
 import { useSmartBack } from '../hooks/useSmartBack'
+import { captureImageOrClick } from '../utils/imagePicker'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -704,7 +705,7 @@ export default function ScoreEntry() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => captureImageOrClick('photos', fileInputRef, handleImageSelect)}
                   className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
                 >
                   <Upload size={16} />
@@ -712,7 +713,7 @@ export default function ScoreEntry() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => captureImageOrClick('camera', cameraInputRef, handleImageSelect)}
                   className="flex-1 flex items-center justify-center gap-2 border border-dashed border-subtle rounded p-3 text-muted text-sm hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
                 >
                   <Camera size={16} />

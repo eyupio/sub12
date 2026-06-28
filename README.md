@@ -219,6 +219,26 @@ What the native shell adds on top of the PWA:
 - **Native share sheet** — `src/utils/share.ts` uses the `@capacitor/share`
   plugin on native (Android WebViews don't expose `navigator.share`) and the Web
   Share API on web, falling back to an explicit channel grid.
+- **Native camera & photo picker** — `src/utils/imagePicker.ts` routes target /
+  score-card capture through the `@capacitor/camera` plugin on native (camera or
+  photo library), keeping the `<input type="file">` flow on web. iOS needs camera
+  / photo-library usage strings in `Info.plist` (see frontend/README.md).
+- **Native geolocation** — `src/utils/geolocation.ts` resolves the shooter's
+  position via the `@capacitor/geolocation` plugin on native (browser API on web)
+  to tag score cards & pellet tests. Android permissions are in the manifest; iOS
+  needs a location usage string in `Info.plist`.
+- **Deep linking** — `https://sub12.io/...` links open the app on the matching
+  in-app screen (`appUrlOpen` → `src/utils/deepLink.ts` → router). Association
+  files live in `frontend/public/.well-known/` (served as JSON by nginx); the
+  Android intent-filter is in the manifest. Publishing real App/Universal Links
+  needs the release signing SHA-256 and Apple Team ID filled in — see
+  frontend/README.md.
+- **Push notifications** — device tokens register via `@capacitor/push-notifications`
+  (`src/utils/push.ts`) to `POST /devices`; the backend stores them
+  (`device_tokens`) and fans push out from the notification pipeline through a
+  pluggable `PushSender`. Delivery needs an FCM/APNs transport + credentials
+  (Firebase `google-services.json` on Android, APNs key on iOS); until then a
+  no-op sender stores tokens without sending. See frontend/README.md.
 - **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
   API host from the WebView, so native persists the refresh token and passes it
   explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only

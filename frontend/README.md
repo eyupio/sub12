@@ -49,6 +49,16 @@ npx cap add ios
 cd ios/App && pod install
 ```
 
+The Camera plugin needs usage-description strings or iOS crashes the first time a
+capture/photo-picker is opened. Add these to `ios/App/App/Info.plist` after
+generating the project (Android needs no equivalent — capture goes through the
+system camera intent + photo picker, and the `FileProvider` in
+`android/app/src/main/AndroidManifest.xml` is already configured):
+
+- `NSCameraUsageDescription` — e.g. "Take photos of your targets and score cards."
+- `NSPhotoLibraryUsageDescription` — e.g. "Attach target and score-card photos from your library."
+- `NSLocationWhenInUseUsageDescription` — e.g. "Tag your score cards and pellet tests with where you were shooting."
+
 ### Build & run
 
 ```bash
@@ -83,6 +93,50 @@ added) after editing the sources, run:
 npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
 ```
 
+### Deep linking (Universal Links / App Links)
+
+Tapping a `https://sub12.io/...` link opens the installed app instead of the
+browser, landing on the matching in-app screen. The in-app routing is handled in
+`src/main.tsx` (the `@capacitor/app` `appUrlOpen` listener → `deepLinkToPath` →
+router). The OS-level verification needs three things wired up for production:
+
+1. **Association files** (served from the web root, already in `public/.well-known/`):
+   - `assetlinks.json` — replace `REPLACE_WITH_RELEASE_SIGNING_SHA256_FINGERPRINT`
+     with the release keystore's SHA-256
+     (`keytool -list -v -keystore <release.keystore>` → SHA256, or the Play
+     Console "App signing" fingerprint).
+   - `apple-app-site-association` — replace `REPLACE_WITH_APPLE_TEAM_ID` with the
+     Apple Developer Team ID (→ `<TEAMID>.uk.sub12.app`). Served as
+     `application/json` with no redirect (see `nginx.conf`).
+2. **Android** — `AndroidManifest.xml` already has the `autoVerify` intent-filter
+   for `https://sub12.io`. Until `assetlinks.json` carries the real fingerprint,
+   Android falls back to opening the link in the browser (no breakage).
+3. **iOS** — after `npx cap add ios`, add the Associated Domains capability with
+   `applinks:sub12.io` (Xcode → Signing & Capabilities, writes `App.entitlements`).
+
+### Push notifications
+
+The device-registration pipeline is wired end to end: on native the app requests
+permission and registers once the user is authenticated (`src/utils/push.ts`),
+forwards the token to `POST /devices`, removes it on logout, and routes a tapped
+notification to the matching screen. The backend stores tokens (`device_tokens`)
+and fans push out from the same path as in-app/email notifications, through a
+pluggable `PushSender`.
+
+Delivery is the one part that needs your provider accounts — until then the
+backend uses a no-op sender (tokens are stored, nothing is sent) and the app
+still builds and runs:
+
+- **Android (FCM)** — add a Firebase project's `google-services.json` to
+  `android/app/`, apply the `com.google.gms.google-services` Gradle plugin, and
+  provide the backend an FCM-backed `service.PushSender`. Without Firebase the
+  app builds but `register()` is a no-op at runtime.
+- **iOS (APNs)** — enable the Push Notifications capability and add an APNs key
+  in the Apple Developer account; Firebase can bridge APNs→FCM if you want one
+  backend transport.
+- **Backend** — implement a `service.PushSender` (FCM HTTP v1 / APNs) and swap it
+  in for `NewNoopPushSender` in `cmd/api/main.go`.
+
 ### Notes
 
 - **Auth on native:** the `sub12_refresh` cookie is `SameSite=Lax` and is not
@@ -97,5 +151,18 @@ npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
   behind one helper (`src/utils/share.ts`). Shareable URLs come from the canonical
   host helper (`src/utils/site.ts`) so a link copied or sent from the app resolves
   to `https://sub12.io`, not the local WebView origin.
+- **Camera & photos:** target / score-card capture routes through the
+  `@capacitor/camera` plugin on native via one helper (`src/utils/imagePicker.ts`),
+  so the in-app Camera/Upload buttons open the native camera or photo picker
+  instead of a WebView file dialog. Web keeps the `<input type="file">` flow
+  unchanged. Wired into the capture surfaces that already had a camera affordance:
+  Quick Capture, score entry, score-card detail, pellet-test detail, and the
+  pellet-test wizard. iOS needs the `Info.plist` usage strings noted under
+  One-time iOS setup.
+- **Geolocation:** the "use my location" controls resolve position through the
+  `@capacitor/geolocation` plugin on native (`src/utils/geolocation.ts`) and the
+  browser API on web. Android location permissions are declared in
+  `AndroidManifest.xml`; iOS needs `NSLocationWhenInUseUsageDescription` (see
+  One-time iOS setup).
 - The Workbox service worker is skipped on native (`main.tsx`) to avoid serving a
   stale app shell after an app update.

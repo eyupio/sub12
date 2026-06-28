@@ -12,6 +12,7 @@ import { ImageEditor } from '../components/ImageEditor'
 import { LocationField, type LocationValue } from '../components/LocationField'
 import { toast } from '../store/toast'
 import { useSmartBack } from '../hooks/useSmartBack'
+import { captureImageOrClick } from '../utils/imagePicker'
 
 type CaptureType = 'score' | 'pellet'
 type Context = 'personal' | 'league' | 'club'
@@ -247,7 +248,7 @@ export default function QuickCapture() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => cameraRef.current?.click()}
+                    onClick={() => captureImageOrClick('camera', cameraRef, setEditingFile)}
                     className="px-3 py-1.5 rounded-full bg-black/60 text-white text-xs tracking-wide"
                   >
                     Retake
@@ -258,7 +259,7 @@ export default function QuickCapture() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => cameraRef.current?.click()}
+                  onClick={() => captureImageOrClick('camera', cameraRef, setEditingFile)}
                   className="flex-1 h-36 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-subtle rounded text-muted hover:border-[var(--brass)]/50 hover:text-[var(--brass)] transition-colors"
                 >
                   <Camera size={24} />
@@ -266,7 +267,7 @@ export default function QuickCapture() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => captureImageOrClick('photos', fileRef, setEditingFile)}
                   className="flex-1 h-36 flex flex-col items-center justify-center gap-2 border border-dashed border-subtle rounded text-muted hover:border-[var(--brass)]/50 hover:text-secondary transition-colors"
                 >
                   <Upload size={20} />
