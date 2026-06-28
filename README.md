@@ -227,6 +227,12 @@ What the native shell adds on top of the PWA:
   position via the `@capacitor/geolocation` plugin on native (browser API on web)
   to tag score cards & pellet tests. Android permissions are in the manifest; iOS
   needs a location usage string in `Info.plist`.
+- **Deep linking** — `https://sub12.io/...` links open the app on the matching
+  in-app screen (`appUrlOpen` → `src/utils/deepLink.ts` → router). Association
+  files live in `frontend/public/.well-known/` (served as JSON by nginx); the
+  Android intent-filter is in the manifest. Publishing real App/Universal Links
+  needs the release signing SHA-256 and Apple Team ID filled in — see
+  frontend/README.md.
 - **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
   API host from the WebView, so native persists the refresh token and passes it
   explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only

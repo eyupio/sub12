@@ -7,7 +7,9 @@ import { App as CapApp } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import App from './App'
+import { router } from './router'
 import { initTheme } from './store/theme'
+import { deepLinkToPath } from './utils/deepLink'
 import './index.css'
 import 'tippy.js/dist/tippy.css'
 
@@ -35,6 +37,14 @@ if (Capacitor.isNativePlatform()) {
     } else {
       CapApp.exitApp()
     }
+  })
+
+  // Universal Links (iOS) / App Links (Android): when the OS hands a
+  // https://sub12.io/... link to the app, route the SPA to the matching in-app
+  // path via the router's own history (fires for warm and cold starts).
+  CapApp.addListener('appUrlOpen', ({ url }) => {
+    const path = deepLinkToPath(url)
+    if (path) router.history.push(path)
   })
 } else {
   // One-time sweep: drop the legacy SW `api-cache` from clients that loaded an

@@ -93,6 +93,27 @@ added) after editing the sources, run:
 npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
 ```
 
+### Deep linking (Universal Links / App Links)
+
+Tapping a `https://sub12.io/...` link opens the installed app instead of the
+browser, landing on the matching in-app screen. The in-app routing is handled in
+`src/main.tsx` (the `@capacitor/app` `appUrlOpen` listener → `deepLinkToPath` →
+router). The OS-level verification needs three things wired up for production:
+
+1. **Association files** (served from the web root, already in `public/.well-known/`):
+   - `assetlinks.json` — replace `REPLACE_WITH_RELEASE_SIGNING_SHA256_FINGERPRINT`
+     with the release keystore's SHA-256
+     (`keytool -list -v -keystore <release.keystore>` → SHA256, or the Play
+     Console "App signing" fingerprint).
+   - `apple-app-site-association` — replace `REPLACE_WITH_APPLE_TEAM_ID` with the
+     Apple Developer Team ID (→ `<TEAMID>.uk.sub12.app`). Served as
+     `application/json` with no redirect (see `nginx.conf`).
+2. **Android** — `AndroidManifest.xml` already has the `autoVerify` intent-filter
+   for `https://sub12.io`. Until `assetlinks.json` carries the real fingerprint,
+   Android falls back to opening the link in the browser (no breakage).
+3. **iOS** — after `npx cap add ios`, add the Associated Domains capability with
+   `applinks:sub12.io` (Xcode → Signing & Capabilities, writes `App.entitlements`).
+
 ### Notes
 
 - **Auth on native:** the `sub12_refresh` cookie is `SameSite=Lax` and is not

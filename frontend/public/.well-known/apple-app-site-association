@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "REPLACE_WITH_APPLE_TEAM_ID.uk.sub12.app",
+        "paths": [
+          "/scores/*",
+          "/score-cards/*",
+          "/pellet-tests/*",
+          "/share/*",
+          "/leagues/*",
+          "/clubs/*",
+          "/users/*",
+          "/events/*"
+        ]
+      }
+    ]
+  }
+}
