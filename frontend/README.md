@@ -59,8 +59,18 @@ after pulling.
 
 ### App icons & splash screens
 
-Capacitor ships working default icons. To regenerate branded assets from a
-1024×1024 source, drop `icon.png` (and an optional `splash.png`) in `assets/` and run:
+Branded source assets live in `assets/` (the SUB12 brass crosshair on gunmetal
+`#0C0C0C`, generated from `brand/svg/`):
+
+- `icon-only.png` (1024²) — full-bleed icon for iOS and legacy Android launchers.
+- `icon-foreground.png` / `icon-background.png` (1024²) — Android adaptive icon
+  layers (transparent reticle over a solid gunmetal field).
+- `splash.png` / `splash-dark.png` (2732²) — the primary stacked lockup centred
+  on gunmetal.
+
+The committed Android resources under `android/app/src/main/res/` are already
+generated from these. To regenerate every density (and iOS, once that project is
+added) after editing the sources, run:
 
 ```bash
 npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
