@@ -12,7 +12,7 @@ import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
 import { postApi, type Post, type PostAttachment, type PostVisibility } from '../api/posts'
 import { commentApi } from '../api/scoreCards'
-import { formatDate, useRegionalPrefs } from '../utils/date'
+import { formatDate, formatDateTime, formatRelativeTime, useRegionalPrefs } from '../utils/date'
 import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { UserAvatar } from './UserAvatar'
 
@@ -198,7 +198,8 @@ export const PostCard = memo(function PostCard({ post, onCommentClick }: { post:
   })
 
   const prefs = useRegionalPrefs()
-  const date = formatDate(post.created_at, prefs)
+  const date = formatRelativeTime(post.created_at, prefs)
+  const exactDate = formatDateTime(post.created_at, prefs)
   const isEdited = new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 5000
   const editedAt = isEdited ? formatDate(post.updated_at, prefs) : null
 
@@ -217,7 +218,7 @@ export const PostCard = memo(function PostCard({ post, onCommentClick }: { post:
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-secondary truncate">{post.display_name}</p>
           <div className="flex items-center gap-2">
-            <p className="text-[10px] text-muted tracking-widest uppercase">{date}</p>
+            <p className="text-[10px] text-muted tracking-widest uppercase" title={exactDate}>{date}</p>
             {editedAt && (
               <span className="inline-flex items-center rounded border border-subtle px-1.5 py-0.5 text-[10px] tracking-wide uppercase text-muted">
                 Edited {editedAt}
