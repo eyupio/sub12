@@ -184,6 +184,13 @@ func main() {
 	notificationRepo := repository.NewNotificationRepository(pool)
 	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, userRepo, emailSenderSvc, log.Logger)
 
+	// Push notifications: device-token registry + transport. The transport is a
+	// no-op until an FCM/APNs sender is configured; registration and fan-out are
+	// fully wired regardless.
+	deviceRepo := repository.NewDeviceRepository(pool)
+	deviceSvc := service.NewDeviceService(deviceRepo)
+	notificationSvc.SetPush(deviceRepo, service.NewNoopPushSender(log.Logger))
+
 	reportRepo := repository.NewReportRepository(pool)
 	moderationSvc := service.NewModerationService(
 		reportRepo, postRepo, commentRepo, activityRepo, leagueRepo, clubRepo, userRepo,
@@ -265,7 +272,7 @@ func main() {
 	pelletTestSvc.SetSimulatedContentFilter(simulationSvc)
 	go service.NewSimulationRunner(simulationSvc, log.Logger).Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

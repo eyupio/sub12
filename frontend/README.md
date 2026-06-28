@@ -114,6 +114,29 @@ router). The OS-level verification needs three things wired up for production:
 3. **iOS** — after `npx cap add ios`, add the Associated Domains capability with
    `applinks:sub12.io` (Xcode → Signing & Capabilities, writes `App.entitlements`).
 
+### Push notifications
+
+The device-registration pipeline is wired end to end: on native the app requests
+permission and registers once the user is authenticated (`src/utils/push.ts`),
+forwards the token to `POST /devices`, removes it on logout, and routes a tapped
+notification to the matching screen. The backend stores tokens (`device_tokens`)
+and fans push out from the same path as in-app/email notifications, through a
+pluggable `PushSender`.
+
+Delivery is the one part that needs your provider accounts — until then the
+backend uses a no-op sender (tokens are stored, nothing is sent) and the app
+still builds and runs:
+
+- **Android (FCM)** — add a Firebase project's `google-services.json` to
+  `android/app/`, apply the `com.google.gms.google-services` Gradle plugin, and
+  provide the backend an FCM-backed `service.PushSender`. Without Firebase the
+  app builds but `register()` is a no-op at runtime.
+- **iOS (APNs)** — enable the Push Notifications capability and add an APNs key
+  in the Apple Developer account; Firebase can bridge APNs→FCM if you want one
+  backend transport.
+- **Backend** — implement a `service.PushSender` (FCM HTTP v1 / APNs) and swap it
+  in for `NewNoopPushSender` in `cmd/api/main.go`.
+
 ### Notes
 
 - **Auth on native:** the `sub12_refresh` cookie is `SameSite=Lax` and is not

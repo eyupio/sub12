@@ -39,6 +39,7 @@ func NewRouter(
 	likes *service.LikeService,
 	posts *service.PostService,
 	notifications *service.NotificationService,
+	devices *service.DeviceService,
 	moderation *service.ModerationService,
 	supportTickets *service.SupportTicketService,
 	featureRequests *service.FeatureRequestService,
@@ -270,6 +271,11 @@ func NewRouter(
 			r.Post("/notifications/read", notifH.MarkRead)
 			r.Get("/notifications/preferences", notifH.GetPreferences)
 			r.Patch("/notifications/preferences", notifH.UpdatePreferences)
+
+			// Push-notification device tokens
+			deviceH := handler.NewDevice(devices)
+			r.Post("/devices", deviceH.Register)
+			r.Delete("/devices", deviceH.Unregister)
 
 			// Moderation: user-submitted reports
 			reportH := handler.NewReport(moderation)

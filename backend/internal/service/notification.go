@@ -18,6 +18,8 @@ type NotificationService struct {
 	mutes   *repository.MuteRepository
 	users   *repository.UserRepository
 	emailer *EmailSenderService
+	devices *repository.DeviceRepository
+	push    PushSender
 	logger  zerolog.Logger
 }
 
@@ -30,6 +32,15 @@ func NewNotificationService(
 	logger zerolog.Logger,
 ) *NotificationService {
 	return &NotificationService{repo: repo, blocks: blocks, mutes: mutes, users: users, emailer: emailer, logger: logger}
+}
+
+// SetPush wires the device registry and push transport used for push fan-out.
+// Optional — when unset (or set to a NoopPushSender) notifications still fan out
+// in-app and via email; only push delivery is skipped. Mirrors the SetX wiring
+// used elsewhere so the constructor signature stays stable.
+func (s *NotificationService) SetPush(devices *repository.DeviceRepository, sender PushSender) {
+	s.devices = devices
+	s.push = sender
 }
 
 // NotifEvent is the input to Fanout. One Fanout call produces one notification
@@ -104,6 +115,11 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 		s.logger.Warn().Err(err).Str("type", ev.Type).Str("recipient_id", ev.RecipientID).Msg("insert notification failed")
 	}
 
+	// Push fan-out mirrors the in-app enablement gate above (we only reach here
+	// for types the recipient has enabled). Best-effort — never affects the
+	// user-facing action.
+	s.pushFanout(ctx, ev)
+
 	if !prefs.EmailEnabledForType(ev.Type) {
 		return
 	}
@@ -134,6 +150,39 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 			s.logger.Warn().Err(err).Str("type", evType).Msg("send notification email failed")
 		}
 	}(recipient.Email, recipient.DisplayName, subject, body, ev.Type)
+}
+
+// pushFanout delivers a push notification for the event to the recipient's
+// registered devices. No-ops when push isn't wired or the recipient has no
+// devices. Delivery is handed to the PushSender, which is responsible for its
+// own async/best-effort behaviour.
+func (s *NotificationService) pushFanout(ctx context.Context, ev NotifEvent) {
+	if s.push == nil || s.devices == nil {
+		return
+	}
+	tokens, err := s.devices.ListTokensByUser(ctx, ev.RecipientID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("recipient_id", ev.RecipientID).Msg("load device tokens for push failed")
+		return
+	}
+	if len(tokens) == 0 {
+		return
+	}
+	actorName := ""
+	if ev.ActorID != "" && s.users != nil {
+		if a, err := s.users.GetByID(ctx, ev.ActorID); err == nil {
+			actorName = a.DisplayName
+		}
+	}
+	title, body := notificationEmailContent(ev, actorName)
+	data := map[string]string{"type": ev.Type}
+	if ev.TargetID != nil {
+		data["target_id"] = *ev.TargetID
+	}
+	if ev.TargetType != nil {
+		data["target_type"] = *ev.TargetType
+	}
+	s.push.Send(ctx, tokens, PushMessage{Title: title, Body: body, Data: data})
 }
 
 func isTicketNotificationType(t string) bool {
