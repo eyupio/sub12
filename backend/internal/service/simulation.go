@@ -337,7 +337,7 @@ func (s *SimulationService) EnsurePersonas(ctx context.Context, target int) (int
 		// Provision one active rifle + pellet for the persona so its cards
 		// carry gear badges and feed into rifle/pellet stats. Failures are
 		// non-fatal: the persona simply posts without gear.
-		s.provisionGear(ctx, userID)
+		s.ensureGear(ctx, userID)
 
 		created++
 	}
@@ -347,43 +347,48 @@ func (s *SimulationService) EnsurePersonas(ctx context.Context, target int) (int
 	return created, nil
 }
 
-// provisionGear creates a randomized rifle and pellet for a simulated user and
-// caches the resulting ids. Errors are logged and swallowed.
-func (s *SimulationService) provisionGear(ctx context.Context, userID string) {
-	if s.rifles != nil {
-		r := s.randomRifleInput()
-		if rifle, err := s.rifles.Create(ctx, userID, r); err == nil {
-			s.cacheGear(userID, gearIDs{rifle: rifle.ID}, true)
-		} else {
+// ensureGear loads the persona's active rifle and pellet, creating whichever
+// piece is missing so the account carries gear on its cards like a real user.
+// Brand-new personas get both created; existing personas that predate gear
+// provisioning (or whose earlier provisioning failed) acquire the missing
+// pieces on their next post. Results are cached. Failures are logged and
+// swallowed: a persona that still has no gear simply posts without a badge.
+func (s *SimulationService) ensureGear(ctx context.Context, userID string) gearIDs {
+	s.cacheMu.Lock()
+	g := s.gear[userID]
+	s.cacheMu.Unlock()
+
+	if g.rifle == "" && s.rifles != nil {
+		if rs, err := s.rifles.List(ctx, userID, true); err != nil {
+			s.log.Warn().Err(err).Msg("simulation: list rifles failed")
+		} else if len(rs) > 0 {
+			g.rifle = rs[0].ID
+		} else if rifle, err := s.rifles.Create(ctx, userID, s.randomRifleInput()); err != nil {
 			s.log.Warn().Err(err).Msg("simulation: create rifle failed")
-		}
-	}
-	if s.pellets != nil {
-		p := s.randomPelletInput()
-		if pellet, err := s.pellets.Create(ctx, userID, p); err == nil {
-			s.cacheGear(userID, gearIDs{pellet: pellet.ID}, false)
 		} else {
-			s.log.Warn().Err(err).Msg("simulation: create pellet failed")
+			g.rifle = rifle.ID
 		}
 	}
+	if g.pellet == "" && s.pellets != nil {
+		if ps, err := s.pellets.List(ctx, userID, true); err != nil {
+			s.log.Warn().Err(err).Msg("simulation: list pellets failed")
+		} else if len(ps) > 0 {
+			g.pellet = ps[0].ID
+		} else if pellet, err := s.pellets.Create(ctx, userID, s.randomPelletInput()); err != nil {
+			s.log.Warn().Err(err).Msg("simulation: create pellet failed")
+		} else {
+			g.pellet = pellet.ID
+		}
+	}
+	s.cacheGear(userID, g)
+	return g
 }
 
-// cacheGear stores a gear id for a persona. If merge is true, the existing
-// entry is kept and only the empty side is filled.
-func (s *SimulationService) cacheGear(userID string, g gearIDs, merge bool) {
+// cacheGear stores the known gear ids for a persona, filling only the non-empty
+// sides so a partial update never clobbers an already-cached id.
+func (s *SimulationService) cacheGear(userID string, g gearIDs) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	if merge {
-		existing := s.gear[userID]
-		if g.rifle != "" {
-			existing.rifle = g.rifle
-		}
-		if g.pellet != "" {
-			existing.pellet = g.pellet
-		}
-		s.gear[userID] = existing
-		return
-	}
 	existing := s.gear[userID]
 	if g.rifle != "" {
 		existing.rifle = g.rifle
@@ -392,29 +397,6 @@ func (s *SimulationService) cacheGear(userID string, g gearIDs, merge bool) {
 		existing.pellet = g.pellet
 	}
 	s.gear[userID] = existing
-}
-
-// personaGear returns the cached active rifle/pellet ids for a persona, loading
-// them from the gear services on cache miss.
-func (s *SimulationService) personaGear(ctx context.Context, userID string) gearIDs {
-	s.cacheMu.Lock()
-	g, ok := s.gear[userID]
-	s.cacheMu.Unlock()
-	if ok && (g.rifle != "" || g.pellet != "") {
-		return g
-	}
-	if s.rifles != nil {
-		if rs, err := s.rifles.List(ctx, userID, true); err == nil && len(rs) > 0 {
-			g.rifle = rs[0].ID
-		}
-	}
-	if s.pellets != nil {
-		if ps, err := s.pellets.List(ctx, userID, true); err == nil && len(ps) > 0 {
-			g.pellet = ps[0].ID
-		}
-	}
-	s.cacheGear(userID, g, false)
-	return g
 }
 
 // RunOnce provisions personas as needed and performs up to n simulated actions,
@@ -676,8 +658,9 @@ func (s *SimulationService) doPost(ctx context.Context, settings *model.Simulati
 	if d := s.randomDistance(); d > 0 {
 		input.DistanceM = &d
 	}
-	// Attach the persona's active rifle + pellet so cards carry gear badges.
-	gear := s.personaGear(ctx, actor)
+	// Attach the persona's active rifle + pellet so cards carry gear badges,
+	// provisioning them on the fly if this persona doesn't have any yet.
+	gear := s.ensureGear(ctx, actor)
 	if gear.rifle != "" {
 		input.RifleID = &gear.rifle
 	}
