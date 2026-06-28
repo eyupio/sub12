@@ -134,19 +134,20 @@ notification to the matching screen. The backend stores tokens (`device_tokens`)
 and fans push out from the same path as in-app/email notifications, through a
 pluggable `PushSender`.
 
-Delivery is the one part that needs your provider accounts — until then the
-backend uses a no-op sender (tokens are stored, nothing is sent) and the app
-still builds and runs:
+The backend FCM transport (HTTP v1) is implemented — it just needs credentials.
+Until they're provided the backend uses a no-op sender (tokens are stored,
+nothing is sent) and the apps still build and run:
 
-- **Android (FCM)** — add a Firebase project's `google-services.json` to
-  `android/app/`, apply the `com.google.gms.google-services` Gradle plugin, and
-  provide the backend an FCM-backed `service.PushSender`. Without Firebase the
-  app builds but `register()` is a no-op at runtime.
-- **iOS (APNs)** — enable the Push Notifications capability and add an APNs key
-  in the Apple Developer account; Firebase can bridge APNs→FCM if you want one
-  backend transport.
-- **Backend** — implement a `service.PushSender` (FCM HTTP v1 / APNs) and swap it
-  in for `NewNoopPushSender` in `cmd/api/main.go`.
+- **Backend (FCM)** — set `FCM_CREDENTIALS_JSON` to a Firebase service-account
+  JSON. The `service.PushSender` (`internal/service/push_fcm.go`) is selected
+  automatically in `cmd/api/main.go` when the var is set; otherwise the no-op
+  sender is used.
+- **Android (FCM)** — add the matching Firebase project's `google-services.json`
+  to `android/app/` and apply the `com.google.gms.google-services` Gradle plugin.
+  Without it the app builds but `register()` is a no-op at runtime.
+- **iOS (APNs)** — enable the Push Notifications capability and add an APNs key in
+  the Apple Developer account; Firebase bridges APNs→FCM so the same backend
+  transport covers both platforms.
 
 ### Notes
 
@@ -154,6 +155,11 @@ still builds and runs:
   delivered cross-site to `sub12.io` from the WebView, so native builds persist the
   refresh token and pass it explicitly on `/auth/refresh` and `/auth/logout` (the
   backend accepts it as a JSON body fallback). Web/PWA keeps the cookie-only flow.
+  The native token is stored in device storage (`@capacitor/preferences`,
+  `src/store/nativeToken.ts`) rather than the WebView's localStorage, and loaded
+  into the auth store at startup (`main.tsx`); only the user record is persisted to
+  localStorage. For at-rest encryption a Keychain/Keystore plugin can be layered
+  in later behind the same module.
 - **Networking:** `CapacitorHttp`/`CapacitorCookies` are enabled in
   `capacitor.config.ts` so requests go through the native HTTP stack (no browser
   CORS preflight; native cookie handling).

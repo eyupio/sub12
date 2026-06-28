@@ -236,9 +236,10 @@ What the native shell adds on top of the PWA:
 - **Push notifications** — device tokens register via `@capacitor/push-notifications`
   (`src/utils/push.ts`) to `POST /devices`; the backend stores them
   (`device_tokens`) and fans push out from the notification pipeline through a
-  pluggable `PushSender`. Delivery needs an FCM/APNs transport + credentials
-  (Firebase `google-services.json` on Android, APNs key on iOS); until then a
-  no-op sender stores tokens without sending. See frontend/README.md.
+  pluggable `PushSender`. The FCM HTTP v1 transport is implemented
+  (`internal/service/push_fcm.go`) — set `FCM_CREDENTIALS_JSON` to enable it,
+  plus Firebase `google-services.json` on Android / an APNs key on iOS. Until
+  configured a no-op sender stores tokens without sending. See frontend/README.md.
 - **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
   API host from the WebView, so native persists the refresh token and passes it
   explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only

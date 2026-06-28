@@ -184,12 +184,22 @@ func main() {
 	notificationRepo := repository.NewNotificationRepository(pool)
 	notificationSvc := service.NewNotificationService(notificationRepo, blockRepo, muteRepo, userRepo, emailSenderSvc, log.Logger)
 
-	// Push notifications: device-token registry + transport. The transport is a
-	// no-op until an FCM/APNs sender is configured; registration and fan-out are
-	// fully wired regardless.
+	// Push notifications: device-token registry + transport. When FCM credentials
+	// are configured the FCM HTTP v1 sender is used; otherwise a no-op sender
+	// stores tokens without delivering. Registration and fan-out are wired either
+	// way.
 	deviceRepo := repository.NewDeviceRepository(pool)
 	deviceSvc := service.NewDeviceService(deviceRepo)
-	notificationSvc.SetPush(deviceRepo, service.NewNoopPushSender(log.Logger))
+	var pushSender service.PushSender = service.NewNoopPushSender(log.Logger)
+	if cfg.FCMCredentialsJSON != "" {
+		if s, err := service.NewFCMSender(cfg.FCMCredentialsJSON, log.Logger); err != nil {
+			log.Warn().Err(err).Msg("invalid FCM credentials; push delivery disabled")
+		} else {
+			pushSender = s
+			log.Info().Msg("FCM push sender enabled")
+		}
+	}
+	notificationSvc.SetPush(deviceRepo, pushSender)
 
 	reportRepo := repository.NewReportRepository(pool)
 	moderationSvc := service.NewModerationService(
