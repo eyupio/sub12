@@ -49,6 +49,15 @@ npx cap add ios
 cd ios/App && pod install
 ```
 
+The Camera plugin needs usage-description strings or iOS crashes the first time a
+capture/photo-picker is opened. Add these to `ios/App/App/Info.plist` after
+generating the project (Android needs no equivalent — capture goes through the
+system camera intent + photo picker, and the `FileProvider` in
+`android/app/src/main/AndroidManifest.xml` is already configured):
+
+- `NSCameraUsageDescription` — e.g. "Take photos of your targets and score cards."
+- `NSPhotoLibraryUsageDescription` — e.g. "Attach target and score-card photos from your library."
+
 ### Build & run
 
 ```bash
@@ -97,5 +106,13 @@ npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
   behind one helper (`src/utils/share.ts`). Shareable URLs come from the canonical
   host helper (`src/utils/site.ts`) so a link copied or sent from the app resolves
   to `https://sub12.io`, not the local WebView origin.
+- **Camera & photos:** target / score-card capture routes through the
+  `@capacitor/camera` plugin on native via one helper (`src/utils/imagePicker.ts`),
+  so the in-app Camera/Upload buttons open the native camera or photo picker
+  instead of a WebView file dialog. Web keeps the `<input type="file">` flow
+  unchanged. Wired into the capture surfaces that already had a camera affordance:
+  Quick Capture, score entry, score-card detail, pellet-test detail, and the
+  pellet-test wizard. iOS needs the `Info.plist` usage strings noted under
+  One-time iOS setup.
 - The Workbox service worker is skipped on native (`main.tsx`) to avoid serving a
   stale app shell after an app update.

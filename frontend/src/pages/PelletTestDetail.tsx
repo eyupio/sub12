@@ -27,6 +27,7 @@ import ScoredImageCard from '../components/ScoredImageCard'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
+import { captureImageOrClick } from '../utils/imagePicker'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { useSmartBack } from '../hooks/useSmartBack'
 
@@ -340,7 +341,7 @@ export default function PelletTestDetail() {
           </button>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => captureImageOrClick('photos', fileInputRef, handleImageSelect)}
             disabled={uploadMutation.isPending}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-line text-[11px] uppercase tracking-widest text-ink-2 hover:border-gold/40 hover:text-ink transition-colors disabled:opacity-50"
           >
@@ -733,7 +734,7 @@ export default function PelletTestDetail() {
               })}
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => captureImageOrClick('photos', fileInputRef, handleImageSelect)}
                 disabled={uploadMutation.isPending}
                 className="aspect-square rounded-lg border border-dashed border-line bg-bg-2/40 text-muted text-xs hover:border-gold/40 hover:text-ink-2 transition-colors flex flex-col items-center justify-center gap-1"
               >
@@ -743,7 +744,7 @@ export default function PelletTestDetail() {
             </div>
             <button
               type="button"
-              onClick={() => cameraInputRef.current?.click()}
+              onClick={() => captureImageOrClick('camera', cameraInputRef, handleImageSelect)}
               disabled={uploadMutation.isPending}
               className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-dashed border-line rounded-lg py-2.5 text-muted text-sm hover:border-gold/40 hover:text-ink-2 transition-colors disabled:opacity-50"
             >

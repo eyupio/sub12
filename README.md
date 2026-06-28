@@ -219,6 +219,10 @@ What the native shell adds on top of the PWA:
 - **Native share sheet** — `src/utils/share.ts` uses the `@capacitor/share`
   plugin on native (Android WebViews don't expose `navigator.share`) and the Web
   Share API on web, falling back to an explicit channel grid.
+- **Native camera & photo picker** — `src/utils/imagePicker.ts` routes target /
+  score-card capture through the `@capacitor/camera` plugin on native (camera or
+  photo library), keeping the `<input type="file">` flow on web. iOS needs camera
+  / photo-library usage strings in `Info.plist` (see frontend/README.md).
 - **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
   API host from the WebView, so native persists the refresh token and passes it
   explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only
