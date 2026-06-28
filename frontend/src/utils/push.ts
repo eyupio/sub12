@@ -25,10 +25,12 @@ function pathFromData(data: Record<string, unknown> | undefined): string {
 
 // Register this device for push and forward its token to the backend. Native
 // only and safe to call repeatedly (guards against double registration).
-// Wrapped in try/catch so an unconfigured native transport (e.g. no Firebase
-// google-services.json) degrades gracefully instead of throwing.
+// Requires VITE_FCM_ENABLED=true and a valid google-services.json in the
+// Android project — without either, calling register() crashes the JVM because
+// FirebaseMessaging.getInstance() throws before JS try/catch can intercept it.
 export async function initPushNotifications(): Promise<void> {
   if (!Capacitor.isNativePlatform() || started) return
+  if (import.meta.env.VITE_FCM_ENABLED !== 'true') return
   started = true
   try {
     await PushNotifications.addListener('registration', (token) => {

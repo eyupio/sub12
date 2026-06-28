@@ -20,6 +20,32 @@ const isNative = Capacitor.isNativePlatform()
 const NATIVE_API_URL = 'https://sub12.io/api/v1'
 const BASE_URL = import.meta.env.VITE_API_URL ?? (isNative ? NATIVE_API_URL : '/api/v1')
 
+// Image URLs in API responses are relative paths (/api/v1/images/…) that work
+// fine in a browser (resolved against the page origin) but break in the native
+// WebView whose origin is https://localhost. Prefix them with the real host so
+// <img> tags load from the backend regardless of platform.
+const NATIVE_HOST = isNative
+  ? (() => { try { return new URL(import.meta.env.VITE_API_URL ?? NATIVE_API_URL).origin } catch { return 'https://sub12.io' } })()
+  : ''
+
+function resolveImagePaths<T>(data: T): T {
+  if (!isNative || data === null || data === undefined) return data
+  if (typeof data === 'string') {
+    return (data.startsWith('/api/v1/images/') ? `${NATIVE_HOST}${data}` : data) as unknown as T
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => resolveImagePaths(item)) as unknown as T
+  }
+  if (typeof data === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const key of Object.keys(data as object)) {
+      result[key] = resolveImagePaths((data as Record<string, unknown>)[key])
+    }
+    return result as T
+  }
+  return data
+}
+
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
 }
@@ -130,7 +156,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   }
 
   if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  return resolveImagePaths(await res.json()) as T
 }
 
 async function requestMultipart<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
@@ -170,7 +196,7 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
   }
 
   if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  return resolveImagePaths(await res.json()) as T
 }
 
 export const api = {
