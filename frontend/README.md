@@ -149,6 +149,60 @@ nothing is sent) and the apps still build and run:
   the Apple Developer account; Firebase bridges APNs→FCM so the same backend
   transport covers both platforms.
 
+### Pre-submission checklist
+
+The committed projects build and run, but a store submission needs the
+deploy-time identifiers and signing material that don't live in git. Work through
+these before uploading to App Store Connect / Play Console.
+
+**iOS (App Store)**
+
+- [x] Camera / photo-library / location usage strings in `ios/App/App/Info.plist`
+  (`NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`,
+  `NSPhotoLibraryAddUsageDescription`, `NSLocationWhenInUseUsageDescription`) —
+  required, and the app crashes on first capture without them.
+- [ ] Set the signing team and a distribution certificate/provisioning profile in
+  Xcode → Signing & Capabilities (`DEVELOPMENT_TEAM` is unset in the committed
+  project).
+- [ ] Add the **Associated Domains** capability (`applinks:sub12.io`) for
+  Universal Links, and the **Push Notifications** capability for APNs.
+- [ ] Replace `REPLACE_WITH_APPLE_TEAM_ID` in
+  `public/.well-known/apple-app-site-association` with the real Apple Team ID and
+  deploy the web root.
+- [ ] Bump `MARKETING_VERSION` (and `CURRENT_PROJECT_VERSION` per build) for each
+  release.
+
+**Android (Play Store)**
+
+- [x] `compileSdk`/`targetSdk` set to **35** (Android 15) in `variables.gradle` —
+  Play requires API 35 for new submissions. Verify the Gradle build locally; if
+  AGP complains about the SDK level, bump `com.android.tools.build:gradle` to
+  8.6.0+ (`android/build.gradle`) and the Gradle wrapper to 8.7+.
+- [ ] Generate a release keystore and add `android/keystore.properties`
+  (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) — the release
+  `signingConfig` falls back to the debug key until this exists, which Play will
+  reject.
+- [ ] Replace `REPLACE_WITH_RELEASE_SIGNING_SHA256_FINGERPRINT` in
+  `public/.well-known/assetlinks.json` with the release (or Play App Signing)
+  SHA-256, and deploy the web root, to enable verified App Links.
+- [ ] Add `android/app/google-services.json` (and set `VITE_FCM_ENABLED=true` at
+  build time) to turn on push; without it the app builds and runs with push
+  disabled.
+- [ ] Bump `versionCode` (and `versionName`) in `android/app/build.gradle` for
+  each upload — Play rejects a duplicate `versionCode`.
+
+**Both stores**
+
+- [ ] Build with the production API/host defaults (`VITE_API_URL` →
+  `https://sub12.io/api/v1`, `VITE_SITE_URL` → `https://sub12.io`) — these are the
+  native defaults, so just don't override them for a release build.
+- [ ] Privacy policy and terms are served at `/app/privacy` and `/app/terms`
+  (linked from the landing page) — supply those URLs in the store listings and
+  fill in the App Privacy / Data Safety questionnaires.
+- [ ] Prepare store-listing assets: app name (SUB12), description, keywords,
+  screenshots per required device size, and the 1024² icon (sourced from
+  `assets/icon-only.png`).
+
 ### Notes
 
 - **Auth on native:** the `sub12_refresh` cookie is `SameSite=Lax` and is not

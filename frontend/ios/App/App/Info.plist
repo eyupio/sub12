@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>sub-12</string>
+        <string>SUB12</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,6 +22,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of your targets and score cards.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach target and score-card photos from your library.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save target and score-card photos to your library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Tag your score cards and pellet tests with where you were shooting.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
