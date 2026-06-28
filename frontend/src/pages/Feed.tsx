@@ -57,7 +57,7 @@ import { ReportDialog } from '../components/ReportDialog'
 import { handleToMention } from '../utils/mention'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
-import { formatDate, useRegionalPrefs } from '../utils/date'
+import { formatDate, formatDateTime, formatRelativeTime, useRegionalPrefs } from '../utils/date'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import {
@@ -888,7 +888,8 @@ function PostHead({
 }) {
   const prefs = useRegionalPrefs()
   const item = post.activity
-  const date = formatDate(item.created_at, prefs)
+  const date = formatRelativeTime(item.created_at, prefs)
+  const exactDate = formatDateTime(item.created_at, prefs)
   const editedAt = item.type === 'post_created' ? item.metadata?.edited_at : undefined
   const editedLabel = editedAt ? formatDate(editedAt, prefs) : null
 
@@ -904,7 +905,7 @@ function PostHead({
           <Link to="/users/$id" params={{ id: item.user_id }} className="post-who">{item.display_name}</Link>
           <span className="post-handle">{relativeHandle(item.display_name)}</span>
           <span className="post-dot">.</span>
-          <span className="post-date">{date}</span>
+          <span className="post-date" title={exactDate}>{date}</span>
           {editedLabel && <span className="post-edited">Edited {editedLabel}</span>}
         </div>
         {post.where && post.whereType && post.whereId && <SourcePill post={post} />}
@@ -1369,7 +1370,7 @@ function JoinPost({ post, muted, commentsOpen, onToggleComments }: { post: FeedP
           ) : (
             <span>{target}</span>
           )}
-          <span className="join-date">{formatDate(item.created_at, prefs)}</span>
+          <span className="join-date" title={formatDateTime(item.created_at, prefs)}>{formatRelativeTime(item.created_at, prefs)}</span>
         </p>
         <button type="button" className="feed-btn feed-btn-outline">Follow</button>
       </div>
@@ -1458,7 +1459,7 @@ function InlineComments({ post }: { post: FeedPost }) {
           <div className="comment-body">
             <div className="comment-meta">
               <span>{topComment.display_name}</span>
-              <time>{formatDate(topComment.created_at, prefs)}</time>
+              <time title={formatDateTime(topComment.created_at, prefs)}>{formatRelativeTime(topComment.created_at, prefs)}</time>
             </div>
             <p>{topComment.body}</p>
           </div>

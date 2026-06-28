@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
 
-import { DEFAULT_PREFS, formatDate, formatDateShort, formatTime, type RegionalPrefs } from '../date'
+import {
+  DEFAULT_PREFS,
+  formatDate,
+  formatDateShort,
+  formatRelativeTime,
+  formatTime,
+  RELATIVE_TIME_CUTOFF_MS,
+  type RegionalPrefs,
+} from '../date'
 
 const withFormat = (dateFormat: RegionalPrefs['dateFormat']): RegionalPrefs => ({
   ...DEFAULT_PREFS,
@@ -59,5 +67,46 @@ describe('formatTime', () => {
     const prefs: RegionalPrefs = { ...DEFAULT_PREFS, timeFormat: '12h', timezone: 'UTC' }
     // en-US 12h formatter gives "02:05 PM" with a narrow non-breaking space.
     expect(formatTime(d, prefs).replace(/\s/g, ' ')).toBe('02:05 PM')
+  })
+})
+
+describe('formatRelativeTime', () => {
+  const now = new Date('2026-06-28T12:00:00Z')
+  const ago = (ms: number) => new Date(now.getTime() - ms)
+  const prefs: RegionalPrefs = { ...DEFAULT_PREFS, timezone: 'UTC' }
+
+  it('shows "Just now" within the first minute', () => {
+    expect(formatRelativeTime(ago(0), prefs, now)).toBe('Just now')
+    expect(formatRelativeTime(ago(59_000), prefs, now)).toBe('Just now')
+  })
+
+  it('treats minor future skew as "Just now"', () => {
+    expect(formatRelativeTime(new Date(now.getTime() + 5_000), prefs, now)).toBe('Just now')
+  })
+
+  it('renders minutes with pluralisation', () => {
+    expect(formatRelativeTime(ago(60_000), prefs, now)).toBe('1 min ago')
+    expect(formatRelativeTime(ago(5 * 60_000), prefs, now)).toBe('5 mins ago')
+  })
+
+  it('renders hours with pluralisation', () => {
+    expect(formatRelativeTime(ago(60 * 60_000), prefs, now)).toBe('1 hour ago')
+    expect(formatRelativeTime(ago(3 * 60 * 60_000), prefs, now)).toBe('3 hours ago')
+  })
+
+  it('renders days with pluralisation', () => {
+    expect(formatRelativeTime(ago(24 * 60 * 60_000), prefs, now)).toBe('1 day ago')
+    expect(formatRelativeTime(ago(3 * 24 * 60 * 60_000), prefs, now)).toBe('3 days ago')
+  })
+
+  it('switches to an absolute date + time stamp past the cutoff', () => {
+    const old = ago(RELATIVE_TIME_CUTOFF_MS)
+    // 7 days before 2026-06-28T12:00Z is 2026-06-21T12:00Z.
+    expect(formatRelativeTime(old, prefs, now)).toBe('21/06/2026 12:00')
+  })
+
+  it('returns empty string on null/invalid input', () => {
+    expect(formatRelativeTime(null, prefs, now)).toBe('')
+    expect(formatRelativeTime('not a date', prefs, now)).toBe('')
   })
 })

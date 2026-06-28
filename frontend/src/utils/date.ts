@@ -92,6 +92,33 @@ export function formatDateTime(input: string | Date | null | undefined, prefs: R
   return timePart ? `${datePart} ${timePart}` : datePart
 }
 
+// After this much time has elapsed, a relative label is no longer useful and
+// we fall back to an absolute date + time stamp.
+export const RELATIVE_TIME_CUTOFF_MS = 7 * 24 * 60 * 60 * 1000
+
+// formatRelativeTime renders a social-media style timestamp: a short relative
+// label ("Just now", "5 mins ago", "3 hours ago", "2 days ago") for recent
+// activity, switching to the absolute date + time stamp once the event is
+// older than RELATIVE_TIME_CUTOFF_MS. `now` is injectable for testing.
+export function formatRelativeTime(
+  input: string | Date | null | undefined,
+  prefs: RegionalPrefs = DEFAULT_PREFS,
+  now: Date = new Date(),
+): string {
+  const d = toDate(input)
+  if (!d) return ''
+  const diffMs = now.getTime() - d.getTime()
+  if (diffMs >= RELATIVE_TIME_CUTOFF_MS) return formatDateTime(d, prefs)
+  // Negative diffs (minor clock skew on fresh activity) collapse to "Just now".
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
 function normalizeDateFormat(v: string | undefined): DateFormat {
   return v === 'mdy_slash' || v === 'ymd_dash' || v === 'dmy_short' ? v : 'dmy_slash'
 }
