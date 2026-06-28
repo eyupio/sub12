@@ -57,6 +57,17 @@ npm run open:ios         # Xcode
 copies are git-ignored (regenerated from `dist/`), so always run `build:mobile`
 after pulling.
 
+### Build output locations
+
+**Android** — Gradle writes the APK to:
+```
+android/app/build/outputs/apk/debug/app-debug.apk       # debug (run:android)
+android/app/build/outputs/apk/release/app-release.apk   # signed release
+android/app/build/outputs/apk/release/app-release-unsigned.apk  # unsigned release
+```
+
+**iOS** — Xcode archives to the default Xcode Organizer location (`~/Library/Developer/Xcode/Archives`). For simulator/device runs, the `.app` bundle is written to the Derived Data folder (`~/Library/Developer/Xcode/DerivedData/<project>/Build/Products/`). Export a distributable `.ipa` via Xcode → Product → Archive → Distribute App.
+
 ### App icons & splash screens
 
 Branded source assets live in `assets/` (the SUB12 brass crosshair on gunmetal
