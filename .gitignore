@@ -16,6 +16,7 @@ backend/tmp/
 
 # Node / Frontend
 frontend/node_modules/
+frontend/package-lock.json
 frontend/dist/
 frontend/.vite/
 frontend/**/*.tsbuildinfo

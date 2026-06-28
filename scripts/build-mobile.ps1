@@ -10,7 +10,7 @@
 #   -SkipWeb       Skip the tsc + vite build + cap sync step (use existing dist/)
 #
 # Output:
-#   Android release: frontend\android\app\build\outputs\apk\release\app-release-unsigned.apk
+#   Android release: frontend\android\app\build\outputs\apk\release\app-release.apk
 #   Android debug:   frontend\android\app\build\outputs\apk\debug\app-debug.apk
 #   iOS:             frontend\ios\App\App.xcarchive  (macOS only)
 
