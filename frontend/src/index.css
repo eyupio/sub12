@@ -4,16 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Native (Capacitor) safe-area insets. The `native-app` class is set on <html>
-   only inside the native shell (see main.tsx), so mobile-web/PWA layout is
-   untouched. The mobile top bar is pushed clear of the device notch; the inset
-   is 0 on hardware without one. The bottom nav already clears the home
-   indicator: `--mobile-nav-offset` (used for both the nav height and the main
-   content's padding-bottom) bakes in `env(safe-area-inset-bottom)`, so adding
-   it again here would double-count and hide content behind the nav. */
-.native-app .app-mobile-header {
-  padding-top: calc(0.5rem + env(safe-area-inset-top));
-}
+/* Native (Capacitor) safe-area insets are handled globally by the `html`
+   padding rule in the base layer below, which applies env(safe-area-inset-*) on
+   all four sides. The mobile top bar is a sticky element in normal flow, so that
+   html padding already pushes it clear of the device notch — adding a per-element
+   `padding-top: env(safe-area-inset-top)` on the header on top of that would
+   double-count the notch. The fixed bottom nav sits outside the html padding box
+   and instead bakes env(safe-area-inset-bottom) into --mobile-nav-offset. */
 
 @layer base {
   /* ── Light mode (default) ─────────────────────────────── */

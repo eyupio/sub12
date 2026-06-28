@@ -20,8 +20,9 @@ import 'tippy.js/dist/tippy.css'
 initTheme()
 
 function setupNative() {
-  // Marks the document so safe-area-inset CSS (index.css) applies only inside the
-  // native shell, leaving mobile-web/PWA layout untouched.
+  // Marks the document as running inside the native shell. Safe-area insets are
+  // applied globally via the `html` padding rule in index.css (env() is 0 on web
+  // without insets), so this is a hook for any future native-only styling.
   document.documentElement.classList.add('native-app')
 
   // Inside a native WebView the Workbox service worker is redundant (assets ship
