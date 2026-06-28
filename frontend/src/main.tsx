@@ -24,7 +24,7 @@ if (Capacitor.isNativePlatform()) {
   // registration entirely. Splash dismissal and status-bar styling are native-only.
   SplashScreen.hide().catch(() => {})
   StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-  StatusBar.setBackgroundColor({ color: '#0f172a' }).catch(() => {})
+  StatusBar.setBackgroundColor({ color: '#0C0C0C' }).catch(() => {})
 
   // Map the Android hardware back button onto browser history so it navigates
   // the SPA (TanStack Router uses the history API) instead of closing the app;
