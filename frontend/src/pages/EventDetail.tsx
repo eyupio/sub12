@@ -11,6 +11,7 @@ import { Badge, EntityDetailHeader, PageGrid, Section } from '../components/leag
 import { DisciplineThumb } from '../components/leagues/structure'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { siteOrigin } from '../utils/site'
 
 function StateBadge({ state }: { state: EventState }) {
   switch (state) {
@@ -98,7 +99,7 @@ export default function EventDetail() {
   })
 
   function copyLink() {
-    const url = `${window.location.origin}/events/${slug}`
+    const url = `${siteOrigin()}/events/${slug}`
     navigator.clipboard?.writeText(url).then(
       () => toast('Link copied', 'success'),
       () => toast('Could not copy link', 'error'),

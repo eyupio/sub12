@@ -58,6 +58,8 @@ import { handleToMention } from '../utils/mention'
 import { iconForAchievement } from '../utils/achievementIcons'
 import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { formatDate, formatDateTime, formatRelativeTime, useRegionalPrefs } from '../utils/date'
+import { siteOrigin } from '../utils/site'
+import { shareExternally } from '../utils/share'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import {
@@ -1637,15 +1639,14 @@ function fallbackText(item: ActivityItem): string {
   }
 }
 
-function sharePost(post: FeedPost) {
-  const url = `${window.location.origin}/feed`
+async function sharePost(post: FeedPost) {
+  const url = `${siteOrigin()}/feed`
   const text = `${post.activity.display_name} on SUB12`
-  if (navigator.share) {
-    navigator.share({ title: 'SUB12 Feed', text, url }).catch(() => {})
-    return
+  const result = await shareExternally({ title: 'SUB12 Feed', text, url })
+  if (result === 'unavailable') {
+    navigator.clipboard?.writeText(url).then(
+      () => toast('Feed link copied', 'success'),
+      () => toast('Failed to copy link', 'error'),
+    )
   }
-  navigator.clipboard?.writeText(url).then(
-    () => toast('Feed link copied', 'success'),
-    () => toast('Failed to copy link', 'error'),
-  )
 }

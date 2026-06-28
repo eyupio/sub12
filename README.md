@@ -190,6 +190,49 @@ Container images:
 
 The production frontend nginx proxies `/api/` to the backend container; the backend port is not exposed to the host.
 
+## Mobile apps (Capacitor)
+
+The web build and the native iOS / Android apps ship from one codebase. The same
+`frontend/dist/` bundle is wrapped in a native shell by [Capacitor 6](https://capacitorjs.com/).
+The `android/` project is committed; the `ios/` project must be generated on a Mac
+(`npx cap add ios`) and committed. The web assets `cap sync` copies into the native
+projects are git-ignored and regenerated from `dist/`.
+
+```bash
+cd frontend
+npm run build:mobile     # tsc -b && vite build && cap sync (copies dist into native)
+npm run run:android      # build + launch on emulator/device
+npm run run:ios          # macOS only
+npm run open:android     # open Android Studio
+npm run open:ios         # open Xcode (macOS only)
+```
+
+What the native shell adds on top of the PWA:
+
+- **API + share hosts** — a native WebView is served from a local origin
+  (`capacitor://localhost` / `https://localhost`), so API calls and user-facing
+  links target the canonical host instead. API base resolves in
+  `src/api/client.ts` (`VITE_API_URL` → `https://sub12.io/api/v1` on native);
+  shareable links resolve in `src/utils/site.ts` (`VITE_SITE_URL` →
+  `https://sub12.io` on native). Set those env vars at build time to retarget a
+  staging/beta build.
+- **Native share sheet** — `src/utils/share.ts` uses the `@capacitor/share`
+  plugin on native (Android WebViews don't expose `navigator.share`) and the Web
+  Share API on web, falling back to an explicit channel grid.
+- **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
+  API host from the WebView, so native persists the refresh token and passes it
+  explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only
+  flow.
+- **Native chrome** — status-bar styling, splash-screen dismissal, safe-area
+  insets, and Android hardware back-button → SPA history mapping (`src/main.tsx`).
+  The Workbox service worker is skipped on native to avoid serving a stale shell
+  after an app update.
+- **Branded icons & splash** — generated from `frontend/assets/` via
+  `npm run cap:assets`.
+
+See [frontend/README.md](frontend/README.md) for prerequisites, one-time iOS
+setup, and the full asset workflow.
+
 ## Mobile keyboard + navigation policy
 
 For mobile shell layout consistency, sub-12 uses this focused-input behavior:
