@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'uk.sub12.app',
-  appName: 'sub-12',
+  appName: 'sub12',
   webDir: 'dist',
   plugins: {
     // Route fetch/XHR through the native HTTP stack. This lets the WebView talk

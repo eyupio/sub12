@@ -3,6 +3,14 @@ apply plugin: 'com.android.application'
 android {
     namespace "uk.sub12.app"
     compileSdk rootProject.ext.compileSdkVersion
+    signingConfigs {
+        debug {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
     defaultConfig {
         applicationId "uk.sub12.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -17,6 +25,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
