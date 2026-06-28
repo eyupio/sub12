@@ -5,7 +5,6 @@ import { registerSW } from 'virtual:pwa-register'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
-import { StatusBar, Style } from '@capacitor/status-bar'
 import App from './App'
 import { router } from './router'
 import { useAuthStore } from './store/auth'
@@ -27,10 +26,9 @@ function setupNative() {
 
   // Inside a native WebView the Workbox service worker is redundant (assets ship
   // inside the app) and can serve a stale app shell after an update, so we skip
-  // registration entirely. Splash dismissal and status-bar styling are native-only.
+  // registration entirely. The status bar is styled to match the active theme by
+  // store/theme.ts (already applied via initTheme above).
   SplashScreen.hide().catch(() => {})
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-  StatusBar.setBackgroundColor({ color: '#0C0C0C' }).catch(() => {})
 
   // Map the Android hardware back button onto browser history so it navigates
   // the SPA (TanStack Router uses the history API) instead of closing the app;
