@@ -5,7 +5,6 @@ import { registerSW } from 'virtual:pwa-register'
 import { Capacitor } from '@capacitor/core'
 import { App as CapApp } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
-import { StatusBar, Style } from '@capacitor/status-bar'
 import App from './App'
 import { router } from './router'
 import { useAuthStore } from './store/auth'
@@ -20,16 +19,16 @@ import 'tippy.js/dist/tippy.css'
 initTheme()
 
 function setupNative() {
-  // Marks the document so safe-area-inset CSS (index.css) applies only inside the
-  // native shell, leaving mobile-web/PWA layout untouched.
+  // Marks the document as running inside the native shell. Safe-area insets are
+  // applied globally via the `html` padding rule in index.css (env() is 0 on web
+  // without insets), so this is a hook for any future native-only styling.
   document.documentElement.classList.add('native-app')
 
   // Inside a native WebView the Workbox service worker is redundant (assets ship
   // inside the app) and can serve a stale app shell after an update, so we skip
-  // registration entirely. Splash dismissal and status-bar styling are native-only.
+  // registration entirely. The status bar is styled to match the active theme by
+  // store/theme.ts (already applied via initTheme above).
   SplashScreen.hide().catch(() => {})
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
-  StatusBar.setBackgroundColor({ color: '#0C0C0C' }).catch(() => {})
 
   // Map the Android hardware back button onto browser history so it navigates
   // the SPA (TanStack Router uses the history API) instead of closing the app;
@@ -44,11 +43,21 @@ function setupNative() {
 
   // Universal Links (iOS) / App Links (Android): when the OS hands a
   // https://sub12.io/... link to the app, route the SPA to the matching in-app
-  // path via the router's own history (fires for warm and cold starts).
-  CapApp.addListener('appUrlOpen', ({ url }) => {
+  // path via the router's own history.
+  let lastDeepLink: string | null = null
+  const openDeepLink = (url: string | undefined) => {
+    if (!url || url === lastDeepLink) return
+    lastDeepLink = url
     const path = deepLinkToPath(url)
     if (path) router.history.push(path)
-  })
+  }
+  // Warm starts: the OS delivers the link to this listener.
+  CapApp.addListener('appUrlOpen', ({ url }) => openDeepLink(url))
+  // Cold starts: the launch URL is often delivered before any JS listener is
+  // attached, so addListener alone silently drops it. Read the launch URL
+  // explicitly; the lastDeepLink guard keeps it from double-navigating if the
+  // listener does also fire.
+  CapApp.getLaunchUrl().then((res) => openDeepLink(res?.url)).catch(() => {})
 
   // Push notifications: register the device once the user is authenticated (the
   // token POST requires auth) and tear down on logout.

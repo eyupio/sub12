@@ -147,7 +147,12 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     }
     useAuthStore.getState().clearAuth()
     toast('Your session has expired. Please sign in again.', 'error')
-    window.location.href = '/login'
+    // SPA navigation, not window.location: a hard document load forces a full
+    // reload from the local WebView origin (capacitor://localhost on iOS,
+    // https://localhost on Android), which re-bootstraps the whole app and is
+    // unreliable for an absolute path under the capacitor:// scheme. Imported
+    // lazily to avoid pulling the route tree into this low-level module.
+    void import('../router').then(({ router }) => router.navigate({ to: '/login' }))
     throw new Error('Session expired')
   }
 
@@ -187,7 +192,12 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
     }
     useAuthStore.getState().clearAuth()
     toast('Your session has expired. Please sign in again.', 'error')
-    window.location.href = '/login'
+    // SPA navigation, not window.location: a hard document load forces a full
+    // reload from the local WebView origin (capacitor://localhost on iOS,
+    // https://localhost on Android), which re-bootstraps the whole app and is
+    // unreliable for an absolute path under the capacitor:// scheme. Imported
+    // lazily to avoid pulling the route tree into this low-level module.
+    void import('../router').then(({ router }) => router.navigate({ to: '/login' }))
     throw new Error('Session expired')
   }
 

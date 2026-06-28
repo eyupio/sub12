@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { Capacitor } from '@capacitor/core'
 import { X, Share2, Link as LinkIcon, Facebook, Mail, MessageCircle } from 'lucide-react'
 import { postApi, SharePayload } from '../api/posts'
 import { leagueApi } from '../api/leagues'
@@ -80,6 +81,11 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
   const shareText = shareTextProp?.trim() || `${targetLabel} on sub-12`
   const effectiveTitle = shareTitle?.trim() || targetLabel
   const systemShare = hasSystemShare()
+  // The explicit channel grid uses window.open, which inside a native WebView
+  // opens in-app or no-ops instead of handing off to the OS browser/mail apps.
+  // The native share sheet already lists the user's installed share targets, so
+  // we hide the grid (and its "More options" reveal) on native entirely.
+  const isNative = Capacitor.isNativePlatform()
 
   const { data: leagues } = useQuery({
     queryKey: ['my-leagues'],
@@ -352,7 +358,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
               <LinkIcon size={14} />
               Copy link
             </button>
-            {systemShare && !showChannels && (
+            {systemShare && !showChannels && !isNative && (
               <button
                 onClick={() => setShowChannels(true)}
                 className="ml-auto t-section-title hover:text-secondary transition-colors"
@@ -364,7 +370,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
 
           {/* Fallback channel grid: rendered automatically when there's no system
               share sheet, revealed on demand otherwise. */}
-          {(!systemShare || showChannels) && (
+          {(!systemShare || showChannels) && !isNative && (
             <div className="flex flex-wrap gap-2 pt-1">
               <ExternalButton
                 onClick={() => openExternal(twitterHref)}

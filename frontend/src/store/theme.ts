@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { syncStatusBar } from '../utils/statusBar'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -27,6 +28,8 @@ function applyToDOM(resolved: 'light' | 'dark') {
   if (meta) {
     meta.setAttribute('content', resolved === 'dark' ? '#0C0C0C' : '#F5F5F0')
   }
+  // Keep the native status bar in step with the theme (no-op on web).
+  syncStatusBar(resolved)
 }
 
 export const useThemeStore = create<ThemeState>()(
