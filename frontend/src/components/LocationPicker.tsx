@@ -1,6 +1,8 @@
-import { MapPin, LocateFixed } from 'lucide-react'
+import { useState } from 'react'
+import { MapPin, LocateFixed, Loader2 } from 'lucide-react'
 import { useLocations, type Location } from '../api/locations'
 import { requestPosition } from '../utils/geolocation'
+import { toast } from '../store/toast'
 
 interface LocationPickerProps {
   value: string | null
@@ -11,6 +13,7 @@ interface LocationPickerProps {
 
 export function LocationPicker({ value, onChange, onApplyDefaults, className = '' }: LocationPickerProps) {
   const { data: locations = [] } = useLocations()
+  const [detecting, setDetecting] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value || null
@@ -22,11 +25,13 @@ export function LocationPicker({ value, onChange, onApplyDefaults, className = '
   }
 
   const handleDetect = () => {
+    setDetecting(true)
     requestPosition()
       .then(({ lat, lng }) => {
         if (onApplyDefaults) onApplyDefaults(null, lat, lng)
       })
-      .catch(() => {})
+      .catch(() => toast("Couldn't get location — pick one from the list", 'error'))
+      .finally(() => setDetecting(false))
   }
 
   return (
@@ -48,10 +53,12 @@ export function LocationPicker({ value, onChange, onApplyDefaults, className = '
         <button
           type="button"
           onClick={handleDetect}
+          disabled={detecting}
           title="Detect my location"
-          className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
+          aria-label="Detect my location"
+          className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <LocateFixed className="w-4 h-4" />
+          {detecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
         </button>
       )}
     </div>
