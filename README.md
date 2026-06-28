@@ -223,6 +223,10 @@ What the native shell adds on top of the PWA:
   score-card capture through the `@capacitor/camera` plugin on native (camera or
   photo library), keeping the `<input type="file">` flow on web. iOS needs camera
   / photo-library usage strings in `Info.plist` (see frontend/README.md).
+- **Native geolocation** — `src/utils/geolocation.ts` resolves the shooter's
+  position via the `@capacitor/geolocation` plugin on native (browser API on web)
+  to tag score cards & pellet tests. Android permissions are in the manifest; iOS
+  needs a location usage string in `Info.plist`.
 - **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
   API host from the WebView, so native persists the refresh token and passes it
   explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only

@@ -5,6 +5,7 @@ import { Loader2, MapPin, Map as MapIcon } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { toast } from '../store/toast'
+import { requestPosition } from '../utils/geolocation'
 import type { PickedLocation } from './MapLocationPicker'
 
 const MapLocationPicker = lazy(() =>
@@ -69,28 +70,17 @@ export function LocationField({
   }, [recentScore, recentPellet, recentLimit])
 
   function useMyLocation() {
-    if (!navigator.geolocation) {
-      toast('Geolocation unavailable on this device', 'error')
-      return
-    }
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
+    requestPosition()
+      .then(({ lat, lng }) => {
         // Only seed the label when empty so existing free-text isn't clobbered.
         const seededLabel = value.label.trim().length > 0
           ? value.label
           : `${formatCoord(lat)}, ${formatCoord(lng)}`
         onChange({ label: seededLabel, lat, lng })
-        setLocating(false)
-      },
-      () => {
-        toast("Couldn't get location — skip or type it in", 'error')
-        setLocating(false)
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
-    )
+      })
+      .catch(() => toast("Couldn't get location — skip or type it in", 'error'))
+      .finally(() => setLocating(false))
   }
 
   function pickRecent(r: RecentLocation) {

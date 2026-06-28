@@ -1,5 +1,6 @@
 import { MapPin, LocateFixed } from 'lucide-react'
 import { useLocations, type Location } from '../api/locations'
+import { requestPosition } from '../utils/geolocation'
 
 interface LocationPickerProps {
   value: string | null
@@ -21,12 +22,11 @@ export function LocationPicker({ value, onChange, onApplyDefaults, className = '
   }
 
   const handleDetect = () => {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(pos => {
-      if (onApplyDefaults) {
-        onApplyDefaults(null, pos.coords.latitude, pos.coords.longitude)
-      }
-    })
+    requestPosition()
+      .then(({ lat, lng }) => {
+        if (onApplyDefaults) onApplyDefaults(null, lat, lng)
+      })
+      .catch(() => {})
   }
 
   return (

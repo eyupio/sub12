@@ -57,6 +57,7 @@ system camera intent + photo picker, and the `FileProvider` in
 
 - `NSCameraUsageDescription` — e.g. "Take photos of your targets and score cards."
 - `NSPhotoLibraryUsageDescription` — e.g. "Attach target and score-card photos from your library."
+- `NSLocationWhenInUseUsageDescription` — e.g. "Tag your score cards and pellet tests with where you were shooting."
 
 ### Build & run
 
@@ -114,5 +115,10 @@ npm run cap:assets       # uses @capacitor/assets via npx; needs libvips/sharp
   Quick Capture, score entry, score-card detail, pellet-test detail, and the
   pellet-test wizard. iOS needs the `Info.plist` usage strings noted under
   One-time iOS setup.
+- **Geolocation:** the "use my location" controls resolve position through the
+  `@capacitor/geolocation` plugin on native (`src/utils/geolocation.ts`) and the
+  browser API on web. Android location permissions are declared in
+  `AndroidManifest.xml`; iOS needs `NSLocationWhenInUseUsageDescription` (see
+  One-time iOS setup).
 - The Workbox service worker is skipped on native (`main.tsx`) to avoid serving a
   stale app shell after an app update.
