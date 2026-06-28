@@ -250,6 +250,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `SEED_ADMIN` | `false` | Auto-seed admin user on startup |
 | `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
+| `FCM_CREDENTIALS_JSON` | *(empty)* | Firebase service-account JSON for push delivery (FCM HTTP v1). When empty, device tokens are still stored but no push is sent (no-op sender). |
 
 ## CI Pipeline
 

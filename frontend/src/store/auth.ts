@@ -1,6 +1,6 @@
-import { Capacitor } from '@capacitor/core'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { saveStoredRefreshToken, clearStoredRefreshToken } from './nativeToken'
 
 interface User {
   id: string
@@ -40,30 +40,29 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      setAuth: (user, accessToken, refreshToken) =>
-        set({ user, accessToken, refreshToken }),
+      setAuth: (user, accessToken, refreshToken) => {
+        // Native keeps the refresh token in device storage (Capacitor
+        // Preferences), not localStorage — see nativeToken.ts. No-op on web.
+        saveStoredRefreshToken(refreshToken)
+        set({ user, accessToken, refreshToken })
+      },
       updateUser: (partial) =>
         set((s) => ({ user: s.user ? { ...s.user, ...partial } : s.user })),
-      clearAuth: () =>
-        set({ user: null, accessToken: null, refreshToken: null }),
+      clearAuth: () => {
+        clearStoredRefreshToken()
+        set({ user: null, accessToken: null, refreshToken: null })
+      },
     }),
     {
       name: 'sub12-auth',
-      // Web/PWA: persist only the user record. Both tokens stay out of
-      // localStorage — the access token is in-memory only, and the refresh token
-      // lives exclusively in an httpOnly cookie set by the backend
-      // (Path=/api/v1/auth). Persisting the user lets us rehydrate identity on
-      // reload and trigger a cookie-based refresh; an XSS payload reading
-      // localStorage gets nothing it can replay against the API.
-      //
-      // Native: the SameSite=Lax cookie is not delivered cross-site to the API
-      // host, so the refresh token must be persisted to survive an app restart.
-      // A native WebView has no shared/scriptable localStorage with the web
-      // origin, so this is the standard mobile trade-off.
-      partialize: (s) =>
-        Capacitor.isNativePlatform()
-          ? { user: s.user, refreshToken: s.refreshToken }
-          : { user: s.user },
+      // Persist only the user record, on every platform. Tokens never touch
+      // localStorage: the access token is in-memory only; the refresh token lives
+      // in an httpOnly cookie on web (Path=/api/v1/auth) and in native device
+      // storage on native (loaded into the store at startup — see main.tsx). An
+      // XSS payload reading localStorage gets nothing it can replay against the
+      // API. Persisting the user lets us rehydrate identity and trigger a refresh
+      // on reload.
+      partialize: (s) => ({ user: s.user }),
     },
   ),
 )

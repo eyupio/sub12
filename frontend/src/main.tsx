@@ -9,6 +9,7 @@ import { StatusBar, Style } from '@capacitor/status-bar'
 import App from './App'
 import { router } from './router'
 import { useAuthStore } from './store/auth'
+import { loadStoredRefreshToken } from './store/nativeToken'
 import { initTheme } from './store/theme'
 import { deepLinkToPath } from './utils/deepLink'
 import { initPushNotifications, teardownPushNotifications } from './utils/push'
@@ -18,7 +19,7 @@ import 'tippy.js/dist/tippy.css'
 // Apply theme before React mounts to prevent FOUC
 initTheme()
 
-if (Capacitor.isNativePlatform()) {
+function setupNative() {
   // Marks the document so safe-area-inset CSS (index.css) applies only inside the
   // native shell, leaving mobile-web/PWA layout untouched.
   document.documentElement.classList.add('native-app')
@@ -50,8 +51,7 @@ if (Capacitor.isNativePlatform()) {
   })
 
   // Push notifications: register the device once the user is authenticated (the
-  // token POST requires auth) and tear down on logout. The auth store rehydrates
-  // synchronously from storage, so the initial state is already settled here.
+  // token POST requires auth) and tear down on logout.
   let pushAuthed = !!useAuthStore.getState().user
   if (pushAuthed) void initPushNotifications()
   useAuthStore.subscribe((state) => {
@@ -60,7 +60,9 @@ if (Capacitor.isNativePlatform()) {
     else if (!authed && pushAuthed) void teardownPushNotifications()
     pushAuthed = authed
   })
-} else {
+}
+
+function setupWeb() {
   // One-time sweep: drop the legacy SW `api-cache` from clients that loaded an
   // older build. Authenticated API responses are no longer cached (NetworkOnly),
   // but stragglers in Cache Storage could still be served by an old SW until it
@@ -91,10 +93,25 @@ const queryClient = new QueryClient({
   },
 })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-)
+async function bootstrap() {
+  if (Capacitor.isNativePlatform()) {
+    // Seed the in-memory refresh token from native device storage before the app
+    // makes any authed request or push registration runs. The user record is
+    // already rehydrated synchronously by the persist store from localStorage.
+    const token = await loadStoredRefreshToken()
+    if (token) useAuthStore.setState({ refreshToken: token })
+    setupNative()
+  } else {
+    setupWeb()
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>,
+  )
+}
+
+void bootstrap()

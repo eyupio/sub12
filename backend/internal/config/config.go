@@ -91,6 +91,12 @@ type Config struct {
 	ModerationFlagGrace time.Duration `envconfig:"MODERATION_FLAG_GRACE" default:"48h"`
 	// Interval at which the moderation sweeper runs.
 	ModerationSweepInterval time.Duration `envconfig:"MODERATION_SWEEP_INTERVAL" default:"15m"`
+
+	// Push notifications (Firebase Cloud Messaging, HTTP v1). FCMCredentialsJSON
+	// is the full service-account JSON (with client_email + private_key); the
+	// project id is read from it. Leave empty to disable push delivery — device
+	// tokens are still stored and the no-op sender is used.
+	FCMCredentialsJSON string `envconfig:"FCM_CREDENTIALS_JSON" default:""`
 }
 
 // DSN returns the PostgreSQL key=value connection string (for pgxpool).
