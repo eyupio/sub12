@@ -77,6 +77,16 @@ func (h *ImageHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", img.SizeBytes))
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Images are public and unauthenticated, so allow any origin to read them
+	// with a CORS-enabled (`crossOrigin`) request. This is required by the
+	// native app, whose local WebView origin never matches the configured
+	// CORS_ORIGIN, so the measurement canvas can load the target un-tainted
+	// (auto-detect's getImageData and the annotated export's toBlob both need
+	// an un-tainted canvas). Override the global middleware's single-origin
+	// header; drop Allow-Credentials since `*` is invalid for credentialed
+	// requests (the image load is anonymous, so none are sent anyway).
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Del("Access-Control-Allow-Credentials")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(img.Data); err != nil {
 		// Headers are already on the wire; we can't change the status, but a
