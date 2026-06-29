@@ -85,6 +85,10 @@ export default function ImageMeasurement({
   const [subMode, setSubMode] = useState<SubMode>('set_aim')
   const [rotation, setRotation] = useState<number>(0)
   const [imageLoaded, setImageLoaded] = useState(false)
+  // True when the image had to be loaded without CORS (cross-origin load was
+  // blocked). The canvas is then tainted, so pixel-reading features
+  // (auto-detect, annotated export) are disabled but the target still displays.
+  const [canvasTainted, setCanvasTainted] = useState(false)
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 })
 
   // Step 1
@@ -127,12 +131,34 @@ export default function ImageMeasurement({
   const distanceLabel = distanceUnit === 'yards' ? 'yd' : 'm'
   const pelletDiameterMM = CALIBER_MAP[markerSize] ?? (Number(markerSize) || 4.5)
 
-  // Load image
+  // Load image. Request it with CORS first so the canvas stays un-tainted
+  // (required for auto-detect's getImageData and the annotated export's
+  // toBlob). On native the SPA runs from a local WebView origin while the
+  // image is served cross-origin from sub12.io; if that CORS load is blocked
+  // we retry without CORS so the target still displays — the canvas becomes
+  // tainted, so the pixel-reading features degrade gracefully.
   useEffect(() => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => { imgRef.current = img; setImageLoaded(true) }
-    img.src = imageUrl
+    let cancelled = false
+    setImageLoaded(false)
+    setCanvasTainted(false)
+    const load = (useCors: boolean) => {
+      const img = new Image()
+      if (useCors) img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (cancelled) return
+        imgRef.current = img
+        setCanvasTainted(!useCors)
+        setImageLoaded(true)
+      }
+      img.onerror = () => {
+        if (cancelled) return
+        if (useCors) load(false)
+        else toast('Could not load the target image', 'error')
+      }
+      img.src = imageUrl
+    }
+    load(true)
+    return () => { cancelled = true }
   }, [imageUrl])
 
   // Canvas resize
@@ -557,6 +583,10 @@ export default function ImageMeasurement({
   const handleAutoDetect = useCallback(() => {
     const img = imgRef.current
     if (!img || pixelsPerMM <= 0) return
+    if (canvasTainted) {
+      setDetectStatus('Auto-detect unavailable for this image — mark impacts manually')
+      return
+    }
     const tc = document.createElement('canvas')
     tc.width = img.width; tc.height = img.height
     const ctx = tc.getContext('2d')
@@ -570,11 +600,13 @@ export default function ImageMeasurement({
     } else {
       setDetectStatus('No holes detected — try marking manually')
     }
-  }, [pixelsPerMM, pelletDiameterMM])
+  }, [pixelsPerMM, pelletDiameterMM, canvasTainted])
 
   const generateAnnotatedBlob = useCallback((): Promise<Blob | null> => {
     const img = imgRef.current
-    if (!img) return Promise.resolve(null)
+    // A tainted canvas (image loaded without CORS) cannot be exported via
+    // toBlob; skip the annotated image rather than throwing.
+    if (!img || canvasTainted) return Promise.resolve(null)
     const tc = document.createElement('canvas')
     tc.width = img.width; tc.height = img.height
     const ctx = tc.getContext('2d')
@@ -589,7 +621,7 @@ export default function ImageMeasurement({
       ctx.beginPath(); ctx.moveTo(imp.x + d, imp.y - d); ctx.lineTo(imp.x - d, imp.y + d); ctx.stroke()
     }
     return new Promise(resolve => { tc.toBlob(b => resolve(b), 'image/png') })
-  }, [impacts, pixelsPerMM, pelletDiameterMM])
+  }, [impacts, pixelsPerMM, pelletDiameterMM, canvasTainted])
 
   const handleDone = useCallback(async () => {
     if (!pointA || pixelsPerMM <= 0) { onClose(); return }
