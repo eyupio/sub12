@@ -46,6 +46,8 @@ import { communityReviewApi } from '../api/communityReview'
 import { postApi } from '../api/posts'
 import { scoreCardApi, type ScoreCardSummary } from '../api/scoreCards'
 import { pelletTestApi, type PelletTestSessionSummary } from '../api/pelletTesting'
+import { HelpIcon } from '../components/Tooltip'
+import { pageHelp } from '../components/tooltips'
 import { UserAvatar } from '../components/UserAvatar'
 import { LikeButton } from '../components/LikeButton'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -263,7 +265,10 @@ function FeedHeader() {
   return (
     <header className="feed-header">
       <div>
-        <h1 className="t-page-title">Feed</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 className="t-page-title">Feed</h1>
+          <HelpIcon content={pageHelp.feed} />
+        </div>
       </div>
       <div className="feed-header-actions">
         <Link to="/notifications" className="feed-btn feed-btn-outline">

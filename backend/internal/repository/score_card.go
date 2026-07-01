@@ -20,8 +20,16 @@ func NewScoreCardRepository(db *pgxpool.Pool) *ScoreCardRepository {
 	return &ScoreCardRepository{db: db}
 }
 
-// Create inserts a new score card and returns it.
-func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error) {
+// ErrSubmissionLimitExceeded is returned when a round's max_submissions_per_round
+// cap is hit at the moment of insert/graduate, closing the race window between
+// the caller's earlier count check and the write.
+var ErrSubmissionLimitExceeded = errors.New("submission limit exceeded")
+
+// Create inserts a new score card and returns it. When maxSubmissions > 0 and
+// the card targets a league round, the count-check and insert are performed
+// atomically under a Postgres advisory transaction lock keyed on (round, user)
+// to prevent concurrent requests from both slipping past the cap.
+func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16, maxSubmissions int) (*model.ScoreCard, error) {
 	var card model.ScoreCard
 	var shotScores pgtype.FlatArray[int16]
 	var shotXs pgtype.FlatArray[bool]
@@ -42,28 +50,54 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		}
 	}
 
-	err := r.db.QueryRow(ctx, `
-		INSERT INTO score_cards (
+	insertCols := `
 			user_id, rifle_id, pellet_id,
 			shot_at, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
-			verification, league_round_id, club_id, location_id, visibility, event_participant_id
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::verification_status,$18,$19,$20,$21,$22)
-		RETURNING
+			verification, league_round_id, club_id, location_id, visibility, event_participant_id`
+	returningCols := `
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
 			shot_scores, shot_xs, total_score, x_count,
 			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
 			like_count, comment_count, is_draft, event_participant_id,
-			created_at, updated_at
-	`,
+			created_at, updated_at`
+
+	args := []any{
 		userID, input.RifleID, input.PelletID,
 		input.ShotAt, input.Location, input.LocationLat, input.LocationLng, input.WindMPH, input.TempCelsius, input.DistanceM, input.Discipline, input.Notes,
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount,
 		verification, input.LeagueRoundID, input.ClubID, input.LocationID, visibility, input.EventParticipantID,
-	).Scan(
+	}
+
+	var query string
+	gated := maxSubmissions > 0 && input.LeagueRoundID != nil && *input.LeagueRoundID != ""
+	if gated {
+		// Acquire a transaction-scoped advisory lock keyed on (round, user) before
+		// counting existing submissions, so a concurrent request for the same
+		// round/user can't read the same pre-insert count.
+		query = `
+			WITH lock AS (
+				SELECT pg_advisory_xact_lock(hashtext($18::text), hashtext($1::text))
+			),
+			cnt AS (
+				SELECT count(*) AS n FROM score_cards, lock
+				WHERE league_round_id = $18 AND user_id = $1 AND is_draft = false
+			)
+			INSERT INTO score_cards (` + insertCols + `)
+			SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::verification_status,$18,$19,$20,$21,$22
+			FROM cnt WHERE cnt.n < $23
+			RETURNING ` + returningCols
+		args = append(args, maxSubmissions)
+	} else {
+		query = `INSERT INTO score_cards (` + insertCols + `)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::verification_status,$18,$19,$20,$21,$22)
+			RETURNING ` + returningCols
+	}
+
+	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
@@ -72,6 +106,9 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 		&card.CreatedAt, &card.UpdatedAt,
 	)
 	if err != nil {
+		if gated && errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubmissionLimitExceeded
+		}
 		return nil, fmt.Errorf("create score card: %w", err)
 	}
 	card.ShotScores = []int16(shotScores)
@@ -141,28 +178,57 @@ func (r *ScoreCardRepository) CreateDraft(ctx context.Context, userID string, in
 // refine flow's final PATCH. Callers should first run Update to persist the
 // full shot grid; Graduate only flips the flag and re-evaluates verification
 // so league rounds move from pending to the appropriate state.
-func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (*model.ScoreCard, error) {
+//
+// When maxSubmissions > 0 and leagueRoundID is set, the peer-submission count
+// and the update are performed atomically under a Postgres advisory
+// transaction lock keyed on (round, user), closing the same TOCTOU race
+// guarded against in Create.
+func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string, leagueRoundID *string, maxSubmissions int) (*model.ScoreCard, error) {
 	var card model.ScoreCard
 	var shotScores pgtype.FlatArray[int16]
 	var shotXs pgtype.FlatArray[bool]
-	err := r.db.QueryRow(ctx, `
-		UPDATE score_cards SET
+
+	returningCols := `
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
+			like_count, comment_count, is_draft, event_participant_id,
+			created_at, updated_at`
+	setClause := `
 			is_draft     = FALSE,
 			verification = CASE
 				WHEN league_round_id IS NOT NULL OR event_participant_id IS NOT NULL
 					THEN 'pending'::verification_status
 				ELSE 'verified'::verification_status
 			END,
-			updated_at   = NOW()
-		WHERE id = $1 AND user_id = $2
-		RETURNING
-			id, user_id, rifle_id, pellet_id,
-			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
-			shot_scores, shot_xs, total_score, x_count,
-			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
-			like_count, comment_count, is_draft, event_participant_id,
-			created_at, updated_at
-	`, id, userID).Scan(
+			updated_at   = NOW()`
+
+	gated := maxSubmissions > 0 && leagueRoundID != nil && *leagueRoundID != ""
+	var query string
+	args := []any{id, userID}
+	if gated {
+		// Excludes this card itself; only peer submissions count toward the cap.
+		query = `
+			WITH lock AS (
+				SELECT pg_advisory_xact_lock(hashtext($3::text), hashtext($2::text))
+			),
+			cnt AS (
+				SELECT count(*) AS n FROM score_cards, lock
+				WHERE league_round_id = $3 AND user_id = $2 AND is_draft = false AND id != $1
+			)
+			UPDATE score_cards SET` + setClause + `
+			FROM cnt
+			WHERE score_cards.id = $1 AND score_cards.user_id = $2 AND cnt.n < $4
+			RETURNING ` + returningCols
+		args = append(args, *leagueRoundID, maxSubmissions)
+	} else {
+		query = `UPDATE score_cards SET` + setClause + `
+			WHERE id = $1 AND user_id = $2
+			RETURNING ` + returningCols
+	}
+
+	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
 		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
@@ -172,6 +238,9 @@ func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string) (
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			if gated {
+				return nil, ErrSubmissionLimitExceeded
+			}
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("graduate score card: %w", err)
@@ -575,14 +644,17 @@ func (r *ScoreCardRepository) Delete(ctx context.Context, id, userID string) err
 	return nil
 }
 
-// UpdateImageURL sets the card_image_url for a score card.
-func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, imageURL string) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE score_cards SET card_image_url = $1, updated_at = NOW() WHERE id = $2`,
-		imageURL, id,
+// UpdateImageURL sets the card_image_url for a score card owned by userID.
+func (r *ScoreCardRepository) UpdateImageURL(ctx context.Context, id, userID, imageURL string) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE score_cards SET card_image_url = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`,
+		imageURL, id, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("update card image url: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

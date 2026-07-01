@@ -563,6 +563,11 @@ export default function LeagueDetail() {
               {scoresData.items.map((s) => <ScoreRow key={s.id} score={s} />)}
             </div>
           )}
+          {scoresData && scoresData.items.length >= 50 && (
+            <p style={{ padding: '8px 4px', fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
+              Showing the latest 50 scores.
+            </p>
+          )}
         </Section>
 
         {/* Feed */}
