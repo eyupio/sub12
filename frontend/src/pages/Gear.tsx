@@ -298,7 +298,7 @@ function RifleRow({ rifle, stats }: { rifle: Rifle; stats?: RifleStats }) {
 
 function RiflesTab() {
   const [adding, setAdding] = useState(false)
-  const { data, isLoading } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
+  const { data, isLoading, isError } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
   const { data: rifleStatsData } = useQuery({ queryKey: ['rifle-stats'], queryFn: () => statsApi.getRifleStats() })
   const rifles = data?.items ?? []
   const rifleStatsMap = useMemo(() => {
@@ -316,10 +316,11 @@ function RiflesTab() {
       )}
       {adding && <AddRifleForm onDone={() => setAdding(false)} />}
       {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
+      {isError && <p className="text-[var(--error-text)] text-sm">Failed to load rifles. Please try again.</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {rifles.map(r => <RifleRow key={r.id} rifle={r} stats={rifleStatsMap.get(r.id)} />)}
       </div>
-      {!isLoading && rifles.length === 0 && !adding && (
+      {!isLoading && !isError && rifles.length === 0 && !adding && (
         <p className="text-muted text-sm">No rifles added yet.</p>
       )}
     </div>
@@ -577,7 +578,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
 
 function PelletsTab() {
   const [adding, setAdding] = useState(false)
-  const { data, isLoading } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
+  const { data, isLoading, isError } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
   const pellets = data?.items ?? []
 
   return (
@@ -589,8 +590,9 @@ function PelletsTab() {
       )}
       {adding && <AddPelletForm onDone={() => setAdding(false)} />}
       {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
+      {isError && <p className="text-[var(--error-text)] text-sm">Failed to load pellets. Please try again.</p>}
       {pellets.map(p => <PelletRow key={p.id} pellet={p} />)}
-      {!isLoading && pellets.length === 0 && !adding && (
+      {!isLoading && !isError && pellets.length === 0 && !adding && (
         <p className="text-muted text-sm">No pellets added yet.</p>
       )}
     </div>

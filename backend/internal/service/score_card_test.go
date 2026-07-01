@@ -34,7 +34,7 @@ type mockScoreCardRepo struct {
 	pelletLabel string
 }
 
-func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
+func (m *mockScoreCardRepo) Create(_ context.Context, _ string, _ *model.CreateScoreCardInput, total, xCount int16, _ int) (*model.ScoreCard, error) {
 	m.createCalled = true
 	m.lastTotal = total
 	m.lastXCount = xCount
@@ -44,7 +44,7 @@ func (m *mockScoreCardRepo) CreateDraft(_ context.Context, _ string, _ *model.Qu
 	m.createDraftCalled = true
 	return &model.ScoreCard{ID: "draft-id", IsDraft: true, Verification: "pending"}, nil
 }
-func (m *mockScoreCardRepo) Graduate(_ context.Context, _, _ string) (*model.ScoreCard, error) {
+func (m *mockScoreCardRepo) Graduate(_ context.Context, _, _ string, _ *string, _ int) (*model.ScoreCard, error) {
 	m.graduateCalled = true
 	if m.card != nil {
 		m.card.IsDraft = false
@@ -68,7 +68,7 @@ func (m *mockScoreCardRepo) ListByUser(_ context.Context, _ string, _, _ int, _ 
 	return nil, nil
 }
 func (m *mockScoreCardRepo) GetDraftCount(_ context.Context, _ string) (int, error) { return 0, nil }
-func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _ string) error    { return nil }
+func (m *mockScoreCardRepo) UpdateImageURL(_ context.Context, _, _, _ string) error { return nil }
 func (m *mockScoreCardRepo) UpdateImageRotation(_ context.Context, _, _ string, rotation int16) (*model.ScoreCard, error) {
 	m.updateRotationCalled = true
 	m.lastRotation = rotation

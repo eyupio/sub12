@@ -26,7 +26,7 @@ type ModerationScope struct {
 
 type CommentService struct {
 	comments        *repository.CommentRepository
-	scoreCards      *repository.ScoreCardRepository
+	scoreCards      *ScoreCardService
 	posts           *repository.PostRepository
 	postSvc         *PostService
 	blocks          *repository.BlockRepository
@@ -39,7 +39,7 @@ type CommentService struct {
 
 func NewCommentService(
 	comments *repository.CommentRepository,
-	scoreCards *repository.ScoreCardRepository,
+	scoreCards *ScoreCardService,
 	posts *repository.PostRepository,
 	postSvc *PostService,
 	blocks *repository.BlockRepository,
@@ -84,12 +84,12 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 	// Validate target and check permissions based on target type
 	switch targetType {
 	case "score_card":
-		card, err := s.scoreCards.GetPublicByID(ctx, targetID)
+		card, err := s.scoreCards.GetForViewer(ctx, targetID, userID)
 		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrCommentDenied
+			}
 			return nil, err
-		}
-		if card.Visibility == "private" && card.UserID != userID {
-			return nil, ErrCommentDenied
 		}
 		if card.UserID != userID {
 			blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
@@ -178,12 +178,9 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType, viewerID string) ([]*model.Comment, error) {
 	switch targetType {
 	case "score_card":
-		card, err := s.scoreCards.GetPublicByID(ctx, targetID)
+		card, err := s.scoreCards.GetForViewer(ctx, targetID, viewerID)
 		if err != nil {
 			return nil, err
-		}
-		if card.Visibility == "private" && card.UserID != viewerID {
-			return nil, repository.ErrNotFound
 		}
 		if viewerID != "" && viewerID != card.UserID {
 			blocked, err := s.blocks.IsBlocked(ctx, viewerID, card.UserID)

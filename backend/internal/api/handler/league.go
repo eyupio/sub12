@@ -887,14 +887,28 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/score-cards/{id}/audit-trail
 func (h *LeagueHandler) GetScoreAuditTrail(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	scoreCardID := chi.URLParam(r, "id")
 	if !isUUID(scoreCardID) {
 		writeInvalidUUIDError(w, "score card id")
 		return
 	}
 
-	confs, actions, err := h.svc.GetScoreAuditTrail(r.Context(), scoreCardID)
+	confs, actions, err := h.svc.GetScoreAuditTrail(r.Context(), scoreCardID, userID)
 	if err != nil {
+		if errors.Is(err, service.ErrNotMember) {
+			writeError(w, http.StatusForbidden, "not a league member")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to get audit trail")
 		return
 	}

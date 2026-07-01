@@ -683,7 +683,22 @@ func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID st
 	return s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
 }
 
-func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID string) ([]*model.ScoreConfirmation, []*model.ScoreCardAction, error) {
+func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID, userID string) ([]*model.ScoreConfirmation, []*model.ScoreCardAction, error) {
+	league, err := s.leagues.GetLeagueByScoreCardID(ctx, scoreCardID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrLeagueNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	isMember, err := s.leagues.IsMember(ctx, league.ID, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !isMember {
+		return nil, nil, ErrNotMember
+	}
+
 	confs, err := s.leagues.ListConfirmations(ctx, scoreCardID)
 	if err != nil {
 		return nil, nil, err

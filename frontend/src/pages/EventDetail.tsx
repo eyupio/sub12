@@ -8,6 +8,7 @@ import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { Badge, EntityDetailHeader, PageGrid, Section } from '../components/leagues'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DisciplineThumb } from '../components/leagues/structure'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -34,6 +35,7 @@ export default function EventDetail() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [showAddGuest, setShowAddGuest] = useState(false)
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false)
 
   const eventQuery = useQuery({ queryKey: ['event', slug], queryFn: () => eventsApi.get(slug) })
   const partsQuery = useQuery({
@@ -109,7 +111,8 @@ export default function EventDetail() {
   if (eventQuery.isLoading) {
     return (
       <PageGrid>
-        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+        <div style={{ height: 96, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', marginBottom: 12 }} />
+        <div style={{ height: 200, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }} />
       </PageGrid>
     )
   }
@@ -214,15 +217,7 @@ export default function EventDetail() {
           {ev.is_owner && ev.state === 'complete' && (
             <button
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Reopen this event? Scoring will be re-enabled and you can edit shots. The public results post stays in place.',
-                  )
-                ) {
-                  promote.mutate('live')
-                }
-              }}
+              onClick={() => setShowReopenConfirm(true)}
               disabled={promote.isPending}
               className="lc-action-ghost"
             >
@@ -230,6 +225,18 @@ export default function EventDetail() {
             </button>
           )}
         </div>
+
+        <ConfirmDialog
+          open={showReopenConfirm}
+          title="Reopen this event?"
+          message="Scoring will be re-enabled and you can edit shots. The public results post stays in place."
+          confirmLabel="Reopen"
+          onConfirm={() => {
+            setShowReopenConfirm(false)
+            promote.mutate('live')
+          }}
+          onCancel={() => setShowReopenConfirm(false)}
+        />
 
         {ev.state === 'complete' && podium.winner && <PodiumSection podium={podium} />}
         {ev.state === 'complete' && (scoreboardQuery.data?.items?.length ?? 0) > 0 && (
@@ -712,6 +719,8 @@ function CardSubmissionSection({
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   const startCard = useMutation({
     mutationFn: (participantId: string) =>
@@ -742,6 +751,8 @@ function CardSubmissionSection({
       queryClient.invalidateQueries({ queryKey: ['event-cards', slug] })
       queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
       toast('Card rejected', 'success')
+      setRejectingId(null)
+      setRejectReason('')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to reject', 'error'),
   })
@@ -749,7 +760,11 @@ function CardSubmissionSection({
   return (
     <Section title="Cards">
       {cardsLoading && (
-        <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>Loading cards…</p>
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="h-12 rounded bg-surface animate-pulse" />
+          <div className="h-12 rounded bg-surface animate-pulse" />
+          <div className="h-12 rounded bg-surface animate-pulse" />
+        </div>
       )}
       {!cardsLoading && cards.length === 0 && (
         <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>
@@ -836,8 +851,8 @@ function CardSubmissionSection({
                   <button
                     type="button"
                     onClick={() => {
-                      const reason = window.prompt('Reason for rejecting this card?')
-                      if (reason && c.card_id) reject.mutate({ cardId: c.card_id, reason })
+                      setRejectingId(c.participant_id)
+                      setRejectReason('')
                     }}
                     className="lc-action-ghost"
                     style={{ color: 'var(--red)' }}
@@ -846,6 +861,35 @@ function CardSubmissionSection({
                   </button>
                 )}
               </div>
+              {rejectingId === c.participant_id && (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  <textarea
+                    placeholder="Reason for rejection (required)"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={2}
+                    className="w-full rounded border border-subtle bg-surface p-2 text-sm resize-none"
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => c.card_id && reject.mutate({ cardId: c.card_id, reason: rejectReason })}
+                      disabled={reject.isPending || !rejectReason.trim()}
+                      className="lc-action-ghost"
+                      style={{ color: 'var(--red)' }}
+                    >
+                      {reject.isPending ? 'Rejecting…' : 'Submit rejection'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectingId(null)}
+                      className="lc-action-ghost"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
           )
         })}

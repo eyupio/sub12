@@ -20,14 +20,14 @@ var (
 
 // ScoreCardRepo is implemented by repository.ScoreCardRepository.
 type ScoreCardRepo interface {
-	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
+	Create(ctx context.Context, userID string, input *model.CreateScoreCardInput, totalScore, xCount int16, maxSubmissions int) (*model.ScoreCard, error)
 	CreateDraft(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error)
-	Graduate(ctx context.Context, id, userID string) (*model.ScoreCard, error)
+	Graduate(ctx context.Context, id, userID string, leagueRoundID *string, maxSubmissions int) (*model.ScoreCard, error)
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
 	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
 	ListByUser(ctx context.Context, userID string, limit, offset int, scope string, leagueID string) ([]*model.ScoreCardSummary, error)
 	GetDraftCount(ctx context.Context, userID string) (int, error)
-	UpdateImageURL(ctx context.Context, id, imageURL string) error
+	UpdateImageURL(ctx context.Context, id, userID, imageURL string) error
 	UpdateImageRotation(ctx context.Context, id, userID string, rotation int16) (*model.ScoreCard, error)
 	Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error)
 	Delete(ctx context.Context, id, userID string) error
@@ -202,6 +202,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 	}
 
 	// Enforce max_submissions_per_round when submitting to a league round
+	var maxSubmissions int
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" && s.leagueRepo != nil {
 		// Verify the user is a member of this league
 		lid, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *input.LeagueRoundID)
@@ -221,6 +222,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			return nil, fmt.Errorf("check league config: %w", err)
 		}
 		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
+			// Fast-fail on the common (non-racing) case; the repository enforces
+			// the cap atomically as well, so a concurrent request racing this
+			// check still can't slip past the limit.
 			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *input.LeagueRoundID)
 			if err != nil {
 				return nil, fmt.Errorf("count submissions: %w", err)
@@ -228,6 +232,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			if count >= int(cfg.MaxSubmissionsPerRound) {
 				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
 			}
+			maxSubmissions = int(cfg.MaxSubmissionsPerRound)
 		}
 
 		// Auto-populate club_id from the league if not explicitly provided
@@ -238,8 +243,11 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		}
 	}
 
-	card, err := s.cards.Create(ctx, userID, input, totalScore, xCount)
+	card, err := s.cards.Create(ctx, userID, input, totalScore, xCount, maxSubmissions)
 	if err != nil {
+		if errors.Is(err, repository.ErrSubmissionLimitExceeded) {
+			return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, maxSubmissions)
+		}
 		return nil, err
 	}
 
@@ -464,12 +472,16 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 	}
 
 	// Enforce league rules at graduation (not at quick-capture).
+	var maxSubmissions int
 	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil {
 		cfg, cfgErr := s.leagueRepo.GetConfigByRoundID(ctx, *card.LeagueRoundID)
 		if cfgErr != nil && !errors.Is(cfgErr, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", cfgErr)
 		}
 		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
+			// Fast-fail on the common (non-racing) case; the repository enforces
+			// the cap atomically as well, so a concurrent request racing this
+			// check still can't slip past the limit.
 			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *card.LeagueRoundID)
 			if err != nil {
 				return nil, fmt.Errorf("count submissions: %w", err)
@@ -478,6 +490,7 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 			if count-1 >= int(cfg.MaxSubmissionsPerRound) {
 				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
 			}
+			maxSubmissions = int(cfg.MaxSubmissionsPerRound)
 		}
 	}
 
@@ -497,8 +510,11 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		eventForCard = ev
 	}
 
-	updated, err := s.cards.Graduate(ctx, id, userID)
+	updated, err := s.cards.Graduate(ctx, id, userID, card.LeagueRoundID, maxSubmissions)
 	if err != nil {
+		if errors.Is(err, repository.ErrSubmissionLimitExceeded) {
+			return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, maxSubmissions)
+		}
 		return nil, err
 	}
 
@@ -654,7 +670,7 @@ func (s *ScoreCardService) UpdateImageURL(ctx context.Context, id, userID, image
 	if err != nil {
 		return err
 	}
-	return s.cards.UpdateImageURL(ctx, id, imageURL)
+	return s.cards.UpdateImageURL(ctx, id, userID, imageURL)
 }
 
 // SubmitToLeague links an already-graduated score card to a league round.

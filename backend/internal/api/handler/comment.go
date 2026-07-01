@@ -70,6 +70,10 @@ func (h *CommentHandler) ListReplies(w http.ResponseWriter, r *http.Request) {
 
 	replies, err := h.svc.ListReplies(r.Context(), commentID, viewerID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "comment not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list replies")
 		return
 	}
