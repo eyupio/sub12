@@ -138,8 +138,13 @@ func (h *FeatureRequestHandler) AdminUpdate(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *FeatureRequestHandler) AdminDelete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	id := chi.URLParam(r, "id")
-	if err := h.svc.AdminDelete(r.Context(), id); err != nil {
+	if err := h.svc.AdminDelete(r.Context(), id, userID); err != nil {
 		h.writeError(w, err)
 		return
 	}

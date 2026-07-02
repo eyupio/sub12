@@ -233,7 +233,18 @@ func (s *SupportTicketService) Delete(ctx context.Context, id, actorID string) e
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *SupportTicketService) AdminDelete(ctx context.Context, id string) error {
+func (s *SupportTicketService) AdminDelete(ctx context.Context, id, actorID string) error {
+	ticket, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	isAdmin, err := s.isAdminForTicket(ctx, ticket, actorID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrNotAdmin
+	}
 	return s.repo.Delete(ctx, id)
 }
 

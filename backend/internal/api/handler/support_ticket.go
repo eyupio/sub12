@@ -234,8 +234,17 @@ func (h *SupportTicketHandler) AdminGet(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *SupportTicketHandler) AdminDelete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	id := chi.URLParam(r, "id")
-	if err := h.svc.AdminDelete(r.Context(), id); err != nil {
+	if err := h.svc.AdminDelete(r.Context(), id, userID); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
 		if errors.Is(err, repository.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "support ticket not found")
 			return

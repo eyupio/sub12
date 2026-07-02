@@ -200,7 +200,18 @@ func (s *FeatureRequestService) Vote(ctx context.Context, id, voterID string, up
 	return s.repo.GetByID(ctx, id, voterID)
 }
 
-func (s *FeatureRequestService) AdminDelete(ctx context.Context, id string) error {
+func (s *FeatureRequestService) AdminDelete(ctx context.Context, id, actorID string) error {
+	current, err := s.repo.GetByID(ctx, id, actorID)
+	if err != nil {
+		return err
+	}
+	isAdmin, err := s.isAdminForScope(ctx, current.ScopeType, current.ScopeID, actorID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrNotAdmin
+	}
 	return s.repo.Delete(ctx, id)
 }
 
