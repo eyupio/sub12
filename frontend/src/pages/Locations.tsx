@@ -13,6 +13,7 @@ import { TARGET_PRESETS, CUSTOM_PRESET_ID, getPresetById } from '../config/targe
 import { toast } from '../store/toast'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { MapLocationPicker, type PickedLocation } from '../components/MapLocationPicker'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const EMPTY_FORM: CreateLocationInput = {
   name: '',
@@ -54,6 +55,7 @@ export default function Locations() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingImage, setPendingImage] = useState<File | null>(null)
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Location | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const openCreate = () => {
@@ -134,13 +136,15 @@ export default function Locations() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this location?')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteMutation.mutateAsync(id)
+      await deleteMutation.mutateAsync(deleteTarget.id)
       toast('Location deleted', 'success')
     } catch {
       toast('Failed to delete location', 'error')
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -228,7 +232,7 @@ export default function Locations() {
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDelete(loc.id)}
+                    onClick={() => setDeleteTarget(loc)}
                     className="p-1.5 text-muted hover:text-[var(--red)] transition-colors"
                     aria-label="Delete location"
                   >
@@ -473,6 +477,14 @@ export default function Locations() {
         initialLng={form.lng}
         onPick={handlePicked}
         onCancel={() => setPickerOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete ${deleteTarget?.name ?? 'this location'}?`}
+        message="This location will be permanently removed. This cannot be undone."
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   )
