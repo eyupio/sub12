@@ -621,3 +621,42 @@ func TestSubmitToLeague_MemberWithImageSucceeds(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, repo.submitToLeagueCalled)
 }
+
+// mockUserReader implements UserProfileReader for GetForViewer privacy tests.
+type mockUserReader struct{ profileVisibility string }
+
+func (m *mockUserReader) GetByID(_ context.Context, _ string) (*model.User, error) {
+	return &model.User{ProfileVisibility: m.profileVisibility}, nil
+}
+
+// GetForViewer is the authorization gate comments and shares route through to
+// stop strangers reading non-public cards (see the audit fix that closed the
+// followers-visibility leak). These pin down every branch of that gate.
+func TestGetForViewer_NonOwnerAccess(t *testing.T) {
+	tests := []struct {
+		name       string
+		card       *model.ScoreCard
+		viewerID   string
+		users      UserProfileReader
+		wantDenied bool
+	}{
+		{"owner sees own private draft", &model.ScoreCard{UserID: "owner", IsDraft: true, Visibility: "private"}, "owner", nil, false},
+		{"stranger denied on private card", &model.ScoreCard{UserID: "owner", Visibility: "private"}, "stranger", nil, true},
+		{"stranger denied on followers-only card", &model.ScoreCard{UserID: "owner", Visibility: "followers"}, "stranger", nil, true},
+		{"stranger denied on public draft", &model.ScoreCard{UserID: "owner", IsDraft: true, Visibility: "public"}, "stranger", nil, true},
+		{"anonymous denied on private card", &model.ScoreCard{UserID: "owner", Visibility: "private"}, "", nil, true},
+		{"stranger allowed on public card, public profile", &model.ScoreCard{UserID: "owner", Visibility: "public"}, "stranger", &mockUserReader{profileVisibility: "public"}, false},
+		{"stranger denied on public card, private profile", &model.ScoreCard{UserID: "owner", Visibility: "public"}, "stranger", &mockUserReader{profileVisibility: "private"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &ScoreCardService{cards: &mockScoreCardRepo{card: tt.card}, users: tt.users}
+			_, err := svc.GetForViewer(context.Background(), "card-1", tt.viewerID)
+			if tt.wantDenied {
+				assert.ErrorIs(t, err, repository.ErrNotFound)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

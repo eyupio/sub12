@@ -1,5 +1,34 @@
 # Testsmith Journal — sub12
 
+## 2026-07-03 - Security-fix commits landing without a test for the new gate
+
+**Learning:** The `538c65b` audit-fix commit closed a real bug (`GetPublicByID` let
+strangers read/comment on `followers`-visibility score cards by routing comment
+create/list through the new `GetForViewer` gate) but shipped with zero new test
+covering that gate. `score_card_test.go` only exercised `GetForViewer` indirectly via
+`GetForViewerWithAuthor`, and always as the card's owner — the non-owner/visibility/
+private-profile branches that are the entire point of the fix were never asserted.
+The same commit also added an authorization check to `GetScoreAuditTrail`, which is
+unit-untestable as written (`LeagueService.leagues` is a concrete `*repository.LeagueRepository`,
+not an interface), so it has no fast test either — only a live-DB integration test could
+reach it, and none exists.
+
+**Risk:** This is the second and third instance of the same pattern this project has
+hit (see the 2026-06-19 and 2026-05-27 entries): a security fix pins the behavior in
+prose (the commit message) but not in code. A later refactor of `GetForViewer` — e.g.
+collapsing the draft/visibility/profile checks — would regress silently, and CI would
+stay green.
+
+**Action:** Added `TestGetForViewer_NonOwnerAccess` (table-driven, 7 cases covering
+owner/stranger/anonymous × private/followers/draft/public × public/private profile) to
+`score_card_test.go`. Separately: `LeagueService` and `CommentService` hold concrete
+repository types instead of interfaces, unlike `ScoreCardService`. That makes their
+authorization logic (`GetScoreAuditTrail` membership check, `CommentService.Create`
+block/visibility checks) unreachable by fast unit tests. Worth flagging if either
+service is touched again — extracting a narrow interface for the specific methods used,
+following the `ScoreCardRepo`/`LeagueConfigRepo` pattern already in `score_card.go`,
+would make the next security fix in those services testable without a live DB.
+
 ## 2026-05-27 - Reset link security contract untested
 
 **Learning:** `AuthService.buildResetLink` has a security-critical design decision (token
