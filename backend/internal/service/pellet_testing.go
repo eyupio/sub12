@@ -580,16 +580,15 @@ func (s *PelletTestService) computeAutoGroupSize(ctx context.Context, sessionID,
 
 	avgConf := totalConf / float64(len(detections))
 
-	// We need pixelsPerMM — get it from the measurement details not readily available here
-	// The detections already have diameter_mm set from client, so we can trust those.
-	// For group size, use detections[0].DiameterMM to estimate scale, or just store pixel distance.
-	// Actually, the client sends diameter_mm which was computed using pixelsPerMM.
-	// Let's compute from the first detection's radius and diameter_mm to get scale.
+	// pixelsPerMM isn't passed into this method, but every detection's DiameterMM
+	// was already derived client-side from the calibrated scale, so we back out
+	// the same scale from the first detection's radius/diameter ratio and use it
+	// to convert the pixel-space max spread into a CTC (center-to-center) group
+	// size in mm — spread plus one pellet diameter, since CTC measures rim-to-rim
+	// across the two outermost holes.
 	if detections[0].DiameterMM != nil && detections[0].RadiusPixels > 0 {
-		ppm := (detections[0].RadiusPixels * 2) / *detections[0].DiameterMM
-		groupMM := maxDist / ppm
-		// Add pellet diameter to get CTC measurement
-		groupMM += *detections[0].DiameterMM
+		pixelsPerMM := (detections[0].RadiusPixels * 2) / *detections[0].DiameterMM
+		groupMM := maxDist/pixelsPerMM + *detections[0].DiameterMM
 		groupMOA := calcMOA(groupMM, session.DistanceM)
 		return &groupMM, &groupMOA, &avgConf
 	}
