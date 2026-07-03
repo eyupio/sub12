@@ -173,11 +173,22 @@ func (r *PostRepository) list(ctx context.Context, where string, arg any, limit,
 		return nil, fmt.Errorf("list posts rows: %w", err)
 	}
 
-	// Load attachments for each post
-	for _, p := range posts {
-		p.Attachments, err = r.listAttachments(ctx, p.ID)
+	// Batch-load attachments for all posts in one query instead of one query per
+	// post (N+1) — this runs on every feed page render.
+	if len(posts) > 0 {
+		postIDs := make([]string, len(posts))
+		for i, p := range posts {
+			postIDs[i] = p.ID
+		}
+		attachmentsByPost, err := r.listAttachmentsForPosts(ctx, postIDs)
 		if err != nil {
 			return nil, err
+		}
+		for _, p := range posts {
+			p.Attachments = attachmentsByPost[p.ID]
+			if p.Attachments == nil {
+				p.Attachments = []model.PostAttachment{}
+			}
 		}
 	}
 
@@ -346,4 +357,33 @@ func (r *PostRepository) listAttachments(ctx context.Context, postID string) ([]
 		attachments = []model.PostAttachment{}
 	}
 	return attachments, nil
+}
+
+// listAttachmentsForPosts loads attachments for many posts in a single query,
+// grouped by post_id.
+func (r *PostRepository) listAttachmentsForPosts(ctx context.Context, postIDs []string) (map[string][]model.PostAttachment, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT post_id, id, type::text, target_id, image_url, sort_order
+		FROM post_attachments
+		WHERE post_id = ANY($1)
+		ORDER BY post_id, sort_order ASC
+	`, postIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list attachments for posts: %w", err)
+	}
+	defer rows.Close()
+
+	byPost := make(map[string][]model.PostAttachment, len(postIDs))
+	for rows.Next() {
+		var postID string
+		var a model.PostAttachment
+		if err := rows.Scan(&postID, &a.ID, &a.Type, &a.TargetID, &a.ImageURL, &a.SortOrder); err != nil {
+			return nil, fmt.Errorf("scan attachment: %w", err)
+		}
+		byPost[postID] = append(byPost[postID], a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list attachments for posts rows: %w", err)
+	}
+	return byPost, nil
 }
