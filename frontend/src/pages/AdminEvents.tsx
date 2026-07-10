@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, ChevronRight, Plus, Save, Tags, Trash2, Users } from 'lucide-react'
 import { adminEventsApi, type AdminEventDTO } from '../api/adminEvents'
 import { categoriesApi, type Category } from '../api/categories'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { Badge, PageGrid, PageHeader, Section, Tabs } from '../components/leagues'
@@ -86,6 +87,7 @@ function EventsList({
   query: ReturnType<typeof useQuery<{ items: AdminEventDTO[] }, Error>>
 }) {
   const queryClient = useQueryClient()
+  const [deleteTarget, setDeleteTarget] = useState<AdminEventDTO | null>(null)
   const remove = useMutation({
     mutationFn: (id: string) => adminEventsApi.delete(id),
     onSuccess: () => {
@@ -93,6 +95,7 @@ function EventsList({
       toast('Event deleted', 'info')
     },
     onError: (err) => toast(parseError(err), 'error'),
+    onSettled: () => setDeleteTarget(null),
   })
 
   if (query.isLoading) {
@@ -114,6 +117,7 @@ function EventsList({
   }
 
   return (
+    <>
     <ul style={{ display: 'flex', flexDirection: 'column' }}>
       {items.map((ev, i) => (
         <li
@@ -152,11 +156,7 @@ function EventsList({
           <button
             type="button"
             aria-label="Delete event"
-            onClick={() => {
-              if (confirm(`Delete event "${ev.name}"? This cannot be undone.`)) {
-                remove.mutate(ev.id)
-              }
-            }}
+            onClick={() => setDeleteTarget(ev)}
             disabled={remove.isPending}
             className="lc-icon-btn"
             style={{ color: 'var(--red)' }}
@@ -169,6 +169,14 @@ function EventsList({
         </li>
       ))}
     </ul>
+    <ConfirmDialog
+      open={!!deleteTarget}
+      title={`Delete event "${deleteTarget?.name ?? ''}"?`}
+      message="This cannot be undone."
+      onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      onCancel={() => setDeleteTarget(null)}
+    />
+    </>
   )
 }
 
@@ -201,6 +209,7 @@ function CategoriesPanel({
     onError: (err) => toast(parseError(err), 'error'),
   })
 
+  const [removeTarget, setRemoveTarget] = useState<Category | null>(null)
   const remove = useMutation({
     mutationFn: (id: string) => categoriesApi.adminDelete(id),
     onSuccess: () => {
@@ -209,6 +218,7 @@ function CategoriesPanel({
       toast('Category removed', 'info')
     },
     onError: (err) => toast(parseError(err), 'error'),
+    onSettled: () => setRemoveTarget(null),
   })
 
   if (query.isLoading) {
@@ -242,9 +252,7 @@ function CategoriesPanel({
             cat={c}
             isFirst={i === 0}
             onSave={(body) => update.mutate({ id: c.id, body })}
-            onRemove={() => {
-              if (confirm(`Remove category "${c.label}"?`)) remove.mutate(c.id)
-            }}
+            onRemove={() => setRemoveTarget(c)}
             pending={update.isPending || remove.isPending}
           />
         ))}
@@ -255,6 +263,13 @@ function CategoriesPanel({
           </li>
         )}
       </ul>
+      <ConfirmDialog
+        open={!!removeTarget}
+        title={`Remove category "${removeTarget?.label ?? ''}"?`}
+        message="This cannot be undone."
+        onConfirm={() => removeTarget && remove.mutate(removeTarget.id)}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   )
 }
