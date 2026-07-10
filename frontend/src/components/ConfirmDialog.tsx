@@ -6,11 +6,12 @@ interface ConfirmDialogProps {
   title: string
   message: string
   confirmLabel?: string
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', confirmDisabled = false, onConfirm, onCancel }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -82,7 +83,8 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', o
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            disabled={confirmDisabled}
+            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             {confirmLabel}
           </button>
