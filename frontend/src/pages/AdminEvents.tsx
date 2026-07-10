@@ -173,7 +173,8 @@ function EventsList({
       open={!!deleteTarget}
       title={`Delete event "${deleteTarget?.name ?? ''}"?`}
       message="This cannot be undone."
-      onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      confirmDisabled={remove.isPending}
+      onConfirm={() => deleteTarget && !remove.isPending && remove.mutate(deleteTarget.id)}
       onCancel={() => setDeleteTarget(null)}
     />
     </>
@@ -267,7 +268,8 @@ function CategoriesPanel({
         open={!!removeTarget}
         title={`Remove category "${removeTarget?.label ?? ''}"?`}
         message="This cannot be undone."
-        onConfirm={() => removeTarget && remove.mutate(removeTarget.id)}
+        confirmDisabled={remove.isPending}
+        onConfirm={() => removeTarget && !remove.isPending && remove.mutate(removeTarget.id)}
         onCancel={() => setRemoveTarget(null)}
       />
     </div>
