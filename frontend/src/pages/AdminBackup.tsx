@@ -7,6 +7,7 @@ import {
   UpdateBackupSettingsInput,
 } from '../api/adminBackup'
 import { useAuthStore } from '../store/auth'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -91,6 +92,11 @@ function formatDate(s?: string): string {
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+type ConfirmAction =
+  | { type: 'restore'; run: BackupRun }
+  | { type: 'delete'; run: BackupRun }
+  | { type: 'upload-restore'; file: File }
+
 export default function AdminBackup() {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(blankForm)
@@ -102,6 +108,7 @@ export default function AdminBackup() {
   const [hasAccessKey, setHasAccessKey] = useState(false)
   const [hasSecretKey, setHasSecretKey] = useState(false)
   const [hasPassphrase, setHasPassphrase] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data, isLoading, error } = useQuery({
@@ -208,18 +215,21 @@ export default function AdminBackup() {
     mutationFn: (id: string) => adminBackupApi.deleteRun(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-backup-runs'] }),
     onError: (err) => setServerError(parseError(err)),
+    onSettled: () => setConfirmAction(null),
   })
 
   const restoreMutation = useMutation({
     mutationFn: (id: string) => adminBackupApi.restoreFromRun(id),
     onSuccess: () => setRunResult('Restore complete.'),
     onError: (err) => setServerError(parseError(err)),
+    onSettled: () => setConfirmAction(null),
   })
 
   const uploadRestoreMutation = useMutation({
     mutationFn: (file: File) => adminBackupApi.restoreUpload(file),
     onSuccess: () => setRunResult('Restore from upload complete.'),
     onError: (err) => setServerError(parseError(err)),
+    onSettled: () => setConfirmAction(null),
   })
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -251,21 +261,30 @@ export default function AdminBackup() {
   }
 
   function handleRestoreClick(run: BackupRun) {
-    if (!window.confirm(`Restore database from ${run.filename}?\n\nThis will OVERWRITE all current data.`)) return
-    restoreMutation.mutate(run.id)
+    setConfirmAction({ type: 'restore', run })
   }
 
   function handleDeleteClick(run: BackupRun) {
-    if (!window.confirm(`Delete backup ${run.filename}? This removes the file from disk and S3.`)) return
-    deleteMutation.mutate(run.id)
+    setConfirmAction({ type: 'delete', run })
   }
 
   function handleUploadRestore() {
     const f = fileInputRef.current?.files?.[0]
     if (!f) return
-    if (!window.confirm(`Restore database from uploaded file ${f.name}?\n\nThis will OVERWRITE all current data.`)) return
-    uploadRestoreMutation.mutate(f)
+    setConfirmAction({ type: 'upload-restore', file: f })
   }
+
+  function handleConfirm() {
+    if (!confirmAction) return
+    if (confirmAction.type === 'restore') restoreMutation.mutate(confirmAction.run.id)
+    else if (confirmAction.type === 'delete') deleteMutation.mutate(confirmAction.run.id)
+    else uploadRestoreMutation.mutate(confirmAction.file)
+  }
+
+  const confirmPending =
+    confirmAction?.type === 'restore' ? restoreMutation.isPending :
+    confirmAction?.type === 'delete' ? deleteMutation.isPending :
+    confirmAction?.type === 'upload-restore' ? uploadRestoreMutation.isPending : false
 
   if (isLoading) return <div className="p-6 text-sm text-muted">Loading backup settings…</div>
   if (error) return <div className="p-6 text-sm text-[var(--error-text)]">{parseError(error)}</div>
@@ -512,6 +531,24 @@ export default function AdminBackup() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={
+          confirmAction?.type === 'restore' ? `Restore from "${confirmAction.run.filename}"?` :
+          confirmAction?.type === 'delete' ? `Delete backup "${confirmAction.run.filename}"?` :
+          confirmAction?.type === 'upload-restore' ? `Restore from uploaded file "${confirmAction.file.name}"?` : ''
+        }
+        message={
+          confirmAction?.type === 'delete'
+            ? 'This removes the file from disk and S3.'
+            : 'This will OVERWRITE all current data.'
+        }
+        confirmLabel={confirmAction?.type === 'delete' ? 'Delete' : 'Restore'}
+        confirmDisabled={confirmPending}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   )
 }
