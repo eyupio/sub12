@@ -75,3 +75,28 @@ would pass the signature check if the guard is absent and the library falls back
 `TestValidateChallengeToken_RejectsAlgorithmSubstitution` in `auth_2fa_test.go`. Each test
 generates a fresh RSA-2048 key pair, mints a structurally valid RS256 token (with correct
 claims and unexpired expiry), and asserts that the validator returns `ErrInvalidToken`.
+
+## 2026-07-17 - Pellet-testing score math had zero coverage; found an unguarded divide-by-zero next to it
+
+**Learning:** `calcMOA` (the group-size-to-MOA conversion in `pellet_testing.go`, used
+everywhere precision stats are shown) had zero test coverage despite `pellet_testing.go`
+being a 694-line file with no test companion at all. While investigating it, found that its
+caller `computeAutoGroupSize` guards `detections[0].DiameterMM != nil` and
+`RadiusPixels > 0` before computing `pixelsPerMM := (RadiusPixels*2) / *DiameterMM`, but
+never checks `*DiameterMM != 0` — a malformed calibration payload with `DiameterMM: 0`
+(non-nil pointer) makes `pixelsPerMM` `+Inf`, and `maxDist/+Inf + 0` silently collapses to a
+"perfect" 0mm group instead of erroring.
+
+**Risk:** `computeAutoGroupSize` calls `s.repo.GetByID` on a concrete
+`*repository.PelletTestRepository` (no interface), so it isn't unit-testable without a live
+DB — the same structural blocker already noted for `league.go`. That means this bug can't be
+pinned by a fast test today, and a future refactor of the nil/zero guards could easily make
+it worse without any test catching it.
+
+**Action:** Added `TestCalcMOA` in the new `pellet_testing_test.go`, anchoring the group-size
+formula to the well-known "1 MOA ≈ 29.089mm at 100m" ballistic constant (catches unit/degree-
+radian mistakes a self-referential test would miss) plus the zero/negative-distance guard.
+Did not touch `computeAutoGroupSize` — fixing the zero-diameter guard is out of scope for a
+test-only pass, but it's a concrete follow-up: add `*DiameterMM != 0` to the guard at
+pellet_testing.go:589, and consider extracting the repo dependency behind an interface so the
+whole function can be unit tested.
