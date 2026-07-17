@@ -64,6 +64,21 @@ func (h *SupportTicketHandler) ListMine(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+// GET /api/v1/tickets/unread-count
+func (h *SupportTicketHandler) UnreadCount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	count, err := h.svc.UnreadCount(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get unread ticket count")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"count": count})
+}
+
 func (h *SupportTicketHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
