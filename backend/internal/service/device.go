@@ -14,6 +14,12 @@ var (
 	ErrInvalidDevicePlatform = errors.New("platform must be one of ios, android, web")
 )
 
+// maxDeviceTokenLen caps stored push tokens. Real FCM tokens are ~163 chars,
+// APNs tokens 64 hex chars, and Web Push endpoints usually <512 bytes; 4096
+// leaves generous headroom while stopping an attacker from filling the
+// device_tokens table with 1 MiB blobs (the JSON decoder's per-request cap).
+const maxDeviceTokenLen = 4096
+
 type DeviceService struct {
 	repo *repository.DeviceRepository
 }
@@ -37,7 +43,7 @@ func (s *DeviceService) Register(ctx context.Context, userID string, in *model.R
 		return ErrInvalidDeviceToken
 	}
 	token := strings.TrimSpace(in.Token)
-	if token == "" {
+	if token == "" || len(token) > maxDeviceTokenLen {
 		return ErrInvalidDeviceToken
 	}
 	platform := strings.ToLower(strings.TrimSpace(in.Platform))
@@ -51,7 +57,7 @@ func (s *DeviceService) Register(ctx context.Context, userID string, in *model.R
 // repository.ErrNotFound when the token wasn't registered to this user.
 func (s *DeviceService) Unregister(ctx context.Context, userID, token string) error {
 	token = strings.TrimSpace(token)
-	if token == "" {
+	if token == "" || len(token) > maxDeviceTokenLen {
 		return ErrInvalidDeviceToken
 	}
 	return s.repo.Delete(ctx, userID, token)
