@@ -284,6 +284,7 @@ func NewRouter(
 			featureH := handler.NewFeatureRequest(featureRequests)
 			r.With(rl.Limit("report")).Post("/tickets", supportH.Create)
 			r.Get("/tickets", supportH.ListMine)
+			r.Get("/tickets/unread-count", supportH.UnreadCount)
 			r.Get("/tickets/{id}", supportH.Get)
 			r.Patch("/tickets/{id}", supportH.Update)
 			r.Delete("/tickets/{id}", supportH.Delete)
@@ -292,6 +293,7 @@ func NewRouter(
 			// backwards-compatible legacy routes
 			r.With(rl.Limit("report")).Post("/support/tickets", supportH.Create)
 			r.Get("/support/tickets", supportH.ListMine)
+			r.Get("/support/tickets/unread-count", supportH.UnreadCount)
 			r.Get("/support/tickets/{id}", supportH.Get)
 			r.Patch("/support/tickets/{id}", supportH.Update)
 			r.Delete("/support/tickets/{id}", supportH.Delete)

@@ -86,6 +86,7 @@ export interface UpdateSupportTicketInput {
 export const supportTicketsApi = {
   create: (payload: CreateSupportTicketInput) => api.post<SupportTicket>('/tickets', payload),
   listMine: (limit = 200) => api.get<SupportTicketListResponse>(`/tickets?limit=${limit}`),
+  unreadCount: () => api.get<{ count: number }>('/tickets/unread-count'),
   getMine: (id: string) => api.get<SupportTicketDetail>(`/tickets/${id}`),
   updateMine: (id: string, payload: UpdateSupportTicketInput) => api.patch<SupportTicket>(`/tickets/${id}`, payload),
   deleteMine: (id: string) => api.del<void>(`/tickets/${id}`),

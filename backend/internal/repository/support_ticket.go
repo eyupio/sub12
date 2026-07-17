@@ -131,6 +131,28 @@ func (r *SupportTicketRepository) List(ctx context.Context, in *model.ListSuppor
 	return items, nil
 }
 
+// UnreadCount returns the total number of unread messages across every ticket
+// the user participates in, via a single aggregate query — avoiding the need
+// to fetch full ticket rows (each with its own correlated unread subquery)
+// just to sum a count, which is how frequent polling (e.g. NotificationBell)
+// used to compute this.
+func (r *SupportTicketRepository) UnreadCount(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(1)
+		FROM support_ticket_messages m
+		JOIN support_ticket_participants p ON p.ticket_id = m.ticket_id
+		WHERE p.user_id = $1
+		  AND m.internal_note = FALSE
+		  AND m.author_id <> $1
+		  AND (p.last_read_at IS NULL OR m.created_at > p.last_read_at)
+	`, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("unread ticket message count: %w", err)
+	}
+	return count, nil
+}
+
 func (r *SupportTicketRepository) GetByID(ctx context.Context, id string) (*model.SupportTicket, error) {
 	t := &model.SupportTicket{}
 	err := r.db.QueryRow(ctx, `

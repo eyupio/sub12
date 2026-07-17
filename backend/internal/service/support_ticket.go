@@ -112,6 +112,11 @@ func (s *SupportTicketService) List(ctx context.Context, viewerID string, in *mo
 	return allowed, nil
 }
 
+// UnreadCount returns the total unread ticket-message count for the user.
+func (s *SupportTicketService) UnreadCount(ctx context.Context, userID string) (int, error) {
+	return s.repo.UnreadCount(ctx, userID)
+}
+
 func (s *SupportTicketService) GetByID(ctx context.Context, id string, viewerID string, includeInternal bool) (*model.SupportTicketDetail, error) {
 	ticket, err := s.repo.GetByID(ctx, id)
 	if err != nil {

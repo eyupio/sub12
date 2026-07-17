@@ -16,14 +16,14 @@ export function NotificationBell() {
   })
   const { data: tickets } = useQuery({
     queryKey: ['tickets', 'unread-count'],
-    queryFn: () => supportTicketsApi.listMine(200),
+    queryFn: () => supportTicketsApi.unreadCount(),
     enabled: !!token,
     refetchInterval: 30_000,
     staleTime: 15_000,
   })
 
   const notifCount = data?.count ?? 0
-  const ticketCount = (tickets?.items ?? []).reduce((sum, t) => sum + (t.unread?.count ?? t.unread_count ?? 0), 0)
+  const ticketCount = tickets?.count ?? 0
   const totalCount = notifCount + ticketCount
   const label =
     totalCount > 0
