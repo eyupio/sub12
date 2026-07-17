@@ -63,6 +63,16 @@ func NewCommentService(
 	}
 }
 
+// blocked reports whether blockerID has blocked blockedID, short-circuiting to
+// false when the two IDs are equal so callers never need a separate identity
+// guard before calling this.
+func (s *CommentService) blocked(ctx context.Context, blockerID, blockedID string) (bool, error) {
+	if blockerID == blockedID {
+		return false, nil
+	}
+	return s.blocks.IsBlocked(ctx, blockerID, blockedID)
+}
+
 func (s *CommentService) validateBody(body string) (string, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
@@ -92,11 +102,9 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 			return nil, err
 		}
 		if card.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, card.UserID, userID)
-			if err != nil {
+			if blocked, err := s.blocked(ctx, card.UserID, userID); err != nil {
 				return nil, err
-			}
-			if blocked {
+			} else if blocked {
 				return nil, ErrCommentDenied
 			}
 		}
@@ -110,11 +118,9 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 			return nil, err
 		}
 		if post.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, post.UserID, userID)
-			if err != nil {
+			if blocked, err := s.blocked(ctx, post.UserID, userID); err != nil {
 				return nil, err
-			}
-			if blocked {
+			} else if blocked {
 				return nil, ErrCommentDenied
 			}
 		}
@@ -137,11 +143,9 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 			return nil, err
 		}
 		if act.UserID != userID {
-			blocked, err := s.blocks.IsBlocked(ctx, act.UserID, userID)
-			if err != nil {
+			if blocked, err := s.blocked(ctx, act.UserID, userID); err != nil {
 				return nil, err
-			}
-			if blocked {
+			} else if blocked {
 				return nil, ErrCommentDenied
 			}
 		}
@@ -183,11 +187,9 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 			return nil, err
 		}
 		if viewerID != "" && viewerID != card.UserID {
-			blocked, err := s.blocks.IsBlocked(ctx, viewerID, card.UserID)
-			if err != nil {
+			if blocked, err := s.blocked(ctx, viewerID, card.UserID); err != nil {
 				return nil, err
-			}
-			if blocked {
+			} else if blocked {
 				return nil, repository.ErrNotFound
 			}
 		}
@@ -202,11 +204,9 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 			return nil, err
 		}
 		if viewerID != "" && viewerID != post.UserID {
-			blocked, err := s.blocks.IsBlocked(ctx, viewerID, post.UserID)
-			if err != nil {
+			if blocked, err := s.blocked(ctx, viewerID, post.UserID); err != nil {
 				return nil, err
-			}
-			if blocked {
+			} else if blocked {
 				return nil, repository.ErrNotFound
 			}
 		}
