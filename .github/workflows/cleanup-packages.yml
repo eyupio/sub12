@@ -1,0 +1,45 @@
+name: Cleanup Old Container Images
+
+# release.yml pushes sub-12-backend and sub-12-frontend on every push to
+# main, tagged with both `latest` and a unique `sha-<commit>` tag via
+# docker/metadata-action. `latest` moves but the sha tag persists, so builds
+# stay tagged rather than going untagged outright — still, untagged package
+# versions can accumulate from buildx cache/manifest layers. This workflow
+# deletes untagged versions on a schedule, keeping a small buffer of the most
+# recent ones so a just-superseded digest can still be rolled back to.
+#
+# Tagged versions (latest, sha-*) are NEVER deleted — the cleanup is
+# restricted to untagged versions only.
+
+on:
+  schedule:
+    - cron: "29 2 * * *" # daily at 02:29 UTC
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [sub-12-backend, sub-12-frontend]
+    steps:
+      - name: Delete untagged versions of ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: container
+          delete-only-untagged-versions: "true"
+          min-versions-to-keep: 10
+          # release.yml logs into GHCR with secrets.TOKEN (a PAT, not the
+          # default GITHUB_TOKEN), so the packages may not be linked to this
+          # repository and the default token can't see them (the API reports
+          # "Package not found"). Use the same PAT. If deletion fails with a
+          # 403, the PAT is missing the delete:packages scope — either add
+          # that scope, or grant this repo admin access on the package
+          # (package settings → Manage Actions access) and switch back to the
+          # default token.
+          token: ${{ secrets.TOKEN }}
