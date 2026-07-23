@@ -227,7 +227,13 @@ func NewRouter(
 			r.Patch("/users/me", uh.UpdateMe)
 			r.Post("/users/me/avatar", uh.UploadAvatar)
 			r.Delete("/users/me/avatar", uh.DeleteAvatar)
-			r.Post("/users/me/email", uh.RequestEmailChange)
+			// Rate-limited: RequestEmailChange sends a confirmation email to
+			// an attacker-controlled address and returns a 409 when the new
+			// address is already registered, so unbounded access lets an
+			// authenticated user amplify outbound email and enumerate
+			// registered accounts. Confirm consumes an issued token only and
+			// is left alone.
+			r.With(rl.Limit("auth")).Post("/users/me/email", uh.RequestEmailChange)
 			r.Post("/users/me/email/confirm", uh.ConfirmEmailChange)
 			r.Delete("/users/me", uh.DeleteMe)
 			r.Post("/users/me/export", uh.RequestExport)
