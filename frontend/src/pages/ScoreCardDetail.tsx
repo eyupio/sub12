@@ -1132,6 +1132,12 @@ export default function ScoreCardDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['score-cards', id] })
       queryClient.invalidateQueries({ queryKey: ['score-cards', id, 'audit-trail'] })
+      // The global staleTime is 5 minutes, so without this the Dashboard,
+      // Profile, and ScoreHistory 'score-cards' lists (which cache this
+      // card's own summary row) would keep showing the pre-edit total score
+      // until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['score-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
       clearImage()
       setEditing(false)
       toast('Score card updated', 'success')

@@ -309,6 +309,11 @@ export default function ScoreEntry() {
       qc.invalidateQueries({ queryKey: ['score-drafts'] })
       qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
       qc.invalidateQueries({ queryKey: ['event-cards'] })
+      // The global staleTime is 5 minutes, so without this the Dashboard,
+      // Profile, and ScoreHistory 'score-cards' lists (and the Dashboard's
+      // 'stats' summary) would keep showing pre-save data until it lapses.
+      qc.invalidateQueries({ queryKey: ['score-cards'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
       if (imageFailedReason) {
         toast(`Score card saved, but image upload failed: ${imageFailedReason}. Try again from the card.`, 'error')
       } else {
