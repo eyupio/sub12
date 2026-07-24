@@ -1503,23 +1503,30 @@ function TargetPreview({ seed, xCount, size }: { seed: string | number; xCount: 
   )
 }
 
-function FeedRail({ posts }: { posts: FeedPost[] }) {
-  const leagueCounts = countByName(posts, 'league')
-  const clubCounts = countByName(posts, 'club')
+// ⚡ Bolt: memoized so a parent Feed re-render triggered by unrelated state
+// (e.g. toggling a post's comment panel, which happens on nearly every feed
+// interaction) doesn't re-run the count/sort/filter passes below — `posts` is
+// itself a stable, memoized reference from Feed, so this component's props
+// are unchanged on those renders and the whole subtree can be skipped.
+const FeedRail = memo(function FeedRail({ posts }: { posts: FeedPost[] }) {
   const { data: myLeagues } = useQuery({ queryKey: ['my-leagues'], queryFn: () => leagueApi.listMine() })
   const { data: myClubs } = useQuery({ queryKey: ['my-clubs'], queryFn: () => clubsApi.listMine() })
   const { data: achievements } = useQuery({ queryKey: ['achievements', 'me'], queryFn: () => achievementApi.listMine() })
 
-  const trending = [
-    ...(myLeagues?.items ?? []).map((l) => ({ id: l.id, name: l.name, type: 'league' as const, count: leagueCounts.get(l.name) ?? 0 })),
-    ...(myClubs?.items ?? []).map((c) => ({ id: c.id, name: c.name, type: 'club' as const, count: clubCounts.get(c.name) ?? 0 })),
-  ].sort((a, b) => b.count - a.count).slice(0, 5)
+  const trending = useMemo(() => {
+    const leagueCounts = countByName(posts, 'league')
+    const clubCounts = countByName(posts, 'club')
+    return [
+      ...(myLeagues?.items ?? []).map((l) => ({ id: l.id, name: l.name, type: 'league' as const, count: leagueCounts.get(l.name) ?? 0 })),
+      ...(myClubs?.items ?? []).map((c) => ({ id: c.id, name: c.name, type: 'club' as const, count: clubCounts.get(c.name) ?? 0 })),
+    ].sort((a, b) => b.count - a.count).slice(0, 5)
+  }, [posts, myLeagues, myClubs])
 
-  const deadlines = (myLeagues?.items ?? [])
+  const deadlines = useMemo(() => (myLeagues?.items ?? [])
     .filter((league) => league.ends_on)
     .map((league) => ({ id: league.id, name: league.name, due: league.ends_on! }))
     .sort((a, b) => Date.parse(a.due) - Date.parse(b.due))
-    .slice(0, 3)
+    .slice(0, 3), [myLeagues])
 
   return (
     <aside className="feed-rail">
@@ -1550,7 +1557,7 @@ function FeedRail({ posts }: { posts: FeedPost[] }) {
       </RailCard>
     </aside>
   )
-}
+})
 
 function RailCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
