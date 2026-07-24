@@ -31,6 +31,10 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
     mutationFn: (file: File) => leagueApi.uploadImage(leagueId, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
+      // The global staleTime is 5 minutes, so without this the Dashboard and
+      // Leagues 'my-leagues' widgets (which cache this league's own image_url)
+      // would keep showing the old image until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['my-leagues'] })
       toast('League image updated', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to upload image', 'error'),
@@ -99,6 +103,10 @@ function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: Le
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId] })
       queryClient.invalidateQueries({ queryKey: ['leagues'] })
+      // The global staleTime is 5 minutes, so without this the Dashboard and
+      // Leagues 'my-leagues' widgets (which cache this league's own name/
+      // description) would keep showing the pre-edit text until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['my-leagues'] })
       toast('League saved', 'success')
     },
     onError: () => toast('Failed to save league', 'error'),
@@ -337,6 +345,11 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
       leagueApi.updateConfig(leagueId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'config'] })
+      // The global staleTime is 5 minutes, so without this the Dashboard's
+      // 'my-leagues' widget (which caches this league's own starts_on/ends_on
+      // and uses them to compute "active" status and days-remaining) would
+      // keep showing the pre-edit season dates until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['my-leagues'] })
       toast('Rules saved', 'success')
     },
     onError: () => toast('Failed to save rules', 'error'),
