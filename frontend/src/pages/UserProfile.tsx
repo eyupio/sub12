@@ -21,7 +21,7 @@ function FollowListModal({ title, items, onClose }: { title: string; items: Foll
       <div className="bg-surface border border-subtle rounded-lg w-full max-w-sm mx-4 max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-subtle">
           <h3 className="t-section-title">{title}</h3>
-          <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary transition-colors">
             <XIcon size={16} />
           </button>
         </div>

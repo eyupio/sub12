@@ -64,7 +64,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
       <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
         <div className="flex items-center justify-between">
           <h2 id="new-league-modal-title" className="t-section-title">New League</h2>
-          <button onClick={onClose} className="text-muted hover:text-secondary transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary transition-colors">
             <X size={18} />
           </button>
         </div>
