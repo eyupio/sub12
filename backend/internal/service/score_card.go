@@ -221,18 +221,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", err)
 		}
-		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
-			// Fast-fail on the common (non-racing) case; the repository enforces
-			// the cap atomically as well, so a concurrent request racing this
-			// check still can't slip past the limit.
-			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *input.LeagueRoundID)
-			if err != nil {
-				return nil, fmt.Errorf("count submissions: %w", err)
-			}
-			if count >= int(cfg.MaxSubmissionsPerRound) {
-				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
-			}
-			maxSubmissions = int(cfg.MaxSubmissionsPerRound)
+		maxSubmissions, err = s.checkMaxSubmissionsPerRound(ctx, userID, *input.LeagueRoundID, cfg, false)
+		if err != nil {
+			return nil, err
 		}
 
 		// Auto-populate club_id from the league if not explicitly provided
@@ -478,19 +469,10 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 		if cfgErr != nil && !errors.Is(cfgErr, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", cfgErr)
 		}
-		if cfg != nil && cfg.MaxSubmissionsPerRound > 0 {
-			// Fast-fail on the common (non-racing) case; the repository enforces
-			// the cap atomically as well, so a concurrent request racing this
-			// check still can't slip past the limit.
-			count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, *card.LeagueRoundID)
-			if err != nil {
-				return nil, fmt.Errorf("count submissions: %w", err)
-			}
-			// Exclude this card itself; only peer submissions count toward the cap.
-			if count-1 >= int(cfg.MaxSubmissionsPerRound) {
-				return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
-			}
-			maxSubmissions = int(cfg.MaxSubmissionsPerRound)
+		// Exclude this card itself; only peer submissions count toward the cap.
+		maxSubmissions, err = s.checkMaxSubmissionsPerRound(ctx, userID, *card.LeagueRoundID, cfg, true)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -625,6 +607,31 @@ func (s *ScoreCardService) Delete(ctx context.Context, id, userID string) error 
 	return s.cards.Delete(ctx, id, userID)
 }
 
+// checkMaxSubmissionsPerRound enforces cfg.MaxSubmissionsPerRound (when set)
+// against the user's current submission count, returning the resolved limit
+// (0 if unconfigured) for the repository to also enforce atomically.
+// excludeSelf accounts for a card that already counts itself in the tally
+// (graduation), unlike a brand-new create or submit.
+func (s *ScoreCardService) checkMaxSubmissionsPerRound(ctx context.Context, userID, roundID string, cfg *model.LeagueConfig, excludeSelf bool) (int, error) {
+	if cfg == nil || cfg.MaxSubmissionsPerRound <= 0 {
+		return 0, nil
+	}
+	// Fast-fail on the common (non-racing) case; the repository enforces the
+	// cap atomically as well, so a concurrent request racing this check still
+	// can't slip past the limit.
+	count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, roundID)
+	if err != nil {
+		return 0, fmt.Errorf("count submissions: %w", err)
+	}
+	if excludeSelf {
+		count--
+	}
+	if count >= int(cfg.MaxSubmissionsPerRound) {
+		return 0, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
+	}
+	return int(cfg.MaxSubmissionsPerRound), nil
+}
+
 // ensureNotLocked returns ErrEditsLocked when the card is verified and its
 // league or event has lock_edits_after_verification enabled. It silently
 // allows the action for personal cards, unverified cards, or when the league /
@@ -707,14 +714,8 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 			return nil, fmt.Errorf("check league config: %w", cfgErr)
 		}
 		if cfg != nil {
-			if cfg.MaxSubmissionsPerRound > 0 {
-				count, err := s.leagueRepo.CountUserSubmissionsForRound(ctx, userID, roundID)
-				if err != nil {
-					return nil, fmt.Errorf("count submissions: %w", err)
-				}
-				if count >= int(cfg.MaxSubmissionsPerRound) {
-					return nil, fmt.Errorf("%w: limit is %d per round", ErrMaxSubmissions, cfg.MaxSubmissionsPerRound)
-				}
+			if _, err := s.checkMaxSubmissionsPerRound(ctx, userID, roundID, cfg, false); err != nil {
+				return nil, err
 			}
 			if cfg.RequireImageUpload && (card.CardImageURL == nil || *card.CardImageURL == "") {
 				return nil, fmt.Errorf("%w: this league requires an image upload", ErrInvalidCard)
