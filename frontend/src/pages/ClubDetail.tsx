@@ -261,11 +261,16 @@ export default function ClubDetail() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to leave club', 'error'),
   })
 
-  function copyJoinCode() {
+  async function copyJoinCode() {
     if (!club) return
-    navigator.clipboard.writeText(club.join_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(club.join_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast('Could not copy code — select and copy it manually', 'error')
+    }
   }
 
   const standingsRows: StandingRow[] = useMemo(() => {
