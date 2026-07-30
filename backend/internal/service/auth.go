@@ -44,6 +44,34 @@ const (
 	purposeClaim            = "purpose"
 )
 
+// dummyBcryptHash is compared against the submitted password when Login
+// targets an account that does not exist (or has no password hash — i.e. an
+// OAuth-only account). Running bcrypt in that branch keeps Login's response
+// time roughly independent of whether the email is registered, closing the
+// user-enumeration timing side channel. The plaintext behind this hash is
+// 32 bytes drawn from crypto/rand at package init and immediately discarded,
+// so no attacker-submitted password can ever match it, and its cost matches
+// bcrypt.DefaultCost — the same cost real password hashes use.
+var dummyBcryptHash []byte
+
+func init() {
+	// 32 bytes from crypto/rand is unknowable to any caller; discarded
+	// after we hash it so it never lives in memory beyond this init.
+	seed := make([]byte, 32)
+	if _, err := rand.Read(seed); err != nil {
+		// Fall back to a pre-computed valid hash so Login still runs a
+		// comparison rather than short-circuiting. This branch would only
+		// fire if the OS RNG were unavailable at process start.
+		dummyBcryptHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
+		return
+	}
+	if h, err := bcrypt.GenerateFromPassword(seed, bcrypt.DefaultCost); err == nil {
+		dummyBcryptHash = h
+	} else {
+		dummyBcryptHash = []byte("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy")
+	}
+}
+
 type AuthService struct {
 	users               *repository.UserRepository
 	passwordResetTokens *repository.PasswordResetTokenRepository
@@ -127,13 +155,19 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 	user, err := s.users.GetByEmail(ctx, strings.ToLower(email))
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
+			// Run bcrypt against a dummy hash so response time does not
+			// reveal whether the account exists (user enumeration).
+			_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(password))
 			return nil, nil, "", ErrInvalidCredentials
 		}
 		return nil, nil, "", err
 	}
 
 	if user.PasswordHash == nil {
-		return nil, nil, "", ErrInvalidCredentials // OAuth-only account
+		// OAuth-only account. Still run bcrypt so timing matches the
+		// password-account path and does not leak account existence.
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(password))
+		return nil, nil, "", ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
