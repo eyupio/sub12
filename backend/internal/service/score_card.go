@@ -135,28 +135,18 @@ func (s *ScoreCardService) resolveEventContext(
 	return ev, nil
 }
 
-// applyEventDefaults overwrites discipline / club_id on a quick-create input
-// from the event, so a client cannot store mismatched values for an
-// event-bound card.
-func applyEventDefaultsQuick(in *model.QuickCreateScoreCardInput, ev *model.Event) {
+// applyEventDefaults overwrites the discipline / club_id fields pointed to by
+// discipline and clubID with the event's values, so a client cannot store
+// mismatched values for an event-bound card. Shared by Create (whose input's
+// fields differ in name-only from QuickCreate's) via pointer-to-field.
+func applyEventDefaults(discipline, clubID **string, ev *model.Event) {
 	if ev.Discipline != "" {
 		d := ev.Discipline
-		in.Discipline = &d
+		*discipline = &d
 	}
 	if ev.ClubID != nil {
 		c := *ev.ClubID
-		in.ClubID = &c
-	}
-}
-
-func applyEventDefaultsCreate(in *model.CreateScoreCardInput, ev *model.Event) {
-	if ev.Discipline != "" {
-		d := ev.Discipline
-		in.Discipline = &d
-	}
-	if ev.ClubID != nil {
-		c := *ev.ClubID
-		in.ClubID = &c
+		*clubID = &c
 	}
 }
 
@@ -194,7 +184,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			// Block here only for the full-create path.
 			return nil, fmt.Errorf("%w: event requires the card image to be uploaded; use the quick-capture flow", ErrInvalidCard)
 		}
-		applyEventDefaultsCreate(input, ev)
+		applyEventDefaults(&input.Discipline, &input.ClubID, ev)
 		// Reject duplicate submissions for the same participant.
 		if existing, err := s.cards.GetExistingCardForParticipant(ctx, *input.EventParticipantID); err == nil && existing != nil && !existing.IsDraft {
 			return nil, fmt.Errorf("%w: this participant already has a submitted card", ErrInvalidCard)
@@ -425,7 +415,7 @@ func (s *ScoreCardService) QuickCreate(ctx context.Context, userID string, input
 		return nil, err
 	}
 	if ev != nil {
-		applyEventDefaultsQuick(input, ev)
+		applyEventDefaults(&input.Discipline, &input.ClubID, ev)
 		// Reject if a finalised card already exists for this participant. Drafts
 		// are allowed alongside, so a participant can restart capture mid-shoot.
 		if existing, err := s.cards.GetExistingCardForParticipant(ctx, *input.EventParticipantID); err == nil && existing != nil && !existing.IsDraft {
