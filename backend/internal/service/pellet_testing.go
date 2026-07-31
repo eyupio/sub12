@@ -367,30 +367,24 @@ func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imag
 func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID, sessionID, userID string, in *model.UpdatePelletTestMeasurementInput) (*model.PelletTestMeasurement, error) {
 	// Recompute measured size if bbox updated
 	if in.BboxWidth != nil && in.BboxHeight != nil {
-		// Need the measurement's pixels_per_mm — fetch existing measurement
-		existing, err := s.repo.GetMeasurementsByImage(ctx, sessionID, "")
+		// Need the measurement's pixels_per_mm — fetch the existing measurement
+		// directly by ID (not by image, which we don't have here and which
+		// previously made this lookup always return zero rows).
+		found, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID)
 		if err != nil {
 			return nil, err
 		}
-		var found *model.PelletTestMeasurement
-		for _, m := range existing {
-			if m.ID == measurementID {
-				found = m
-				break
-			}
-		}
-		if found != nil {
-			diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
-			sizeMM := diag / found.PixelsPerMM
-			in.MeasuredSizeMM = &sizeMM
 
-			distanceM, err := s.distanceForMeasurement(ctx, sessionID, userID, in.DistanceM)
-			if err != nil {
-				return nil, err
-			}
-			moa := calcMOA(sizeMM, distanceM)
-			in.MeasuredSizeMOA = &moa
+		diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
+		sizeMM := diag / found.PixelsPerMM
+		in.MeasuredSizeMM = &sizeMM
+
+		distanceM, err := s.distanceForMeasurement(ctx, sessionID, userID, in.DistanceM)
+		if err != nil {
+			return nil, err
 		}
+		moa := calcMOA(sizeMM, distanceM)
+		in.MeasuredSizeMOA = &moa
 	}
 
 	m, err := s.repo.UpdateMeasurement(ctx, measurementID, sessionID, userID, in)
