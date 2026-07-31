@@ -236,6 +236,18 @@ export default function LeagueDetail() {
   const visibility: 'public' | 'private' = league?.type === 'private' ? 'private' : 'public'
   const code = league?.join_code
 
+  async function copyCode() {
+    if (!code) return
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast('Could not copy code — select and copy it manually', 'error')
+    }
+  }
+
   if (!leagueId) {
     return (
       <PageGrid>
@@ -430,7 +442,7 @@ export default function LeagueDetail() {
         {/* Code copy */}
         {isMember && code && (
           <button
-            onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+            onClick={copyCode}
             style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: 0 }}
           >
             {copied ? <Check size={12} style={{ color: 'var(--green)' }} /> : <Copy size={12} />}
@@ -529,7 +541,7 @@ export default function LeagueDetail() {
                   <span className="lc-kv-key">Code</span>
                   <button
                     type="button"
-                    onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                    onClick={copyCode}
                     className="lc-kv-val"
                     style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, color: 'inherit', font: 'inherit' }}
                     title="Click to copy"
