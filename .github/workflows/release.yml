@@ -11,7 +11,7 @@ concurrency:
 jobs:
   push-backend:
     name: Build and push backend image
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
@@ -51,7 +51,7 @@ jobs:
 
   push-frontend:
     name: Build and push frontend image
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
