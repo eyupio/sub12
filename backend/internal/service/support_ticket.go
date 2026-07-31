@@ -99,9 +99,14 @@ func (s *SupportTicketService) List(ctx context.Context, viewerID string, in *mo
 	if viewerID == "" {
 		return items, nil
 	}
+	viewer, err := s.users.GetByID(ctx, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	isAdmin := viewer.Role == "admin"
 	allowed := make([]*model.SupportTicket, 0, len(items))
 	for _, item := range items {
-		ok, err := s.canAccessTicket(ctx, item, viewerID)
+		ok, err := s.canAccessTicketAsRole(ctx, item, viewerID, isAdmin)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +356,23 @@ func (s *SupportTicketService) canAccessTicket(ctx context.Context, ticket *mode
 	if err != nil {
 		return false, err
 	}
-	if user.Role == "admin" {
+	return s.canAccessTicketAsRole(ctx, ticket, userID, user.Role == "admin")
+}
+
+// canAccessTicketAsRole is canAccessTicket with the viewer's admin status
+// already resolved, so a caller checking many tickets for the same viewer
+// (List) can fetch that viewer's user row once instead of once per ticket.
+func (s *SupportTicketService) canAccessTicketAsRole(ctx context.Context, ticket *model.SupportTicket, userID string, isAdmin bool) (bool, error) {
+	if ticket == nil {
+		return false, nil
+	}
+	if ticket.RequesterID == userID {
+		return true, nil
+	}
+	if _, err := s.repo.GetParticipant(ctx, ticket.ID, userID); err == nil {
+		return true, nil
+	}
+	if isAdmin {
 		return true, nil
 	}
 	switch ticket.ScopeType {
