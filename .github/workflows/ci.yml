@@ -13,7 +13,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (Go)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: backend
@@ -89,7 +89,7 @@ jobs:
 
   frontend:
     name: Frontend (React)
-    runs-on: ubuntu-slim
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: frontend
@@ -131,7 +131,7 @@ jobs:
 
   docker:
     name: Docker image smoke tests
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
