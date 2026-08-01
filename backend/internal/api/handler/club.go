@@ -179,7 +179,7 @@ func (h *ClubHandler) Update(w http.ResponseWriter, r *http.Request) {
 	club, err := h.svc.UpdateClub(r.Context(), clubID, userID, &in)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if isClubValidationError(err) {
@@ -217,7 +217,7 @@ func (h *ClubHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.DeleteClub(r.Context(), clubID, userID); err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrClubNotFound) {
@@ -272,7 +272,7 @@ func (h *ClubHandler) ReplaceOpeningHours(w http.ResponseWriter, r *http.Request
 	hours, err := h.svc.ReplaceOpeningHours(r.Context(), clubID, userID, body.Items)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if isClubValidationError(err) {
@@ -307,7 +307,7 @@ func (h *ClubHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Request)
 	code, err := h.svc.RegenerateJoinCode(r.Context(), clubID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrClubNotFound) {
@@ -362,18 +362,23 @@ func (h *ClubHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if in.IsAdmin == nil {
-		writeError(w, http.StatusBadRequest, "is_admin field is required")
+	if in.Moderator() == nil && in.Permissions == nil {
+		writeError(w, http.StatusBadRequest, "is_moderator or permissions is required")
 		return
 	}
 
-	if err := h.svc.UpdateMemberRole(r.Context(), clubID, requesterID, targetID, *in.IsAdmin); err != nil {
-		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+	if err := h.svc.UpdateMemberRole(r.Context(), clubID, requesterID, targetID, &in); err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) || errors.Is(err, service.ErrNotPermitted) ||
+			errors.Is(err, service.ErrCannotEditOwner) {
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrClubLastAdmin) {
 			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotModerator) || errors.Is(err, service.ErrClubNotMember) {
+			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update member")
@@ -431,6 +436,29 @@ func (h *ClubHandler) Join(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/clubs/{id}/members
+// GET /api/v1/clubs/{id}/moderator-permissions
+//
+// Returns the capabilities a club owner can delegate, alongside the caller's
+// own standing, so club settings can render the grant editor and gate its own
+// controls from one request.
+func (h *ClubHandler) ModeratorPermissions(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	clubID := chi.URLParam(r, "id")
+	role, err := h.svc.GetMemberRole(r.Context(), clubID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve role")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"catalogue": model.ClubModeratorPermissions,
+		"role":      role,
+	})
+}
+
 func (h *ClubHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -489,7 +517,7 @@ func (h *ClubHandler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 	requests, err := h.svc.ListJoinRequests(r.Context(), clubID, userID, status)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to list join requests")
@@ -523,7 +551,7 @@ func (h *ClubHandler) DecideJoinRequest(w http.ResponseWriter, r *http.Request) 
 	err := h.svc.DecideJoinRequest(r.Context(), clubID, requestID, userID, body.Decision)
 	if err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrClubNotFound) {
@@ -553,7 +581,7 @@ func (h *ClubHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.RemoveMember(r.Context(), clubID, requesterID, targetID); err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to remove member")
@@ -572,13 +600,13 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 
 	clubID := chi.URLParam(r, "id")
 
-	isAdmin, err := h.svc.IsAdmin(r.Context(), clubID, userID)
+	allowed, err := h.svc.Can(r.Context(), clubID, userID, model.PermManageSettings)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check permissions")
 		return
 	}
-	if !isAdmin {
-		writeError(w, http.StatusForbidden, "admin access required")
+	if !allowed {
+		writeError(w, http.StatusForbidden, "moderator access required")
 		return
 	}
 
@@ -609,7 +637,7 @@ func (h *ClubHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	imageURL := fmt.Sprintf("/api/v1/images/%s", img.ID)
 	if err := h.svc.UpdateImageURL(r.Context(), clubID, userID, imageURL); err != nil {
 		if errors.Is(err, service.ErrClubNotAdmin) {
-			writeError(w, http.StatusForbidden, "admin access required")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update club image")

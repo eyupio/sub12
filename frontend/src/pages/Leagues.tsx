@@ -124,7 +124,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
               {([
                 { value: 'open' as const, label: 'Open', desc: 'Anyone can join' },
                 { value: 'invite_code' as const, label: 'Invite Code', desc: 'Requires a code to join' },
-                { value: 'approval' as const, label: 'Approval', desc: 'Admin must approve requests' },
+                { value: 'approval' as const, label: 'Approval', desc: 'Moderators must approve requests' },
               ]).map((opt) => (
                 <button
                   key={opt.value}

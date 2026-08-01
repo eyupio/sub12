@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { League, CreateLeaguePayload } from './leagues'
+import type { ModeratorPermissionsResponse } from '../utils/moderators'
 
 export interface Club {
   id: string
@@ -20,8 +21,14 @@ export interface Club {
   updated_at: string
   member_count: number
   league_count: number
+  /** Legacy spelling of is_moderator, still sent by the API. */
   is_admin?: boolean
   is_member?: boolean
+  /** Viewer runs the club (owner or promoted moderator). */
+  is_moderator?: boolean
+  is_owner?: boolean
+  /** Viewer's effective capabilities — the whole catalogue for an owner. */
+  permissions?: string[]
 
   // Real-world profile — all optional.
   website_url?: string
@@ -85,7 +92,12 @@ export interface ClubMember {
   user_id: string
   display_name: string
   avatar_url?: string
+  /** Legacy spelling of is_moderator, still sent by the API. */
   is_admin: boolean
+  is_moderator: boolean
+  is_owner: boolean
+  /** Omitted for viewers who do not help run the club. */
+  permissions?: string[]
   joined_at: string
 }
 
@@ -236,8 +248,15 @@ export const clubsApi = {
   leave: (id: string) =>
     api.del<void>(`/clubs/${id}/members/me`),
 
-  updateMember: (clubId: string, userId: string, input: { is_admin: boolean }) =>
-    api.patch<{ updated: boolean }>(`/clubs/${clubId}/members/${userId}`, input),
+  updateMember: (
+    clubId: string,
+    userId: string,
+    input: { is_moderator?: boolean; permissions?: string[] },
+  ) => api.patch<{ updated: boolean }>(`/clubs/${clubId}/members/${userId}`, input),
+
+  /** The capabilities a club owner can delegate, plus the caller's own role. */
+  getModeratorPermissions: (clubId: string) =>
+    api.get<ModeratorPermissionsResponse>(`/clubs/${clubId}/moderator-permissions`),
 
   listJoinRequests: (clubId: string, status = 'pending') =>
     api.get<{ items: ClubJoinRequest[] }>(`/clubs/${clubId}/join-requests?status=${encodeURIComponent(status)}`),

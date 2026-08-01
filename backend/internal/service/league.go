@@ -14,10 +14,19 @@ import (
 )
 
 var (
-	ErrLeagueNotFound   = errors.New("league not found")
-	ErrAlreadyMember    = errors.New("already a member of this league")
-	ErrInvalidLeague    = errors.New("invalid league")
-	ErrNotAdmin         = errors.New("not a league admin")
+	ErrLeagueNotFound = errors.New("league not found")
+	ErrAlreadyMember  = errors.New("already a member of this league")
+	ErrInvalidLeague  = errors.New("invalid league")
+	ErrNotAdmin       = errors.New("league moderator access required")
+	// ErrNotPermitted is returned when the caller is a moderator but the owner
+	// did not delegate the capability the action needs. It wraps ErrNotAdmin so
+	// every caller that already refuses non-moderators refuses this too.
+	ErrNotPermitted = fmt.Errorf("%w: the owner has not delegated this capability to you", ErrNotAdmin)
+	// ErrCannotEditOwner guards the one role nobody may reassign.
+	ErrCannotEditOwner = fmt.Errorf("%w: the owner's role cannot be changed", ErrNotAdmin)
+	// ErrNotModerator is returned when a capability grant targets somebody who
+	// has not been promoted.
+	ErrNotModerator     = errors.New("that member is not a moderator")
 	ErrNotMember        = errors.New("not a league member")
 	ErrInvalidConfig    = errors.New("invalid league config")
 	ErrInvalidSeason    = errors.New("invalid season")
@@ -28,13 +37,13 @@ var (
 	ErrCannotConfirmOwn = errors.New("cannot confirm your own score")
 	ErrReasonRequired   = errors.New("reason is required for rejection")
 	ErrNotClubMember    = errors.New("club membership required")
-	ErrLeagueLastAdmin  = errors.New("cannot leave as the last admin; promote another member first")
-	ErrLeagueOnlyAdmin  = errors.New("cannot demote the last admin; promote another member first")
+	ErrLeagueLastAdmin  = errors.New("cannot leave as the last moderator; promote another member first")
+	ErrLeagueOnlyAdmin  = errors.New("cannot demote the last moderator; promote another member first")
 	ErrUnauthenticated  = errors.New("authentication required")
 	ErrInvalidAmend     = errors.New("invalid amendment")
 
 	ErrVerificationDisabled = errors.New("this league does not use peer verification")
-	ErrScoreRejected        = errors.New("this score has been rejected by an admin")
+	ErrScoreRejected        = errors.New("this score has been rejected by a moderator")
 	ErrScoreNotRejected     = errors.New("only a rejected score can be reopened")
 	ErrScoreNotPending      = errors.New("only a pending score can be verified")
 	ErrScoreIsDraft         = errors.New("draft cards cannot be actioned")
@@ -84,13 +93,60 @@ func (s *LeagueService) notifyScoreOutcome(ctx context.Context, scoreCardID, act
 	})
 }
 
-func (s *LeagueService) requireAdmin(ctx context.Context, leagueID, userID string) error {
-	isAdmin, err := s.leagues.IsAdmin(ctx, leagueID, userID)
+// GetMemberRole reports the caller's standing in a league — owner, moderator
+// or plain member — together with the capabilities the owner delegated.
+func (s *LeagueService) GetMemberRole(ctx context.Context, leagueID, userID string) (*model.MemberRole, error) {
+	return s.leagues.GetMemberRole(ctx, leagueID, userID)
+}
+
+// IsModerator reports whether the user runs the league, without regard to
+// which capabilities they hold.
+func (s *LeagueService) IsModerator(ctx context.Context, leagueID, userID string) (bool, error) {
+	return s.leagues.IsModerator(ctx, leagueID, userID)
+}
+
+// Can reports whether the user may exercise one delegated capability. Owners
+// always can.
+func (s *LeagueService) Can(ctx context.Context, leagueID, userID, permission string) (bool, error) {
+	role, err := s.leagues.GetMemberRole(ctx, leagueID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.Can(permission), nil
+}
+
+// require gates an action on a delegated capability. A non-moderator is told
+// they are not a moderator; a moderator missing the grant is told the owner
+// did not delegate it, so the two cases stay distinguishable in the UI.
+func (s *LeagueService) require(ctx context.Context, leagueID, userID, permission string) error {
+	role, err := s.leagues.GetMemberRole(ctx, leagueID, userID)
 	if err != nil {
 		return err
 	}
-	if !isAdmin {
+	if !role.IsModerator {
 		return ErrNotAdmin
+	}
+	if !role.Can(permission) {
+		return ErrNotPermitted
+	}
+	return nil
+}
+
+// requireForScoreCard is require() for actions addressed by score card rather
+// than by league, resolving the owning league in the same query.
+func (s *LeagueService) requireForScoreCard(ctx context.Context, scoreCardID, userID, permission string) error {
+	role, _, err := s.leagues.GetMemberRoleForScoreCard(ctx, scoreCardID, userID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !role.IsModerator {
+		return ErrNotAdmin
+	}
+	if !role.Can(permission) {
+		return ErrNotPermitted
 	}
 	return nil
 }
@@ -108,14 +164,14 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
 		return nil, fmt.Errorf("%w: join_policy must be 'open', 'invite_code', or 'approval'", ErrInvalidLeague)
 	}
-	// If creating under a club, verify the user is a club admin.
+	// If creating under a club, the caller needs the club's league capability.
 	if input.ClubID != nil && *input.ClubID != "" {
-		isAdmin, err := s.clubs.IsAdmin(ctx, *input.ClubID, userID)
+		role, err := s.clubs.GetMemberRole(ctx, *input.ClubID, userID)
 		if err != nil {
 			return nil, err
 		}
-		if !isAdmin {
-			return nil, fmt.Errorf("%w: must be a club admin to create a league under this club", ErrNotAdmin)
+		if !role.Can(model.PermManageLeagues) {
+			return nil, fmt.Errorf("%w: you cannot create leagues under this club", ErrNotAdmin)
 		}
 		// Club leagues default to private
 		if input.Type == "" {
@@ -130,43 +186,96 @@ func (s *LeagueService) ListByClub(ctx context.Context, clubID string) ([]*model
 	return s.leagues.ListByClub(ctx, clubID)
 }
 
-// RemoveMember removes a non-admin member from a league. Only league admins may call this.
+// RemoveMember removes a plain member from a league. Requires the member
+// management capability.
 func (s *LeagueService) RemoveMember(ctx context.Context, leagueID, adminID, memberID string) error {
 	if adminID == memberID {
 		return fmt.Errorf("%w: cannot remove yourself", ErrNotAdmin)
 	}
-	if err := s.requireAdmin(ctx, leagueID, adminID); err != nil {
+	if err := s.require(ctx, leagueID, adminID, model.PermManageMembers); err != nil {
 		return err
 	}
 	return s.leagues.RemoveMember(ctx, leagueID, memberID)
 }
 
-// UpdateMemberRole lets a league admin promote another member to admin, or
-// demote a co-admin. The last remaining admin cannot be demoted — otherwise
-// the league would be left with nobody able to manage it.
-func (s *LeagueService) UpdateMemberRole(ctx context.Context, leagueID, requesterID, targetID string, isAdmin bool) error {
-	if err := s.requireAdmin(ctx, leagueID, requesterID); err != nil {
+// UpdateMemberRole promotes a member to moderator, demotes one, and/or
+// re-grants what a moderator may do. Requires the moderator-management
+// capability, which the owner holds implicitly.
+//
+// The owner's own role is not editable — they are the league's root of
+// authority — and the last remaining moderator cannot be demoted, or the
+// league would be left with nobody able to run it.
+func (s *LeagueService) UpdateMemberRole(ctx context.Context, leagueID, requesterID, targetID string, in *model.UpdateLeagueMemberInput) error {
+	if err := s.require(ctx, leagueID, requesterID, model.PermManageModerators); err != nil {
 		return err
 	}
-	if isAdmin {
-		err := s.leagues.PromoteMember(ctx, leagueID, targetID)
+	targetRole, err := s.leagues.GetMemberRole(ctx, leagueID, targetID)
+	if err != nil {
+		return err
+	}
+	if targetRole.IsOwner {
+		return ErrCannotEditOwner
+	}
+
+	moderator := in.Moderator()
+	demoting := moderator != nil && !*moderator
+	if demoting {
+		err := s.leagues.DemoteMemberGuarded(ctx, leagueID, targetID)
+		if errors.Is(err, repository.ErrLeagueLastAdmin) {
+			return ErrLeagueOnlyAdmin
+		}
 		if errors.Is(err, repository.ErrNotFound) {
 			return ErrNotMember
 		}
 		return err
 	}
-	err := s.leagues.DemoteMemberGuarded(ctx, leagueID, targetID)
-	if errors.Is(err, repository.ErrLeagueLastAdmin) {
-		return ErrLeagueOnlyAdmin
+
+	// Promotion, or a re-grant on somebody already promoted. Either way the
+	// grant is whatever was asked for, defaulting to the day-to-day set on a
+	// fresh promotion and to the existing grant on a bare re-promotion.
+	permissions := targetRole.Permissions
+	if !targetRole.IsModerator {
+		permissions = model.DefaultModeratorPermissions(model.LeagueModeratorPermissions)
 	}
+	if in.Permissions != nil {
+		permissions, err = s.delegatable(ctx, leagueID, requesterID, *in.Permissions)
+		if err != nil {
+			return err
+		}
+	}
+
+	if moderator == nil && !targetRole.IsModerator {
+		// A grant with nothing to grant it to.
+		return ErrNotModerator
+	}
+	err = s.leagues.PromoteMember(ctx, leagueID, targetID, permissions)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrNotMember
 	}
 	return err
 }
 
-// LeaveLeague allows a member to remove themselves. The last admin must
-// promote or demote a co-admin first.
+// delegatable narrows a requested grant to the recognised capabilities the
+// granter holds themselves, so a moderator with manage_moderators can share
+// their own reach but never manufacture more of it. Owners hold everything, so
+// for them this only filters unknown keys.
+func (s *LeagueService) delegatable(ctx context.Context, leagueID, granterID string, requested []string) ([]string, error) {
+	granter, err := s.leagues.GetMemberRole(ctx, leagueID, granterID)
+	if err != nil {
+		return nil, err
+	}
+	wanted := model.NormaliseModeratorPermissions(model.LeagueModeratorPermissions, requested)
+	out := make([]string, 0, len(wanted))
+	for _, p := range wanted {
+		if granter.Can(p) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+// LeaveLeague allows a member to remove themselves. The last moderator must
+// promote another member first.
 func (s *LeagueService) LeaveLeague(ctx context.Context, leagueID, userID string) error {
 	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
 	if err != nil {
@@ -175,11 +284,11 @@ func (s *LeagueService) LeaveLeague(ctx context.Context, leagueID, userID string
 	if !isMember {
 		return ErrNotMember
 	}
-	isAdmin, err := s.leagues.IsAdmin(ctx, leagueID, userID)
+	isModerator, err := s.leagues.IsModerator(ctx, leagueID, userID)
 	if err != nil {
 		return err
 	}
-	if isAdmin {
+	if isModerator {
 		count, err := s.leagues.CountAdmins(ctx, leagueID)
 		if err != nil {
 			return err
@@ -412,7 +521,7 @@ func (s *LeagueService) GetConfig(ctx context.Context, leagueID string) (*model.
 }
 
 func (s *LeagueService) UpdateConfig(ctx context.Context, leagueID, userID string, input *model.UpdateLeagueConfigInput) (*model.LeagueConfig, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSettings); err != nil {
 		return nil, err
 	}
 
@@ -456,7 +565,7 @@ func (s *LeagueService) UpdateConfig(ctx context.Context, leagueID, userID strin
 // ---------------------------------------------------------------------------
 
 func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID string, input *model.CreateSeasonInput) (*model.Season, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
 		return nil, err
 	}
 	if input.Name == "" {
@@ -499,7 +608,7 @@ func (s *LeagueService) ListSeasons(ctx context.Context, leagueID, viewerID, vie
 }
 
 func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seasonID string, input *model.CreateRoundInput) (*model.Round, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
 		return nil, err
 	}
 	if input.Name == "" {
@@ -643,14 +752,14 @@ func (s *LeagueService) GetLeagueForScoreCard(ctx context.Context, scoreCardID s
 // ---------------------------------------------------------------------------
 
 func (s *LeagueService) ListJoinRequests(ctx context.Context, leagueID, userID, status string) ([]*model.JoinRequest, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageMembers); err != nil {
 		return nil, err
 	}
 	return s.leagues.ListJoinRequests(ctx, leagueID, status)
 }
 
 func (s *LeagueService) DecideJoinRequest(ctx context.Context, leagueID, requestID, adminID, decision string) error {
-	if err := s.requireAdmin(ctx, leagueID, adminID); err != nil {
+	if err := s.require(ctx, leagueID, adminID, model.PermManageMembers); err != nil {
 		return err
 	}
 	if decision != "approved" && decision != "rejected" {
@@ -664,7 +773,7 @@ func (s *LeagueService) DecideJoinRequest(ctx context.Context, leagueID, request
 }
 
 func (s *LeagueService) RegenerateJoinCode(ctx context.Context, leagueID, userID string) (string, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSettings); err != nil {
 		return "", err
 	}
 	return s.leagues.RegenerateJoinCode(ctx, leagueID)
@@ -673,7 +782,7 @@ func (s *LeagueService) RegenerateJoinCode(ctx context.Context, leagueID, userID
 // UpdateLeague applies a partial update to owner-editable league fields.
 // Requires the caller to be a league admin.
 func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID string, in *model.UpdateLeagueBasicsInput) (*model.League, error) {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSettings); err != nil {
 		return nil, err
 	}
 	if in.Name != nil {
@@ -710,7 +819,7 @@ func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID strin
 // ---------------------------------------------------------------------------
 
 func (s *LeagueService) UpdateImageURL(ctx context.Context, leagueID, userID, imageURL string) error {
-	if err := s.requireAdmin(ctx, leagueID, userID); err != nil {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSettings); err != nil {
 		return err
 	}
 	return s.leagues.UpdateImageURL(ctx, leagueID, imageURL)
@@ -722,6 +831,26 @@ func (s *LeagueService) UpdateImageURL(ctx context.Context, leagueID, userID, im
 
 func (s *LeagueService) ListMembers(ctx context.Context, leagueID string) ([]*model.LeagueMember, error) {
 	return s.leagues.ListMembers(ctx, leagueID)
+}
+
+// ListMembersForViewer is ListMembers with the delegation map redacted for
+// anyone who does not help run the league. Who the moderators are is public;
+// which capabilities each was granted is the owner's business.
+func (s *LeagueService) ListMembersForViewer(ctx context.Context, leagueID, viewerID string) ([]*model.LeagueMember, error) {
+	members, err := s.leagues.ListMembers(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	isModerator, err := s.leagues.IsModerator(ctx, leagueID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isModerator {
+		for _, m := range members {
+			m.Permissions = nil
+		}
+	}
+	return members, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -818,21 +947,14 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 // VerifyScore lets a league admin explicitly verify a pending card without
 // having to route through an amend. Records a 'verify' audit action.
 func (s *LeagueService) VerifyScore(ctx context.Context, scoreCardID, adminID string, input *model.VerifyScoreInput) error {
-	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return ErrLeagueNotFound
-	}
-	if err != nil {
+	if err := s.requireForScoreCard(ctx, scoreCardID, adminID, model.PermVerifyScores); err != nil {
 		return err
-	}
-	if !isAdmin {
-		return ErrNotAdmin
 	}
 	var reason *string
 	if input != nil {
 		reason = input.Reason
 	}
-	err = s.leagues.VerifyScore(ctx, scoreCardID, adminID, reason)
+	err := s.leagues.VerifyScore(ctx, scoreCardID, adminID, reason)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrScoreNotPending
 	}
@@ -845,17 +967,10 @@ func (s *LeagueService) VerifyScore(ctx context.Context, scoreCardID, adminID st
 
 // ReopenScore returns a rejected card to the pending queue. League admins only.
 func (s *LeagueService) ReopenScore(ctx context.Context, scoreCardID, adminID string, input *model.ReopenScoreInput) error {
-	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return ErrLeagueNotFound
-	}
-	if err != nil {
+	if err := s.requireForScoreCard(ctx, scoreCardID, adminID, model.PermVerifyScores); err != nil {
 		return err
 	}
-	if !isAdmin {
-		return ErrNotAdmin
-	}
-	err = s.leagues.ReopenScore(ctx, scoreCardID, adminID, input.Reason)
+	err := s.leagues.ReopenScore(ctx, scoreCardID, adminID, input.Reason)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrScoreNotRejected
 	}
@@ -870,17 +985,10 @@ func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID str
 		return fmt.Errorf("%w: new_x_count must be 0-25", ErrInvalidAmend)
 	}
 
-	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return ErrLeagueNotFound
-	}
-	if err != nil {
+	if err := s.requireForScoreCard(ctx, scoreCardID, adminID, model.PermVerifyScores); err != nil {
 		return err
 	}
-	if !isAdmin {
-		return ErrNotAdmin
-	}
-	err = s.leagues.AmendScore(ctx, scoreCardID, adminID, input)
+	err := s.leagues.AmendScore(ctx, scoreCardID, adminID, input)
 	if errors.Is(err, repository.ErrCardRejected) {
 		return ErrScoreRejected
 	}
@@ -898,21 +1006,14 @@ func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID str
 }
 
 func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error {
-	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return ErrLeagueNotFound
-	}
-	if err != nil {
+	if err := s.requireForScoreCard(ctx, scoreCardID, adminID, model.PermVerifyScores); err != nil {
 		return err
-	}
-	if !isAdmin {
-		return ErrNotAdmin
 	}
 	input.Reason = strings.TrimSpace(input.Reason)
 	if input.Reason == "" {
 		return ErrReasonRequired
 	}
-	err = s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
+	err := s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
 	if errors.Is(err, repository.ErrCardRejected) {
 		return ErrScoreRejected
 	}

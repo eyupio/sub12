@@ -315,7 +315,7 @@ func (h *LeagueHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	cfg, err := h.svc.UpdateConfig(r.Context(), leagueID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrInvalidConfig) {
@@ -360,7 +360,7 @@ func (h *LeagueHandler) CreateSeason(w http.ResponseWriter, r *http.Request) {
 	season, err := h.svc.CreateSeason(r.Context(), leagueID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrInvalidSeason) {
@@ -433,7 +433,7 @@ func (h *LeagueHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	round, err := h.svc.CreateRound(r.Context(), leagueID, userID, seasonID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrInvalidRound) {
@@ -603,6 +603,33 @@ func (h *LeagueHandler) ScoreCounts(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // GET /api/v1/leagues/{id}/members
+// GET /api/v1/leagues/{id}/moderator-permissions
+//
+// Returns the capabilities a league owner can delegate, alongside the caller's
+// own standing, so the settings screen can render the grant editor and gate its
+// own controls from one request.
+func (h *LeagueHandler) ModeratorPermissions(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	role, err := h.svc.GetMemberRole(r.Context(), leagueID, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve role")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"catalogue": model.LeagueModeratorPermissions,
+		"role":      role,
+	})
+}
+
 func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	leagueID := chi.URLParam(r, "id")
 	if !isUUID(leagueID) {
@@ -626,7 +653,7 @@ func (h *LeagueHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	members, err := h.svc.ListMembers(r.Context(), leagueID)
+	members, err := h.svc.ListMembersForViewer(r.Context(), leagueID, viewerID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list members")
 		return
@@ -727,22 +754,23 @@ func (h *LeagueHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if input.IsAdmin == nil {
-		writeError(w, http.StatusBadRequest, "is_admin field is required")
+	if input.Moderator() == nil && input.Permissions == nil {
+		writeError(w, http.StatusBadRequest, "is_moderator or permissions is required")
 		return
 	}
 
-	if err := h.svc.UpdateMemberRole(r.Context(), leagueID, requesterID, targetID, *input.IsAdmin); err != nil {
-		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+	if err := h.svc.UpdateMemberRole(r.Context(), leagueID, requesterID, targetID, &input); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) || errors.Is(err, service.ErrNotPermitted) ||
+			errors.Is(err, service.ErrCannotEditOwner) {
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrLeagueOnlyAdmin) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		if errors.Is(err, service.ErrNotMember) {
-			writeError(w, http.StatusNotFound, "member not found")
+		if errors.Is(err, service.ErrNotMember) || errors.Is(err, service.ErrNotModerator) {
+			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update member")
@@ -774,7 +802,7 @@ func (h *LeagueHandler) ListJoinRequests(w http.ResponseWriter, r *http.Request)
 	requests, err := h.svc.ListJoinRequests(r.Context(), leagueID, userID, status)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to list join requests")
@@ -817,7 +845,7 @@ func (h *LeagueHandler) DecideJoinRequest(w http.ResponseWriter, r *http.Request
 	err := h.svc.DecideJoinRequest(r.Context(), leagueID, requestID, userID, body.Decision)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
@@ -858,7 +886,7 @@ func (h *LeagueHandler) Update(w http.ResponseWriter, r *http.Request) {
 	league, err := h.svc.UpdateLeague(r.Context(), leagueID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrInvalidLeague) {
@@ -893,7 +921,7 @@ func (h *LeagueHandler) RegenerateJoinCode(w http.ResponseWriter, r *http.Reques
 	code, err := h.svc.RegenerateJoinCode(r.Context(), leagueID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to regenerate join code")
@@ -949,7 +977,7 @@ func (h *LeagueHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	err = h.svc.UpdateImageURL(r.Context(), leagueID, userID, imageURL)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to update league image")
@@ -1030,7 +1058,7 @@ func (h *LeagueHandler) ReopenScore(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.ReopenScore(r.Context(), scoreCardID, userID, &input); err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrScoreNotRejected) {
@@ -1108,7 +1136,7 @@ func (h *LeagueHandler) AmendScore(w http.ResponseWriter, r *http.Request) {
 	err := h.svc.AmendScore(r.Context(), scoreCardID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrInvalidAmend) {
@@ -1150,7 +1178,7 @@ func (h *LeagueHandler) VerifyScore(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.VerifyScore(r.Context(), scoreCardID, userID, &input); err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrScoreNotPending) {
@@ -1191,7 +1219,7 @@ func (h *LeagueHandler) RejectScore(w http.ResponseWriter, r *http.Request) {
 	err := h.svc.RejectScore(r.Context(), scoreCardID, userID, &input)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrReasonRequired) {

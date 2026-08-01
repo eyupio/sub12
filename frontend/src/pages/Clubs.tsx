@@ -90,7 +90,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
               {([
                 { value: 'open' as const, label: 'Open', desc: 'Anyone can join' },
                 { value: 'invite_code' as const, label: 'Invite Code', desc: 'Requires a code to join' },
-                { value: 'approval' as const, label: 'Approval', desc: 'Admin must approve requests' },
+                { value: 'approval' as const, label: 'Approval', desc: 'Moderators must approve requests' },
               ]).map(opt => (
                 <button key={opt.value} type="button" onClick={() => setJoinPolicy(opt.value)} className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${joinPolicy === opt.value ? 'border-[var(--gold)]/50 bg-[var(--gold-tint)] text-[var(--gold)]' : 'border-subtle text-muted hover:text-secondary'}`}>
                   <span className="text-[11px] tracking-widest uppercase font-medium">{opt.label}</span>

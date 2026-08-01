@@ -279,12 +279,12 @@ func (s *FeatureRequestService) isAdminForScope(ctx context.Context, scopeType s
 		if scopeID == nil || *scopeID == "" {
 			return false, nil
 		}
-		return s.leagues.IsAdmin(ctx, *scopeID, userID)
+		return s.leagues.Can(ctx, *scopeID, userID, model.PermManageSupport)
 	case model.SupportScopeClub:
 		if scopeID == nil || *scopeID == "" {
 			return false, nil
 		}
-		return s.clubs.IsAdmin(ctx, *scopeID, userID)
+		return s.clubs.Can(ctx, *scopeID, userID, model.PermManageSupport)
 	default:
 		return false, nil
 	}

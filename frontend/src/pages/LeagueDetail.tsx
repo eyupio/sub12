@@ -39,6 +39,7 @@ import {
   type StandingRow,
   type TabSpec,
 } from '../components/leagues'
+import { can, PERM } from '../utils/moderators'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -287,7 +288,8 @@ export default function LeagueDetail() {
 
   const isLoading = leagueLoading || standingsLoading
   const currentMember = currentUser && members ? members.items.find(m => m.user_id === currentUser.id) : null
-  const isAdmin = currentMember?.is_admin ?? false
+  const isModerator = currentMember?.is_moderator ?? false
+  const canReviewScores = can(currentMember, PERM.verifyScores)
   const isMember = !!currentMember
 
   const joinMutation = useMutation({
@@ -312,7 +314,7 @@ export default function LeagueDetail() {
     },
   })
 
-  const adminCount = members?.items.filter(m => m.is_admin).length ?? 0
+  const moderatorCount = members?.items.filter(m => m.is_moderator).length ?? 0
 
   const leaveMutation = useMutation({
     mutationFn: () => leagueApi.leave(leagueId!),
@@ -326,12 +328,12 @@ export default function LeagueDetail() {
     },
     onError: (err: Error) => {
       setConfirmLeave(false)
-      if (err instanceof ApiError && err.status === 409) toast('You are the last admin — promote another member before leaving.', 'error')
+      if (err instanceof ApiError && err.status === 409) toast('You are the last moderator — promote another member before leaving.', 'error')
       else toast('Failed to leave league', 'error')
     },
   })
 
-  const canLeave = isMember && (!isAdmin || adminCount > 1)
+  const canLeave = isMember && (!isModerator || moderatorCount > 1)
   const joinPolicy = config?.join_policy ?? 'open'
   const scoringRule = config?.scoring_rule ?? 'highest'
 
@@ -511,7 +513,7 @@ export default function LeagueDetail() {
             {canLeave && (
               <button className="lc-icon-btn" onClick={() => setConfirmLeave(true)} aria-label="Leave"><LogOut size={14} /></button>
             )}
-            {isAdmin && leagueId && (
+            {isModerator && leagueId && (
               <Link to="/leagues/$id/settings" params={{ id: leagueId }} className="lc-icon-btn" aria-label="Settings">
                 <Settings size={14} />
               </Link>
@@ -543,7 +545,7 @@ export default function LeagueDetail() {
       <ConfirmDialog
         open={confirmLeave}
         title="Leave league?"
-        message={isAdmin ? 'You will lose admin access and will need to rejoin (and be re-promoted) to return.' : 'You will need to rejoin to submit scores or see members-only posts.'}
+        message={isModerator ? 'You will lose your moderator role and will need to rejoin (and be re-promoted) to return.' : 'You will need to rejoin to submit scores or see members-only posts.'}
         confirmLabel="Leave"
         onConfirm={() => leaveMutation.mutate()}
         onCancel={() => setConfirmLeave(false)}
@@ -572,7 +574,7 @@ export default function LeagueDetail() {
                 <Users size={14} />
                 {joinPolicy === 'open' && 'Public league'}
                 {joinPolicy === 'invite_code' && 'Invite code required'}
-                {joinPolicy === 'approval' && 'Admin approval required'}
+                {joinPolicy === 'approval' && 'Moderator approval required'}
               </div>
               {(joinPolicy === 'open' || joinPolicy === 'approval') && (
                 <button onClick={() => { setJoinError(''); joinMutation.mutate() }} disabled={joinMutation.isPending} className="lc-action-ghost" style={{ background: 'var(--gold)', color: 'white' }}>
@@ -602,15 +604,15 @@ export default function LeagueDetail() {
           <div className="lc-status-row"><Trophy size={14} /> You've joined this league</div>
         )}
         {joinPending && (
-          <div className="lc-status-row warn"><Users size={14} /> Your request is pending admin approval</div>
+          <div className="lc-status-row warn"><Users size={14} /> Your request is pending moderator approval</div>
         )}
         {joinError && <p style={{ color: 'var(--red)', fontSize: 12 }}>{joinError}</p>}
 
-        {/* Status row — admins only; jumps straight to the pending queue */}
-        {isAdmin && scoreCounts && scoreCounts.pending === 0 && (
+        {/* Status row — score reviewers only; jumps straight to the pending queue */}
+        {canReviewScores && scoreCounts && scoreCounts.pending === 0 && (
           <div className="lc-status-row"><CheckCircle size={14} /> All scores reviewed</div>
         )}
-        {isAdmin && scoreCounts && scoreCounts.pending > 0 && (
+        {canReviewScores && scoreCounts && scoreCounts.pending > 0 && (
           <button
             type="button"
             onClick={() => setScoreFilter('pending')}

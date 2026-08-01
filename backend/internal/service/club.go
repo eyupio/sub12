@@ -14,9 +14,9 @@ import (
 var (
 	ErrClubNotFound       = errors.New("club not found")
 	ErrClubAlreadyMember  = errors.New("already a member of this club")
-	ErrClubNotAdmin       = errors.New("admin access required")
+	ErrClubNotAdmin       = errors.New("club moderator access required")
 	ErrClubNotMember      = errors.New("not a member of this club")
-	ErrClubLastAdmin      = errors.New("cannot leave as the last admin; promote another member first")
+	ErrClubLastAdmin      = errors.New("cannot leave as the last moderator; promote another member first")
 	ErrInvalidClub        = errors.New("club name is required")
 	ErrClubInvalidType    = errors.New("type must be 'public' or 'private'")
 	ErrClubInvalidPolicy  = errors.New("join_policy must be 'open', 'invite_code', or 'approval'")
@@ -24,6 +24,17 @@ var (
 	ErrClubInvalidCode    = errors.New("invalid join code")
 	ErrClubInvalidDecide  = errors.New("decision must be 'approved' or 'rejected'")
 	ErrClubValidation     = errors.New("invalid club details")
+	// ErrClubNotPermitted is returned when the caller is a moderator but the
+	// owner did not delegate the capability the action needs. It wraps
+	// ErrClubNotAdmin so every caller that already refuses non-moderators
+	// refuses this too.
+	ErrClubNotPermitted = fmt.Errorf("%w: the owner has not delegated this capability to you", ErrClubNotAdmin)
+	// ErrClubOwnerOnly guards the capabilities that stay with the club's owner
+	// and are never delegated.
+	ErrClubOwnerOnly = fmt.Errorf("%w: only the club owner can do this", ErrClubNotAdmin)
+	// ErrCannotRemoveModerator keeps a member-management grant from being used
+	// against the moderators, and the owner, who granted it.
+	ErrCannotRemoveModerator = fmt.Errorf("%w: demote this moderator before removing them", ErrClubNotAdmin)
 )
 
 // clubInvalid builds a validation error that handlers surface verbatim as a
@@ -220,17 +231,67 @@ func (s *ClubService) IsMember(ctx context.Context, clubID, userID string) (bool
 	return s.repo.IsMember(ctx, clubID, userID)
 }
 
-func (s *ClubService) IsAdmin(ctx context.Context, clubID, userID string) (bool, error) {
-	return s.repo.IsAdmin(ctx, clubID, userID)
+// GetMemberRole reports the caller's standing in a club — owner, moderator or
+// plain member — together with the capabilities the owner delegated.
+func (s *ClubService) GetMemberRole(ctx context.Context, clubID, userID string) (*model.MemberRole, error) {
+	return s.repo.GetMemberRole(ctx, clubID, userID)
+}
+
+// IsModerator reports whether the user runs the club, without regard to which
+// capabilities they hold.
+func (s *ClubService) IsModerator(ctx context.Context, clubID, userID string) (bool, error) {
+	return s.repo.IsModerator(ctx, clubID, userID)
+}
+
+// Can reports whether the user may exercise one delegated capability. Owners
+// always can.
+func (s *ClubService) Can(ctx context.Context, clubID, userID, permission string) (bool, error) {
+	role, err := s.repo.GetMemberRole(ctx, clubID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.Can(permission), nil
+}
+
+// require gates an action on a delegated capability. A non-moderator is told
+// they are not a moderator; a moderator missing the grant is told the owner
+// did not delegate it, so the two cases stay distinguishable in the UI.
+func (s *ClubService) require(ctx context.Context, clubID, userID, permission string) error {
+	role, err := s.repo.GetMemberRole(ctx, clubID, userID)
+	if err != nil {
+		return err
+	}
+	if !role.IsModerator {
+		return ErrClubNotAdmin
+	}
+	if !role.Can(permission) {
+		return ErrClubNotPermitted
+	}
+	return nil
 }
 
 // ListMembers returns club members. Private clubs are gated to members only;
-// site admins bypass the gate.
+// site admins bypass the gate. The delegation map is redacted for anyone who
+// does not help run the club — who the moderators are is public, which
+// capabilities each was granted is the owner's business.
 func (s *ClubService) ListMembers(ctx context.Context, clubID, viewerID, viewerRole string) ([]*model.ClubMember, error) {
 	if err := s.ensureClubAccess(ctx, clubID, viewerID, viewerRole); err != nil {
 		return nil, err
 	}
-	return s.repo.ListMembers(ctx, clubID)
+	members, err := s.repo.ListMembers(ctx, clubID)
+	if err != nil {
+		return nil, err
+	}
+	isModerator, err := s.repo.IsModerator(ctx, clubID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isModerator && viewerRole != "admin" {
+		for _, m := range members {
+			m.Permissions = nil
+		}
+	}
+	return members, nil
 }
 
 // GetStandings returns club standings. Private clubs are gated to members
@@ -273,12 +334,8 @@ func (s *ClubService) ensureClubAccess(ctx context.Context, clubID, viewerID, vi
 
 // ListJoinRequests returns pending (or filtered) join requests for admins.
 func (s *ClubService) ListJoinRequests(ctx context.Context, clubID, requesterID, status string) ([]*model.ClubJoinRequest, error) {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
-	if err != nil {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageMembers); err != nil {
 		return nil, err
-	}
-	if !isAdmin {
-		return nil, ErrClubNotAdmin
 	}
 	return s.repo.ListJoinRequests(ctx, clubID, status)
 }
@@ -289,12 +346,8 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 	if decision != "approved" && decision != "rejected" {
 		return ErrClubInvalidDecide
 	}
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, adminID)
-	if err != nil {
+	if err := s.require(ctx, clubID, adminID, model.PermManageMembers); err != nil {
 		return err
-	}
-	if !isAdmin {
-		return ErrClubNotAdmin
 	}
 	req, err := s.repo.DecideJoinRequest(ctx, requestID, adminID, decision)
 	if err != nil {
@@ -345,36 +398,35 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 	return nil
 }
 
+// RemoveMember removes a plain member. Moderators — the owner above all — have
+// to be demoted first, so a delegated manage_members grant can never be turned
+// on the people who granted it. This mirrors the league repository, which
+// refuses the delete outright.
 func (s *ClubService) RemoveMember(ctx context.Context, clubID, requesterID, targetID string) error {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err := s.require(ctx, clubID, requesterID, model.PermManageMembers); err != nil {
+		return err
+	}
+	targetRole, err := s.repo.GetMemberRole(ctx, clubID, targetID)
 	if err != nil {
 		return err
 	}
-	if !isAdmin {
-		return ErrClubNotAdmin
+	if targetRole.IsModerator {
+		return ErrCannotRemoveModerator
 	}
 	return s.repo.RemoveMember(ctx, clubID, targetID)
 }
 
 func (s *ClubService) UpdateImageURL(ctx context.Context, clubID, requesterID, url string) error {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
-	if err != nil {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageSettings); err != nil {
 		return err
-	}
-	if !isAdmin {
-		return ErrClubNotAdmin
 	}
 	return s.repo.UpdateImageURL(ctx, clubID, url)
 }
 
 // UpdateClub allows a club admin to update the club's settings and profile.
 func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string, in *model.UpdateClubInput) (*model.Club, error) {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
-	if err != nil {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageSettings); err != nil {
 		return nil, err
-	}
-	if !isAdmin {
-		return nil, ErrClubNotAdmin
 	}
 	if err := ValidateClubUpdate(in); err != nil {
 		return nil, err
@@ -573,12 +625,8 @@ func (s *ClubService) GetOpeningHours(ctx context.Context, clubID, viewerID, vie
 
 // ReplaceOpeningHours swaps a club's whole published week. Club admins only.
 func (s *ClubService) ReplaceOpeningHours(ctx context.Context, clubID, requesterID string, slots []model.ClubOpeningHoursInput) ([]*model.ClubOpeningHours, error) {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
-	if err != nil {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageSettings); err != nil {
 		return nil, err
-	}
-	if !isAdmin {
-		return nil, ErrClubNotAdmin
 	}
 	if err := ValidateOpeningHours(slots); err != nil {
 		return nil, err
@@ -639,12 +687,12 @@ func ValidateOpeningHours(slots []model.ClubOpeningHoursInput) error {
 // the club (members, join requests, opening hours, posts) cascades; leagues
 // are detached rather than deleted, per the club_id FK.
 func (s *ClubService) DeleteClub(ctx context.Context, clubID, requesterID string) error {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	role, err := s.repo.GetMemberRole(ctx, clubID, requesterID)
 	if err != nil {
 		return err
 	}
-	if !isAdmin {
-		return ErrClubNotAdmin
+	if !role.IsOwner {
+		return ErrClubOwnerOnly
 	}
 	if err := s.repo.AdminDelete(ctx, clubID); err != nil {
 		return fmt.Errorf("%w: %v", ErrClubNotFound, err)
@@ -654,12 +702,8 @@ func (s *ClubService) DeleteClub(ctx context.Context, clubID, requesterID string
 
 // RegenerateJoinCode rotates the club's invite code. Admins only.
 func (s *ClubService) RegenerateJoinCode(ctx context.Context, clubID, requesterID string) (string, error) {
-	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
-	if err != nil {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageSettings); err != nil {
 		return "", err
-	}
-	if !isAdmin {
-		return "", ErrClubNotAdmin
 	}
 	code, err := s.repo.RegenerateJoinCode(ctx, clubID)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -680,24 +724,78 @@ func (s *ClubService) LeaveClub(ctx context.Context, clubID, userID string) erro
 	return err
 }
 
-// UpdateMemberRole allows a club admin to promote or demote another member.
-func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID, targetID string, isAdmin bool) error {
-	reqIsAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+// UpdateMemberRole promotes a member to moderator, demotes one, and/or
+// re-grants what a moderator may do. Requires the moderator-management
+// capability, which the owner holds implicitly.
+//
+// The owner's own role is not editable — they are the club's root of authority
+// — and the last remaining moderator cannot be demoted.
+func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID, targetID string, in *model.UpdateClubMemberInput) error {
+	if err := s.require(ctx, clubID, requesterID, model.PermManageModerators); err != nil {
+		return err
+	}
+	targetRole, err := s.repo.GetMemberRole(ctx, clubID, targetID)
 	if err != nil {
 		return err
 	}
-	if !reqIsAdmin {
-		return ErrClubNotAdmin
+	if targetRole.IsOwner {
+		return ErrCannotEditOwner
 	}
-	if !isAdmin {
-		// Demotion: enforce the last-admin invariant atomically.
+
+	moderator := in.Moderator()
+	if moderator != nil && !*moderator {
+		// Demotion: enforce the last-moderator invariant atomically.
 		err := s.repo.DemoteMemberGuarded(ctx, clubID, targetID)
 		if errors.Is(err, repository.ErrClubLastAdmin) {
 			return ErrClubLastAdmin
 		}
+		if errors.Is(err, repository.ErrClubMemberNotFound) {
+			return ErrClubNotMember
+		}
 		return err
 	}
-	return s.repo.UpdateMemberRole(ctx, clubID, targetID, isAdmin)
+
+	// Promotion, or a re-grant on somebody already promoted.
+	permissions := targetRole.Permissions
+	if !targetRole.IsModerator {
+		permissions = model.DefaultModeratorPermissions(model.ClubModeratorPermissions)
+	}
+	if in.Permissions != nil {
+		permissions, err = s.delegatable(ctx, clubID, requesterID, *in.Permissions)
+		if err != nil {
+			return err
+		}
+	}
+	if moderator == nil && !targetRole.IsModerator {
+		// A grant with nothing to grant it to.
+		return ErrNotModerator
+	}
+	if err := s.repo.PromoteMember(ctx, clubID, targetID, permissions); err != nil {
+		if errors.Is(err, repository.ErrClubMemberNotFound) {
+			return ErrClubNotMember
+		}
+		return err
+	}
+	return nil
+}
+
+// delegatable narrows a requested grant to the recognised capabilities the
+// granter holds themselves, so a moderator with manage_moderators can share
+// their own reach but never manufacture more of it. Owners hold everything, so
+// for them this only filters unknown keys.
+func (s *ClubService) delegatable(ctx context.Context, clubID, granterID string, requested []string) ([]string, error) {
+	granter, err := s.repo.GetMemberRole(ctx, clubID, granterID)
+	if err != nil {
+		return nil, err
+	}
+	wanted := model.NormaliseModeratorPermissions(model.ClubModeratorPermissions, requested)
+	out := make([]string, 0, len(wanted))
+	for _, p := range wanted {
+		if granter.Can(p) {
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }
 
 // AdminList returns every club, private ones included, for the platform admin

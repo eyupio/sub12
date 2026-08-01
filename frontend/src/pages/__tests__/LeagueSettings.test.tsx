@@ -55,13 +55,51 @@ function makeConfig(partial: Partial<LeagueConfig> = {}): LeagueConfig {
 }
 
 function makeMember(partial: Partial<LeagueMember> = {}): LeagueMember {
-  return {
+  const base = {
     user_id: 'user-1',
-    display_name: 'Admin User',
+    display_name: 'Owner User',
     is_admin: true,
+    is_moderator: true,
+    // The league's created_by, so user-1 is the owner in every fixture.
+    is_owner: true,
+    permissions: LEAGUE_PERMISSIONS.map(p => p.key),
     joined_at: '2026-01-01T00:00:00Z',
-    ...partial,
-  } as LeagueMember
+  }
+  const member = { ...base, ...partial } as LeagueMember
+  // Fixtures set is_admin for brevity; keep the two spellings consistent.
+  if (partial.is_admin !== undefined && partial.is_moderator === undefined) {
+    member.is_moderator = partial.is_admin
+  }
+  if (partial.user_id !== undefined && partial.is_owner === undefined) {
+    member.is_owner = partial.user_id === 'user-1'
+  }
+  if (!member.is_owner && partial.permissions === undefined) {
+    member.permissions = member.is_moderator ? ['manage_members'] : []
+  }
+  return member
+}
+
+const LEAGUE_PERMISSIONS = [
+  { key: 'manage_members', label: 'Manage members', description: '', default: true },
+  { key: 'verify_scores', label: 'Verify scores', description: '', default: true },
+  { key: 'moderate_content', label: 'Moderate content', description: '', default: true },
+  { key: 'manage_seasons', label: 'Manage seasons', description: '', default: false },
+  { key: 'manage_settings', label: 'Manage settings', description: '', default: false },
+  { key: 'manage_support', label: 'Handle support', description: '', default: false },
+  { key: 'manage_moderators', label: 'Manage moderators', description: '', default: false },
+]
+
+/** The owner's view of the delegation catalogue. */
+function mockModeratorPermissions() {
+  vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
+    catalogue: LEAGUE_PERMISSIONS,
+    role: {
+      is_member: true,
+      is_moderator: true,
+      is_owner: true,
+      permissions: LEAGUE_PERMISSIONS.map(p => p.key),
+    },
+  })
 }
 
 describe('LeagueSettings rules save flow', () => {
@@ -81,6 +119,7 @@ describe('LeagueSettings rules save flow', () => {
     vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
     vi.spyOn(leagueApi, 'updateConfig').mockResolvedValue(makeConfig({ ends_on: '2026-12-01' }))
+    mockModeratorPermissions()
   })
 
   afterEach(() => {
@@ -125,6 +164,7 @@ describe('LeagueSettings seasons and rounds', () => {
     vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
     vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
+    mockModeratorPermissions()
   })
 
   afterEach(() => {
@@ -178,6 +218,7 @@ describe('LeagueSettings member roles', () => {
     vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
     vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'updateMember').mockResolvedValue({ updated: true })
+    mockModeratorPermissions()
   })
 
   afterEach(() => {
@@ -194,22 +235,22 @@ describe('LeagueSettings member roles', () => {
     )
   }
 
-  it('promotes another member to admin', async () => {
+  it('promotes another member to moderator', async () => {
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
       items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: false })],
     })
 
     renderSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: /promote second shooter to admin/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /promote second shooter to moderator/i }))
     fireEvent.click(await screen.findByRole('button', { name: /^promote$/i }))
 
     await waitFor(() =>
-      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: true }),
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_moderator: true }),
     )
   })
 
-  it('demotes a co-admin back to member', async () => {
+  it('demotes a co-moderator back to member', async () => {
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
       items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
     })
@@ -220,13 +261,13 @@ describe('LeagueSettings member roles', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^demote$/i }))
 
     await waitFor(() =>
-      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: false }),
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_moderator: false }),
     )
   })
 
   // Removing a member is destructive and must stay behind its own confirm
   // step — never share the role dialog's confirm button.
-  it('does not offer a remove control for co-admins', async () => {
+  it('does not offer a remove control for co-moderators', async () => {
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
       items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
     })

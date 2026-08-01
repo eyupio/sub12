@@ -100,7 +100,7 @@ export function PostComposer({ leagueId, clubId, queryKey, groupPostVisibility }
         {scopedLabel ? (
           <div
             className="flex items-center gap-1.5 text-[11px] tracking-wide text-muted"
-            title="The league or club admin controls this setting."
+            title="The league or club owner controls this setting."
           >
             <span className="tracking-widest uppercase">Visibility</span>
             <scopedLabel.icon size={12} />

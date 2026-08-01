@@ -111,28 +111,50 @@ func (s *ModerationService) ListAll(ctx context.Context, status string, limit in
 	return s.reports.List(ctx, status, "", "", limit)
 }
 
-// ListForLeague returns reports scoped to a specific league, gated on the
-// caller being an admin of that league.
-func (s *ModerationService) ListForLeague(ctx context.Context, leagueID, adminID, status string, limit int) ([]*model.Report, error) {
-	admin, err := s.leagues.IsAdmin(ctx, leagueID, adminID)
+// leagueCan / clubCan gate the scoped moderation queues on the content
+// moderation capability, which a league or club owner delegates.
+func (s *ModerationService) leagueCan(ctx context.Context, leagueID, userID string) error {
+	role, err := s.leagues.GetMemberRole(ctx, leagueID, userID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if !admin {
-		return nil, ErrNotAdmin
+	if !role.IsModerator {
+		return ErrNotAdmin
+	}
+	if !role.Can(model.PermModerateContent) {
+		return ErrNotPermitted
+	}
+	return nil
+}
+
+func (s *ModerationService) clubCan(ctx context.Context, clubID, userID string) error {
+	role, err := s.clubs.GetMemberRole(ctx, clubID, userID)
+	if err != nil {
+		return err
+	}
+	if !role.IsModerator {
+		return ErrNotAdmin
+	}
+	if !role.Can(model.PermModerateContent) {
+		return ErrNotPermitted
+	}
+	return nil
+}
+
+// ListForLeague returns reports scoped to a specific league, gated on the
+// caller holding the league's content moderation capability.
+func (s *ModerationService) ListForLeague(ctx context.Context, leagueID, adminID, status string, limit int) ([]*model.Report, error) {
+	if err := s.leagueCan(ctx, leagueID, adminID); err != nil {
+		return nil, err
 	}
 	return s.reports.List(ctx, status, "league", leagueID, limit)
 }
 
 // ListForClub returns reports scoped to a specific club, gated on the caller
-// being an admin of that club.
+// holding the club's content moderation capability.
 func (s *ModerationService) ListForClub(ctx context.Context, clubID, adminID, status string, limit int) ([]*model.Report, error) {
-	admin, err := s.clubs.IsAdmin(ctx, clubID, adminID)
-	if err != nil {
+	if err := s.clubCan(ctx, clubID, adminID); err != nil {
 		return nil, err
-	}
-	if !admin {
-		return nil, ErrNotAdmin
 	}
 	return s.reports.List(ctx, status, "club", clubID, limit)
 }
@@ -156,12 +178,8 @@ func (s *ModerationService) Decide(ctx context.Context, reportID, adminID string
 // DecideForLeague is Decide with an additional check that the report is
 // scoped to the given league.
 func (s *ModerationService) DecideForLeague(ctx context.Context, leagueID, reportID, adminID string, in *model.DecideReportInput) (*model.Report, error) {
-	admin, err := s.leagues.IsAdmin(ctx, leagueID, adminID)
-	if err != nil {
+	if err := s.leagueCan(ctx, leagueID, adminID); err != nil {
 		return nil, err
-	}
-	if !admin {
-		return nil, ErrNotAdmin
 	}
 	if !model.IsValidModerationAction(in.Action) {
 		return nil, ErrReportInvalidAction
@@ -182,12 +200,8 @@ func (s *ModerationService) DecideForLeague(ctx context.Context, leagueID, repor
 // DecideForClub is Decide with an additional check that the report is scoped
 // to the given club.
 func (s *ModerationService) DecideForClub(ctx context.Context, clubID, reportID, adminID string, in *model.DecideReportInput) (*model.Report, error) {
-	admin, err := s.clubs.IsAdmin(ctx, clubID, adminID)
-	if err != nil {
+	if err := s.clubCan(ctx, clubID, adminID); err != nil {
 		return nil, err
-	}
-	if !admin {
-		return nil, ErrNotAdmin
 	}
 	if !model.IsValidModerationAction(in.Action) {
 		return nil, ErrReportInvalidAction

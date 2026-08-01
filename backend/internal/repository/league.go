@@ -55,8 +55,9 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 	}
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO league_members (league_id, user_id, is_admin) VALUES ($1, $2, true)
-	`, league.ID, userID)
+		INSERT INTO league_members (league_id, user_id, is_admin, moderator_permissions)
+		VALUES ($1, $2, true, $3)
+	`, league.ID, userID, model.AllModeratorPermissions(model.LeagueModeratorPermissions))
 	if err != nil {
 		return nil, fmt.Errorf("insert creator as member: %w", err)
 	}
@@ -550,19 +551,80 @@ func sameScore(a, b *float64) bool {
 // Authorization helpers
 // ---------------------------------------------------------------------------
 
-func (r *LeagueRepository) IsAdmin(ctx context.Context, leagueID, userID string) (bool, error) {
-	var isAdmin bool
-	err := r.db.QueryRow(ctx,
-		`SELECT is_admin FROM league_members WHERE league_id = $1 AND user_id = $2`,
-		leagueID, userID,
-	).Scan(&isAdmin)
+// GetMemberRole resolves a user's standing in a league: membership, whether
+// they were promoted to moderator, whether they own the league, and the
+// capabilities the owner delegated to them. A missing league or a stranger
+// yields the zero role rather than an error — callers turn that into a
+// not-a-moderator refusal.
+func (r *LeagueRepository) GetMemberRole(ctx context.Context, leagueID, userID string) (*model.MemberRole, error) {
+	role := &model.MemberRole{Permissions: []string{}}
+	if leagueID == "" || userID == "" {
+		return role, nil
+	}
+	var permissions []string
+	err := r.db.QueryRow(ctx, `
+		SELECT l.created_by = $2,
+		       lm.user_id IS NOT NULL,
+		       COALESCE(lm.is_admin, FALSE),
+		       COALESCE(lm.moderator_permissions, '{}'::text[])
+		FROM leagues l
+		LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $2
+		WHERE l.id = $1
+	`, leagueID, userID).Scan(&role.IsOwner, &role.IsMember, &role.IsModerator, &permissions)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
+		return role, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("check admin: %w", err)
+		return nil, fmt.Errorf("get league member role: %w", err)
 	}
-	return isAdmin, nil
+	// The owner runs the league whether or not they hold a membership row, and
+	// holds every capability without anything being granted to them.
+	if role.IsOwner {
+		role.IsModerator = true
+		permissions = model.AllModeratorPermissions(model.LeagueModeratorPermissions)
+	}
+	if permissions != nil {
+		role.Permissions = permissions
+	}
+	return role, nil
+}
+
+// IsModerator reports whether the user runs the league — its owner, or a
+// member promoted to moderator. It says nothing about which capabilities they
+// were delegated; use GetMemberRole for that.
+func (r *LeagueRepository) IsModerator(ctx context.Context, leagueID, userID string) (bool, error) {
+	role, err := r.GetMemberRole(ctx, leagueID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.IsModerator, nil
+}
+
+// Can reports whether the user holds one delegated capability in the league.
+// Owners always can.
+func (r *LeagueRepository) Can(ctx context.Context, leagueID, userID, permission string) (bool, error) {
+	role, err := r.GetMemberRole(ctx, leagueID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.Can(permission), nil
+}
+
+// SetModeratorPermissions replaces a moderator's delegated capability grant.
+// Returns ErrNotFound when the target is not a promoted member.
+func (r *LeagueRepository) SetModeratorPermissions(ctx context.Context, leagueID, userID string, permissions []string) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE league_members SET moderator_permissions = $3
+		 WHERE league_id = $1 AND user_id = $2 AND is_admin = TRUE`,
+		leagueID, userID, permissions,
+	)
+	if err != nil {
+		return fmt.Errorf("set league moderator permissions: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *LeagueRepository) IsMember(ctx context.Context, leagueID, userID string) (bool, error) {
@@ -1223,11 +1285,14 @@ func (r *LeagueRepository) UpdateScoreVerification(ctx context.Context, scoreCar
 
 func (r *LeagueRepository) ListMembers(ctx context.Context, leagueID string) ([]*model.LeagueMember, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT lm.user_id, u.display_name, lm.is_admin, lm.joined_at
+		SELECT lm.user_id, u.display_name, lm.is_admin, lm.joined_at,
+		       COALESCE(lm.moderator_permissions, '{}'::text[]),
+		       lm.user_id = l.created_by
 		FROM league_members lm
-		JOIN users u ON u.id = lm.user_id
+		JOIN users u   ON u.id = lm.user_id
+		JOIN leagues l ON l.id = lm.league_id
 		WHERE lm.league_id = $1
-		ORDER BY lm.is_admin DESC, lm.joined_at ASC
+		ORDER BY lm.user_id = l.created_by DESC, lm.is_admin DESC, lm.joined_at ASC
 	`, leagueID)
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
@@ -1237,9 +1302,20 @@ func (r *LeagueRepository) ListMembers(ctx context.Context, leagueID string) ([]
 	var members []*model.LeagueMember
 	for rows.Next() {
 		var m model.LeagueMember
-		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.IsAdmin, &m.JoinedAt); err != nil {
+		var permissions []string
+		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.IsAdmin, &m.JoinedAt, &permissions, &m.IsOwner); err != nil {
 			return nil, fmt.Errorf("scan member: %w", err)
 		}
+		m.Permissions = permissions
+		if m.Permissions == nil {
+			m.Permissions = []string{}
+		}
+		// The owner runs the league by construction, and holds everything.
+		if m.IsOwner {
+			m.IsAdmin = true
+			m.Permissions = model.AllModeratorPermissions(model.LeagueModeratorPermissions)
+		}
+		m.IsModerator = m.IsAdmin
 		members = append(members, &m)
 	}
 	return members, rows.Err()
@@ -1261,12 +1337,15 @@ func (r *LeagueRepository) RemoveMember(ctx context.Context, leagueID, memberID 
 	return nil
 }
 
-// PromoteMember grants admin rights to an existing league member.
+// PromoteMember makes an existing league member a moderator, granting the
+// supplied capabilities. Re-promoting an existing moderator re-grants, which
+// is how the owner edits a moderator's delegated capabilities.
 // Returns ErrNotFound when the target is not a member.
-func (r *LeagueRepository) PromoteMember(ctx context.Context, leagueID, userID string) error {
+func (r *LeagueRepository) PromoteMember(ctx context.Context, leagueID, userID string, permissions []string) error {
 	tag, err := r.db.Exec(ctx,
-		`UPDATE league_members SET is_admin = TRUE WHERE league_id = $1 AND user_id = $2`,
-		leagueID, userID,
+		`UPDATE league_members SET is_admin = TRUE, moderator_permissions = $3
+		 WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID, permissions,
 	)
 	if err != nil {
 		return fmt.Errorf("promote league member: %w", err)
@@ -1277,9 +1356,9 @@ func (r *LeagueRepository) PromoteMember(ctx context.Context, leagueID, userID s
 	return nil
 }
 
-// DemoteMemberGuarded clears admin rights for the target member, checking the
-// last-admin invariant inside the same transaction so two concurrent demotions
-// cannot leave the league without an admin.
+// DemoteMemberGuarded clears moderator rights for the target member, checking
+// the last-moderator invariant inside the same transaction so two concurrent
+// demotions cannot leave the league without anybody able to run it.
 func (r *LeagueRepository) DemoteMemberGuarded(ctx context.Context, leagueID, userID string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -1287,13 +1366,28 @@ func (r *LeagueRepository) DemoteMemberGuarded(ctx context.Context, leagueID, us
 	}
 	defer tx.Rollback(ctx)
 
-	var adminCount int
-	err = tx.QueryRow(ctx,
-		`SELECT COUNT(*) FROM league_members WHERE league_id = $1 AND is_admin = TRUE FOR UPDATE`,
+	// Lock the moderator rows and count them in Go: PostgreSQL rejects
+	// FOR UPDATE alongside an aggregate, so `SELECT COUNT(*) ... FOR UPDATE`
+	// fails outright rather than locking anything.
+	rows, err := tx.Query(ctx,
+		`SELECT user_id FROM league_members WHERE league_id = $1 AND is_admin = TRUE FOR UPDATE`,
 		leagueID,
-	).Scan(&adminCount)
+	)
 	if err != nil {
-		return fmt.Errorf("count league admins: %w", err)
+		return fmt.Errorf("lock league moderators: %w", err)
+	}
+	adminCount := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan league moderator: %w", err)
+		}
+		adminCount++
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iter league moderators: %w", err)
 	}
 
 	var isAdmin bool
@@ -1312,7 +1406,8 @@ func (r *LeagueRepository) DemoteMemberGuarded(ctx context.Context, leagueID, us
 	}
 
 	_, err = tx.Exec(ctx,
-		`UPDATE league_members SET is_admin = FALSE WHERE league_id = $1 AND user_id = $2`,
+		`UPDATE league_members SET is_admin = FALSE, moderator_permissions = '{}'
+		 WHERE league_id = $1 AND user_id = $2`,
 		leagueID, userID,
 	)
 	if err != nil {
@@ -1371,27 +1466,40 @@ func (r *LeagueRepository) GetLeagueByScoreCardID(ctx context.Context, scoreCard
 	return &league, nil
 }
 
-// IsAdminForScoreCard checks whether the given user is an admin of the league
-// that owns the given score card.
-func (r *LeagueRepository) IsAdminForScoreCard(ctx context.Context, scoreCardID, userID string) (bool, string, error) {
+// GetMemberRoleForScoreCard resolves the caller's standing in the league that
+// owns the given score card, so a verification action can be gated on the
+// delegated capability without a second round trip to find the league.
+func (r *LeagueRepository) GetMemberRoleForScoreCard(ctx context.Context, scoreCardID, userID string) (*model.MemberRole, string, error) {
 	var leagueID string
-	var isAdmin bool
+	role := &model.MemberRole{Permissions: []string{}}
+	var permissions []string
 	err := r.db.QueryRow(ctx, `
-		SELECT l.id, COALESCE(lm.is_admin, false)
+		SELECT l.id,
+		       l.created_by = $2,
+		       lm.user_id IS NOT NULL,
+		       COALESCE(lm.is_admin, FALSE),
+		       COALESCE(lm.moderator_permissions, '{}'::text[])
 		FROM leagues l
 		JOIN seasons s  ON s.league_id = l.id
 		JOIN rounds rd  ON rd.season_id = s.id
 		JOIN score_cards sc ON sc.league_round_id = rd.id
 		LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $2
 		WHERE sc.id = $1
-	`, scoreCardID, userID).Scan(&leagueID, &isAdmin)
+	`, scoreCardID, userID).Scan(&leagueID, &role.IsOwner, &role.IsMember, &role.IsModerator, &permissions)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, "", ErrNotFound
+		return nil, "", ErrNotFound
 	}
 	if err != nil {
-		return false, "", fmt.Errorf("check admin for score card: %w", err)
+		return nil, "", fmt.Errorf("get league member role for score card: %w", err)
 	}
-	return isAdmin, leagueID, nil
+	if role.IsOwner {
+		role.IsModerator = true
+		permissions = model.AllModeratorPermissions(model.LeagueModeratorPermissions)
+	}
+	if permissions != nil {
+		role.Permissions = permissions
+	}
+	return role, leagueID, nil
 }
 
 // GetScoreCardOwner returns the user_id and current verification status of a

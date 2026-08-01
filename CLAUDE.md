@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **114** (000001–000114). Latest: `000114_auto_verify_unverified_league_cards`.
+Current migration count: **115** (000001–000115). Latest: `000115_moderator_permissions`.
 
 ## Critical Migration Rules
 
@@ -208,6 +208,40 @@ stable name and keep their UUID.
   redirecting a signed-in user, since the detail pages pass the route param
   straight to endpoints that don't resolve slugs.
 
+### Moderator roles
+
+Members a league or club **owner** promotes to help run it are **moderators**,
+never "admins" — `admin` is the platform-wide `users.role`, and a moderator's
+reach stops at the one league or club they were promoted in.
+
+- **Owner** is `leagues.created_by` / `clubs.created_by`. They hold every
+  capability implicitly, are never gated by the grant column, and their own role
+  cannot be edited or demoted. Deleting a club is owner-only and never
+  delegated.
+- **Capabilities** live in `model/moderator.go`
+  (`LeagueModeratorPermissions` / `ClubModeratorPermissions`) and are stored per
+  membership row in `league_members.moderator_permissions` /
+  `club_members.moderator_permissions`. Adding one means adding a catalogue
+  entry and gating the call site — the settings UI renders whatever the backend
+  serves, so no frontend change is needed.
+- **Resolution** goes through `GetMemberRole` on the league/club repository,
+  which returns `model.MemberRole` (`is_member`, `is_moderator`, `is_owner`,
+  effective `permissions`). Services gate with `require(ctx, id, userID, perm)`;
+  `requireForScoreCard` does the same for actions addressed by card. A stranger
+  or missing entity resolves to the zero role rather than an error.
+- **Errors** distinguish the two refusals: `ErrNotAdmin` / `ErrClubNotAdmin`
+  ("you don't run this") from `ErrNotPermitted` / `ErrClubNotPermitted` ("the
+  owner didn't delegate this"). The latter wrap the former, so every handler
+  branch that already returned 403 keeps doing so.
+- **Promotion** grants the catalogue's `Default` set — the day-to-day duties,
+  never `manage_moderators` or `manage_settings`. Demotion clears the grant, so
+  a re-promotion never resurrects an old one. A moderator holding
+  `manage_moderators` can only delegate capabilities they hold themselves.
+- **Wire compatibility:** `is_admin` is still emitted and still accepted
+  alongside `is_moderator`, so a Capacitor app running an older bundle keeps
+  working. Member listings redact `permissions` for viewers who don't help run
+  the group.
+
 ### Public (no auth)
 
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
@@ -226,8 +260,9 @@ stable name and keep their UUID.
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
-- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (member confirm + admin verify/amend/reject/reopen + audit trail). Leagues with `require_score_verification` off auto-verify submissions (create/graduate/submit and on config change), so cards never strand outside the standings; a threshold of 0 with verification on counts as 1. Rejected cards must be reopened before amending; an owner editing a rejected card is audited as a reopen. Non-members only see verified cards and counts. Verification outcomes notify the shooter (`score_verified`/`score_rejected`/`score_amended`).
-- **Clubs:** Create, update, delete (club admins, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
+- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons, rounds, join requests, score verification (member confirm + moderator verify/amend/reject/reopen + audit trail). Leagues with `require_score_verification` off auto-verify submissions (create/graduate/submit and on config change), so cards never strand outside the standings; a threshold of 0 with verification on counts as 1. Rejected cards must be reopened before amending; an owner editing a rejected card is audited as a reopen. Non-members only see verified cards and counts. Verification outcomes notify the shooter (`score_verified`/`score_rejected`/`score_amended`).
+- **Clubs:** Create, update, delete (the club owner, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
+- **Moderators and delegated capabilities:** see "Moderator roles" above. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` return the delegable catalogue plus the caller's own role; `PATCH .../members/{userId}` promotes, demotes and re-grants.
 - **Feature board:** `GET /feature-requests` (recent) and `/feature-requests/ranking` (most-voted) list the ideas visible to the viewer — platform ideas for everyone, league/club ideas for members of that league or club. `POST /feature-requests/{id}/vote` toggles the viewer's upvote, `/comments` carries the discussion, and `GET /feature-requests/{id}/events` returns the request's history (created, status, priority and owner changes). Rows come back enriched with requester, owner, scope *name* and vote/comment counts so the board never renders a raw ID. New ideas are not created here: the board's composer opens a `feature`-category support ticket, which an admin refines onto the board via `POST /admin/tickets/{id}/feature-request`. Admins set `status` and `priority` with `PATCH /admin/feature-requests/{id}`; both changes are recorded in the history. The UI collapses the eight statuses into five stages (under review, planned, in progress, shipped, not planned) defined once in `frontend/src/utils/featureBoard.ts`.
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users
