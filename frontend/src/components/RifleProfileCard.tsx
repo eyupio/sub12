@@ -81,13 +81,6 @@ export function RifleProfileCard({
         {/* Action icons — gear mode only */}
         {mode === 'gear' && (
           <div className="absolute left-3 top-5 flex flex-col gap-2.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}
               disabled={isUploadPending}
@@ -158,7 +151,9 @@ export function RifleProfileCard({
   }
 
   // In the gear list the whole card opens the rifle showcase; the action icons
-  // inside stop propagation so they still work.
+  // inside stop propagation so they still work. The file input lives outside the
+  // link because the click() we fire on it would otherwise bubble to the anchor
+  // and navigate away before the picker returns.
   const wrapped = mode === 'gear'
     ? <Link to="/gear/rifles/$id" params={{ id: rifle.id }} className="block">{cardContent}</Link>
     : cardContent
@@ -166,6 +161,15 @@ export function RifleProfileCard({
   return (
     <>
       {wrapped}
+      {mode === 'gear' && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      )}
       {editingFile && (
         <ImageEditor
           file={editingFile}
