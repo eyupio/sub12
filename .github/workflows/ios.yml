@@ -1,0 +1,336 @@
+name: iOS IPA
+
+# Builds the Capacitor iOS app on a Blacksmith macOS runner (Apple Silicon M4),
+# mirroring android.yml as closely as iOS distribution rules allow.
+#
+#   pull_request  → unsigned .ipa, uploaded as a workflow artifact only
+#   push to main  → signed .ipa attached to the rolling `ios-latest` pre-release
+#                   (only when signing secrets are configured; otherwise the
+#                   unsigned build stays an artifact)
+#   tag v*        → signed .ipa attached to that version's GitHub Release, and
+#                   uploaded to TestFlight when App Store Connect keys are set
+#   manual run    → same as the branch/tag it is dispatched from
+#
+# Unlike Android, an unsigned iOS build is NOT installable. Apple requires every
+# .ipa to be signed by a paid Apple Developer Program account against a
+# provisioning profile, so without the IOS_CERTIFICATE_* / IOS_PROVISIONING_*
+# secrets this workflow is a compile check: it proves the Xcode project, pods and
+# web bundle still build, but the artifact needs re-signing before it will run on
+# a device.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build IPA
+    # macOS 15 rather than macos-latest: Blacksmith tracks the GitHub-hosted
+    # images, and the 15 image ships the Xcode 16 line that Capacitor 6 and the
+    # iOS 13.0 pod deployment target are tested against.
+    runs-on: blacksmith-6vcpu-macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: vars
+        run: |
+          set -euo pipefail
+          # CFBundleShortVersionString must be a plain dotted number, so the
+          # Android scheme of appending a short SHA isn't available here. The
+          # build number carries the run identity instead.
+          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          else
+            version="0.0.${{ github.run_number }}"
+          fi
+          echo "version_name=$version" >> "$GITHUB_OUTPUT"
+          # Monotonic across runs so App Store Connect accepts each upload.
+          echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          pod --version || true
+          node --version
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build web bundle
+        working-directory: frontend
+        run: npm run build
+
+      - name: Sync Capacitor iOS project
+        working-directory: frontend
+        run: npx cap sync ios
+
+      - name: Install pods
+        working-directory: frontend/ios/App
+        run: |
+          set -euo pipefail
+          # cap sync runs pod install when CocoaPods is on PATH; re-running is
+          # cheap and makes the workspace a hard requirement rather than a
+          # side effect of the sync step.
+          command -v pod >/dev/null || sudo gem install cocoapods --no-document
+          pod install --repo-update
+
+      - name: Detect signing configuration
+        id: signing
+        env:
+          CERT_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CERT_BASE64:-}" ] && [ -n "${PROFILE_BASE64:-}" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No IOS_CERTIFICATE_BASE64 / IOS_PROVISIONING_PROFILE_BASE64 secrets set — producing an unsigned .ipa. It verifies that the iOS app builds, but Apple will not let it install on a device until it is re-signed."
+          fi
+
+      - name: Install signing assets
+        id: profile
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          CERT_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/signing"
+          mkdir -p "$workdir"
+
+          # A dedicated keychain keeps the imported identity out of the login
+          # keychain and lets codesign run without an interactive unlock.
+          keychain="$workdir/build.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          echo "$CERT_BASE64" | base64 -d > "$workdir/certificate.p12"
+          security import "$workdir/certificate.p12" \
+            -k "$keychain" -P "${CERT_PASSWORD:-}" -A \
+            -t cert -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+
+          echo "$PROFILE_BASE64" | base64 -d > "$workdir/profile.mobileprovision"
+          security cms -D -i "$workdir/profile.mobileprovision" > "$workdir/profile.plist"
+          uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$workdir/profile.plist")"
+          name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$workdir/profile.plist")"
+          team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$workdir/profile.plist")"
+          app_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$workdir/profile.plist")"
+          bundle_id="${app_id#*.}"
+          # A wildcard profile carries no concrete bundle id; fall back to the
+          # one capacitor.config.ts declares.
+          if [ "$bundle_id" = "*" ]; then
+            bundle_id="uk.sub12.app"
+          fi
+
+          profiles="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$profiles"
+          cp "$workdir/profile.mobileprovision" "$profiles/$uuid.mobileprovision"
+
+          echo "Installed profile '$name' ($uuid) for $bundle_id, team $team"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "team=$team" >> "$GITHUB_OUTPUT"
+          echo "bundle_id=$bundle_id" >> "$GITHUB_OUTPUT"
+
+      - name: Archive
+        working-directory: frontend/ios/App
+        env:
+          BUNDLE_ID: ${{ steps.profile.outputs.bundle_id }}
+        run: |
+          set -euo pipefail
+          # The archive is deliberately unsigned: applying manual signing here
+          # would also push the app's provisioning profile onto every CocoaPods
+          # framework target, which then fails to match. exportArchive re-signs
+          # the app and its embedded frameworks from ExportOptions.plist, so the
+          # signed and unsigned paths share one archive step.
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            MARKETING_VERSION='${{ steps.vars.outputs.version_name }}' \
+            CURRENT_PROJECT_VERSION='${{ steps.vars.outputs.build_number }}' \
+            ${BUNDLE_ID:+PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"} \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            archive
+
+      - name: Export signed IPA
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          # `app-store` feeds TestFlight. Use `ad-hoc` (installs only on UDIDs
+          # registered in the profile) or `development` by setting the
+          # IOS_EXPORT_METHOD repository variable.
+          EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD || 'app-store' }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          TEAM_ID: ${{ steps.profile.outputs.team }}
+          BUNDLE_ID: ${{ steps.profile.outputs.bundle_id }}
+        run: |
+          set -euo pipefail
+          if [ "$EXPORT_METHOD" = "development" ]; then
+            certificate="Apple Development"
+          else
+            certificate="Apple Distribution"
+          fi
+
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>$EXPORT_METHOD</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>$certificate</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key><string>$PROFILE_NAME</string>
+            </dict>
+            <key>stripSwiftSymbols</key><true/>
+            <key>compileBitcode</key><false/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+      - name: Package unsigned IPA
+        if: steps.signing.outputs.signed != 'true'
+        run: |
+          set -euo pipefail
+          # An .ipa is just a zip with the .app under Payload/. Without a signing
+          # identity there is nothing to export, so assemble it by hand.
+          mkdir -p "$RUNNER_TEMP/payload/Payload" "$RUNNER_TEMP/export"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" \
+            "$RUNNER_TEMP/payload/Payload/"
+          (cd "$RUNNER_TEMP/payload" && zip -qry "$RUNNER_TEMP/export/App.ipa" Payload)
+
+      - name: Stage IPA for upload
+        id: stage
+        run: |
+          set -euo pipefail
+          mkdir -p dist-ipa
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            variant="signed"
+          else
+            variant="unsigned"
+          fi
+          ipa="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' | head -n1)"
+          if [ -z "$ipa" ]; then
+            echo "::error::No .ipa produced"
+            exit 1
+          fi
+          name="sub12-${{ steps.vars.outputs.version_name }}-$variant.ipa"
+          cp "$ipa" "dist-ipa/$name"
+          # A fixed filename alongside the versioned one keeps the rolling
+          # download URL stable across releases.
+          cp "$ipa" "dist-ipa/sub12.ipa"
+          echo "variant=$variant" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          ls -lh dist-ipa
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/signing" "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sub12-ipa-${{ steps.stage.outputs.variant }}
+          path: dist-ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      # ── Publish ───────────────────────────────────────────────────────────
+      # Only signed builds are published. An unsigned .ipa behind a "download the
+      # iOS app" link would be a dead end — iOS refuses to install it.
+      - name: Upload to TestFlight
+        if: >-
+          steps.signing.outputs.signed == 'true'
+          && (vars.IOS_EXPORT_METHOD || 'app-store') == 'app-store'
+          && github.event_name == 'push'
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPSTORE_KEY_ID:-}" ] || [ -z "${APPSTORE_ISSUER_ID:-}" ]; then
+            echo "::notice::No APPSTORE_KEY_ID / APPSTORE_ISSUER_ID secrets — skipping TestFlight upload."
+            exit 0
+          fi
+          # altool looks the key up by ID in this fixed location.
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          key="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          printf '%s' "$APPSTORE_PRIVATE_KEY" > "$key"
+          trap 'rm -f "$key"' EXIT
+          xcrun altool --upload-app \
+            -f dist-ipa/sub12.ipa \
+            -t ios \
+            --apiKey "$APPSTORE_KEY_ID" \
+            --apiIssuer "$APPSTORE_ISSUER_ID"
+
+      - name: Publish rolling ios-latest release
+        if: steps.signing.outputs.signed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-latest
+          name: iOS IPA (latest main)
+          body: |
+            Automatically built from `main` — commit ${{ github.sha }}.
+
+            **Download:** `sub12.ipa` below, or the versioned
+            `${{ steps.stage.outputs.name }}`.
+
+            iOS only installs builds whose provisioning profile lists your
+            device, so this file is for registered test devices. TestFlight is
+            the route for everyone else.
+          prerelease: true
+          make_latest: false
+          files: dist-ipa/*.ipa
+
+      - name: Attach IPA to tagged release
+        if: steps.signing.outputs.signed == 'true' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-ipa/*.ipa

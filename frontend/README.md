@@ -40,18 +40,19 @@ staging/beta build.
 
 ### One-time iOS setup
 
-The `android/` project is committed. The `ios/` project must be generated on a Mac
-(it can't be created on Linux/CI) and then committed:
+Both the `android/` and `ios/` projects are committed, so there is nothing to
+generate — clone, `npm ci`, `npm run build`, then `cd ios/App && pod install`.
+The `ios/` project was originally created on a Mac with `npx cap add ios` (it
+can't be created on Linux/CI); the notes below record what had to be added
+by hand afterwards.
 
-```bash
-npm run build
-npx cap add ios
-cd ios/App && pod install
-```
+`ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` is committed too.
+`xcodebuild -scheme App` in CI needs a *shared* scheme, and Xcode writes only a
+per-user one (under the git-ignored `xcuserdata/`) by default.
 
 The Camera plugin needs usage-description strings or iOS crashes the first time a
-capture/photo-picker is opened. Add these to `ios/App/App/Info.plist` after
-generating the project (Android needs no equivalent — capture goes through the
+capture/photo-picker is opened. These are in `ios/App/App/Info.plist`
+(Android needs no equivalent — capture goes through the
 system camera intent + photo picker, and the `FileProvider` in
 `android/app/src/main/AndroidManifest.xml` is already configured):
 
@@ -84,6 +85,39 @@ android/app/build/outputs/apk/release/app-release-unsigned.apk  # unsigned relea
 ```
 
 **iOS** — Xcode archives to the default Xcode Organizer location (`~/Library/Developer/Xcode/Archives`). For simulator/device runs, the `.app` bundle is written to the Derived Data folder (`~/Library/Developer/Xcode/DerivedData/<project>/Build/Products/`). Export a distributable `.ipa` via Xcode → Product → Archive → Distribute App.
+
+### CI builds
+
+`.github/workflows/android.yml` builds the APK on a Linux runner and
+`.github/workflows/ios.yml` builds the `.ipa` on a Blacksmith macOS runner
+(`blacksmith-6vcpu-macos-15`, Apple Silicon M4). Both run on PRs touching
+`frontend/**`, on pushes to `main`, and on `v*` tags.
+
+The two are not equivalent, because Apple's rules differ from Android's. An APK
+is installable however it is signed, so CI mints a throwaway key when no release
+keystore is configured and every build is downloadable. An `.ipa` will not
+install unless it is signed by a paid Apple Developer Program account against a
+provisioning profile that names the target device. So `ios.yml` defaults to a
+compile check — it archives unsigned, packages the `.app` into a `Payload/` zip,
+and uploads that as a workflow artifact without publishing a release.
+
+To get installable builds out of CI, set these repository secrets:
+
+| Secret | Contents |
+|---|---|
+| `IOS_CERTIFICATE_BASE64` | base64 of the signing certificate `.p12` (Apple Distribution, or Apple Development for a `development` export) |
+| `IOS_CERTIFICATE_PASSWORD` | the `.p12` export password |
+| `IOS_PROVISIONING_PROFILE_BASE64` | base64 of the matching `.mobileprovision` |
+
+With those present the workflow imports the identity into a temporary keychain,
+installs the profile, re-signs through `xcodebuild -exportArchive`, refreshes the
+rolling `ios-latest` pre-release on `main`, and attaches the `.ipa` to `v*`
+releases. Set the `IOS_EXPORT_METHOD` repository variable to `ad-hoc` or
+`development` for direct device installs; it defaults to `app-store`. Adding the
+App Store Connect API key (`APPSTORE_KEY_ID`, `APPSTORE_ISSUER_ID`,
+`APPSTORE_PRIVATE_KEY` — the `.p8` contents) also uploads each push to
+TestFlight, which is the practical way to hand builds to testers who aren't on
+the profile's device list.
 
 ### App icons & splash screens
 
