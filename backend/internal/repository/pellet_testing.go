@@ -395,16 +395,19 @@ func (r *PelletTestRepository) UpdateGroup(ctx context.Context, groupID, session
 		return nil, ErrNotFound
 	}
 
+	// userID is deliberately not a parameter here: ownership is already settled
+	// by the EXISTS check above, and a placeholder the statement never
+	// references has no inferable type, which Postgres rejects outright.
 	group, err := scanGroup(r.db.QueryRow(ctx, `
 		UPDATE pellet_test_groups SET
-			shot_count     = COALESCE($4, shot_count),
-			group_size_mm  = COALESCE($5, group_size_mm),
-			group_size_moa = COALESCE($6, group_size_moa),
-			notes          = COALESCE($7, notes),
+			shot_count     = COALESCE($3, shot_count),
+			group_size_mm  = COALESCE($4, group_size_mm),
+			group_size_moa = COALESCE($5, group_size_moa),
+			notes          = COALESCE($6, notes),
 			updated_at     = NOW()
 		WHERE id = $1 AND session_id = $2
 		RETURNING `+groupCols+`
-	`, groupID, sessionID, userID, in.ShotCount, in.GroupSizeMM, in.GroupSizeMOA, in.Notes))
+	`, groupID, sessionID, in.ShotCount, in.GroupSizeMM, in.GroupSizeMOA, in.Notes))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
