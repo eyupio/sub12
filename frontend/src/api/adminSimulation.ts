@@ -17,6 +17,12 @@ export interface SimulationSettings {
   max_cards_per_persona: number
   hourly_multipliers: number[]
   include_in_public_stats: boolean
+  backdate_days: number
+  weekend_bias: number
+  away_day_chance: number
+  reply_chance: number
+  session_actions: number
+  persona_history_days: number
   last_run_at?: string
   last_action?: string
   last_tick_at?: string
@@ -49,6 +55,12 @@ export interface UpdateSimulationSettingsInput {
   max_cards_per_persona: number
   hourly_multipliers: number[]
   include_in_public_stats: boolean
+  backdate_days: number
+  weekend_bias: number
+  away_day_chance: number
+  reply_chance: number
+  session_actions: number
+  persona_history_days: number
 }
 
 export interface SimulationStatus {
