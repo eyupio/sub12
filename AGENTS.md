@@ -114,7 +114,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **106** (000001–000106). Latest: `000106_gear_comparison_showcase`.
+Current migration count: **107** (000001–000107). Latest: `000107_share_slugs`.
 
 ## Critical Migration Rules
 

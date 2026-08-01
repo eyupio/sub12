@@ -52,18 +52,22 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 	err = tx.QueryRow(ctx, `
 		INSERT INTO clubs (name, description, created_by, type, join_policy)
 		VALUES ($1, $2, $3, $4::club_type, $5::club_join_policy)
-		RETURNING id, name, description, image_url, join_code,
+		RETURNING id, name, coalesce(slug, ''), description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility,
 		          date_format, time_format, timezone,
 		          created_by, created_at::text, updated_at::text
 	`, input.Name, input.Description, userID, clubType, joinPolicy).Scan(
-		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert club: %w", err)
+	}
+
+	if club.Slug, err = syncShareSlug(ctx, tx, SlugEntityClub, club.ID, club.Name, club.Slug); err != nil {
+		return nil, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -84,12 +88,16 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 }
 
 func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (*model.Club, error) {
+	clubID, err := resolveEntityRef(ctx, r.db, SlugEntityClub, clubID)
+	if err != nil {
+		return nil, err
+	}
 	var club model.Club
 	if viewerID == "" {
 		// Unauthenticated: skip member/admin subqueries to avoid invalid UUID cast
 		err := r.db.QueryRow(ctx, `
 			SELECT
-				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 				c.type::text, c.join_policy::text, c.post_visibility,
 				c.date_format, c.time_format, c.timezone,
 				c.created_by, c.created_at::text, c.updated_at::text,
@@ -97,7 +105,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 			FROM clubs c
 			WHERE c.id = $1
 		`, clubID).Scan(
-			&club.ID, &club.Name, &club.Description, &club.ImageURL,
+			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -112,9 +120,9 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		return &club, nil
 	}
 
-	err := r.db.QueryRow(ctx, `
+	err = r.db.QueryRow(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility,
 			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
@@ -124,7 +132,7 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 		FROM clubs c
 		WHERE c.id = $1
 	`, clubID, viewerID).Scan(
-		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -148,7 +156,7 @@ func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID strin
 	if viewerID == "" {
 		err := r.db.QueryRow(ctx, `
 			SELECT
-				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 				c.type::text, c.join_policy::text, c.post_visibility,
 				c.date_format, c.time_format, c.timezone,
 				c.created_by, c.created_at::text, c.updated_at::text,
@@ -157,7 +165,7 @@ func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID strin
 			WHERE UPPER(c.join_code) = UPPER($1)
 			LIMIT 1
 		`, code).Scan(
-			&club.ID, &club.Name, &club.Description, &club.ImageURL,
+			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -174,7 +182,7 @@ func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID strin
 
 	err := r.db.QueryRow(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility,
 			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
@@ -185,7 +193,7 @@ func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID strin
 		WHERE UPPER(c.join_code) = UPPER($1)
 		LIMIT 1
 	`, code, viewerID).Scan(
-		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -205,7 +213,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		// Public clubs directory: hide private clubs from unauthenticated viewers.
 		rows, err := r.db.Query(ctx, `
 			SELECT
-				c.id, c.name, c.description, c.image_url, c.join_code,
+				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 				c.type::text, c.join_policy::text, c.post_visibility,
 				c.date_format, c.time_format, c.timezone,
 				c.created_by, c.created_at::text, c.updated_at::text,
@@ -225,7 +233,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 		for rows.Next() {
 			var club model.Club
 			if err := rows.Scan(
-				&club.ID, &club.Name, &club.Description, &club.ImageURL,
+				&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 				&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 				&club.DateFormat, &club.TimeFormat, &club.Timezone,
 				&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -241,7 +249,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 	// Authenticated viewers see public clubs + private clubs they belong to.
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility,
 			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
@@ -264,7 +272,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 	for rows.Next() {
 		var club model.Club
 		if err := rows.Scan(
-			&club.ID, &club.Name, &club.Description, &club.ImageURL,
+			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -280,7 +288,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			c.id, c.name, c.description, c.image_url, c.join_code,
+			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
 			c.type::text, c.join_policy::text, c.post_visibility,
 			c.date_format, c.time_format, c.timezone,
 			c.created_by, c.created_at::text, c.updated_at::text,
@@ -299,7 +307,7 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 	for rows.Next() {
 		var club model.Club
 		if err := rows.Scan(
-			&club.ID, &club.Name, &club.Description, &club.ImageURL,
+			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 			&club.DateFormat, &club.TimeFormat, &club.Timezone,
 			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -613,13 +621,13 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 		    timezone        = COALESCE($9, timezone),
 		    updated_at      = NOW()
 		WHERE id = $1
-		RETURNING id, name, description, image_url, join_code,
+		RETURNING id, name, coalesce(slug, ''), description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility,
 		          date_format, time_format, timezone,
 		          created_by, created_at::text, updated_at::text,
 		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
 	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
-		&club.ID, &club.Name, &club.Description, &club.ImageURL,
+		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
@@ -630,6 +638,12 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("admin update club: %w", err)
+	}
+
+	// Renaming re-derives the slug; the previous one stays in
+	// share_slug_aliases so links already shared keep resolving.
+	if club.Slug, err = syncShareSlug(ctx, r.db, SlugEntityClub, club.ID, club.Name, club.Slug); err != nil {
+		return nil, err
 	}
 	return &club, nil
 }

@@ -63,6 +63,7 @@ make dev                        # docker compose -f docker-compose.dev.yml up -d
 # Backend
 cd backend && make run          # starts API on :8080
 cd backend && make test         # go test -race -count=1 ./...
+                                # database-backed tests skip unless DB_HOST is set
 cd backend && make lint         # go vet ./...
 cd backend && make build        # compiles to bin/api
 cd backend && make tidy         # go mod tidy + verify
@@ -114,7 +115,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **106** (000001–000106). Latest: `000106_gear_comparison_showcase`.
+Current migration count: **107** (000001–000107). Latest: `000107_share_slugs`.
 
 ## Critical Migration Rules
 
@@ -186,6 +187,24 @@ Any link sent to a user via email, push, or other out-of-band channel **must** b
 ## API Structure
 
 All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
+
+### Share URLs and slugs
+
+Users, leagues and clubs carry a `slug` derived from their name, used in public
+share URLs (`/share/users/paul-jennings`). Score cards and pellet tests have no
+stable name and keep their UUID.
+
+- `share_slug_aliases` maps every slug ever issued to its entity. Its primary
+  key is the single uniqueness constraint, so a renamed entity's old slug keeps
+  resolving and is never handed to something else.
+- Repository `GetByID` / `GetPublicProfile` accept either spelling via
+  `resolveEntityRef`, so pre-existing UUID links keep working everywhere.
+- Slugs are claimed in `repository/share_slug.go` on create and re-derived on
+  rename. `ShareMeta` points `og:url` and `rel=canonical` at the slug form even
+  when the visitor arrived on the UUID one.
+- In-app routes still expect UUIDs — `SharedView` resolves a slug before
+  redirecting a signed-in user, since the detail pages pass the route param
+  straight to endpoints that don't resolve slugs.
 
 ### Public (no auth)
 

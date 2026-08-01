@@ -40,14 +40,18 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 	err = tx.QueryRow(ctx, `
 		INSERT INTO leagues (name, description, type, created_by, club_id)
 		VALUES ($1, $2, COALESCE(NULLIF($3, ''), 'public')::league_type, $4, $5)
-		RETURNING id, name, description, type::text, post_visibility, image_url, club_id, created_by, date_format, time_format, timezone, created_at
+		RETURNING id, name, coalesce(slug, ''), description, type::text, post_visibility, image_url, club_id, created_by, date_format, time_format, timezone, created_at
 	`, input.Name, input.Description, input.Type, userID, input.ClubID).Scan(
-		&league.ID, &league.Name, &league.Description,
+		&league.ID, &league.Name, &league.Slug, &league.Description,
 		&league.Type, &league.PostVisibility, &league.ImageURL, &league.ClubID, &league.CreatedBy,
 		&league.DateFormat, &league.TimeFormat, &league.Timezone, &league.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert league: %w", err)
+	}
+
+	if league.Slug, err = syncShareSlug(ctx, tx, SlugEntityLeague, league.ID, league.Name, league.Slug); err != nil {
+		return nil, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -119,7 +123,7 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 // ListPublic returns all public leagues with their member counts.
 func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
+		SELECT l.id, l.name, coalesce(l.slug, '') AS slug, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
 		       l.date_format, l.time_format, l.timezone, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
@@ -136,7 +140,7 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 	var leagues []*model.League
 	for rows.Next() {
 		var l model.League
-		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		if err := rows.Scan(&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 			&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan league: %w", err)
 		}
@@ -150,13 +154,13 @@ func (r *LeagueRepository) ListPublic(ctx context.Context) ([]*model.League, err
 func (r *LeagueRepository) GetByJoinCode(ctx context.Context, code string) (*model.League, error) {
 	var l model.League
 	err := r.db.QueryRow(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.join_code, l.image_url, l.club_id, l.created_by,
+		SELECT l.id, l.name, coalesce(l.slug, '') AS slug, l.description, l.type::text, l.post_visibility, l.join_code, l.image_url, l.club_id, l.created_by,
 		       l.date_format, l.time_format, l.timezone, l.created_at,
 		       (SELECT COUNT(*) FROM league_members WHERE league_id = l.id) AS member_count
 		FROM leagues l
 		WHERE l.join_code IS NOT NULL AND UPPER(l.join_code) = UPPER($1)
 		LIMIT 1
-	`, code).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.JoinCode, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+	`, code).Scan(&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.JoinCode, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 		&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -196,16 +200,20 @@ func (r *LeagueRepository) ListByUser(ctx context.Context, userID string) ([]*mo
 
 // GetByID returns a single league with member count.
 func (r *LeagueRepository) GetByID(ctx context.Context, id string) (*model.League, error) {
+	id, err := resolveEntityRef(ctx, r.db, SlugEntityLeague, id)
+	if err != nil {
+		return nil, err
+	}
 	var l model.League
-	err := r.db.QueryRow(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.join_code, l.image_url, l.club_id, l.created_by,
+	err = r.db.QueryRow(ctx, `
+		SELECT l.id, l.name, coalesce(l.slug, '') AS slug, l.description, l.type::text, l.post_visibility, l.join_code, l.image_url, l.club_id, l.created_by,
 		       l.date_format, l.time_format, l.timezone, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id
 		WHERE l.id = $1
 		GROUP BY l.id
-	`, id).Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.JoinCode, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+	`, id).Scan(&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.JoinCode, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 		&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -234,7 +242,7 @@ func (r *LeagueRepository) UpdateImageURL(ctx context.Context, leagueID, imageUR
 // ListAll returns all leagues (public and private) with member counts for admin use.
 func (r *LeagueRepository) ListAll(ctx context.Context) ([]*model.League, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
+		SELECT l.id, l.name, coalesce(l.slug, '') AS slug, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
 		       l.date_format, l.time_format, l.timezone, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
@@ -250,7 +258,7 @@ func (r *LeagueRepository) ListAll(ctx context.Context) ([]*model.League, error)
 	var leagues []*model.League
 	for rows.Next() {
 		var l model.League
-		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		if err := rows.Scan(&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 			&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan league: %w", err)
 		}
@@ -268,11 +276,11 @@ func (r *LeagueRepository) AdminUpdate(ctx context.Context, id string, in *model
 		    description = COALESCE($3, description),
 		    updated_at  = NOW()
 		WHERE id = $1
-		RETURNING id, name, description, type::text, post_visibility, image_url, club_id, created_by,
+		RETURNING id, name, coalesce(slug, ''), description, type::text, post_visibility, image_url, club_id, created_by,
 		          date_format, time_format, timezone, created_at,
 		          (SELECT COUNT(*) FROM league_members WHERE league_id = $1)::int
 	`, id, in.Name, in.Description).Scan(
-		&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 		&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount,
 	)
 	if err != nil {
@@ -300,11 +308,11 @@ func (r *LeagueRepository) UpdateBasics(ctx context.Context, id string, in *mode
 		    timezone        = COALESCE($8, timezone),
 		    updated_at      = NOW()
 		WHERE id = $1
-		RETURNING id, name, description, type::text, post_visibility, image_url, club_id, created_by,
+		RETURNING id, name, coalesce(slug, ''), description, type::text, post_visibility, image_url, club_id, created_by,
 		          date_format, time_format, timezone, created_at,
 		          (SELECT COUNT(*) FROM league_members WHERE league_id = $1)::int
 	`, id, in.Name, in.Description, in.Type, in.PostVisibility, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
-		&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 		&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount,
 	)
 	if err != nil {
@@ -312,6 +320,12 @@ func (r *LeagueRepository) UpdateBasics(ctx context.Context, id string, in *mode
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("update league basics: %w", err)
+	}
+
+	// Renaming re-derives the slug; the previous one stays in
+	// share_slug_aliases so links already shared keep resolving.
+	if l.Slug, err = syncShareSlug(ctx, r.db, SlugEntityLeague, l.ID, l.Name, l.Slug); err != nil {
+		return nil, err
 	}
 	return &l, nil
 }
@@ -337,7 +351,7 @@ func (r *LeagueRepository) AdminRemoveMember(ctx context.Context, leagueID, user
 // ListByClub returns all leagues hosted by a given club.
 func (r *LeagueRepository) ListByClub(ctx context.Context, clubID string) ([]*model.League, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT l.id, l.name, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
+		SELECT l.id, l.name, coalesce(l.slug, '') AS slug, l.description, l.type::text, l.post_visibility, l.image_url, l.club_id, l.created_by,
 		       l.date_format, l.time_format, l.timezone, l.created_at,
 		       COUNT(lm.user_id) AS member_count
 		FROM leagues l
@@ -354,7 +368,7 @@ func (r *LeagueRepository) ListByClub(ctx context.Context, clubID string) ([]*mo
 	var leagues []*model.League
 	for rows.Next() {
 		var l model.League
-		if err := rows.Scan(&l.ID, &l.Name, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
+		if err := rows.Scan(&l.ID, &l.Name, &l.Slug, &l.Description, &l.Type, &l.PostVisibility, &l.ImageURL, &l.ClubID, &l.CreatedBy,
 			&l.DateFormat, &l.TimeFormat, &l.Timezone, &l.CreatedAt, &l.MemberCount); err != nil {
 			return nil, fmt.Errorf("scan league: %w", err)
 		}

@@ -3,11 +3,15 @@ package model
 import "time"
 
 type User struct {
-	ID                     string     `json:"id"`
-	Email                  string     `json:"email"`
-	PasswordHash           *string    `json:"-"`
-	Role                   string     `json:"role"`
-	DisplayName            string     `json:"display_name"`
+	ID           string  `json:"id"`
+	Email        string  `json:"email"`
+	PasswordHash *string `json:"-"`
+	Role         string  `json:"role"`
+	DisplayName  string  `json:"display_name"`
+	// Slug is the human-readable identifier used in public share URLs
+	// (/share/users/paul-jennings). Set on create and re-derived on rename;
+	// previous values keep resolving via share_slug_aliases.
+	Slug                   string     `json:"slug"`
 	Bio                    *string    `json:"bio,omitempty"`
 	Location               *string    `json:"location,omitempty"`
 	Club                   *string    `json:"club,omitempty"`
@@ -33,6 +37,7 @@ type User struct {
 type PublicProfile struct {
 	ID                 string    `json:"id"`
 	DisplayName        string    `json:"display_name"`
+	Slug               string    `json:"slug"`
 	Bio                *string   `json:"bio,omitempty"`
 	Location           *string   `json:"location,omitempty"`
 	Club               *string   `json:"club,omitempty"`

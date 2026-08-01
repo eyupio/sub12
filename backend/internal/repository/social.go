@@ -155,12 +155,16 @@ func (r *SocialRepository) ListFollowing(ctx context.Context, userID string) ([]
 
 // GetPublicProfile returns a user's public profile fields.
 func (r *SocialRepository) GetPublicProfile(ctx context.Context, userID string) (*model.PublicProfile, error) {
+	userID, err := resolveEntityRef(ctx, r.db, SlugEntityUser, userID)
+	if err != nil {
+		return nil, err
+	}
 	var p model.PublicProfile
-	err := r.db.QueryRow(ctx,
-		`SELECT id, display_name, bio, location, club, avatar_url, profile_visibility, show_follower_counts, star_level, is_simulated, created_at
+	err = r.db.QueryRow(ctx,
+		`SELECT id, display_name, coalesce(slug, '') AS slug, bio, location, club, avatar_url, profile_visibility, show_follower_counts, star_level, is_simulated, created_at
 		 FROM users WHERE id = $1`,
 		userID,
-	).Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.StarLevel, &p.IsSimulated, &p.CreatedAt)
+	).Scan(&p.ID, &p.DisplayName, &p.Slug, &p.Bio, &p.Location, &p.Club, &p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.StarLevel, &p.IsSimulated, &p.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -119,7 +120,8 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 		if id != "" {
 			card, err := s.scoreCards.GetForViewer(r.Context(), id, "")
 			if err == nil {
-				displayName := s.lookupDisplayName(r.Context(), card.UserID)
+				author := s.lookupAuthor(r.Context(), card.UserID)
+				displayName := authorDisplayName(author)
 				rifle := s.lookupRifle(r.Context(), card.RifleID, card.UserID)
 				pellet := s.lookupPellet(r.Context(), card.PelletID, card.UserID)
 				achievements := s.lookupUserAchievements(r.Context(), card.UserID)
@@ -128,9 +130,9 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 				og.Image = s.absolute("/og/score-cards/" + id + ".png")
 				og.ImageAlt = scoreCardImageAlt(card, displayName)
 				og.Type = "article"
-				if displayName != "" {
+				if author != nil {
 					og.AuthorName = displayName
-					og.AuthorURL = s.absolute("/share/users/" + card.UserID)
+					og.AuthorURL = s.absolute("/share/users/" + shareRef(author.Slug, author.ID))
 				}
 			}
 		}
@@ -146,15 +148,16 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 		if id != "" {
 			sess, err := s.pelletTest.GetForViewer(r.Context(), id, "")
 			if err == nil {
-				displayName := s.lookupDisplayName(r.Context(), sess.UserID)
+				author := s.lookupAuthor(r.Context(), sess.UserID)
+				displayName := authorDisplayName(author)
 				og.Title = pelletTestTitle(sess)
 				og.Description = pelletTestDescription(sess, displayName)
 				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
 				og.ImageAlt = pelletTestImageAlt(sess, displayName)
 				og.Type = "article"
-				if displayName != "" {
+				if author != nil {
 					og.AuthorName = displayName
-					og.AuthorURL = s.absolute("/share/users/" + sess.UserID)
+					og.AuthorURL = s.absolute("/share/users/" + shareRef(author.Slug, author.ID))
 				}
 			}
 		}
@@ -170,11 +173,13 @@ func (s *ShareMeta) League() http.HandlerFunc {
 		if id != "" && s.leagues != nil {
 			league, err := s.leagues.GetByID(r.Context(), id, "", "")
 			if err == nil && league != nil {
+				ref := shareRef(league.Slug, league.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
 				og.Description = leagueDescription(league)
-				og.Image = s.absolute("/og/leagues/" + id + ".png")
+				og.Image = s.absolute("/og/leagues/" + ref + ".png")
 				og.ImageAlt = leagueImageAlt(league)
 				og.Type = "article"
+				og.URL = s.absolute("/share/leagues/" + ref)
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -189,11 +194,13 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 		if id != "" && s.clubs != nil {
 			club, err := s.clubs.GetByID(r.Context(), id, "", "")
 			if err == nil && club != nil {
+				ref := shareRef(club.Slug, club.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
 				og.Description = clubDescription(club)
-				og.Image = s.absolute("/og/clubs/" + id + ".png")
+				og.Image = s.absolute("/og/clubs/" + ref + ".png")
 				og.ImageAlt = clubImageAlt(club)
 				og.Type = "article"
+				og.URL = s.absolute("/share/clubs/" + ref)
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -208,28 +215,45 @@ func (s *ShareMeta) User() http.HandlerFunc {
 		if id != "" && s.users != nil {
 			profile, err := s.users.GetPublicProfile(r.Context(), id)
 			if err == nil && profile != nil && profile.ProfileVisibility != "private" {
+				ref := shareRef(profile.Slug, profile.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", profile.DisplayName)
 				og.Description = userDescription(profile)
-				og.Image = s.absolute("/og/users/" + id + ".png")
+				og.Image = s.absolute("/og/users/" + ref + ".png")
 				og.ImageAlt = userImageAlt(profile)
 				og.Type = "profile"
+				// Point og:url and rel=canonical at the slug form even when the
+				// visitor arrived on the UUID one, so the two spellings of the
+				// same page consolidate instead of competing.
+				og.URL = s.absolute("/share/users/" + ref)
+				// profile:username is the property Open Graph defines for
+				// og:type=profile; without it a shared profile is just an
+				// untyped page to anything consuming the graph.
+				og.AuthorName = profile.DisplayName
 			}
 		}
 		s.writeHTML(w, r, og)
 	}
 }
 
-// lookupDisplayName returns the owner's display name if the profile is not
-// private. Returns "" on any error so callers can degrade gracefully.
-func (s *ShareMeta) lookupDisplayName(ctx context.Context, userID string) string {
+// lookupAuthor returns the owner's public profile, or nil when the owner is
+// private or unresolvable, so callers can degrade to an unattributed preview.
+func (s *ShareMeta) lookupAuthor(ctx context.Context, userID string) *model.PublicProfile {
 	if s.users == nil || userID == "" {
-		return ""
+		return nil
 	}
 	profile, err := s.users.GetPublicProfile(ctx, userID)
 	if err != nil || profile == nil || profile.ProfileVisibility == "private" {
+		return nil
+	}
+	return profile
+}
+
+// authorDisplayName is the nil-safe accessor callers use for copy.
+func authorDisplayName(p *model.PublicProfile) string {
+	if p == nil {
 		return ""
 	}
-	return profile.DisplayName
+	return p.DisplayName
 }
 
 // lookupUserAchievements returns the owner's earned achievements as an
@@ -275,9 +299,20 @@ func (s *ShareMeta) defaultOG(r *http.Request) openGraph {
 		Title:       "SUB12 — Precision Shooting Platform",
 		Description: "Track scores, manage gear, and compete in leagues. The platform for precision airgun shooters.",
 		Image:       s.absolute("/og-image.png"),
+		ImageAlt:    "SUB12 — precision shooting platform for FT, HFT and benchrest",
 		URL:         s.absoluteFromRequest(r),
 		Type:        "website",
 	}
+}
+
+// shareRef prefers an entity's human-readable slug for public URLs, falling
+// back to its UUID. The fallback covers the window between a row being
+// inserted and its slug being claimed, and any row a backfill missed.
+func shareRef(slug, id string) string {
+	if slug != "" {
+		return slug
+	}
+	return id
 }
 
 // isValidUUID reports whether s parses as a UUID. Used to short-circuit
@@ -420,23 +455,30 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 // Regexes scoped to tag attributes; all anchored to the beginning of an
 // opening <meta ...> so we don't replace tags we didn't mean to.
 var (
-	reOGTitle       = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
-	reOGDesc        = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
-	reOGImage       = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
-	reOGType        = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
-	reOGURL         = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
-	reOGSiteName    = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
-	reOGImageAlt    = regexp.MustCompile(`(?i)<meta\s+property="og:image:alt"[^>]*>`)
-	reOGImageWH     = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height)"[^>]*>`)
-	reOGProfileUser = regexp.MustCompile(`(?i)<meta\s+property="og:profile:username"[^>]*>`)
-	reArticleAuthor = regexp.MustCompile(`(?i)<meta\s+property="article:author"[^>]*>`)
-	reTwitterTitle  = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
-	reTwitterDesc   = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
-	reTwitterImage  = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reOGTitle        = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
+	reOGDesc         = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
+	reOGImage        = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
+	reOGType         = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
+	reOGURL          = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
+	reOGSiteName     = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
+	reOGImageAlt     = regexp.MustCompile(`(?i)<meta\s+property="og:image:alt"[^>]*>`)
+	reOGImageWidth   = regexp.MustCompile(`(?i)<meta\s+property="og:image:width"[^>]*>`)
+	reOGImageHeight  = regexp.MustCompile(`(?i)<meta\s+property="og:image:height"[^>]*>`)
+	reOGImageType    = regexp.MustCompile(`(?i)<meta\s+property="og:image:type"[^>]*>`)
+	reOGImageSecure  = regexp.MustCompile(`(?i)<meta\s+property="og:image:secure_url"[^>]*>`)
+	reOGLocale       = regexp.MustCompile(`(?i)<meta\s+property="og:locale"[^>]*>`)
+	reProfileUser    = regexp.MustCompile(`(?i)<meta\s+property="(og:)?profile:username"[^>]*>`)
+	reArticleAuthor  = regexp.MustCompile(`(?i)<meta\s+property="article:author"[^>]*>`)
+	reTwitterCard    = regexp.MustCompile(`(?i)<meta\s+name="twitter:card"[^>]*>`)
+	reTwitterTitle   = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
+	reTwitterDesc    = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
+	reTwitterImage   = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reTwitterImgAlt  = regexp.MustCompile(`(?i)<meta\s+name="twitter:image:alt"[^>]*>`)
 	reTwitterCreator = regexp.MustCompile(`(?i)<meta\s+name="twitter:creator"[^>]*>`)
-	reDescription   = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
-	rePageTitle     = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
-	reHeadOpen      = regexp.MustCompile(`(?i)<head[^>]*>`)
+	reDescription    = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
+	reCanonical      = regexp.MustCompile(`(?i)<link\s+rel="canonical"[^>]*>`)
+	rePageTitle      = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
+	reHeadOpen       = regexp.MustCompile(`(?i)<head[^>]*>`)
 )
 
 func metaProp(prop, content string) string {
@@ -445,6 +487,10 @@ func metaProp(prop, content string) string {
 
 func metaName(name, content string) string {
 	return fmt.Sprintf(`<meta name=%q content=%q />`, name, content)
+}
+
+func linkRel(rel, href string) string {
+	return fmt.Sprintf(`<link rel=%q href=%q />`, rel, href)
 }
 
 // injectOG rewrites the OG/Twitter tags in the template. It replaces
@@ -464,10 +510,12 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 	authorURL := html.EscapeString(og.AuthorURL)
 	authorName := html.EscapeString(og.AuthorName)
 
-	replacements := []struct {
+	type replacement struct {
 		re  *regexp.Regexp
 		tag string
-	}{
+	}
+
+	replacements := []replacement{
 		{rePageTitle, "<title>" + title + "</title>"},
 		{reDescription, metaName("description", desc)},
 		{reOGTitle, metaProp("og:title", title)},
@@ -476,49 +524,61 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 		{reOGType, metaProp("og:type", ogType)},
 		{reOGURL, metaProp("og:url", ogURL)},
 		{reOGSiteName, metaProp("og:site_name", site)},
+		{reOGLocale, metaProp("og:locale", "en_GB")},
 		{reTwitterTitle, metaName("twitter:title", title)},
 		{reTwitterDesc, metaName("twitter:description", desc)},
 		{reTwitterImage, metaName("twitter:image", img)},
+		// Pinned rather than inherited from the template: a missing or
+		// downgraded twitter:card turns a full-bleed preview into a small
+		// square thumbnail, which is the difference between a share that
+		// advertises sub-12 and one that doesn't.
+		{reTwitterCard, metaName("twitter:card", "summary_large_image")},
+		// Every image we point og:image at — the per-entity renders and the
+		// static site default alike — is a 1200×630 PNG. Declaring that is
+		// what lets Facebook and LinkedIn lay the card out at the intended
+		// 1.91:1 on first scrape instead of guessing an aspect ratio and
+		// centre-cropping the artwork.
+		{reOGImageWidth, metaProp("og:image:width", strconv.Itoa(ogWidth))},
+		{reOGImageHeight, metaProp("og:image:height", strconv.Itoa(ogHeight))},
+		{reOGImageType, metaProp("og:image:type", "image/png")},
+		// Canonical: the SPA shell hard-codes the site root, which would have
+		// every share page declaring itself a duplicate of the homepage and
+		// getting folded away in search results.
+		{reCanonical, linkRel("canonical", ogURL)},
 	}
 
-	// og:image:width/height are stripped because our dynamic image dimensions
-	// are unknown; omitting is better than misleading.
-	out = reOGImageWH.ReplaceAllString(out, "")
+	if strings.HasPrefix(og.Image, "https://") {
+		replacements = append(replacements, replacement{reOGImageSecure, metaProp("og:image:secure_url", img)})
+	} else {
+		out = reOGImageSecure.ReplaceAllString(out, "")
+	}
 
 	// og:image:alt: inject when we have alt text, drop any stale tag
 	// otherwise so we don't surface copy from a previous entity render.
 	if imgAlt != "" {
-		replacements = append(replacements, struct {
-			re  *regexp.Regexp
-			tag string
-		}{reOGImageAlt, metaProp("og:image:alt", imgAlt)})
+		replacements = append(replacements,
+			replacement{reOGImageAlt, metaProp("og:image:alt", imgAlt)},
+			replacement{reTwitterImgAlt, metaName("twitter:image:alt", imgAlt)},
+		)
 	} else {
 		out = reOGImageAlt.ReplaceAllString(out, "")
+		out = reTwitterImgAlt.ReplaceAllString(out, "")
 	}
 
-	// Author attribution for article-type OG (og:profile:username +
+	// Author attribution for article-type OG (profile:username +
 	// article:author + twitter:creator). Only emitted when we resolved an
 	// owner so anonymous / private shares don't leak a misleading byline.
 	if authorName != "" {
 		replacements = append(replacements,
-			struct {
-				re  *regexp.Regexp
-				tag string
-			}{reOGProfileUser, metaProp("og:profile:username", authorName)},
-			struct {
-				re  *regexp.Regexp
-				tag string
-			}{reTwitterCreator, metaName("twitter:creator", authorName)},
+			replacement{reProfileUser, metaProp("profile:username", authorName)},
+			replacement{reTwitterCreator, metaName("twitter:creator", authorName)},
 		)
 	} else {
-		out = reOGProfileUser.ReplaceAllString(out, "")
+		out = reProfileUser.ReplaceAllString(out, "")
 		out = reTwitterCreator.ReplaceAllString(out, "")
 	}
 	if authorURL != "" {
-		replacements = append(replacements, struct {
-			re  *regexp.Regexp
-			tag string
-		}{reArticleAuthor, metaProp("article:author", authorURL)})
+		replacements = append(replacements, replacement{reArticleAuthor, metaProp("article:author", authorURL)})
 	} else {
 		out = reArticleAuthor.ReplaceAllString(out, "")
 	}

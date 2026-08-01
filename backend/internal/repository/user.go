@@ -24,15 +24,21 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, email, displayName, passwordHash string) (*model.User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var u model.User
-	err := r.db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO users (email, display_name, password_hash)
 		VALUES ($1, $2, $3)
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 	`, email, displayName, passwordHash).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -40,18 +46,25 @@ func (r *UserRepository) Create(ctx context.Context, email, displayName, passwor
 		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
+
+	if u.Slug, err = syncShareSlug(ctx, tx, SlugEntityUser, u.ID, u.DisplayName, u.Slug); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit create user: %w", err)
+	}
 	return &u, nil
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 	err := r.db.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 		FROM users WHERE email = $1
 	`, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -63,14 +76,18 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
+	id, err := resolveEntityRef(ctx, r.db, SlugEntityUser, id)
+	if err != nil {
+		return nil, err
+	}
 	var u model.User
-	err := r.db.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+	err = r.db.QueryRow(ctx, `
+		SELECT id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 		FROM users WHERE id = $1
 	`, id).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -82,8 +99,14 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*model.User, e
 }
 
 func (r *UserRepository) UpdateMe(ctx context.Context, id string, in *model.UpdateProfileInput) (*model.User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var u model.User
-	err := r.db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE users
 		SET
 			display_name             = COALESCE($2, display_name),
@@ -101,17 +124,26 @@ func (r *UserRepository) UpdateMe(ctx context.Context, id string, in *model.Upda
 			timezone                 = COALESCE($14, timezone),
 			updated_at               = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 	`, id, in.DisplayName, in.Bio, in.Location, in.Club, in.ProfileVisibility, in.DefaultScoreVisibility, in.FeedOptOut, in.ShowFollowerCounts, in.DefaultDistanceUnit, in.DefaultMeasurementUnit, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("update user: %w", err)
+	}
+
+	// Renaming re-derives the slug; the previous one stays in
+	// share_slug_aliases so links already shared keep resolving.
+	if u.Slug, err = syncShareSlug(ctx, tx, SlugEntityUser, u.ID, u.DisplayName, u.Slug); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update user: %w", err)
 	}
 	return &u, nil
 }
@@ -122,11 +154,11 @@ func (r *UserRepository) UpdateAvatarURL(ctx context.Context, id, avatarURL stri
 		UPDATE users
 		SET avatar_url = $2, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 	`, id, avatarURL).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -143,11 +175,11 @@ func (r *UserRepository) DeleteAvatarURL(ctx context.Context, id string) (*model
 		UPDATE users
 		SET avatar_url = NULL, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 	`, id).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -179,11 +211,11 @@ func (r *UserRepository) UpdateEmail(ctx context.Context, id, email string) (*mo
 		UPDATE users
 		SET email = $2, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at
+		RETURNING id, email, password_hash, role, display_name, bio, location, club, avatar_url, profile_visibility, default_score_visibility, feed_opt_out, show_follower_counts, star_level, default_distance_unit, default_measurement_unit, date_format, time_format, timezone, totp_secret, totp_enabled, totp_enrolled_at, created_at, updated_at, coalesce(slug, '') AS slug
 	`, id, email).Scan(
 		&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.DisplayName,
 		&u.Bio, &u.Location, &u.Club, &u.AvatarURL, &u.ProfileVisibility,
-		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.DefaultScoreVisibility, &u.FeedOptOut, &u.ShowFollowerCounts, &u.StarLevel, &u.DefaultDistanceUnit, &u.DefaultMeasurementUnit, &u.DateFormat, &u.TimeFormat, &u.Timezone, &u.TOTPSecret, &u.TOTPEnabled, &u.TOTPEnrolledAt, &u.CreatedAt, &u.UpdatedAt, &u.Slug,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -202,7 +234,7 @@ func (r *UserRepository) Search(ctx context.Context, query, viewerID string, lim
 		limit = 20
 	}
 	rows, err := r.db.Query(ctx, `
-		SELECT id, display_name, bio, location, club, avatar_url,
+		SELECT id, display_name, coalesce(slug, '') AS slug, bio, location, club, avatar_url,
 		       profile_visibility, show_follower_counts, star_level, created_at
 		FROM users
 		WHERE LOWER(display_name) LIKE LOWER($1) || '%'
@@ -224,7 +256,7 @@ func (r *UserRepository) Search(ctx context.Context, query, viewerID string, lim
 	var results []*model.PublicProfile
 	for rows.Next() {
 		var p model.PublicProfile
-		if err := rows.Scan(&p.ID, &p.DisplayName, &p.Bio, &p.Location, &p.Club,
+		if err := rows.Scan(&p.ID, &p.DisplayName, &p.Slug, &p.Bio, &p.Location, &p.Club,
 			&p.AvatarURL, &p.ProfileVisibility, &p.ShowFollowerCounts, &p.StarLevel, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}

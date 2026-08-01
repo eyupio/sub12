@@ -268,10 +268,62 @@ func TestInjectOG_ReplacesTagsInPlace(t *testing.T) {
 	assert.Contains(t, out, `content="Fresh Desc"`)
 	assert.Contains(t, out, `content="https://example.com/new.png"`)
 	assert.Contains(t, out, `content="article"`)
-	// og:image:width was stripped because we can't guarantee the dimensions
-	assert.NotContains(t, out, "og:image:width")
 	// No duplicate og:title tags
 	assert.Equal(t, 1, strings.Count(out, `property="og:title"`))
+}
+
+func TestInjectOG_DeclaresImageDimensionsAndCardType(t *testing.T) {
+	// Regression test for previews being centre-cropped: without declared
+	// dimensions and a pinned card type, Facebook and LinkedIn guess the
+	// aspect ratio on first scrape and crop the artwork. Every image we point
+	// og:image at is a 1200×630 PNG, so say so.
+	tmpl := []byte(`<!doctype html>
+<html>
+  <head>
+    <title>Old</title>
+    <meta property="og:image:width" content="640" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href="https://sub12.io/" />
+  </head>
+</html>`)
+	og := openGraph{
+		Title: "Fresh", Description: "Desc",
+		Image: "https://example.com/og/users/abc.png",
+		URL:   "https://example.com/share/users/abc",
+		Type:  "profile",
+	}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.Contains(t, out, `property="og:image:width" content="1200"`)
+	assert.Contains(t, out, `property="og:image:height" content="630"`)
+	assert.Contains(t, out, `property="og:image:type" content="image/png"`)
+	assert.Contains(t, out, `property="og:image:secure_url" content="https://example.com/og/users/abc.png"`)
+	assert.Contains(t, out, `property="og:locale" content="en_GB"`)
+	assert.Contains(t, out, `name="twitter:card" content="summary_large_image"`)
+	assert.NotContains(t, out, `content="summary"/`)
+	assert.Equal(t, 1, strings.Count(out, `property="og:image:width"`))
+	assert.Equal(t, 1, strings.Count(out, `name="twitter:card"`))
+
+	// The shell hard-codes the site root as canonical; each share page must
+	// claim its own URL or search engines fold them into the homepage.
+	assert.Contains(t, out, `<link rel="canonical" href="https://example.com/share/users/abc" />`)
+	assert.NotContains(t, out, `href="https://sub12.io/"`)
+	assert.Equal(t, 1, strings.Count(out, `rel="canonical"`))
+}
+
+func TestInjectOG_OmitsSecureImageURLWhenNotHTTPS(t *testing.T) {
+	tmpl := []byte(`<!doctype html>
+<html>
+  <head>
+    <meta property="og:image:secure_url" content="stale" />
+  </head>
+</html>`)
+	og := openGraph{Title: "SUB12", Description: "…", Image: "http://localhost:8080/og-image.png", URL: "http://localhost:8080/", Type: "website"}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.NotContains(t, out, "og:image:secure_url")
 }
 
 func TestInjectOG_EmitsAuthorAndImageAltWhenSet(t *testing.T) {
@@ -295,9 +347,10 @@ func TestInjectOG_EmitsAuthorAndImageAltWhenSet(t *testing.T) {
 
 	out := string(injectOG(tmpl, og, "SUB12"))
 
-	assert.Contains(t, out, `property="og:profile:username" content="John Shooter"`)
+	assert.Contains(t, out, `property="profile:username" content="John Shooter"`)
 	assert.Contains(t, out, `property="article:author" content="https://example.com/share/users/abc"`)
 	assert.Contains(t, out, `property="og:image:alt" content="John Shooter — 245 points (12X) on sub-12"`)
+	assert.Contains(t, out, `name="twitter:image:alt" content="John Shooter — 245 points (12X) on sub-12"`)
 	assert.Contains(t, out, `name="twitter:creator" content="John Shooter"`)
 }
 
@@ -305,7 +358,8 @@ func TestInjectOG_OmitsAuthorWhenUnknown(t *testing.T) {
 	tmpl := []byte(`<!doctype html>
 <html>
   <head>
-    <meta property="og:profile:username" content="stale" />
+    <meta property="profile:username" content="stale" />
+    <meta name="twitter:image:alt" content="stale" />
     <meta property="article:author" content="stale" />
     <meta property="og:image:alt" content="stale" />
     <meta name="twitter:creator" content="stale" />
@@ -316,9 +370,10 @@ func TestInjectOG_OmitsAuthorWhenUnknown(t *testing.T) {
 	out := string(injectOG(tmpl, og, "SUB12"))
 
 	assert.NotContains(t, out, "stale")
-	assert.NotContains(t, out, "og:profile:username")
+	assert.NotContains(t, out, "profile:username")
 	assert.NotContains(t, out, "article:author")
 	assert.NotContains(t, out, "og:image:alt")
+	assert.NotContains(t, out, "twitter:image:alt")
 	assert.NotContains(t, out, "twitter:creator")
 }
 
@@ -330,4 +385,31 @@ func newShareMetaForTest(frontendOrigin string, ttl time.Duration) *ShareMeta {
 		log:            zerolog.Nop(),
 		ttl:            ttl,
 	}
+}
+
+func TestShareRef_PrefersSlugAndFallsBackToID(t *testing.T) {
+	assert.Equal(t, "paul-jennings", shareRef("paul-jennings", "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6"))
+	// A row inserted but not yet slugged, or one a backfill missed, still has
+	// to produce a working URL.
+	assert.Equal(t, "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6", shareRef("", "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6"))
+}
+
+func TestInjectOG_CanonicalUsesTheSlugURLEvenWhenServedTheUUIDOne(t *testing.T) {
+	// The whole point of canonicalising: a visitor may arrive on either
+	// spelling, but search engines and social platforms must be told there is
+	// one page, at the readable URL.
+	tmpl := []byte(`<!doctype html><html><head><title>x</title></head></html>`)
+	og := openGraph{
+		Title:       "Paul Jennings on sub-12",
+		Description: "Yorkshire",
+		Image:       "https://sub12.io/og/users/paul-jennings.png",
+		URL:         "https://sub12.io/share/users/paul-jennings",
+		Type:        "profile",
+	}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.Contains(t, out, `<link rel="canonical" href="https://sub12.io/share/users/paul-jennings" />`)
+	assert.Contains(t, out, `property="og:url" content="https://sub12.io/share/users/paul-jennings"`)
+	assert.NotContains(t, out, "bb2c625d")
 }

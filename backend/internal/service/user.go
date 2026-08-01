@@ -152,6 +152,7 @@ func (s *UserService) GetPublicProfile(ctx context.Context, id string) (*model.P
 	return &model.PublicProfile{
 		ID:                 u.ID,
 		DisplayName:        u.DisplayName,
+		Slug:               u.Slug,
 		Bio:                u.Bio,
 		Location:           u.Location,
 		Club:               u.Club,

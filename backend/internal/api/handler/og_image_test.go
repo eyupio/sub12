@@ -5,8 +5,10 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/fogleman/gg"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,12 +33,66 @@ func TestOGImage_RendersValidPNG(t *testing.T) {
 	assert.Equal(t, ogHeight, img.Bounds().Dy())
 }
 
-func TestOGImage_PrimaryFontSizeShrinksForLongText(t *testing.T) {
-	// Short score card number gets the biggest headline.
-	assert.Greater(t, primaryFontSize("245"), primaryFontSize("The Rotary Shooting League of Birmingham"))
-	// Two-level bucket check so minor tweaks to thresholds are still caught.
-	assert.GreaterOrEqual(t, primaryFontSize("245"), 200.0)
-	assert.LessOrEqual(t, primaryFontSize("The Rotary Shooting League of Birmingham"), 78.0)
+func TestOGImage_BrandFurnitureSurvivesSquareCrop(t *testing.T) {
+	// Regression test for the reported bug: platforms that centre-crop a
+	// 1200×630 preview towards a square keep only x ∈ [285, 915], which used
+	// to slice the left-aligned wordmark to "B12". Every piece of brand
+	// furniture must now measure narrower than that window.
+	h, err := NewOGImage(nil, nil, nil, nil, nil, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+	dc := gg.NewContext(ogWidth, ogHeight)
+	limit := 2 * ogSafeHalfWidth
+
+	dc.SetFontFace(h.face(66, true))
+	subWidth, _ := dc.MeasureString(wordmarkSUB)
+	dc.SetFontFace(h.face(66*0.62, true))
+	numWidth, _ := dc.MeasureString(wordmark12)
+	assert.LessOrEqual(t, subWidth+numWidth, limit, "wordmark must fit the square-crop window")
+
+	assert.LessOrEqual(t, h.trackedWidth(dc, taglineText, 17, false, 3.4), limit, "tagline must fit the square-crop window")
+	assert.LessOrEqual(t, h.trackedWidth(dc, siteText, 21, true, 7), limit, "footer URL must fit the square-crop window")
+	for _, label := range []string{"SCORE CARD", "PELLET TEST", "LEAGUE", "CLUB", "PROFILE"} {
+		assert.LessOrEqual(t, h.trackedWidth(dc, label, 23, true, 6.5), limit, "eyebrow %q must fit the square-crop window", label)
+	}
+}
+
+func TestOGImage_LayoutPrimaryWrapsInsteadOfShrinking(t *testing.T) {
+	h, err := NewOGImage(nil, nil, nil, nil, nil, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+	dc := gg.NewContext(ogWidth, ogHeight)
+
+	// A short score keeps a single, very large line.
+	lines, size := h.layoutPrimary(dc, "245")
+	assert.Equal(t, []string{"245"}, lines)
+	assert.GreaterOrEqual(t, size, 150.0)
+
+	// A long league name breaks onto two lines rather than collapsing to a
+	// size nobody can read in a feed.
+	lines, size = h.layoutPrimary(dc, "The Rotary Shooting League of Birmingham")
+	assert.Len(t, lines, 2)
+	assert.GreaterOrEqual(t, size, 44.0)
+	assert.Equal(t, "The Rotary Shooting League of Birmingham", strings.Join(lines, " "))
+}
+
+func TestOGImage_LayoutPrimaryNeverExceedsTwoLines(t *testing.T) {
+	h, err := NewOGImage(nil, nil, nil, nil, nil, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+	dc := gg.NewContext(ogWidth, ogHeight)
+
+	for _, in := range []string{
+		"",
+		"A",
+		strings.Repeat("Supercalifragilistic ", 12),
+		strings.Repeat("x", 200),
+	} {
+		lines, _ := h.layoutPrimary(dc, in)
+		assert.LessOrEqual(t, len(lines), 2, "input %q should never produce more than two headline lines", in)
+	}
+}
+
+func TestOGImage_MetaLinesCapAtTwoAndSkipBlanks(t *testing.T) {
+	assert.Empty(t, metaLines([]string{"", "   "}))
+	assert.Equal(t, []string{"one", "three"}, metaLines([]string{"one", "", "three", "four"}))
 }
 
 func TestOGCache_EvictsOldestWhenFull(t *testing.T) {
