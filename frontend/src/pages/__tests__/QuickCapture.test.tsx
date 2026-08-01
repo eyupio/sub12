@@ -7,6 +7,7 @@ import { gearApi, type Pellet, type Rifle } from '../../api/gear'
 import { scoreCardApi, type ScoreCard } from '../../api/scoreCards'
 import { pelletTestApi } from '../../api/pelletTesting'
 import { locationsApi, type Location } from '../../api/locations'
+import { geoApi } from '../../api/geo'
 
 const navigate = vi.fn()
 let search: Record<string, string> = {}
@@ -124,6 +125,7 @@ describe('QuickCapture gear selection', () => {
     vi.spyOn(pelletTestApi, 'list').mockResolvedValue(
       { items: [] } as Awaited<ReturnType<typeof pelletTestApi.list>>,
     )
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -179,6 +181,41 @@ describe('QuickCapture gear selection', () => {
       location_id: 'place-1',
       location_lat: 53.862,
       location_lng: -1.957,
+    })
+  })
+
+  it('labels a detected location with its place name, not coordinates', async () => {
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue({ name: 'Otley Sports Ground, Otley' })
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) =>
+          success({
+            coords: { latitude: 53.862, longitude: -1.958, accuracy: 10 },
+            timestamp: 0,
+          } as GeolocationPosition),
+      },
+    })
+    const quickCreate = vi.spyOn(scoreCardApi, 'quickCreate').mockResolvedValue(makeCard())
+    vi.spyOn(scoreCardApi, 'uploadImage').mockResolvedValue({ card_image_url: '/images/card-1' })
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Detect my location' }))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Range / club')).toHaveValue('Otley Sports Ground, Otley'),
+    )
+
+    attachPhoto()
+    fireEvent.click(await screen.findByRole('button', { name: /Accept photo/i }))
+    const save = await screen.findByRole('button', { name: /Save Draft/i })
+    await waitFor(() => expect(save).toBeEnabled())
+    fireEvent.click(save)
+
+    await waitFor(() => expect(quickCreate).toHaveBeenCalled())
+    expect(quickCreate.mock.calls[0][0]).toMatchObject({
+      location: 'Otley Sports Ground, Otley',
+      location_lat: 53.862,
+      location_lng: -1.958,
     })
   })
 

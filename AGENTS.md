@@ -217,6 +217,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Achievements:** List own + list for user
 - **Stats:** User stats, rifle stats, score trends
 - **Images:** Upload
+- **Geo:** `GET /geo/reverse?lat=&lng=` names a coordinate — see "Naming a picked location"
 
 ### Admin (requires `middleware.RequireAdmin`)
 
@@ -225,6 +226,25 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List (private clubs included), get, update, delete, members management
+
+### Naming a picked location
+
+A location the user picks must read as a place, not a grid reference. The rule
+lives in `frontend/src/api/geo.ts` (`nameForPick`) and applies everywhere a
+point is captured — quick capture, score entry, the pellet-test wizard, the map
+picker, the "save this as a new place" dialog, and the recent-location chips:
+
+1. a saved place within `NEARBY_PLACE_THRESHOLD_M` (150m) wins, by name;
+2. then whatever the user typed;
+3. then the reverse geocoder's name for the spot;
+4. and only then `53.862, -1.958`.
+
+`GET /api/v1/geo/reverse?lat=&lng=` fronts a Nominatim-compatible endpoint
+(`GEOCODE_URL`; empty disables the lookup). It caches hits *and* misses in Redis
+under coordinates rounded to three decimals (~110m), paces upstream calls to the
+one per second Nominatim's usage policy allows, and reports every failure as
+"nowhere named here" (204) — a flaky third party must never block saving a card,
+it just means the coordinates stand.
 
 ## Environment Variables
 
@@ -255,6 +275,8 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `SEED_ADMIN` | `false` | Auto-seed admin user on startup |
 | `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
+| `GEOCODE_URL` | `https://nominatim.openstreetmap.org` | Nominatim-compatible endpoint used to name picked coordinates. Empty disables reverse geocoding; the UI then shows coordinates. |
+| `GEOCODE_USER_AGENT` | *(derived from `SITE_URL`)* | Identifies us to that endpoint, as Nominatim's usage policy requires. |
 
 ## CI Pipeline
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { LocateFixed, MapPin, MapPinned, Plus } from 'lucide-react'
 import { useLocations, type Location } from '../api/locations'
+import { nameForPick } from '../api/geo'
 import { LocationField, type LocationValue } from './LocationField'
 import { SavePlaceDialog } from './SavePlaceDialog'
 import { toast } from '../store/toast'
@@ -32,6 +34,7 @@ export function PlaceSelector({
 }: PlaceSelectorProps) {
   const { data: places = [] } = useLocations()
   const [saveOpen, setSaveOpen] = useState(false)
+  const qc = useQueryClient()
 
   const selectedPlace = locationId ? places.find(p => p.id === locationId) ?? null : null
 
@@ -78,7 +81,11 @@ export function PlaceSelector({
           return
         }
         if (locationId) onLocationIdChange(null)
-        onLocationChange({ label: location.label, lat, lng })
+        // No saved place here — fall back to what the map calls this spot
+        // rather than leaving the card labelled with coordinates.
+        return nameForPick(qc, location.label, lat, lng, places).then((label) =>
+          onLocationChange({ label, lat, lng }),
+        )
       })
       .catch(() => toast("Couldn't get location — skip or type it in", 'error'))
   }

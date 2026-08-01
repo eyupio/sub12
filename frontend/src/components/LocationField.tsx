@@ -1,10 +1,11 @@
 import { Suspense, lazy, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, MapPin, Map as MapIcon } from 'lucide-react'
 
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { useLocations } from '../api/locations'
+import { nameForPick, reverseGeocodeQuery } from '../api/geo'
 import { toast } from '../store/toast'
 import { requestPosition } from '../utils/geolocation'
 import { isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
@@ -45,6 +46,7 @@ export function LocationField({
 }: LocationFieldProps) {
   const [locating, setLocating] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const qc = useQueryClient()
 
   const { data: recentScore } = useQuery({
     queryKey: ['score-cards-recent'],
@@ -71,12 +73,47 @@ export function LocationField({
     return Array.from(buckets.values()).slice(0, recentLimit)
   }, [recentScore, recentPellet, recentLimit, places])
 
+  // Cards stored before the user named anywhere still carry a "53.862, -1.958"
+  // label. Ask the geocoder what that point is called so the chip offers a
+  // place rather than a grid reference.
+  const unnamedRecents = useMemo(
+    () =>
+      recentLocations.filter(
+        (r) =>
+          isCoordinateLabel(r.label) && typeof r.lat === 'number' && typeof r.lng === 'number',
+      ),
+    [recentLocations],
+  )
+  const geocodedRecents = useQueries({
+    queries: unnamedRecents.map((r) => reverseGeocodeQuery(r.lat!, r.lng!)),
+  })
+  const namedRecents = useMemo<RecentLocation[]>(() => {
+    const names = new Map<string, string>()
+    unnamedRecents.forEach((r, i) => {
+      const name = geocodedRecents[i]?.data?.name
+      if (name) names.set(r.label, name)
+    })
+    const seen = new Set<string>()
+    const out: RecentLocation[] = []
+    for (const r of recentLocations) {
+      const label = names.get(r.label) ?? r.label
+      // Two coordinate labels can name the same place once resolved.
+      if (seen.has(label)) continue
+      seen.add(label)
+      out.push({ ...r, label })
+    }
+    return out
+    // geocodedRecents is a fresh array each render; the memo only saves work.
+  }, [recentLocations, unnamedRecents, geocodedRecents])
+
   function useMyLocation() {
     setLocating(true)
     requestPosition()
-      .then(({ lat, lng }) => {
-        onChange({ label: resolveLocationLabel(value.label, lat, lng, places), lat, lng })
-      })
+      .then(({ lat, lng }) =>
+        nameForPick(qc, value.label, lat, lng, places).then((label) =>
+          onChange({ label, lat, lng }),
+        ),
+      )
       .catch(() => toast("Couldn't get location — skip or type it in", 'error'))
       .finally(() => setLocating(false))
   }
@@ -90,12 +127,17 @@ export function LocationField({
   }
 
   function handlePicked(loc: PickedLocation) {
+    setPickerOpen(false)
     onChange({
       label: resolveLocationLabel(loc.label, loc.lat, loc.lng, places),
       lat: loc.lat,
       lng: loc.lng,
     })
-    setPickerOpen(false)
+    // The picker has usually already resolved a name, so this is a cache hit;
+    // it only changes anything when the pick came back as bare coordinates.
+    void nameForPick(qc, loc.label, loc.lat, loc.lng, places).then((label) =>
+      onChange({ label, lat: loc.lat, lng: loc.lng }),
+    )
   }
 
   const hasCoords = typeof value.lat === 'number' && typeof value.lng === 'number'
@@ -134,7 +176,7 @@ export function LocationField({
           <MapIcon size={14} />
           Pick on map
         </button>
-        {recentLocations.map((loc) => {
+        {namedRecents.map((loc) => {
           const active = value.label === loc.label
           return (
             <button

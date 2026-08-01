@@ -59,6 +59,7 @@ func NewRouter(
 	simulation *service.SimulationService,
 	gearShowcase *service.GearShowcaseService,
 	adminGear *service.AdminGearService,
+	geocode *service.GeocodeService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -204,6 +205,10 @@ func NewRouter(
 			r.Patch("/locations/{id}", locH.Update)
 			r.Delete("/locations/{id}", locH.Delete)
 			r.Post("/locations/{id}/image", locH.UploadImage)
+
+			// Reverse geocoding — names the point a card was shot at.
+			geoH := handler.NewGeocode(geocode)
+			r.With(rl.Limit("geocode")).Get("/geo/reverse", geoH.Reverse)
 
 			// Pellet tests (mutations — reads are public via OptionalAuthenticate below)
 			pth := handler.NewPelletTest(pelletTests, images)
