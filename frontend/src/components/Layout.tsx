@@ -323,11 +323,18 @@ export default function Layout({ children }: PropsWithChildren) {
           </div>
         )}
 
-        {/* Page content */}
+        {/* Page content. Deliberately not a scroll container: the shell is
+            `min-h-screen` — a floor, not a height — so <main> always grows to
+            its content and the document is the real scroller. Giving it
+            `overflow-auto` made it a scroll container that can never scroll,
+            and the `overscroll-y-contain` on top stopped a touch gesture
+            landing inside it from chaining out to the document, so swipes were
+            swallowed and the page would not move at all. Native overscroll is
+            suppressed on the viewport instead (see `body` in index.css). */}
         <main
           id="main-content"
           ref={mainRef}
-          className={`flex-1 flex flex-col overflow-auto overscroll-y-contain lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}
+          className={`flex-1 flex flex-col lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}
         >
           <div className="flex-1">
             {children ?? <Outlet />}

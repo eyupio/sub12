@@ -451,6 +451,15 @@ these over ad-hoc Tailwind so surfaces stay consistent.
   WebView never reports system-bar insets to `env(safe-area-inset-*)`, so the
   app shell would otherwise draw under the status and gesture bars.
 
+- **Scrolling** — the document is the app's only scroller. The shell is
+  `min-h-screen`, a floor rather than a height, so `<main>` always grows to its
+  content and can never scroll itself. Do not give it (or any full-page wrapper)
+  an `overflow` value: that makes it a scroll container which can never scroll,
+  and an `overscroll-behavior` of `contain`/`none` on such a dead container
+  stops touch gestures inside it chaining out to the document — the page then
+  will not scroll at all on a phone. Native pull-to-refresh/bounce is suppressed
+  on `body` (which propagates to the viewport) instead.
+
 ## Container Images
 
 - `ghcr.io/jnnngs/sub-12-backend:latest`
