@@ -15,7 +15,7 @@ import { Tooltip } from './Tooltip'
 import { Sub12BrandLockup } from './Sub12BrandLockup'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
-import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import { usePullToRefresh, pageScrollTop } from '../hooks/usePullToRefresh'
 import { clearClientSession } from '../utils/clearSession'
 import { haptics } from '../utils/haptics'
 
@@ -135,15 +135,19 @@ export default function Layout({ children }: PropsWithChildren) {
     }
   }, [])
 
-  // The page content scrolls inside <main>, not the window, so the elevation
-  // listener has to sit on that element rather than on window scroll.
+  // <main> only scrolls itself when its content overflows it; the shell is
+  // document-height, so usually the document scrolls and <main> never emits a
+  // scroll event. Listen on both and read whichever is actually offset.
   useEffect(() => {
     const el = mainRef.current
-    if (!el) return
-    const onScroll = () => setScrolled(el.scrollTop > 4)
+    const onScroll = () => setScrolled(pageScrollTop(el) > 4)
     onScroll()
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    el?.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      el?.removeEventListener('scroll', onScroll)
+    }
   }, [])
 
   // Close the More sheet when the viewport grows past the mobile breakpoint —
