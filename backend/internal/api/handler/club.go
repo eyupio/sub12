@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,14 +26,32 @@ func NewClub(svc *service.ClubService, leagues *service.LeagueService, images *r
 	return &ClubHandler{svc: svc, leagues: leagues, images: images}
 }
 
-// GET /api/v1/clubs
+// optionalFloat parses a query parameter that is only applied when present and
+// numeric; anything unparseable is treated as absent rather than an error, so a
+// stale bookmark still returns the unfiltered directory.
+func optionalFloat(raw string) *float64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil
+	}
+	return &v
+}
+
 // GET /api/v1/clubs
 // Optional ?code=XYZ resolves a single club by join_code (case-insensitive),
 // including private clubs, so codes work as discovery handles.
+//
+// The directory otherwise accepts ?q= (name, town, region or postcode),
+// ?discipline=, and ?lat=&lng=[&radius_km=] to sort nearest-first.
 func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
 	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	query := r.URL.Query()
 
-	if code := r.URL.Query().Get("code"); code != "" {
+	if code := query.Get("code"); code != "" {
 		club, err := h.svc.LookupByJoinCode(r.Context(), code, viewerID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to look up club")
@@ -45,7 +65,13 @@ func (h *ClubHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clubs, err := h.svc.List(r.Context(), viewerID)
+	clubs, err := h.svc.List(r.Context(), viewerID, model.ClubDirectoryQuery{
+		Search:     query.Get("q"),
+		Discipline: query.Get("discipline"),
+		Latitude:   optionalFloat(query.Get("lat")),
+		Longitude:  optionalFloat(query.Get("lng")),
+		RadiusKM:   optionalFloat(query.Get("radius_km")),
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list clubs")
 		return
@@ -156,7 +182,7 @@ func (h *ClubHandler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "admin access required")
 			return
 		}
-		if errors.Is(err, service.ErrInvalidClub) {
+		if isClubValidationError(err) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
@@ -168,6 +194,104 @@ func (h *ClubHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, club)
+}
+
+// isClubValidationError reports whether err is one of the club input errors
+// that should surface to the caller verbatim as a 422.
+func isClubValidationError(err error) bool {
+	return errors.Is(err, service.ErrInvalidClub) ||
+		errors.Is(err, service.ErrClubValidation) ||
+		errors.Is(err, service.ErrClubInvalidType) ||
+		errors.Is(err, service.ErrClubInvalidPolicy)
+}
+
+// DELETE /api/v1/clubs/{id}
+func (h *ClubHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	if err := h.svc.DeleteClub(r.Context(), clubID, userID); err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to delete club")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GET /api/v1/clubs/{id}/opening-hours
+func (h *ClubHandler) GetOpeningHours(w http.ResponseWriter, r *http.Request) {
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	clubID := chi.URLParam(r, "id")
+
+	hours, err := h.svc.GetOpeningHours(r.Context(), clubID, viewerID, viewerRole)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotFound) {
+			writeError(w, http.StatusNotFound, "club not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to get opening hours")
+		return
+	}
+	if hours == nil {
+		hours = []*model.ClubOpeningHours{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": hours})
+}
+
+// PUT /api/v1/clubs/{id}/opening-hours replaces the whole published week.
+func (h *ClubHandler) ReplaceOpeningHours(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	clubID := chi.URLParam(r, "id")
+
+	var body struct {
+		Items []model.ClubOpeningHoursInput `json:"items"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	hours, err := h.svc.ReplaceOpeningHours(r.Context(), clubID, userID, body.Items)
+	if err != nil {
+		if errors.Is(err, service.ErrClubNotAdmin) {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+		if isClubValidationError(err) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to save opening hours")
+		return
+	}
+	if hours == nil {
+		hours = []*model.ClubOpeningHours{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": hours})
+}
+
+// GET /api/v1/clubs/disciplines returns the canonical discipline vocabulary
+// used by the club editor and the directory filter.
+func (h *ClubHandler) ListDisciplines(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"items": model.ClubDisciplines})
 }
 
 // POST /api/v1/clubs/{id}/join-code

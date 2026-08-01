@@ -1,13 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut, Check, X as XIcon, RefreshCw } from 'lucide-react'
-import { clubsApi, type Club, type ClubMember } from '../api/clubs'
+import { ChevronLeft, Camera, Shield, ShieldOff, Trash2, LogOut, Check, X as XIcon, RefreshCw, MapPin, Plus } from 'lucide-react'
+import {
+  clubsApi,
+  DAY_LABELS,
+  type Club,
+  type ClubMember,
+  type ClubOpeningHoursInput,
+  type UpdateClubInput,
+} from '../api/clubs'
+import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { UserAvatar } from '../components/UserAvatar'
+import { requestPosition } from '../utils/geolocation'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 
 const TIMEZONES: string[] = (() => {
@@ -119,7 +128,9 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
   function handleSave() {
     mutation.mutate({
       name: name.trim() || undefined,
-      description: description.trim() || undefined,
+      // Send the trimmed value even when empty — an empty string is how the
+      // API clears a description, whereas undefined would keep the old one.
+      description: description.trim(),
     })
   }
 
@@ -149,7 +160,500 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
         />
       </div>
 
-      <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary}>
+      <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary} aria-label="Save general details">
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Location & Contact Section
+// ---------------------------------------------------------------------------
+
+/** Reports the API's message on a rejected club update rather than a generic one. */
+function updateErrorMessage(err: unknown, fallback: string) {
+  return err instanceof ApiError && err.message ? err.message : fallback
+}
+
+function LocationContactSection({ clubId, club }: { clubId: string; club: Club }) {
+  const queryClient = useQueryClient()
+  const [form, setForm] = useState({
+    address_line1: club.address_line1 ?? '',
+    address_line2: club.address_line2 ?? '',
+    city: club.city ?? '',
+    region: club.region ?? '',
+    postcode: club.postcode ?? '',
+    country: club.country ?? '',
+    website_url: club.website_url ?? '',
+    contact_email: club.contact_email ?? '',
+    contact_phone: club.contact_phone ?? '',
+  })
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    club.latitude != null && club.longitude != null ? { lat: club.latitude, lng: club.longitude } : null,
+  )
+  const [locating, setLocating] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateClubInput) => clubsApi.update(clubId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Location & contact saved', 'success')
+    },
+    onError: (err) => toast(updateErrorMessage(err, 'Failed to save location & contact'), 'error'),
+  })
+
+  function set(key: keyof typeof form, value: string) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function useCurrentLocation() {
+    setLocating(true)
+    try {
+      const pos = await requestPosition()
+      setCoords({ lat: Number(pos.lat.toFixed(6)), lng: Number(pos.lng.toFixed(6)) })
+    } catch {
+      toast('Could not get your location — check location permissions.', 'error')
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  function handleSave() {
+    mutation.mutate({
+      ...form,
+      ...(coords ? { latitude: coords.lat, longitude: coords.lng } : { clear_coordinates: true }),
+    })
+  }
+
+  const fields: { key: keyof typeof form; label: string; placeholder: string; type?: string }[] = [
+    { key: 'address_line1', label: 'Address', placeholder: 'Street or range name' },
+    { key: 'address_line2', label: 'Address line 2', placeholder: 'Optional' },
+    { key: 'city', label: 'Town / City', placeholder: 'e.g. Huddersfield' },
+    { key: 'region', label: 'County / Region', placeholder: 'e.g. West Yorkshire' },
+    { key: 'postcode', label: 'Postcode', placeholder: 'e.g. HD3 3FR' },
+    { key: 'country', label: 'Country', placeholder: 'e.g. United Kingdom' },
+    { key: 'website_url', label: 'Website', placeholder: 'https://…', type: 'url' },
+    { key: 'contact_email', label: 'Contact email', placeholder: 'info@example.com', type: 'email' },
+    { key: 'contact_phone', label: 'Contact phone', placeholder: 'e.g. 07700 900000', type: 'tel' },
+  ]
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="t-section-title">Location &amp; Contact</h2>
+      <p className="text-[10px] text-muted -mt-2">
+        Shown on the club page so shooters can find and reach you. Leave anything blank to hide it.
+      </p>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        {fields.map(f => (
+          <div key={f.key} className="space-y-1.5">
+            <label className={labelCls} htmlFor={`club-${f.key}`}>{f.label}</label>
+            <input
+              id={`club-${f.key}`}
+              type={f.type ?? 'text'}
+              value={form[f.key]}
+              onChange={e => set(f.key, e.target.value)}
+              className={inputCls}
+              placeholder={f.placeholder}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Map pin</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-secondary font-mono">
+            {coords ? `${coords.lat}, ${coords.lng}` : 'Not set'}
+          </span>
+          <button type="button" onClick={useCurrentLocation} disabled={locating} className="lc-action-ghost">
+            <MapPin size={12} /> {locating ? 'Locating…' : 'Use current location'}
+          </button>
+          {coords && (
+            <button type="button" onClick={() => setCoords(null)} className="lc-action-ghost text-muted">
+              <XIcon size={12} /> Remove pin
+            </button>
+          )}
+        </div>
+        <p className="text-[10px] text-muted">A pin lets the club appear in "near me" searches.</p>
+      </div>
+
+      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save location and contact">
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Disciplines & Facilities Section
+// ---------------------------------------------------------------------------
+
+/** Free-text tag editor used for distances and facilities. */
+function TagInput({ label, hint, placeholder, values, onChange }: {
+  label: string
+  hint: string
+  placeholder: string
+  values: string[]
+  onChange: (next: string[]) => void
+}) {
+  const [draft, setDraft] = useState('')
+
+  function add() {
+    const value = draft.trim()
+    if (!value) return
+    if (!values.some(v => v.toLowerCase() === value.toLowerCase())) onChange([...values, value])
+    setDraft('')
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className={labelCls}>{label}</label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          className={inputCls}
+          placeholder={placeholder}
+          aria-label={label}
+        />
+        <button type="button" onClick={add} disabled={!draft.trim()} className="lc-action-ghost shrink-0">Add</button>
+      </div>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {values.map(v => (
+            <span key={v} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-subtle text-secondary">
+              {v}
+              <button type="button" onClick={() => onChange(values.filter(x => x !== v))} aria-label={`Remove ${v}`} className="text-muted hover:text-[var(--error-text)]">
+                <XIcon size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-muted">{hint}</p>
+    </div>
+  )
+}
+
+function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
+  const queryClient = useQueryClient()
+  const [disciplines, setDisciplines] = useState<string[]>(club.disciplines)
+  const [distances, setDistances] = useState<string[]>(club.distances)
+  const [facilities, setFacilities] = useState<string[]>(club.facilities)
+
+  // The vocabulary is owned by the API so the editor and the directory filter
+  // can never drift apart.
+  const { data: vocab } = useQuery({
+    queryKey: ['club-disciplines'],
+    queryFn: () => clubsApi.listDisciplines(),
+    staleTime: Infinity,
+  })
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateClubInput) => clubsApi.update(clubId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Disciplines & facilities saved', 'success')
+    },
+    onError: (err) => toast(updateErrorMessage(err, 'Failed to save disciplines & facilities'), 'error'),
+  })
+
+  function toggleDiscipline(value: string) {
+    setDisciplines(prev => prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value])
+  }
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="t-section-title">Disciplines &amp; Facilities</h2>
+      <p className="text-[10px] text-muted -mt-2">
+        Disciplines drive the club directory filter — pick every one you shoot.
+      </p>
+
+      <div className="space-y-1.5">
+        <label className={labelCls}>Disciplines</label>
+        <div className="flex flex-wrap gap-2">
+          {(vocab?.items ?? []).map(value => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => toggleDiscipline(value)}
+              aria-pressed={disciplines.includes(value)}
+              className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                disciplines.includes(value)
+                  ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
+                  : 'border-subtle text-muted hover:text-secondary'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <TagInput
+        label="Distances"
+        hint="Ranges you can shoot, e.g. 10m, 25 yards, 100m."
+        placeholder="e.g. 25 yards"
+        values={distances}
+        onChange={setDistances}
+      />
+      <TagInput
+        label="Facilities"
+        hint="What members get on site, e.g. covered firing line, clubhouse, parking."
+        placeholder="e.g. Covered firing line"
+        values={facilities}
+        onChange={setFacilities}
+      />
+
+      <button
+        onClick={() => mutation.mutate({ disciplines, distances, facilities })}
+        disabled={mutation.isPending}
+        className={btnPrimary} aria-label="Save disciplines and facilities"
+      >
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Membership & Visitors Section
+// ---------------------------------------------------------------------------
+
+function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club }) {
+  const queryClient = useQueryClient()
+  const [membershipInfo, setMembershipInfo] = useState(club.membership_info ?? '')
+  const [visitorPolicy, setVisitorPolicy] = useState(club.visitor_policy ?? '')
+  const [established, setEstablished] = useState(club.established_year != null ? String(club.established_year) : '')
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdateClubInput) => clubsApi.update(clubId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      toast('Membership details saved', 'success')
+    },
+    onError: (err) => toast(updateErrorMessage(err, 'Failed to save membership details'), 'error'),
+  })
+
+  function handleSave() {
+    const year = established.trim()
+    mutation.mutate({
+      membership_info: membershipInfo.trim(),
+      visitor_policy: visitorPolicy.trim(),
+      // 0 is the API's "clear this" value for the founding year.
+      established_year: year === '' ? 0 : Number(year),
+    })
+  }
+
+  return (
+    <div className={sectionCls}>
+      <h2 className="t-section-title">Membership &amp; Visitors</h2>
+
+      <div className="space-y-1.5">
+        <label className={labelCls} htmlFor="club-membership-info">How to join</label>
+        <textarea
+          id="club-membership-info"
+          value={membershipInfo}
+          onChange={e => setMembershipInfo(e.target.value)}
+          className={inputCls + ' resize-none'}
+          rows={4}
+          placeholder="Fees, probationary period, what a new member needs to bring…"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls} htmlFor="club-visitor-policy">Visitors &amp; guests</label>
+        <textarea
+          id="club-visitor-policy"
+          value={visitorPolicy}
+          onChange={e => setVisitorPolicy(e.target.value)}
+          className={inputCls + ' resize-none'}
+          rows={3}
+          placeholder="Whether guests can shoot, booking requirements, hire availability…"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelCls} htmlFor="club-established">Established</label>
+        <input
+          id="club-established"
+          type="number"
+          inputMode="numeric"
+          value={established}
+          onChange={e => setEstablished(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. 1978"
+        />
+      </div>
+
+      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save membership details">
+        {mutation.isPending ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Opening Hours Section
+// ---------------------------------------------------------------------------
+
+/** Editable slot state; the id keeps React keys stable across edits. */
+interface SlotDraft {
+  key: string
+  day_of_week: number
+  opens_at: string
+  closes_at: string
+  is_closed: boolean
+  note: string
+}
+
+let slotKeySeq = 0
+function newSlotKey() { return `slot-${slotKeySeq++}` }
+
+function OpeningHoursSection({ clubId }: { clubId: string }) {
+  const queryClient = useQueryClient()
+  const [slots, setSlots] = useState<SlotDraft[] | null>(null)
+
+  const { data } = useQuery({
+    queryKey: ['club', clubId, 'opening-hours'],
+    queryFn: () => clubsApi.getOpeningHours(clubId),
+  })
+
+  // Seed the editor once from the server, then let local edits own the state.
+  useEffect(() => {
+    if (!data || slots !== null) return
+    setSlots(data.items.map(h => ({
+      key: h.id,
+      day_of_week: h.day_of_week,
+      opens_at: h.opens_at ?? '',
+      closes_at: h.closes_at ?? '',
+      is_closed: h.is_closed,
+      note: h.note ?? '',
+    })))
+  }, [data, slots])
+
+  const mutation = useMutation({
+    mutationFn: (items: ClubOpeningHoursInput[]) => clubsApi.replaceOpeningHours(clubId, items),
+    onSuccess: (res) => {
+      queryClient.setQueryData(['club', clubId, 'opening-hours'], res)
+      setSlots(res.items.map(h => ({
+        key: h.id,
+        day_of_week: h.day_of_week,
+        opens_at: h.opens_at ?? '',
+        closes_at: h.closes_at ?? '',
+        is_closed: h.is_closed,
+        note: h.note ?? '',
+      })))
+      toast('Opening times saved', 'success')
+    },
+    onError: (err) => toast(updateErrorMessage(err, 'Failed to save opening times'), 'error'),
+  })
+
+  const rows = slots ?? []
+
+  function update(key: string, patch: Partial<SlotDraft>) {
+    setSlots(prev => (prev ?? []).map(s => (s.key === key ? { ...s, ...patch } : s)))
+  }
+
+  function handleSave() {
+    mutation.mutate(rows.map(s => ({
+      day_of_week: s.day_of_week,
+      opens_at: s.is_closed ? null : s.opens_at,
+      closes_at: s.is_closed ? null : s.closes_at,
+      is_closed: s.is_closed,
+      note: s.note.trim() || null,
+    })))
+  }
+
+  return (
+    <div className={sectionCls}>
+      <div className="flex items-center justify-between">
+        <h2 className="t-section-title">Opening Times</h2>
+        <button
+          type="button"
+          onClick={() => setSlots([...rows, { key: newSlotKey(), day_of_week: 0, opens_at: '10:00', closes_at: '15:00', is_closed: false, note: '' }])}
+          className="lc-action-ghost"
+        >
+          <Plus size={12} /> Add slot
+        </button>
+      </div>
+      <p className="text-[10px] text-muted -mt-2">
+        Add a slot per session — a day can have more than one. Mark a day closed to say so explicitly.
+      </p>
+
+      {rows.length === 0 && (
+        <p className="text-sm text-muted text-center py-4">No opening times published.</p>
+      )}
+
+      {rows.map(slot => (
+        <div key={slot.key} className="space-y-2 py-2 border-b border-subtle last:border-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={slot.day_of_week}
+              onChange={e => update(slot.key, { day_of_week: Number(e.target.value) })}
+              className={inputCls + ' w-auto'}
+              aria-label="Day of week"
+            >
+              {DAY_LABELS.map((label, day) => <option key={label} value={day}>{label}</option>)}
+            </select>
+
+            {!slot.is_closed && (
+              <>
+                <input
+                  type="time"
+                  value={slot.opens_at}
+                  onChange={e => update(slot.key, { opens_at: e.target.value })}
+                  className={inputCls + ' w-auto'}
+                  aria-label="Opens at"
+                />
+                <span className="text-muted text-sm">–</span>
+                <input
+                  type="time"
+                  value={slot.closes_at}
+                  onChange={e => update(slot.key, { closes_at: e.target.value })}
+                  className={inputCls + ' w-auto'}
+                  aria-label="Closes at"
+                />
+              </>
+            )}
+
+            <label className="flex items-center gap-1.5 text-[11px] tracking-widest uppercase text-muted">
+              <input
+                type="checkbox"
+                checked={slot.is_closed}
+                onChange={e => update(slot.key, { is_closed: e.target.checked })}
+              />
+              Closed
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setSlots(rows.filter(s => s.key !== slot.key))}
+              className="p-1 rounded text-muted hover:text-[var(--error-text)] ml-auto"
+              aria-label="Remove slot"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={slot.note}
+            onChange={e => update(slot.key, { note: e.target.value })}
+            className={inputCls}
+            placeholder="Note (optional) — e.g. pre-booking required"
+            aria-label="Slot note"
+          />
+        </div>
+      ))}
+
+      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save opening times">
         {mutation.isPending ? 'Saving…' : 'Save'}
       </button>
     </div>
@@ -592,10 +1096,11 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
 // Leave Club Section
 // ---------------------------------------------------------------------------
 
-function LeaveSection({ clubId, members, currentUserId }: { clubId: string; members: ClubMember[]; currentUserId: string }) {
+function LeaveSection({ clubId, club, members, currentUserId }: { clubId: string; club: Club; members: ClubMember[]; currentUserId: string }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const currentMember = members.find(m => m.user_id === currentUserId)
   const adminCount = members.filter(m => m.is_admin).length
@@ -612,6 +1117,16 @@ function LeaveSection({ clubId, members, currentUserId }: { clubId: string; memb
       const msg = err instanceof Error ? err.message : 'Failed to leave club'
       toast(msg, 'error')
     },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => clubsApi.remove(clubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      toast('Club deleted', 'success')
+      navigate({ to: '/clubs' })
+    },
+    onError: (err) => toast(updateErrorMessage(err, 'Failed to delete club'), 'error'),
   })
 
   return (
@@ -633,6 +1148,24 @@ function LeaveSection({ clubId, members, currentUserId }: { clubId: string; memb
           Leave
         </button>
       </div>
+
+      <div className="flex items-center justify-between pt-3 border-t border-subtle">
+        <div>
+          <p className="text-sm text-secondary">Delete this club</p>
+          <p className="text-[11px] text-muted">
+            Removes the club, its members, posts and opening times. Leagues stay but are no longer club-hosted.
+          </p>
+        </div>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          disabled={deleteMutation.isPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] tracking-widest uppercase border border-red-500/30 text-red-400 rounded hover:bg-red-500/10 transition-colors disabled:opacity-30 shrink-0"
+        >
+          <Trash2 size={12} />
+          Delete
+        </button>
+      </div>
+
       <ConfirmDialog
         open={confirmLeave}
         title="Leave club?"
@@ -640,6 +1173,14 @@ function LeaveSection({ clubId, members, currentUserId }: { clubId: string; memb
         confirmLabel="Leave"
         onConfirm={() => { setConfirmLeave(false); leaveMutation.mutate() }}
         onCancel={() => setConfirmLeave(false)}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete ${club.name}?`}
+        message={`This permanently removes the club and its ${members.length} member${members.length === 1 ? '' : 's'}, posts and opening times. This cannot be undone.`}
+        confirmLabel="Delete club"
+        onConfirm={() => { setConfirmDelete(false); deleteMutation.mutate() }}
+        onCancel={() => setConfirmDelete(false)}
       />
     </div>
   )
@@ -694,7 +1235,10 @@ export default function ClubSettings() {
     )
   }
 
-  if (!isAdmin) return null
+  // currentUser can briefly be null while the persisted auth store settles, and
+  // is null outright once a session expires — render nothing rather than
+  // dereferencing it.
+  if (!isAdmin || !currentUser) return null
 
   const members = membersData?.items ?? []
 
@@ -712,11 +1256,15 @@ export default function ClubSettings() {
 
       <ClubImageSection clubId={id} club={club} />
       <GeneralInfoSection clubId={id} club={club} />
+      <LocationContactSection clubId={id} club={club} />
+      <OpeningHoursSection clubId={id} />
+      <DisciplinesSection clubId={id} club={club} />
+      <MembershipInfoSection clubId={id} club={club} />
       <PrivacySection clubId={id} club={club} />
       <RegionalSection clubId={id} club={club} />
       {club.join_policy === 'approval' && <JoinRequestsSection clubId={id} />}
-      <MembersSection clubId={id} currentUserId={currentUser!.id} />
-      <LeaveSection clubId={id} members={members} currentUserId={currentUser!.id} />
+      <MembersSection clubId={id} currentUserId={currentUser.id} />
+      <LeaveSection clubId={id} club={club} members={members} currentUserId={currentUser.id} />
     </div>
   )
 }

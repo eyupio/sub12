@@ -1,13 +1,14 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Copy, Check, Trash2, ImagePlus, Trophy, Plus, Settings,
   Shield, ShieldOff, LogOut, Lock, Flag, Share2, Activity, Flame,
-  UserPlus, CalendarClock, Eye,
+  UserPlus, CalendarClock, Eye, MapPin, Clock, Phone, Info, Target,
+  Ruler, Building2,
 } from 'lucide-react'
 import { ApiError } from '../api/client'
-import { clubsApi, type ClubMember } from '../api/clubs'
+import { clubsApi, DAY_LABELS, type Club, type ClubMember, type ClubOpeningHours } from '../api/clubs'
 import { eventsApi, type EventState } from '../api/events'
 import { postApi } from '../api/posts'
 import { useAuthStore } from '../store/auth'
@@ -217,6 +218,14 @@ export default function ClubDetail() {
     enabled: !!id && !!club?.is_member,
   })
 
+  // Approval-gated clubs used to leave admins to discover requests by chance —
+  // surface the queue on the club page itself.
+  const { data: pendingRequests } = useQuery({
+    queryKey: ['club', id, 'join-requests', 'pending'],
+    queryFn: () => clubsApi.listJoinRequests(id, 'pending'),
+    enabled: !!club?.is_admin && club?.join_policy === 'approval',
+  })
+
   const [showCreateLeague, setShowCreateLeague] = useState(false)
   const [newLeagueName, setNewLeagueName] = useState('')
   const [newLeagueDesc, setNewLeagueDesc] = useState('')
@@ -304,6 +313,8 @@ export default function ClubDetail() {
   const needsJoinCode = !club.is_member && club.join_policy === 'invite_code'
   const joinLabel = club.join_policy === 'approval' ? 'Request' : 'Join'
   const adminCount = (membersData?.items ?? []).filter(m => m.is_admin).length
+  const placeLabel = [club.city, club.region].filter(Boolean).join(', ')
+  const pendingCount = pendingRequests?.items?.length ?? 0
 
   return (
     <PageGrid>
@@ -337,9 +348,13 @@ export default function ClubDetail() {
             {club.description && <span>{club.description}</span>}
             {club.description && <span className="lc-detail-sub-sep">·</span>}
             <span><Users size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {club.member_count} member{club.member_count !== 1 ? 's' : ''}</span>
-            {club.league_count != null && (<>
+            {club.league_count > 0 && (<>
               <span className="lc-detail-sub-sep">·</span>
               <span><Trophy size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {club.league_count} league{club.league_count !== 1 ? 's' : ''}</span>
+            </>)}
+            {placeLabel && (<>
+              <span className="lc-detail-sub-sep">·</span>
+              <span><MapPin size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {placeLabel}</span>
             </>)}
           </>
         }
@@ -391,6 +406,21 @@ export default function ClubDetail() {
         </div>
       )}
 
+      {pendingCount > 0 && (
+        <Link
+          to="/clubs/$id/settings"
+          params={{ id }}
+          className="lc-section u-nudge"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', marginBottom: 14, color: 'var(--ink)' }}
+        >
+          <UserPlus size={14} style={{ color: 'var(--gold)' }} />
+          <span style={{ flex: 1, fontSize: 13 }}>
+            {pendingCount} join request{pendingCount !== 1 ? 's' : ''} waiting for review
+          </span>
+          <span style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--gold)' }}>Review</span>
+        </Link>
+      )}
+
       {/* Code copy for members (admins included) */}
       {club.is_member && club.join_code && (
         <button
@@ -403,6 +433,8 @@ export default function ClubDetail() {
       )}
 
       <div className="lc-stack-lg">
+        <ClubAbout club={club} />
+
         {/* Two-column: Top performers + Members */}
         <div className="lc-grid-2">
           <Section title="Top Performers" icon={<Trophy size={12} />}>
@@ -564,6 +596,157 @@ export default function ClubDetail() {
         />
       )}
     </PageGrid>
+  )
+}
+
+/** Renders a labelled row inside the About panel, skipping empty values. */
+function AboutRow({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
+      <span style={{ color: 'var(--muted)', marginTop: 2, flexShrink: 0 }}>{icon}</span>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 13, color: 'var(--ink)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function ChipList({ items }: { items: string[] }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {items.map((item) => (
+        <span
+          key={item}
+          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid var(--line)', background: 'var(--lc-surface)', color: 'var(--ink-2)' }}
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Formats one published slot, e.g. "10:00 – 15:00" or "Closed". */
+function formatSlot(slot: ClubOpeningHours) {
+  if (slot.is_closed) return 'Closed'
+  if (!slot.opens_at || !slot.closes_at) return '—'
+  return `${slot.opens_at} – ${slot.closes_at}`
+}
+
+function OpeningHoursTable({ hours }: { hours: ClubOpeningHours[] }) {
+  const byDay = DAY_LABELS.map((label, day) => ({ label, slots: hours.filter((h) => h.day_of_week === day) }))
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      {byDay.filter((d) => d.slots.length > 0).map((d) => (
+        <div key={d.label} style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+          <span style={{ width: 88, flexShrink: 0, color: 'var(--muted)' }}>{d.label}</span>
+          <span style={{ minWidth: 0 }}>
+            {d.slots.map((slot, i) => (
+              <span key={slot.id} style={{ display: 'block' }}>
+                <span className="u-tnum">{formatSlot(slot)}</span>
+                {slot.note && <span style={{ color: 'var(--muted)' }}> · {slot.note}</span>}
+                {i < d.slots.length - 1 ? '' : ''}
+              </span>
+            ))}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The public face of a club: where it is, how to reach it, what you can shoot
+ * there and when. Visible to non-members too — it's what someone browsing the
+ * directory needs before deciding to join.
+ */
+function ClubAbout({ club }: { club: Club }) {
+  const { data: hoursData } = useQuery({
+    queryKey: ['club', club.id, 'opening-hours'],
+    queryFn: () => clubsApi.getOpeningHours(club.id),
+    retry: false,
+  })
+  const hours = hoursData?.items ?? []
+
+  const addressLines = [club.address_line1, club.address_line2, club.city, club.region, club.postcode, club.country].filter(Boolean) as string[]
+  const hasContact = !!(club.website_url || club.contact_email || club.contact_phone)
+  const hasGear = club.disciplines.length > 0 || club.distances.length > 0 || club.facilities.length > 0
+  const hasProfile = addressLines.length > 0 || hasContact || hasGear || hours.length > 0 ||
+    !!club.membership_info || !!club.visitor_policy || club.established_year != null
+
+  if (!hasProfile) {
+    if (!club.is_admin) return null
+    return (
+      <Section title="About" icon={<Info size={12} />}>
+        <EmptyState
+          icon={<MapPin size={36} />}
+          title="No club details yet"
+          body="Add your location, contact details, disciplines and opening times so shooters can find you."
+          cta={<Link to="/clubs/$id/settings" params={{ id: club.id }} className="lc-action-ghost"><Settings size={12} /> Add details</Link>}
+        />
+      </Section>
+    )
+  }
+
+  const mapHref = club.latitude != null && club.longitude != null
+    ? `https://www.openstreetmap.org/?mlat=${club.latitude}&mlon=${club.longitude}#map=15/${club.latitude}/${club.longitude}`
+    : null
+
+  return (
+    <Section title="About" icon={<Info size={12} />}>
+      {addressLines.length > 0 && (
+        <AboutRow icon={<MapPin size={13} />} label="Where">
+          {addressLines.join('\n')}
+          {mapHref && (
+            <div style={{ marginTop: 6 }}>
+              <a href={mapHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', fontSize: 12 }}>View on map ↗</a>
+            </div>
+          )}
+        </AboutRow>
+      )}
+
+      {hours.length > 0 && (
+        <AboutRow icon={<Clock size={13} />} label="Opening times">
+          <OpeningHoursTable hours={hours} />
+        </AboutRow>
+      )}
+
+      {club.disciplines.length > 0 && (
+        <AboutRow icon={<Target size={13} />} label="Disciplines"><ChipList items={club.disciplines} /></AboutRow>
+      )}
+      {club.distances.length > 0 && (
+        <AboutRow icon={<Ruler size={13} />} label="Distances"><ChipList items={club.distances} /></AboutRow>
+      )}
+      {club.facilities.length > 0 && (
+        <AboutRow icon={<Building2 size={13} />} label="Facilities"><ChipList items={club.facilities} /></AboutRow>
+      )}
+
+      {club.membership_info && (
+        <AboutRow icon={<UserPlus size={13} />} label="Membership">{club.membership_info}</AboutRow>
+      )}
+      {club.visitor_policy && (
+        <AboutRow icon={<Eye size={13} />} label="Visitors &amp; guests">{club.visitor_policy}</AboutRow>
+      )}
+
+      {hasContact && (
+        <AboutRow icon={<Phone size={13} />} label="Contact">
+          <div style={{ display: 'grid', gap: 4 }}>
+            {club.website_url && (
+              <a href={club.website_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)' }}>{club.website_url}</a>
+            )}
+            {club.contact_email && <a href={`mailto:${club.contact_email}`} style={{ color: 'var(--gold)' }}>{club.contact_email}</a>}
+            {club.contact_phone && <a href={`tel:${club.contact_phone.replace(/\s+/g, '')}`} style={{ color: 'var(--gold)' }}>{club.contact_phone}</a>}
+          </div>
+        </AboutRow>
+      )}
+
+      {club.established_year != null && (
+        <AboutRow icon={<CalendarClock size={13} />} label="Established">
+          <span className="u-tnum">{club.established_year}</span>
+        </AboutRow>
+      )}
+    </Section>
   )
 }
 

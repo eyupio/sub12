@@ -433,6 +433,8 @@ func NewRouter(
 			r.Get("/users/me/clubs", clh.ListMine)
 			r.Post("/clubs", clh.Create)
 			r.Patch("/clubs/{id}", clh.Update)
+			r.Delete("/clubs/{id}", clh.Delete)
+			r.Put("/clubs/{id}/opening-hours", clh.ReplaceOpeningHours)
 			r.Post("/clubs/{id}/join", clh.Join)
 			r.Get("/clubs/{id}/members", clh.ListMembers)
 			r.Delete("/clubs/{id}/members/me", clh.Leave)
@@ -629,9 +631,11 @@ func NewRouter(
 
 			clh := handler.NewClub(clubs, leagues, images)
 			r.Get("/clubs", clh.List)
+			r.Get("/clubs/disciplines", clh.ListDisciplines)
 			r.Get("/clubs/{id}", clh.GetByID)
 			r.Get("/clubs/{id}/summary", clh.Summary)
 			r.Get("/clubs/{id}/standings", clh.GetStandings)
+			r.Get("/clubs/{id}/opening-hours", clh.GetOpeningHours)
 
 			// League reads mirror club semantics: the detail endpoint honors
 			// private-league gating via the service layer; the summary endpoint

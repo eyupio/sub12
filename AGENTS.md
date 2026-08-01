@@ -114,7 +114,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **107** (000001–000107). Latest: `000107_share_slugs`.
+Current migration count: **109** (000001–000109). Latest: `000109_club_opening_hours`.
 
 ## Critical Migration Rules
 
@@ -193,7 +193,8 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - `POST /auth/forgot-password`, `POST /auth/reset-password`
 - `GET /images/{id}`
 - `GET /leagues`, `GET /leagues/{id}`
-- `GET /clubs`, `GET /clubs/{id}`, `GET /clubs/{id}/standings`
+- `GET /clubs`, `GET /clubs/{id}`, `GET /clubs/{id}/standings`, `GET /clubs/{id}/opening-hours`, `GET /clubs/disciplines`
+  - The club directory accepts `?q=` (name, town, region or postcode), `?discipline=`, and `?lat=&lng=[&radius_km=]` to return `distance_km` and sort nearest-first. `?code=` still resolves a single club by join code and ignores the other filters.
 - `GET /score-cards/{id}/comments`
 - `GET /pellet-tests/public-leaderboard`
 
@@ -205,7 +206,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
 - **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (confirm/amend/reject/reopen + audit trail)
-- **Clubs:** Create, join, members, image upload
+- **Clubs:** Create, update, delete (club admins, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users
 - **Activity:** `GET /feed`
@@ -219,7 +220,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Users:** List, get, update role, delete
 - **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
-- **Clubs:** List, get, update, delete, members management
+- **Clubs:** List (private clubs included), get, update, delete, members management
 
 ## Environment Variables
 
