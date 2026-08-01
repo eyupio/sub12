@@ -94,8 +94,9 @@ android/app/build/outputs/apk/release/app-release-unsigned.apk  # unsigned relea
 `frontend/**`, on pushes to `main`, and on `v*` tags.
 
 The two are not equivalent, because Apple's rules differ from Android's. An APK
-is installable however it is signed, so CI mints a throwaway key when no release
-keystore is configured and every build is downloadable. An `.ipa` will not
+is installable however it is signed, so CI mints its own key when no release
+keystore is configured — reused from the Actions cache across runs, so builds
+stay upgradeable — and every build is downloadable. An `.ipa` will not
 install unless it is signed by a paid Apple Developer Program account against a
 provisioning profile that names the target device. So `ios.yml` defaults to a
 compile check — it archives unsigned, packages the `.app` into a `Payload/` zip,
