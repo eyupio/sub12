@@ -97,6 +97,25 @@ jobs:
         working-directory: frontend
         run: npx cap sync android
 
+      - name: Ensure debug keystore
+        if: steps.vars.outputs.variant == 'debug'
+        run: |
+          set -euo pipefail
+          keystore="$HOME/.android/debug.keystore"
+          # app/build.gradle declares an explicit debug signingConfig, which
+          # stops AGP auto-creating the default debug keystore. A fresh runner
+          # therefore has no such file and validateSigningDebug fails. Mint one
+          # with the standard debug credentials build.gradle expects.
+          if [ ! -f "$keystore" ]; then
+            mkdir -p "$HOME/.android"
+            keytool -genkeypair -v \
+              -keystore "$keystore" \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Configure release signing
         if: steps.vars.outputs.variant == 'release'
         working-directory: frontend/android
