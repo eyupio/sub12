@@ -282,16 +282,16 @@ function HeroMockup() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best Group</p>
-                  <p className="mt-2 font-mono text-xl font-semibold text-[var(--brass)]">7.82mm</p>
+                  <p className="mt-2 font-mono text-base font-semibold text-[var(--brass)] sm:text-xl">7.82<span className="text-xs">mm</span></p>
                 </div>
-                <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
-                  <p className="mt-2 font-mono text-xl font-semibold text-primary">9.64mm</p>
+                  <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-xl">9.64<span className="text-xs">mm</span></p>
                 </div>
-                <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Confidence</p>
                   <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-primary">High</p>
                 </div>
@@ -809,18 +809,18 @@ export default function LandingPage() {
                         </div>
                         <Crosshair size={18} className="text-[var(--brass)]" />
                       </div>
-                      <div className="mt-4 grid grid-cols-3 gap-3">
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                           <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-[var(--brass)]">8.31mm</p>
+                          <p className="mt-2 font-mono text-base font-semibold text-[var(--brass)] sm:text-lg">8.31<span className="text-xs">mm</span></p>
                         </div>
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                        <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                           <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-primary">10.02mm</p>
+                          <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-lg">10.02<span className="text-xs">mm</span></p>
                         </div>
-                        <div className="rounded-2xl border border-subtle bg-surface px-3 py-3">
+                        <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
                           <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Spread</p>
-                          <p className="mt-2 font-mono text-lg font-semibold text-primary">1.71mm</p>
+                          <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-lg">1.71<span className="text-xs">mm</span></p>
                         </div>
                       </div>
                     </div>
@@ -835,12 +835,12 @@ export default function LandingPage() {
 
                   <div className="space-y-5 p-6">
                     <div className="rounded-[22px] border border-subtle bg-page p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
                           <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Setup</p>
                           <p className="mt-2 text-sm font-semibold text-primary">TX200 MkIII / JSB Exact 8.44 / Batch A21</p>
                         </div>
-                        <span className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
                           Ranked #1
                         </span>
                       </div>
