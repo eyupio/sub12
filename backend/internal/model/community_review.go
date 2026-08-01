@@ -28,8 +28,8 @@ type CommunityReviewMeta struct {
 // CommunityReviewStatusResponse is the GET shape returned to the frontend so
 // the card detail page can render the right call-to-action and progress.
 type CommunityReviewStatusResponse struct {
-	Request           *CommunityReviewRequest `json:"request,omitempty"`
-	Confirmations     []*ScoreConfirmation    `json:"confirmations"`
-	ConfirmationCount int                     `json:"confirmation_count"`
-	ViewerHasConfirmed bool                   `json:"viewer_has_confirmed"`
+	Request            *CommunityReviewRequest `json:"request,omitempty"`
+	Confirmations      []*ScoreConfirmation    `json:"confirmations"`
+	ConfirmationCount  int                     `json:"confirmation_count"`
+	ViewerHasConfirmed bool                    `json:"viewer_has_confirmed"`
 }

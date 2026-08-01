@@ -1059,15 +1059,26 @@ func (r *LeagueRepository) AmendScore(ctx context.Context, scoreCardID, adminID 
 	defer tx.Rollback(ctx)
 
 	var oldTotal, oldX int16
+	var verification string
+	var isDraft bool
 	err = tx.QueryRow(ctx,
-		`SELECT total_score, x_count FROM score_cards WHERE id = $1 FOR UPDATE`,
+		`SELECT total_score, x_count, verification::text, is_draft FROM score_cards WHERE id = $1 FOR UPDATE`,
 		scoreCardID,
-	).Scan(&oldTotal, &oldX)
+	).Scan(&oldTotal, &oldX, &verification, &isDraft)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("read current score: %w", err)
+	}
+	// A rejected card must be reopened first — amending would silently jump it
+	// straight to 'verified', bypassing the reopen audit semantics. A draft
+	// isn't submitted yet, and graduation would reset the verification anyway.
+	if verification == "rejected" {
+		return ErrCardRejected
+	}
+	if isDraft {
+		return ErrCardDraft
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -1096,6 +1107,25 @@ func (r *LeagueRepository) RejectScore(ctx context.Context, scoreCardID, adminID
 	}
 	defer tx.Rollback(ctx)
 
+	var verification string
+	var isDraft bool
+	err = tx.QueryRow(ctx,
+		`SELECT verification::text, is_draft FROM score_cards WHERE id = $1 FOR UPDATE`,
+		scoreCardID,
+	).Scan(&verification, &isDraft)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current score: %w", err)
+	}
+	if verification == "rejected" {
+		return ErrCardRejected
+	}
+	if isDraft {
+		return ErrCardDraft
+	}
+
 	_, err = tx.Exec(ctx, `
 		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
 		VALUES ($1, 'reject', $2, $3)
@@ -1109,6 +1139,39 @@ func (r *LeagueRepository) RejectScore(ctx context.Context, scoreCardID, adminID
 	`, scoreCardID)
 	if err != nil {
 		return fmt.Errorf("update verification: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+// VerifyScore lets a league admin explicitly mark a pending card as verified,
+// recording a 'verify' row in the audit trail. Returns ErrNotFound when the
+// card does not exist or is not in the pending state (a rejected card must be
+// reopened first; drafts are not submitted yet).
+func (r *LeagueRepository) VerifyScore(ctx context.Context, scoreCardID, adminID string, reason *string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE score_cards SET verification = 'verified', updated_at = NOW()
+		WHERE id = $1 AND verification = 'pending' AND is_draft = FALSE
+	`, scoreCardID)
+	if err != nil {
+		return fmt.Errorf("verify score card: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
+		VALUES ($1, 'verify', $2, $3)
+	`, scoreCardID, adminID, reason)
+	if err != nil {
+		return fmt.Errorf("insert verify action: %w", err)
 	}
 
 	return tx.Commit(ctx)
@@ -1381,6 +1444,14 @@ func (r *LeagueRepository) ReopenScore(ctx context.Context, scoreCardID, adminID
 		return ErrNotFound
 	}
 
+	// Confirmations gathered before the rejection must not carry over —
+	// otherwise a single fresh confirm would instantly re-trip the threshold
+	// and defeat the point of re-review.
+	_, err = tx.Exec(ctx, `DELETE FROM score_confirmations WHERE score_card_id = $1`, scoreCardID)
+	if err != nil {
+		return fmt.Errorf("clear confirmations on reopen: %w", err)
+	}
+
 	_, err = tx.Exec(ctx, `
 		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
 		VALUES ($1, 'reopen', $2, $3)
@@ -1390,6 +1461,56 @@ func (r *LeagueRepository) ReopenScore(ctx context.Context, scoreCardID, adminID
 	}
 
 	return tx.Commit(ctx)
+}
+
+// RecordOwnerReopen audits the shooter editing their own rejected card. The
+// score-card update itself flips rejected → pending; this row keeps the
+// transition visible in the audit trail instead of silently erasing the
+// rejection's consequence.
+func (r *LeagueRepository) RecordOwnerReopen(ctx context.Context, scoreCardID, userID string) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
+		VALUES ($1, 'reopen', $2, 'Owner edited the card after rejection')
+	`, scoreCardID, userID)
+	if err != nil {
+		return fmt.Errorf("record owner reopen: %w", err)
+	}
+	return nil
+}
+
+// VerifyPendingForLeague verifies every pending, non-draft card in a league.
+// Called when a league runs (or switches to running) without score
+// verification, so submissions are not stranded outside the standings.
+func (r *LeagueRepository) VerifyPendingForLeague(ctx context.Context, leagueID string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE score_cards sc
+		SET verification = 'verified', updated_at = NOW()
+		FROM rounds rd
+		JOIN seasons s ON s.id = rd.season_id
+		WHERE sc.league_round_id = rd.id
+		  AND s.league_id = $1
+		  AND sc.verification = 'pending'
+		  AND sc.is_draft = FALSE
+	`, leagueID)
+	if err != nil {
+		return 0, fmt.Errorf("verify pending cards for league: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+// SeasonBelongsToLeague reports whether the season is owned by the league.
+// Guards round creation so an admin of one league cannot attach rounds to
+// another league's season.
+func (r *LeagueRepository) SeasonBelongsToLeague(ctx context.Context, seasonID, leagueID string) (bool, error) {
+	var ok bool
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM seasons WHERE id = $1 AND league_id = $2)`,
+		seasonID, leagueID,
+	).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("check season league: %w", err)
+	}
+	return ok, nil
 }
 
 // GetConfigByRoundID looks up the league config for the league that owns the given round.

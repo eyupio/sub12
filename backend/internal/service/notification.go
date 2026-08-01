@@ -218,9 +218,13 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 	case model.NotificationTypeLikeOnMyContent:
 		return "Someone liked your content", actor + " liked your content on sub12.io."
 	case model.NotificationTypeScoreVerified:
-		return "Your score was verified", "A league admin verified your score card."
+		return "Your score was verified", "Your score card was verified."
 	case model.NotificationTypeScoreRejected:
-		return "Your score was rejected", "A league admin rejected your score card."
+		body := "A league admin rejected your score card."
+		if reason, ok := ev.Metadata["reason"].(string); ok && reason != "" {
+			body = "A league admin rejected your score card. Reason: " + reason
+		}
+		return "Your score was rejected", body
 	case model.NotificationTypeScoreAmended:
 		return "Your score was amended", "A league admin amended your score card."
 	case model.NotificationTypeLeagueJoinApproved:

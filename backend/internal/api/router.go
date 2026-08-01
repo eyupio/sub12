@@ -416,18 +416,19 @@ func NewRouter(
 
 			// Score verification
 			r.Get("/score-cards/{id}/league", lh.GetLeagueForScoreCard)
-			r.Post("/score-cards/{id}/confirmations", lh.ConfirmScore)
+			r.With(rl.Limit("like")).Post("/score-cards/{id}/confirmations", lh.ConfirmScore)
 			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
-			r.Post("/score-cards/{id}/reopen", lh.ReopenScore)
-			r.Post("/score-cards/{id}/amend", lh.AmendScore)
-			r.Post("/score-cards/{id}/reject", lh.RejectScore)
+			r.With(rl.Limit("comment")).Post("/score-cards/{id}/verify", lh.VerifyScore)
+			r.With(rl.Limit("comment")).Post("/score-cards/{id}/reopen", lh.ReopenScore)
+			r.With(rl.Limit("comment")).Post("/score-cards/{id}/amend", lh.AmendScore)
+			r.With(rl.Limit("comment")).Post("/score-cards/{id}/reject", lh.RejectScore)
 
 			// Community review for personal practice cards
 			crh := handler.NewCommunityReview(communityReview)
 			r.Get("/score-cards/{id}/review-request", crh.Get)
-			r.Post("/score-cards/{id}/review-request", crh.Request)
-			r.Delete("/score-cards/{id}/review-request", crh.Cancel)
-			r.Post("/score-cards/{id}/review-request/confirm", crh.Confirm)
+			r.With(rl.Limit("report")).Post("/score-cards/{id}/review-request", crh.Request)
+			r.With(rl.Limit("report")).Delete("/score-cards/{id}/review-request", crh.Cancel)
+			r.With(rl.Limit("like")).Post("/score-cards/{id}/review-request/confirm", crh.Confirm)
 
 			// Clubs (auth-required operations)
 			clh := handler.NewClub(clubs, leagues, images)

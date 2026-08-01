@@ -38,6 +38,10 @@ func (h *CommunityReviewHandler) Request(w http.ResponseWriter, r *http.Request)
 			writeError(w, http.StatusForbidden, "not the card owner")
 		case errors.Is(err, service.ErrCardIsLeague):
 			writeError(w, http.StatusUnprocessableEntity, "league cards use league verification")
+		case errors.Is(err, service.ErrCardIsDraft):
+			writeError(w, http.StatusUnprocessableEntity, "graduate the draft before requesting review")
+		case errors.Is(err, service.ErrCardIsPrivate):
+			writeError(w, http.StatusUnprocessableEntity, "make the card visible before requesting review — reviewers must be able to see it")
 		case errors.Is(err, service.ErrCardAlreadyVerified):
 			writeError(w, http.StatusConflict, "card already verified")
 		case errors.Is(err, service.ErrReviewRequestExists):
@@ -119,6 +123,10 @@ func (h *CommunityReviewHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.GetForCard(r.Context(), scoreCardID, viewerID)
 	if err != nil {
+		if errors.Is(err, service.ErrCardNotVisible) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to get review status")
 		return
 	}

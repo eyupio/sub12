@@ -55,6 +55,22 @@ func (r *ActivityRepository) DeletePostActivities(ctx context.Context, postID st
 	return nil
 }
 
+// DeleteReviewRequestActivities removes the community_review_requested feed
+// rows for a card whose review request was cancelled, so the feed doesn't keep
+// advertising a confirm CTA that can only 404.
+func (r *ActivityRepository) DeleteReviewRequestActivities(ctx context.Context, scoreCardID string) error {
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM activities
+		WHERE type = $1
+		  AND target_type = 'score_card'
+		  AND target_id = $2::uuid
+	`, model.ActivityCommunityReviewRequested, scoreCardID)
+	if err != nil {
+		return fmt.Errorf("delete review request activities: %w", err)
+	}
+	return nil
+}
+
 // DeleteOwn permanently removes an activity row owned by the given user.
 // Returns ErrNotFound if the activity does not exist or belongs to another user.
 func (r *ActivityRepository) DeleteOwn(ctx context.Context, activityID, userID string) error {

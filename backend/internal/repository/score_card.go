@@ -729,12 +729,21 @@ func (r *ScoreCardRepository) GetGearLabels(ctx context.Context, cardID string) 
 // SubmitToLeague links a graduated (non-draft) score card to a league round
 // and sets verification to pending. Only updates rows that have no existing
 // league_round_id, so double-submission is a no-op (0 rows affected → ErrNotFound).
+// Any confirmations or community review request gathered while the card was a
+// personal practice card are cleared in the same transaction — league
+// verification must start from zero.
 func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID, roundID string) (*model.ScoreCard, error) {
 	var card model.ScoreCard
 	var shotScores pgtype.FlatArray[int16]
 	var shotXs pgtype.FlatArray[bool]
 
-	err := r.db.QueryRow(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx, `
 		UPDATE score_cards SET
 			league_round_id = $3,
 			verification    = 'pending'::verification_status,
@@ -763,5 +772,16 @@ func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID
 	}
 	card.ShotScores = []int16(shotScores)
 	card.ShotXs = []bool(shotXs)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM score_confirmations WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear confirmations on league submit: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM community_review_requests WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear community review request on league submit: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
 	return &card, nil
 }

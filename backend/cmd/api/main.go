@@ -221,6 +221,7 @@ func main() {
 	socialSvc.SetNotifications(notificationSvc)
 	postSvc.SetNotifications(notificationSvc)
 	clubSvc.SetNotifications(notificationSvc)
+	leagueSvc.SetNotifications(notificationSvc)
 
 	// Wire the export aggregators into UserService so GDPR data-export
 	// can include score cards, posts, clubs and leagues without forcing
@@ -244,6 +245,8 @@ func main() {
 	go moderationSweeper.Run(ctx)
 
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
+	communityReviewSvc.SetNotifications(notificationSvc)
+	communityReviewSvc.SetLogger(log.Logger)
 
 	// Live Events
 	categoryRepo := repository.NewCategoryRepository(pool)

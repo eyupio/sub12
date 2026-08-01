@@ -541,8 +541,12 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parsePagination(r, 20, 100)
 	verification := r.URL.Query().Get("verification")
 
-	scores, err := h.svc.ListScores(r.Context(), leagueID, limit, offset, verification)
+	scores, err := h.svc.ListScores(r.Context(), leagueID, viewerID, limit, offset, verification)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidScoreFilter) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
 			return
@@ -581,7 +585,7 @@ func (h *LeagueHandler) ScoreCounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	counts, err := h.svc.CountScores(r.Context(), leagueID)
+	counts, err := h.svc.CountScores(r.Context(), leagueID, viewerID)
 	if err != nil {
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "league not found")
@@ -1111,11 +1115,57 @@ func (h *LeagueHandler) AmendScore(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrScoreRejected) {
+			writeError(w, http.StatusConflict, "reopen the rejected score before amending it")
+			return
+		}
+		if errors.Is(err, service.ErrScoreIsDraft) {
+			writeError(w, http.StatusConflict, "draft cards cannot be amended")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to amend score")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"amended": true})
+}
+
+// POST /api/v1/score-cards/{id}/verify
+func (h *LeagueHandler) VerifyScore(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+
+	var input model.VerifyScoreInput
+	// Body is optional — the reason is a note, not a requirement.
+	_ = decodeJSON(r, &input)
+
+	if err := h.svc.VerifyScore(r.Context(), scoreCardID, userID, &input); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
+		if errors.Is(err, service.ErrScoreNotPending) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify score")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"verified": true})
 }
 
 // POST /api/v1/score-cards/{id}/reject
@@ -1146,6 +1196,14 @@ func (h *LeagueHandler) RejectScore(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, service.ErrReasonRequired) {
 			writeError(w, http.StatusUnprocessableEntity, "reason is required for rejection")
+			return
+		}
+		if errors.Is(err, service.ErrScoreRejected) {
+			writeError(w, http.StatusConflict, "score is already rejected")
+			return
+		}
+		if errors.Is(err, service.ErrScoreIsDraft) {
+			writeError(w, http.StatusConflict, "draft cards cannot be rejected")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to reject score")

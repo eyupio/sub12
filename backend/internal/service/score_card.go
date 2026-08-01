@@ -46,6 +46,7 @@ type LeagueConfigRepo interface {
 	GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error)
 	GetByID(ctx context.Context, id string) (*model.League, error)
 	IsMember(ctx context.Context, leagueID, userID string) (bool, error)
+	RecordOwnerReopen(ctx context.Context, scoreCardID, userID string) error
 }
 
 // UserProfileReader returns the profile-visibility flag needed when deciding
@@ -231,6 +232,7 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		}
 		return nil, err
 	}
+	card = s.applyLeagueAutoVerify(ctx, card)
 
 	isPB, err := s.cards.IsPersonalBest(ctx, userID, card.ID, card.TotalScore)
 	if err != nil {
@@ -497,6 +499,8 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 			updated.Verification = "verified"
 		}
 	}
+	// Same for league-bound cards whose league runs without verification.
+	updated = s.applyLeagueAutoVerify(ctx, updated)
 
 	isPB, pbErr := s.cards.IsPersonalBest(ctx, userID, updated.ID, updated.TotalScore)
 	if pbErr != nil {
@@ -569,11 +573,29 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 		}
 	}
 
-	if err := s.ensureNotLocked(ctx, id, userID); err != nil {
+	card, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureNotLockedCard(ctx, card); err != nil {
+		return nil, err
+	}
+	// Editing a rejected league card is the shooter's recourse, but it must
+	// leave a trace: the silent rejected → pending flip the update performs is
+	// recorded as an owner reopen in the audit trail.
+	wasRejectedLeagueCard := card.Verification == "rejected" &&
+		card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil
 
-	return s.cards.Update(ctx, id, userID, input, totalScore, xCount)
+	updated, err := s.cards.Update(ctx, id, userID, input, totalScore, xCount)
+	if err != nil {
+		return nil, err
+	}
+	if wasRejectedLeagueCard {
+		if reopenErr := s.leagueRepo.RecordOwnerReopen(ctx, id, userID); reopenErr != nil {
+			s.log.Warn().Err(reopenErr).Str("score_card_id", id).Msg("score_card: record owner reopen failed")
+		}
+	}
+	return s.applyLeagueAutoVerify(ctx, updated), nil
 }
 
 // Rotate updates only the card_image_rotation field. Rotation is a cosmetic
@@ -589,9 +611,13 @@ func (s *ScoreCardService) Rotate(ctx context.Context, id, userID string, rotati
 }
 
 // Delete removes a score card, enforcing the league's lock-edits-after-verification
-// policy when the card is a verified league submission.
+// policy when the card is a verified or rejected league submission.
 func (s *ScoreCardService) Delete(ctx context.Context, id, userID string) error {
-	if err := s.ensureNotLocked(ctx, id, userID); err != nil {
+	card, err := s.cards.GetByID(ctx, id, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureNotLockedCard(ctx, card); err != nil {
 		return err
 	}
 	return s.cards.Delete(ctx, id, userID)
@@ -622,16 +648,14 @@ func (s *ScoreCardService) checkMaxSubmissionsPerRound(ctx context.Context, user
 	return int(cfg.MaxSubmissionsPerRound), nil
 }
 
-// ensureNotLocked returns ErrEditsLocked when the card is verified and its
-// league or event has lock_edits_after_verification enabled. It silently
-// allows the action for personal cards, unverified cards, or when the league /
-// event config is unavailable.
-func (s *ScoreCardService) ensureNotLocked(ctx context.Context, id, userID string) error {
-	card, err := s.cards.GetByID(ctx, id, userID)
-	if err != nil {
-		return err
-	}
-	if card.Verification != "verified" {
+// ensureNotLockedCard returns ErrEditsLocked when the card is verified or
+// rejected and its league or event has lock_edits_after_verification enabled.
+// Rejected cards are covered so a shooter cannot quietly delete (or rewrite)
+// a card an admin has ruled on while the league locks decided cards. It
+// silently allows the action for personal cards, pending cards, or when the
+// league / event config is unavailable.
+func (s *ScoreCardService) ensureNotLockedCard(ctx context.Context, card *model.ScoreCard) error {
+	if card.Verification != "verified" && card.Verification != "rejected" {
 		return nil
 	}
 	if card.EventParticipantID != nil && *card.EventParticipantID != "" && s.events != nil {
@@ -658,6 +682,28 @@ func (s *ScoreCardService) ensureNotLocked(ctx context.Context, id, userID strin
 		return ErrEditsLocked
 	}
 	return nil
+}
+
+// applyLeagueAutoVerify flips a pending league card straight to 'verified'
+// when its league does not require score verification — the exact counterpart
+// of the event override above. Without it, nothing could ever verify the card
+// and it would sit outside the standings forever. Best-effort: on any lookup
+// failure the card is returned unchanged.
+func (s *ScoreCardService) applyLeagueAutoVerify(ctx context.Context, card *model.ScoreCard) *model.ScoreCard {
+	if card == nil || card.IsDraft || card.Verification != "pending" {
+		return card
+	}
+	if card.LeagueRoundID == nil || *card.LeagueRoundID == "" || s.leagueRepo == nil {
+		return card
+	}
+	cfg, err := s.leagueRepo.GetConfigByRoundID(ctx, *card.LeagueRoundID)
+	if err != nil || cfg == nil || cfg.RequireScoreVerification {
+		return card
+	}
+	if err := s.cards.SetVerification(ctx, card.ID, "verified"); err == nil {
+		card.Verification = "verified"
+	}
+	return card
 }
 
 // UpdateImageURL updates the card_image_url for a score card owned by the given user.
@@ -713,5 +759,9 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 		}
 	}
 
-	return s.cards.SubmitToLeague(ctx, cardID, userID, roundID)
+	submitted, err := s.cards.SubmitToLeague(ctx, cardID, userID, roundID)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyLeagueAutoVerify(ctx, submitted), nil
 }

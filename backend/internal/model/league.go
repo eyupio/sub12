@@ -181,6 +181,12 @@ type RejectScoreInput struct {
 	Reason string `json:"reason"`
 }
 
+// VerifyScoreInput carries the optional note recorded when an admin explicitly
+// verifies a pending card.
+type VerifyScoreInput struct {
+	Reason *string `json:"reason"`
+}
+
 type LeagueMember struct {
 	UserID      string    `json:"user_id"`
 	DisplayName string    `json:"display_name"`

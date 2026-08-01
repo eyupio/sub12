@@ -130,6 +130,7 @@ func (m *mockLeagueRepo) GetByID(_ context.Context, _ string) (*model.League, er
 func (m *mockLeagueRepo) IsMember(_ context.Context, _, _ string) (bool, error) {
 	return m.isMember, nil
 }
+func (m *mockLeagueRepo) RecordOwnerReopen(_ context.Context, _, _ string) error { return nil }
 
 func newTestService(repo *mockScoreCardRepo) *ScoreCardService {
 	return &ScoreCardService{cards: repo}
