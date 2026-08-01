@@ -116,7 +116,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **110** (000001–000110). Latest: `000110_feature_request_board`.
+Current migration count: **111** (000001–000111). Latest: `000111_faqs_new_user_onboarding`.
 
 ## Critical Migration Rules
 
