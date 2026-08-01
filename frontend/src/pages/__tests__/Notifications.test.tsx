@@ -94,6 +94,7 @@ describe('Notifications routing', () => {
     expect(notificationLink(makeNotification({ type: 'ticket_replied', target_id: 't-2' }))).toBe('/support/tickets/t-2')
     expect(notificationLink(makeNotification({ type: 'ticket_assigned', target_id: 't-3' }))).toBe('/support/tickets/t-3')
     expect(notificationLink(makeNotification({ type: 'ticket_status_changed', target_id: 't-4' }))).toBe('/support/tickets/t-4')
+    expect(notificationLink(makeNotification({ type: 'feature_request_state_changed', target_id: 'fr-1' }))).toBe('/feature-requests/fr-1')
     expect(notificationLink(makeNotification({ type: 'feature_request_state_changed' }))).toBe('/feature-requests')
     expect(notificationLink(makeNotification({ type: 'score_verified', target_type: 'score_card', target_id: 'sc-1' }))).toBe('/scores/sc-1')
     expect(notificationLink(makeNotification({ type: 'mention', target_type: 'post', target_id: 'post-1' }))).toBe('/feed')

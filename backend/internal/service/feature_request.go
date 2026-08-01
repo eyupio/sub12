@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ErrFeatureRequestInvalidStatus = errors.New("invalid feature request status")
-	ErrFeatureRequestTitleEmpty    = errors.New("feature request title cannot be empty")
+	ErrFeatureRequestInvalidStatus   = errors.New("invalid feature request status")
+	ErrFeatureRequestInvalidPriority = errors.New("invalid feature request priority")
+	ErrFeatureRequestTitleEmpty      = errors.New("feature request title cannot be empty")
 )
 
 type FeatureRequestService struct {
@@ -68,7 +69,7 @@ func (s *FeatureRequestService) CreateFromTicket(ctx context.Context, ticketID, 
 		RefinedDescription: strings.TrimSpace(in.RefinedDescription),
 		OwnerAdminID:       in.OwnerAdminID,
 	}
-	item, err := s.repo.CreateFromTicket(ctx, ticket, input)
+	item, err := s.repo.CreateFromTicket(ctx, ticket, actorID, input)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +115,9 @@ func (s *FeatureRequestService) Update(ctx context.Context, id, actorID string, 
 	if in.Status != nil && !model.IsValidFeatureRequestStatus(*in.Status) {
 		return nil, ErrFeatureRequestInvalidStatus
 	}
+	if in.Priority != nil && !model.IsValidFeatureRequestPriority(*in.Priority) {
+		return nil, ErrFeatureRequestInvalidPriority
+	}
 	if in.Title != nil {
 		title := strings.TrimSpace(*in.Title)
 		if title == "" {
@@ -158,6 +162,15 @@ func (s *FeatureRequestService) Get(ctx context.Context, id, viewerID string) (*
 		return nil, ErrNotAdmin
 	}
 	return item, nil
+}
+
+// Events returns the request's history, gated by the same scope visibility as
+// the request itself.
+func (s *FeatureRequestService) Events(ctx context.Context, id, viewerID string) ([]*model.FeatureRequestEvent, error) {
+	if _, err := s.Get(ctx, id, viewerID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListEvents(ctx, id)
 }
 
 func (s *FeatureRequestService) List(ctx context.Context, viewerID string, in *model.ListFeatureRequestsInput) ([]*model.FeatureRequest, error) {

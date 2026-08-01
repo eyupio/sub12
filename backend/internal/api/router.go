@@ -327,6 +327,7 @@ func NewRouter(
 			r.Get("/feature-requests", featureH.List)
 			r.Get("/feature-requests/ranking", featureH.Rank)
 			r.Get("/feature-requests/{id}", featureH.Get)
+			r.Get("/feature-requests/{id}/events", featureH.Events)
 			r.Post("/feature-requests/{id}/vote", featureH.Vote)
 			r.With(rl.Limit("comment")).Post("/feature-requests/{id}/comments", commentH.CreateOnFeatureRequest)
 			r.Get("/feature-requests/{id}/comments", commentH.ListOnFeatureRequest)

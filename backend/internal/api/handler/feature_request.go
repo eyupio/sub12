@@ -75,6 +75,20 @@ func (h *FeatureRequestHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+func (h *FeatureRequestHandler) Events(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := h.svc.Events(r.Context(), chi.URLParam(r, "id"), userID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func (h *FeatureRequestHandler) Vote(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -158,6 +172,7 @@ func (h *FeatureRequestHandler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, repository.ErrNotFound):
 		writeError(w, http.StatusNotFound, "feature request not found")
 	case errors.Is(err, service.ErrFeatureRequestInvalidStatus),
+		errors.Is(err, service.ErrFeatureRequestInvalidPriority),
 		errors.Is(err, service.ErrFeatureRequestTitleEmpty):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 	default:
