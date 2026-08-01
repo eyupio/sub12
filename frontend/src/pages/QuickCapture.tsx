@@ -10,7 +10,8 @@ import { pelletTestApi } from '../api/pelletTesting'
 import { CatalogSearch } from '../components/CatalogSearch'
 import { ChipSelector } from '../components/ChipSelector'
 import { ImageEditor } from '../components/ImageEditor'
-import { LocationField, type LocationValue } from '../components/LocationField'
+import { type LocationValue } from '../components/LocationField'
+import { PlaceSelector } from '../components/PlaceSelector'
 import { RIFLE_CATALOG, type RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, type PelletCatalogEntry } from '../catalog/pelletCatalog'
 import { rifleImage, pelletImage, UNKNOWN_BRAND_IMAGE } from '../catalog/brandImages'
@@ -241,6 +242,7 @@ export default function QuickCapture() {
   const [wind, setWind] = useState<number | null>(null)
   const [temp, setTemp] = useState<number | null>(null)
   const [location, setLocation] = useState<LocationValue>({ label: '' })
+  const [locationId, setLocationId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
@@ -306,6 +308,7 @@ export default function QuickCapture() {
           location: location.label || undefined,
           location_lat: location.lat,
           location_lng: location.lng,
+          location_id: locationId ?? undefined,
           wind_mph: wind ?? undefined,
           temp_celsius: temp ?? undefined,
         })
@@ -327,6 +330,7 @@ export default function QuickCapture() {
         location: location.label || undefined,
         location_lat: location.lat,
         location_lng: location.lng,
+        location_id: locationId ?? undefined,
         wind_mph: wind ?? undefined,
         temp_celsius: temp ?? undefined,
         league_round_id: leagueRoundId,
@@ -688,10 +692,11 @@ export default function QuickCapture() {
           {/* Location */}
           <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
             <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Location</p>
-            <LocationField
-              value={location}
-              onChange={setLocation}
-              showLabelInput={false}
+            <PlaceSelector
+              locationId={locationId}
+              onLocationIdChange={setLocationId}
+              location={location}
+              onLocationChange={setLocation}
               inputClassName={`${inputCls} placeholder:text-muted`}
             />
           </div>

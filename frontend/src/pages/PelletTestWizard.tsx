@@ -153,6 +153,7 @@ export default function PelletTestWizard() {
       ...c,
       distanceValue,
       distanceUnit: unit,
+      savedLocationId: draft.location_id ?? null,
       location: {
         label: draft.location ?? '',
         lat: draft.location_lat ?? undefined,
@@ -287,6 +288,7 @@ export default function PelletTestWizard() {
       location: conditions.location.label || undefined,
       location_lat: conditions.location.lat,
       location_lng: conditions.location.lng,
+      location_id: conditions.savedLocationId ?? undefined,
       wind_mph: conditions.windMph ? Number(conditions.windMph) : undefined,
       temp_celsius: conditions.tempCelsius ? Number(conditions.tempCelsius) : undefined,
       humidity_pct: conditions.humidityPct ? Number(conditions.humidityPct) : undefined,

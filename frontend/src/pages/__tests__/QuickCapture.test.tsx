@@ -5,6 +5,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import QuickCapture from '../QuickCapture'
 import { gearApi, type Pellet, type Rifle } from '../../api/gear'
 import { scoreCardApi, type ScoreCard } from '../../api/scoreCards'
+import { pelletTestApi } from '../../api/pelletTesting'
+import { locationsApi, type Location } from '../../api/locations'
 
 const navigate = vi.fn()
 let search: Record<string, string> = {}
@@ -78,6 +80,19 @@ function makeCard(partial: Partial<ScoreCard> = {}): ScoreCard {
   }
 }
 
+function makePlace(partial: Partial<Location> = {}): Location {
+  return {
+    id: 'place-1',
+    user_id: 'user-1',
+    name: 'Ilkley Range',
+    lat: 53.862,
+    lng: -1.957,
+    created_at: '2026-07-01T00:00:00Z',
+    updated_at: '2026-07-01T00:00:00Z',
+    ...partial,
+  }
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -102,6 +117,13 @@ describe('QuickCapture gear selection', () => {
     navigate.mockReset()
     vi.spyOn(gearApi, 'listRifles').mockResolvedValue({ items: [makeRifle()] })
     vi.spyOn(gearApi, 'listPellets').mockResolvedValue({ items: [makePellet()] })
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [] })
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue(
+      { items: [] } as Awaited<ReturnType<typeof scoreCardApi.list>>,
+    )
+    vi.spyOn(pelletTestApi, 'list').mockResolvedValue(
+      { items: [] } as Awaited<ReturnType<typeof pelletTestApi.list>>,
+    )
   })
 
   afterEach(() => {
@@ -131,6 +153,33 @@ describe('QuickCapture gear selection', () => {
     await waitFor(() => expect(quickCreate).toHaveBeenCalled())
     expect(quickCreate.mock.calls[0][0]).toMatchObject({ rifle_id: undefined, pellet_id: undefined })
     expect(uploadImage).toHaveBeenCalled()
+  })
+
+  it('offers saved places by name and sends the place id with the draft', async () => {
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [makePlace()] })
+    const quickCreate = vi.spyOn(scoreCardApi, 'quickCreate').mockResolvedValue(makeCard())
+    vi.spyOn(scoreCardApi, 'uploadImage').mockResolvedValue({ card_image_url: '/images/card-1' })
+
+    renderPage()
+    const select = await screen.findByLabelText('Saved place')
+    // The place reads as its name — coordinates never stand in for it.
+    expect(await screen.findByRole('option', { name: 'Ilkley Range' })).toBeInTheDocument()
+    fireEvent.change(select, { target: { value: 'place-1' } })
+    await waitFor(() => expect(screen.getAllByText('Ilkley Range').length).toBeGreaterThan(1))
+
+    attachPhoto()
+    fireEvent.click(await screen.findByRole('button', { name: /Accept photo/i }))
+    const save = await screen.findByRole('button', { name: /Save Draft/i })
+    await waitFor(() => expect(save).toBeEnabled())
+    fireEvent.click(save)
+
+    await waitFor(() => expect(quickCreate).toHaveBeenCalled())
+    expect(quickCreate.mock.calls[0][0]).toMatchObject({
+      location: 'Ilkley Range',
+      location_id: 'place-1',
+      location_lat: 53.862,
+      location_lng: -1.957,
+    })
   })
 
   it('marks rifle and pellet optional for a score card, required for a pellet test', async () => {

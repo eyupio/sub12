@@ -6,6 +6,42 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { LocationField, type LocationValue } from '../LocationField'
 import { scoreCardApi } from '../../api/scoreCards'
 import { pelletTestApi } from '../../api/pelletTesting'
+import { locationsApi, type Location } from '../../api/locations'
+
+function makePlace(partial: Partial<Location> = {}): Location {
+  return {
+    id: 'place-1',
+    user_id: 'user-1',
+    name: 'Ilkley Range',
+    lat: 53.862,
+    lng: -1.957,
+    created_at: '2026-07-01T00:00:00Z',
+    updated_at: '2026-07-01T00:00:00Z',
+    ...partial,
+  }
+}
+
+function mockGeolocation(latitude: number, longitude: number) {
+  const getCurrentPosition = vi.fn((success: PositionCallback) => {
+    success({
+      coords: {
+        latitude,
+        longitude,
+        accuracy: 10,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      },
+      timestamp: 0,
+    } as GeolocationPosition)
+  })
+  Object.defineProperty(navigator, 'geolocation', {
+    configurable: true,
+    value: { getCurrentPosition },
+  })
+  return getCurrentPosition
+}
 
 function Wrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -38,6 +74,7 @@ describe('LocationField', () => {
   beforeEach(() => {
     vi.spyOn(scoreCardApi, 'list').mockResolvedValue({ items: [] } as Awaited<ReturnType<typeof scoreCardApi.list>>)
     vi.spyOn(pelletTestApi, 'list').mockResolvedValue({ items: [] } as Awaited<ReturnType<typeof pelletTestApi.list>>)
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [] })
   })
 
   afterEach(() => {
@@ -52,26 +89,7 @@ describe('LocationField', () => {
   })
 
   it('clicking "Use my location" populates coords and auto-seeds the label when empty', async () => {
-    const getCurrentPosition = vi.fn(
-      (success: PositionCallback) => {
-        success({
-          coords: {
-            latitude: 51.5,
-            longitude: -0.12,
-            accuracy: 10,
-            altitude: null,
-            altitudeAccuracy: null,
-            heading: null,
-            speed: null,
-          },
-          timestamp: Date.now(),
-        } as GeolocationPosition)
-      },
-    )
-    Object.defineProperty(navigator, 'geolocation', {
-      configurable: true,
-      value: { getCurrentPosition },
-    })
+    const getCurrentPosition = mockGeolocation(51.5, -0.12)
 
     const { onChange } = renderField()
     fireEvent.click(screen.getByRole('button', { name: /use my location/i }))
@@ -88,31 +106,53 @@ describe('LocationField', () => {
   })
 
   it('clicking "Use my location" preserves a non-empty label', async () => {
-    const getCurrentPosition = vi.fn(
-      (success: PositionCallback) => {
-        success({
-          coords: {
-            latitude: 12.34,
-            longitude: 56.78,
-            accuracy: 1,
-            altitude: null,
-            altitudeAccuracy: null,
-            heading: null,
-            speed: null,
-          },
-          timestamp: 0,
-        } as GeolocationPosition)
-      },
-    )
-    Object.defineProperty(navigator, 'geolocation', {
-      configurable: true,
-      value: { getCurrentPosition },
-    })
+    mockGeolocation(12.34, 56.78)
 
     const { onChange } = renderField({ label: 'My Range' })
     fireEvent.click(screen.getByRole('button', { name: /use my location/i }))
     await waitFor(() => expect(onChange).toHaveBeenCalled())
     expect(onChange.mock.calls[onChange.mock.calls.length - 1][0].label).toBe('My Range')
+  })
+
+  it('names the saved place instead of coordinates when geolocation lands on one', async () => {
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [makePlace()] })
+    mockGeolocation(53.862, -1.9575)
+
+    const { onChange } = renderField()
+    // Wait for the saved places to land, otherwise the click races the query.
+    await waitFor(() => expect(locationsApi.list).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /use my location/i })).toBeEnabled(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /use my location/i }))
+    await waitFor(() =>
+      expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0].label).toBe('Ilkley Range'),
+    )
+  })
+
+  it('lists a recent card shot at a saved place under that place name', async () => {
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [makePlace()] })
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'a',
+          shot_at: '2026-01-01',
+          total_score: 0,
+          x_count: 0,
+          // Stored before the place existed, so the label is raw coordinates.
+          location: '53.862, -1.957',
+          location_lat: 53.862,
+          location_lng: -1.957,
+          verification: 'verified',
+          is_draft: false,
+          created_at: '',
+        },
+      ],
+    } as Awaited<ReturnType<typeof scoreCardApi.list>>)
+
+    renderField()
+    expect(await screen.findByRole('button', { name: 'Ilkley Range' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '53.862, -1.957' })).not.toBeInTheDocument()
   })
 
   it('renders a chip per recent score-card location and restores label + coords on click', async () => {

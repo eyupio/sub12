@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findNearbyPlace, metersBetween } from '../geo'
+import { findNearbyPlace, isCoordinateLabel, metersBetween, resolveLocationLabel } from '../geo'
 
 describe('metersBetween', () => {
   it('returns 0 for identical points', () => {
@@ -56,5 +56,46 @@ describe('findNearbyPlace', () => {
       { id: 'b', lat: 53.862, lng: -1.957 },
     ]
     expect(findNearbyPlace(53.862, -1.957, nearby)?.id).toBe('b')
+  })
+})
+
+describe('isCoordinateLabel', () => {
+  it('recognises the coordinate fallback the pickers write', () => {
+    expect(isCoordinateLabel('53.862, -1.957')).toBe(true)
+    expect(isCoordinateLabel('53.86200, -1.95700')).toBe(true)
+    expect(isCoordinateLabel(' 51.5,-0.12 ')).toBe(true)
+  })
+
+  it('leaves real names alone', () => {
+    expect(isCoordinateLabel('Bisley')).toBe(false)
+    expect(isCoordinateLabel('Range 25, Bay 3')).toBe(false)
+    expect(isCoordinateLabel('')).toBe(false)
+    expect(isCoordinateLabel(undefined)).toBe(false)
+  })
+})
+
+describe('resolveLocationLabel', () => {
+  const places = [{ id: 'home', name: 'Ilkley Range', lat: 53.862, lng: -1.957 }]
+
+  it('prefers the saved place name over a typed label', () => {
+    expect(resolveLocationLabel('somewhere else', 53.862, -1.9575, places)).toBe('Ilkley Range')
+  })
+
+  it('replaces a coordinate label with the saved place name', () => {
+    expect(resolveLocationLabel('53.862, -1.957', 53.862, -1.957, places)).toBe('Ilkley Range')
+  })
+
+  it('keeps a typed label when no saved place is nearby', () => {
+    expect(resolveLocationLabel('Bisley', 51.31, -0.62, places)).toBe('Bisley')
+  })
+
+  it('falls back to coordinates only when there is no name at all', () => {
+    expect(resolveLocationLabel('', 51.31, -0.62, places)).toBe('51.310, -0.620')
+    expect(resolveLocationLabel('51.31000, -0.62000', 51.31, -0.62, places)).toBe('51.310, -0.620')
+  })
+
+  it('returns the typed label unchanged when there are no coordinates', () => {
+    expect(resolveLocationLabel('Bisley', undefined, undefined, places)).toBe('Bisley')
+    expect(resolveLocationLabel(undefined, undefined, undefined, places)).toBe('')
   })
 })

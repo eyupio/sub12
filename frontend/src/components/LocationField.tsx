@@ -4,8 +4,10 @@ import { Loader2, MapPin, Map as MapIcon } from 'lucide-react'
 
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
+import { useLocations } from '../api/locations'
 import { toast } from '../store/toast'
 import { requestPosition } from '../utils/geolocation'
+import { isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
 import type { PickedLocation } from './MapLocationPicker'
 
 const MapLocationPicker = lazy(() =>
@@ -33,10 +35,6 @@ interface RecentLocation {
   lng?: number
 }
 
-function formatCoord(n: number) {
-  return n.toFixed(3)
-}
-
 export function LocationField({
   value,
   onChange,
@@ -56,35 +54,35 @@ export function LocationField({
     queryKey: ['pellet-tests-recent'],
     queryFn: () => pelletTestApi.list(10, 0),
   })
+  const { data: places = [] } = useLocations()
 
   const recentLocations = useMemo<RecentLocation[]>(() => {
     const buckets = new Map<string, RecentLocation>()
     const visit = (loc?: string, lat?: number, lng?: number) => {
       if (!loc) return
-      if (buckets.has(loc)) return
-      buckets.set(loc, { label: loc, lat, lng })
+      // A card shot at a saved place is listed under that place's name, even
+      // when it was stored back when the label was still raw coordinates.
+      const label = resolveLocationLabel(loc, lat, lng, places)
+      if (!label || buckets.has(label)) return
+      buckets.set(label, { label, lat, lng })
     }
     recentScore?.items.forEach((s) => visit(s.location, s.location_lat, s.location_lng))
     recentPellet?.items.forEach((s) => visit(s.location, s.location_lat, s.location_lng))
     return Array.from(buckets.values()).slice(0, recentLimit)
-  }, [recentScore, recentPellet, recentLimit])
+  }, [recentScore, recentPellet, recentLimit, places])
 
   function useMyLocation() {
     setLocating(true)
     requestPosition()
       .then(({ lat, lng }) => {
-        // Only seed the label when empty so existing free-text isn't clobbered.
-        const seededLabel = value.label.trim().length > 0
-          ? value.label
-          : `${formatCoord(lat)}, ${formatCoord(lng)}`
-        onChange({ label: seededLabel, lat, lng })
+        onChange({ label: resolveLocationLabel(value.label, lat, lng, places), lat, lng })
       })
       .catch(() => toast("Couldn't get location — skip or type it in", 'error'))
       .finally(() => setLocating(false))
   }
 
   function pickRecent(r: RecentLocation) {
-    if (value.label === r.label && value.lat === r.lat && value.lng === r.lng) {
+    if (value.label === r.label) {
       onChange({ label: '' })
     } else {
       onChange({ label: r.label, lat: r.lat, lng: r.lng })
@@ -92,7 +90,11 @@ export function LocationField({
   }
 
   function handlePicked(loc: PickedLocation) {
-    onChange({ label: loc.label, lat: loc.lat, lng: loc.lng })
+    onChange({
+      label: resolveLocationLabel(loc.label, loc.lat, loc.lng, places),
+      lat: loc.lat,
+      lng: loc.lng,
+    })
     setPickerOpen(false)
   }
 
@@ -133,7 +135,7 @@ export function LocationField({
           Pick on map
         </button>
         {recentLocations.map((loc) => {
-          const active = value.label === loc.label && value.lat === loc.lat && value.lng === loc.lng
+          const active = value.label === loc.label
           return (
             <button
               key={loc.label}
@@ -151,9 +153,10 @@ export function LocationField({
         })}
       </div>
 
-      {hasCoords && value.label && (
+      {hasCoords && (
         <p className="text-xs text-muted">
-          {value.label} · <span className="tabular-nums">{value.lat!.toFixed(3)}, {value.lng!.toFixed(3)}</span>
+          {value.label && !isCoordinateLabel(value.label) && <>{value.label} · </>}
+          <span className="tabular-nums">{value.lat!.toFixed(3)}, {value.lng!.toFixed(3)}</span>
         </p>
       )}
 
