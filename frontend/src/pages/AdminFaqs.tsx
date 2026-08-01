@@ -253,7 +253,7 @@ export default function AdminFaqs() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <aside className="bg-surface border border-subtle rounded-lg p-3 space-y-2 h-fit">
+        <aside className="min-w-0 bg-surface border border-subtle rounded-lg p-3 space-y-2 h-fit">
           <button className={`${btnSecondary} w-full flex items-center justify-center gap-2`} onClick={startCreate}>
             <Plus size={14} /> New FAQ
           </button>
@@ -261,7 +261,7 @@ export default function AdminFaqs() {
           {itemsByCategory.map(([category, bucket], sectionIdx) => (
             <div key={category} className="space-y-1">
               <div className="flex items-center gap-1 px-2 pt-2">
-                <h2 className="t-section-title flex-1 truncate">{category}</h2>
+                <h2 className="t-section-title min-w-0 flex-1 truncate">{category}</h2>
                 <button
                   type="button"
                   className={iconBtn}
@@ -284,7 +284,7 @@ export default function AdminFaqs() {
               {bucket.list.map((item, itemIdx) => (
                 <div key={item.id} className="flex items-stretch gap-1">
                   <button
-                    className={`flex-1 text-left rounded px-2.5 py-2 text-sm border transition-colors ${
+                    className={`min-w-0 flex-1 text-left rounded px-2.5 py-2 text-sm border transition-colors ${
                       selectedId === item.id
                         ? 'border-[var(--brass)]/50 text-[var(--brass)] bg-[var(--brass)]/10'
                         : 'border-transparent text-secondary hover:bg-surface-hover'
@@ -324,7 +324,7 @@ export default function AdminFaqs() {
           {!items.length && <p className="text-xs text-muted px-2 py-3">No FAQs yet. Create one above.</p>}
         </aside>
 
-        <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
+        <section className="min-w-0 bg-surface border border-subtle rounded-lg p-4 space-y-4">
           {listQuery.isLoading && <SkeletonList count={3} />}
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -372,7 +372,7 @@ export default function AdminFaqs() {
               </div>
               <div className="space-y-1">
                 <label className={labelCls}>Preview</label>
-                <div className="min-h-[260px] border border-subtle rounded p-3 bg-surface-hover prose prose-sm dark:prose-invert max-w-none text-secondary">
+                <div className="min-h-[260px] overflow-x-auto border border-subtle rounded p-3 bg-surface-hover prose prose-sm dark:prose-invert max-w-none text-secondary">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{form.answer_md || '*Nothing to preview yet.*'}</ReactMarkdown>
                 </div>
               </div>

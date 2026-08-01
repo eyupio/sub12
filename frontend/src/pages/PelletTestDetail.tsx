@@ -323,7 +323,7 @@ export default function PelletTestDetail() {
       <div className="p-4 lg:p-8 space-y-6 max-w-lg lg:max-w-5xl mx-auto pb-32">
 
       {/* Top action bar */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={smartBack}
@@ -331,7 +331,7 @@ export default function PelletTestDetail() {
         >
           <ChevronLeft size={14} /> Back to testing
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <button
             type="button"
             onClick={() => setAddingGroup(true)}

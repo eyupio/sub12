@@ -420,7 +420,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <Link
             to="/scores/new"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[6px] bg-gold text-white text-[10px] tracking-[0.18em] uppercase font-medium hover:bg-gold-2 transition-colors shadow-card"
