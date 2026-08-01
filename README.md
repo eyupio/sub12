@@ -289,9 +289,14 @@ required for users to upgrade an installed APK in place:
 | `ANDROID_KEY_ALIAS` | Key alias inside the keystore |
 | `ANDROID_KEY_PASSWORD` | Key password |
 
-Without them the workflow generates a throwaway key per run so the build still
-produces an installable APK — fine for testing, but each build must be
-uninstalled before the next one can be installed.
+Without them the workflow mints its own key on the first run and reuses it from
+the Actions cache on later ones, so sideloaded builds upgrade in place. That
+matters because Android identifies an installed app by (package name, signing
+certificate): re-signing with a fresh key each build makes every new APK refuse
+to install over the previous one, and the phone silently carries on running the
+build it already has. The cache entry expires after 7 days without a build, and
+that rotates the key — the `android-latest` release notes carry the signer's
+SHA-256 fingerprint, and a rotation means uninstalling before installing again.
 
 The workflow stamps `versionCode` from the run number and `versionName` from the
 tag (or `0.0.<run>-<sha>` off a tag) via the `ANDROID_VERSION_CODE` /

@@ -11,9 +11,12 @@ name: Android APK
 #   manual run    → release APK as an artifact
 #
 # Signing uses the ANDROID_KEYSTORE_* secrets when they are configured. Without
-# them the job generates a throwaway keystore so the workflow still produces an
-# installable APK — those builds are for testing only, since a new signing key
-# each run means installs can't be upgraded in place.
+# them the job falls back to a CI key it mints once and then reuses from the
+# Actions cache. Android identifies an installed app by (package name, signing
+# certificate), so a key that changes between builds makes every new APK refuse
+# to install over the previous one — the phone silently keeps running the build
+# it already has. The fallback key keeps the sideload channel upgradeable; it is
+# still testing-only, because a cache eviction rotates it.
 
 on:
   push:
@@ -116,7 +119,23 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      # The fallback signing key has to survive between runs. Android keys an
+      # installed package on its signing certificate, so minting a new one each
+      # build makes `android-latest` un-installable for anyone who already has
+      # the app: the installer rejects it with INSTALL_FAILED_UPDATE_INCOMPATIBLE
+      # and they carry on running whichever build they installed first — new
+      # commits land in the APK but never reach the device. Restoring the same
+      # key from the cache keeps sideloaded builds upgrading in place. Unused
+      # when the ANDROID_KEYSTORE_* secrets are configured.
+      - name: Restore the fallback CI signing key
+        if: steps.vars.outputs.variant == 'release'
+        uses: actions/cache@v4
+        with:
+          path: ~/.sub12-ci-signing
+          key: android-fallback-keystore-v1
+
       - name: Configure release signing
+        id: signing
         if: steps.vars.outputs.variant == 'release'
         working-directory: frontend/android
         env:
@@ -126,24 +145,33 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          keystore="$(pwd)/release.keystore"
           if [ -n "${KEYSTORE_BASE64:-}" ]; then
             echo "Signing with the configured release keystore."
+            # Inside the repo so the cleanup step below wipes it from the runner.
+            keystore="$(pwd)/release.keystore"
             echo "$KEYSTORE_BASE64" | base64 -d > "$keystore"
             store_password="$KEYSTORE_PASSWORD"
             key_alias="$KEY_ALIAS"
             key_password="$KEY_PASSWORD"
           else
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret set — generating a throwaway key. This APK installs, but cannot upgrade a previously installed build."
+            # Outside the repo, so it lands in the cached directory rather than
+            # being deleted with the rest of the signing material.
+            keystore="$HOME/.sub12-ci-signing/release.keystore"
             store_password="sub12ci"
             key_alias="sub12ci"
             key_password="sub12ci"
-            keytool -genkeypair -v \
-              -keystore "$keystore" \
-              -alias "$key_alias" \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$store_password" -keypass "$key_password" \
-              -dname "CN=SUB12 CI, OU=CI, O=SUB12, C=GB"
+            if [ -f "$keystore" ]; then
+              echo "::notice::No ANDROID_KEYSTORE_BASE64 secret set — reusing the cached CI key. This APK upgrades a previous CI build in place."
+            else
+              echo "::warning::No ANDROID_KEYSTORE_BASE64 secret set and no cached CI key — minting one. Anyone already running a CI build has to uninstall SUB12 before this APK will install."
+              mkdir -p "$(dirname "$keystore")"
+              keytool -genkeypair -v \
+                -keystore "$keystore" \
+                -alias "$key_alias" \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$store_password" -keypass "$key_password" \
+                -dname "CN=SUB12 CI, OU=CI, O=SUB12, C=GB"
+            fi
           fi
           # build.gradle reads this file from the android/ project root and falls
           # back to the debug keystore when it's absent.
@@ -153,6 +181,12 @@ jobs:
           keyAlias=$key_alias
           keyPassword=$key_password
           EOF
+          # Publish the certificate alongside the APK. A signature change is
+          # invisible from the download page but is the one thing that stops an
+          # install, so it needs to be checkable rather than guessed at.
+          fingerprint="$(keytool -list -keystore "$keystore" -storepass "$store_password" -alias "$key_alias" 2>/dev/null \
+            | sed -n 's/.*SHA-256: //p' | head -1)"
+          echo "signer_sha256=${fingerprint:-unknown}" >> "$GITHUB_OUTPUT"
 
       - name: Build ${{ steps.vars.outputs.variant }} APK
         working-directory: frontend/android
@@ -204,6 +238,11 @@ jobs:
 
             Android blocks installs from outside the Play Store by default;
             allow installs from your browser or file manager when prompted.
+
+            If the install fails with "app not installed" or "package conflicts
+            with an existing package", this build is signed with a different key
+            than the one on the device — uninstall SUB12 and install again.
+            Signing certificate (SHA-256): `${{ steps.signing.outputs.signer_sha256 }}`
           prerelease: true
           make_latest: false
           files: dist-apk/*.apk

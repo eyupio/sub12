@@ -278,8 +278,12 @@ Builds the Capacitor Android app and publishes the APK for download.
 - Tags `v*` attach the APK to that version's GitHub Release
 - Signs with the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` /
   `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` secrets when configured;
-  otherwise generates a throwaway key so the build still yields an installable
-  APK
+  otherwise falls back to a CI key minted once and reused from the Actions
+  cache. The key has to be stable: Android identifies an installed app by
+  (package name, signing certificate), so a key that changes between builds
+  makes each new APK refuse to install over the last one and the device keeps
+  running the build it already has. A cache eviction still rotates it, so the
+  release notes carry the signer's SHA-256 fingerprint
 - `versionCode` / `versionName` come from `ANDROID_VERSION_CODE` /
   `ANDROID_VERSION_NAME`, read in `android/app/build.gradle`
 
