@@ -5,8 +5,8 @@
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#0f172a",
-  "background_color": "#0f172a",
+  "theme_color": "#0C0C0C",
+  "background_color": "#0C0C0C",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -19,6 +19,31 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "sports",
+    "utilities",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Quick capture",
+      "short_name": "Capture",
+      "url": "/quick-capture",
+      "description": "Photograph a card or group now, score it later"
+    },
+    {
+      "name": "Log a score card",
+      "short_name": "New card",
+      "url": "/scores/new",
+      "description": "Enter a 25-shot score card"
+    },
+    {
+      "name": "Leagues",
+      "short_name": "Leagues",
+      "url": "/leagues",
+      "description": "Standings and submissions"
     }
   ]
 }

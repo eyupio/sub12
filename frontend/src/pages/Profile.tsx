@@ -31,6 +31,7 @@ import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader } from '../components/leagues'
 import '../components/leagues/styles.css'
+import { SkeletonList } from '../components/Skeleton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -857,7 +858,7 @@ function NotificationsTab() {
 
           {isLoading && (
             <div className="space-y-2">
-              {NOTIF_ROWS.map((_, i) => <div key={i} className="h-14 rounded border border-subtle bg-surface animate-pulse" />)}
+              {NOTIF_ROWS.map((_, i) => <div key={i} className="h-14 rounded border border-subtle skeleton" />)}
             </div>
           )}
 
@@ -1362,7 +1363,7 @@ function SocialTabContent() {
           )}
 
           {isLoading ? (
-            <p className="text-sm text-muted text-center py-8">Loading…</p>
+            <SkeletonList count={4} />
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted text-center py-8 tracking-wide">
               {query ? 'No matches.' : tab === 'following' ? 'Not following anyone yet.' : 'No followers yet.'}

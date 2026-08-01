@@ -98,7 +98,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           {error && <p className="text-[var(--error-text)] text-xs">{error}</p>}
-          <button type="submit" disabled={mutation.isPending} className="w-full bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-opacity">
+          <button type="submit" disabled={mutation.isPending} className="w-full btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-all">
             {mutation.isPending ? 'Creating…' : 'Create Club'}
           </button>
         </form>

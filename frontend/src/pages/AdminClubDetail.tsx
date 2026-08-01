@@ -9,7 +9,7 @@ import { UserAvatar } from '../components/UserAvatar'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
 
 function parseError(error: unknown) {
@@ -148,8 +148,8 @@ export default function AdminClubDetail() {
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-4">
-        <div className="h-6 w-32 rounded bg-surface animate-pulse" />
-        <div className="h-40 rounded bg-surface animate-pulse" />
+        <div className="h-6 w-32 rounded skeleton" />
+        <div className="h-40 rounded skeleton" />
       </div>
     )
   }

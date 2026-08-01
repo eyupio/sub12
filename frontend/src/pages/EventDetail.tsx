@@ -410,7 +410,7 @@ function AddGuestForm({
       <button
         type="submit"
         disabled={add.isPending || !name.trim()}
-        className="bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-4 py-2 rounded transition-opacity"
+        className="btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-4 py-2 rounded transition-all"
       >
         {add.isPending ? 'Adding…' : 'Add guest'}
       </button>
@@ -761,9 +761,9 @@ function CardSubmissionSection({
     <Section title="Cards">
       {cardsLoading && (
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div className="h-12 rounded bg-surface animate-pulse" />
-          <div className="h-12 rounded bg-surface animate-pulse" />
-          <div className="h-12 rounded bg-surface animate-pulse" />
+          <div className="h-12 rounded skeleton" />
+          <div className="h-12 rounded skeleton" />
+          <div className="h-12 rounded skeleton" />
         </div>
       )}
       {!cardsLoading && cards.length === 0 && (

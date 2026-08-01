@@ -28,6 +28,12 @@ frontend/android/app/src/main/assets/capacitor.config.json
 frontend/ios/App/App/public/
 frontend/ios/App/App/capacitor.config.json
 
+# Android release signing material. CI writes these from repository secrets and
+# they must never be committed.
+frontend/android/keystore.properties
+frontend/android/**/*.keystore
+frontend/android/**/*.jks
+
 # Docker bind-mount data directories
 data/
 

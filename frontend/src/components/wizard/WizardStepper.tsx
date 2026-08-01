@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { haptics } from '../../utils/haptics'
 
 export type WizardStepStatus = 'pending' | 'current' | 'complete'
 
@@ -43,7 +44,7 @@ export function WizardStepper({ steps, currentIndex, onJump }: Props) {
             <li key={s.key} className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => s.reachable && onJump(i)}
+                onClick={() => { if (s.reachable) { haptics.selectionChanged(); onJump(i) } }}
                 disabled={!s.reachable}
                 aria-current={isCurrent ? 'step' : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${cls}`}

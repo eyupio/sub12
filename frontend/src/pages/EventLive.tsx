@@ -6,7 +6,7 @@ import { eventsApi, type EventStandingRow } from '../api/events'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
-import { PageGrid, Section } from '../components/leagues'
+import { PageGrid, Section, LoadingRows } from '../components/leagues'
 
 // Tighten the cadence while the event is live so spectators see new shots
 // without manual refresh. When the event is not live (draft / open / complete /
@@ -116,7 +116,7 @@ export default function EventLive() {
 
         <Section>
           {board.isLoading && (
-            <p style={{ padding: 18, fontSize: 13, color: 'var(--muted)' }}>Loading scoreboard…</p>
+            <LoadingRows rows={6} />
           )}
           {board.error && (
             <p style={{ padding: 18, fontSize: 13, color: 'var(--red)' }}>

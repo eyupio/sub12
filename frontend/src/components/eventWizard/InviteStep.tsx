@@ -9,6 +9,7 @@ import {
 import { toast } from '../../store/toast'
 import { identiconDataUri } from '../../utils/identicon'
 import { WIZARD_INPUT_CLS, WIZARD_LABEL_CLS, toggleCls } from './wizardShared'
+import { Skeleton } from '../Skeleton'
 
 interface Props {
   slug: string
@@ -145,7 +146,7 @@ export function InviteStep({ slug, hasClub }: Props) {
 
       <div className="border border-line rounded-lg divide-y divide-line max-h-96 overflow-y-auto">
         {inviteesQuery.isLoading && (
-          <div className="p-4 text-sm text-muted">Loading…</div>
+          <div className="p-4 space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} height={32} />)}</div>
         )}
         {!inviteesQuery.isLoading && items.length === 0 && (
           <div className="p-4 text-sm text-muted">

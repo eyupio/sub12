@@ -6,7 +6,7 @@ import { eventsApi, type EventDTO, type EventParticipantDTO } from '../api/event
 import { enqueue, flush, installOnlineListener, newClientId } from '../offline/scoreOutbox'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
-import { PageGrid } from '../components/leagues'
+import { PageGrid, Section, LoadingRows } from '../components/leagues'
 import { toast } from '../store/toast'
 
 // Cycle order: empty → first listed result token → next → … → empty.
@@ -168,7 +168,7 @@ export default function EventScorecard() {
   if (evQuery.isLoading || partsQuery.isLoading) {
     return (
       <PageGrid>
-        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+        <Section title="Scorecard"><LoadingRows rows={6} /></Section>
       </PageGrid>
     )
   }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { haptics } from '../utils/haptics'
 
 export type ToastVariant = 'success' | 'error' | 'info'
 
@@ -6,6 +7,8 @@ export interface Toast {
   id: string
   message: string
   variant: ToastVariant
+  /** Full lifetime in ms — drives the countdown bar in ToastContainer. */
+  duration: number
 }
 
 const DEFAULT_DURATIONS: Record<ToastVariant, number> = {
@@ -38,7 +41,11 @@ export const useToastStore = create<ToastState>()((set) => ({
   addToast: (message, variant = 'info', duration?: number) => {
     const id = String(++nextId)
     const ms = duration ?? DEFAULT_DURATIONS[variant]
-    set((s) => ({ toasts: [...s.toasts, { id, message, variant }] }))
+    // Toasts are the app's single confirmation channel, so pairing them with
+    // haptics gives every success/failure a native feel for free. No-op on web.
+    if (variant === 'success') haptics.notifySuccess()
+    else if (variant === 'error') haptics.notifyError()
+    set((s) => ({ toasts: [...s.toasts, { id, message, variant, duration: ms }] }))
     startTimer(id, ms, (tid) => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== tid) }))
     })

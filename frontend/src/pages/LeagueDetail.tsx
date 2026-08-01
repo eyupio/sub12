@@ -26,6 +26,7 @@ import {
   Tabs,
   Badge,
   EmptyState,
+  LoadingRows,
   Avatar,
   LeagueTable,
   rankColumn,
@@ -478,7 +479,7 @@ export default function LeagueDetail() {
           tabs={<Tabs<StandingsTab> tabs={standingsTabs} active={standingsTab} onChange={setStandingsTab} />}
         >
           {isLoading && (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading standings…</div>
+            <LoadingRows rows={6} />
           )}
           {isError && (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--red)' }}>Failed to load standings.</div>
@@ -574,7 +575,7 @@ export default function LeagueDetail() {
           tabs={<Tabs<ScoreTab> tabs={scoreTabs} active={scoreFilter} onChange={setScoreFilter} />}
         >
           {scoresLoading && (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
+            <LoadingRows rows={5} />
           )}
           {scoresData && scoresData.items.length === 0 && (
             <EmptyState

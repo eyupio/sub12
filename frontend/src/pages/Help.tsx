@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
-import { Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import { faqApi, type FAQ } from '../api/faq'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { SkeletonList } from '../components/Skeleton'
+import { Capacitor } from '@capacitor/core'
+import { androidApkUrl } from '../utils/site'
 
 function groupByCategory(items: FAQ[]): [string, FAQ[]][] {
   const map = new Map<string, { order: number; list: FAQ[] }>()
@@ -19,6 +22,10 @@ function groupByCategory(items: FAQ[]): [string, FAQ[]][] {
     .sort((a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]))
     .map(([category, bucket]) => [category, bucket.list] as [string, FAQ[]])
 }
+
+// The APK download only makes sense on the web build — inside the native app
+// the user already has it installed.
+const isNativeApp = Capacitor.isNativePlatform()
 
 export default function Help() {
   const [query, setQuery] = useState('')
@@ -90,10 +97,28 @@ export default function Help() {
               </button>
             ))}
           </div>
+
+          {/* Hidden inside the native app, where the APK is already installed. */}
+          {!isNativeApp && (
+            <>
+              <hr className="u-hairline my-3" />
+              <h2 className="t-section-title px-2 pb-2">Android App</h2>
+              <a
+                href={androidApkUrl()}
+                className="flex items-center gap-2 rounded px-2.5 py-2 text-sm text-secondary hover:bg-surface-hover hover:text-[var(--brass)] u-nudge"
+              >
+                <Download size={15} className="shrink-0 text-muted" />
+                Download the APK
+              </a>
+              <p className="px-2.5 pt-1 text-[11px] leading-4 text-muted">
+                Direct install — Android will ask you to allow it the first time.
+              </p>
+            </>
+          )}
         </aside>
 
         <section className="space-y-5">
-          {faqsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
+          {faqsQuery.isLoading && <SkeletonList count={4} />}
           {!faqsQuery.isLoading && visibleGrouped.length === 0 && (
             <p className="text-sm text-muted">No help articles match your search.</p>
           )}

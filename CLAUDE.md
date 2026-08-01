@@ -254,7 +254,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
 ## CI Pipeline
 
-Two GitHub Actions workflows:
+Three GitHub Actions workflows:
 
 ### ci.yml (push/PR to `main`)
 
@@ -264,11 +264,55 @@ Two GitHub Actions workflows:
    - Node.js 20
 3. **Docker:** Smoke-test image builds for both services (depends on backend + frontend jobs)
 
+### android.yml (PR / push to `main` / tag `v*` / manual)
+
+Builds the Capacitor Android app and publishes the APK for download.
+
+- PRs build a **debug** APK and upload it as a workflow artifact
+- Pushes to `main` build a **release** APK and refresh the rolling
+  `android-latest` pre-release, giving a stable download URL:
+  `https://github.com/<owner>/<repo>/releases/download/android-latest/sub12.apk`
+- Tags `v*` attach the APK to that version's GitHub Release
+- Signs with the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` /
+  `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` secrets when configured;
+  otherwise generates a throwaway key so the build still yields an installable
+  APK
+- `versionCode` / `versionName` come from `ANDROID_VERSION_CODE` /
+  `ANDROID_VERSION_NAME`, read in `android/app/build.gradle`
+
 ### release.yml (push to `main`)
 
 - Builds and pushes backend + frontend Docker images to GHCR
 - Tags: `sha-<commit>` + `latest`
 - Uses Docker Buildx with GitHub Actions cache
+
+## Frontend Design System
+
+Shared visual and motion vocabulary lives in `frontend/src/index.css`. Prefer
+these over ad-hoc Tailwind so surfaces stay consistent.
+
+- **Motion tokens** — `--dur-instant/fast/base/slow` and `--ease-out`,
+  `--ease-in-out`, `--ease-spring`. A global `prefers-reduced-motion` guard
+  collapses every animation and transition.
+- **Elevation** — `--shadow-sm/md/lg/xl`, `--shadow-gold`, plus the
+  `.shadow-card`, `.shadow-float`, `.shadow-overlay`, `.shadow-gold` utilities.
+- **Entrance animations** — `.animate-fade-in`, `.animate-fade-in-up`,
+  `.animate-scale-in` (modals), `.animate-sheet-up` (bottom sheets),
+  `.animate-pop` (value changes), `.u-stagger` (sequenced list children).
+- **Interaction utilities** — `.u-lift` (cards that link somewhere), `.u-press`
+  (buttons and icon controls), `.u-nudge` (nav and list rows), `.u-sheen`
+  (primary CTAs), `.u-hairline`, `.u-tnum`, `.u-text-gold-gradient`.
+- **Component classes** — `.btn` + `.btn-primary/secondary/ghost/danger` +
+  `.btn-sm/lg`, `.field`, `.surface-card`, `.skeleton`, `.spinner`,
+  `.skip-link`, `.app-tab` (mobile bottom-nav dot/pill markers).
+- **Loading states** — use `src/components/Skeleton.tsx` (`Skeleton`,
+  `SkeletonText`, `SkeletonCard`, `SkeletonList`, `SkeletonTable`,
+  `SkeletonStats`, `SkeletonPage`, `Spinner`) or `LoadingRows` from
+  `src/components/leagues` inside a `<Section>`. Don't ship a bare "Loading…"
+  string — it collapses the layout and reflows when data lands.
+- **Native-only rules** — `.native-app` selectors in the base layer disable
+  long-press callouts, chrome text selection, and overscroll bounce inside the
+  Capacitor WebView. Add `.selectable` to opt real content back in.
 
 ## Container Images
 

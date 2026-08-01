@@ -2,10 +2,11 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { adminEmailApi, UpdateSMTPSettingsInput } from '../api/adminEmail'
 import { SMTPSettingsFormState, validateSMTPSettingsForm } from './adminEmailValidation'
+import { SkeletonPage } from '../components/Skeleton'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
 function parseError(error: unknown) {
@@ -156,7 +157,7 @@ export default function AdminEmailSettings() {
   }
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-muted">Loading SMTP settings...</div>
+    return <SkeletonPage />
   }
 
   if (error) {

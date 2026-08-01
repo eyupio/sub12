@@ -42,7 +42,7 @@ export default function Register() {
   const inputCls = 'w-full bg-surface border border-subtle rounded px-4 py-3 text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)] focus:bg-[var(--brass)]/[0.04] transition-colors text-sm tracking-wider'
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <div className="inline-flex items-baseline justify-center">
@@ -116,7 +116,8 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium rounded py-3 transition-opacity text-sm tracking-[0.15em] uppercase mt-2"
+            className="w-full u-sheen u-press flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium rounded py-3 shadow-gold hover:shadow-float transition-shadow text-sm tracking-[0.15em] uppercase mt-2"
+            style={{ background: 'linear-gradient(135deg, var(--gold-2), var(--gold))' }}
           >
             {loading ? 'Creating account…' : 'Create Account'}
           </button>

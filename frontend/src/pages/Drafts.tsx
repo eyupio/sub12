@@ -326,7 +326,7 @@ export default function Drafts() {
           {isLoading && allRows.length === 0 && (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-24 rounded-lg border border-subtle bg-surface animate-pulse" />
+                <div key={i} className="h-24 rounded-lg border border-subtle skeleton" />
               ))}
             </div>
           )}

@@ -16,6 +16,7 @@ import { ShareDialog, ShareTargetType } from '../components/ShareDialog'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { Share2 } from 'lucide-react'
 import { useState } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 
 // SharedView is the public landing page for every shareable URL. Logged-in
 // users are redirected to the full in-app experience; anonymous visitors get
@@ -194,7 +195,7 @@ function TemporarilyUnavailable({
 function LoadingShell({ type }: { type: ShareTargetType }) {
   return (
     <Shell title={labels[type]}>
-      <p className="text-sm text-muted">Loading…</p>
+      <SkeletonList count={3} />
     </Shell>
   )
 }

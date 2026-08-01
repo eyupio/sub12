@@ -61,7 +61,7 @@ export default function AdminUsers() {
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-14 rounded bg-surface animate-pulse" />
+            <div key={i} className="h-14 rounded skeleton" />
           ))}
         </div>
       ) : (
