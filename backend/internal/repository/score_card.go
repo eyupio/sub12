@@ -522,6 +522,12 @@ func (r *ScoreCardRepository) ListByUser(ctx context.Context, userID string, lim
 
 // Update modifies a score card's shots and metadata, resets verification to
 // pending, and deletes any existing score confirmations — all in one transaction.
+//
+// input.LeagueRoundID follows the "omit to keep, empty string to clear"
+// convention: clearing it detaches the card from its league round, and the
+// verification reset below has to read the *new* link rather than the row's
+// current one, or a card on its way out of a league would be left pending
+// forever with nothing able to verify it.
 func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, input *model.UpdateScoreCardInput, totalScore, xCount int16) (*model.ScoreCard, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -532,6 +538,19 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 	var card model.ScoreCard
 	var shotScores pgtype.FlatArray[int16]
 	var shotXs pgtype.FlatArray[bool]
+
+	// $21 carries the request's intent (NULL = keep, '' = detach) and $22 the
+	// round to move to, kept in a separate parameter so the uuid cast is never
+	// applied to the empty string.
+	const newRoundExpr = `CASE
+			WHEN $21::text IS NULL THEN score_cards.league_round_id
+			WHEN $21::text = ''    THEN NULL
+			ELSE $22::uuid
+		END`
+	var newRound *string
+	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" {
+		newRound = input.LeagueRoundID
+	}
 
 	err = tx.QueryRow(ctx, `
 		UPDATE score_cards SET
@@ -553,8 +572,9 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			visibility   = COALESCE($18, visibility),
 			location_id  = $19,
 			card_image_rotation = COALESCE($20, card_image_rotation),
+			league_round_id = `+newRoundExpr+`,
 			verification = CASE
-				WHEN league_round_id IS NOT NULL OR event_participant_id IS NOT NULL
+				WHEN `+newRoundExpr+` IS NOT NULL OR event_participant_id IS NOT NULL
 					THEN 'pending'::verification_status
 				ELSE 'verified'::verification_status
 			END,
@@ -574,6 +594,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount, input.Visibility, input.LocationID, input.CardImageRotation,
+		input.LeagueRoundID, newRound,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,

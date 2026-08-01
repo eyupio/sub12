@@ -202,7 +202,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
 ### Protected (requires `Authorization: Bearer <jwt>`)
 
-- **Score cards:** CRUD + image upload + comments (write)
+- **Score cards:** CRUD + image upload + comments (write). `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in — moving a card between rounds stays with `submit-to-league`.
 - **Rifles:** CRUD + image upload + showcase (`GET /rifles/{id}/showcase`)
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.

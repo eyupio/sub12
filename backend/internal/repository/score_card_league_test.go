@@ -141,3 +141,62 @@ func TestGraduate_GatedByLeagueSubmissionCap(t *testing.T) {
 	_, err = repo.Graduate(ctx, second.ID, userID, &roundID, 1)
 	assert.ErrorIs(t, err, ErrSubmissionLimitExceeded)
 }
+
+// The way out of a full (or closed) round: keep the card as a personal one.
+// Detaching happens in the same statement that saves the refinement, so the
+// verification reset has to read the new link — reading the row's current one
+// would leave a personal card stuck on 'pending' with no league to verify it.
+func TestUpdate_DetachesFromLeagueRound(t *testing.T) {
+	pool := testPool(t)
+	repo := NewScoreCardRepository(pool)
+	ctx := context.Background()
+
+	userID := newTestUser(t, pool, "update-detach", testName(t, "shooter"))
+	roundID := newTestLeagueRound(t, pool, userID, 1)
+	scores, xs := fullGrid()
+
+	card, err := repo.Create(ctx, userID, &model.CreateScoreCardInput{
+		ShotAt:        "2026-08-01",
+		ShotScores:    scores,
+		ShotXs:        xs,
+		LeagueRoundID: &roundID,
+	}, 225, 0, 1)
+	require.NoError(t, err)
+	require.NotNil(t, card.LeagueRoundID)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM score_cards WHERE id = $1`, card.ID)
+	})
+
+	// Omitting league_round_id leaves the card where it is.
+	kept, err := repo.Update(ctx, card.ID, userID, &model.UpdateScoreCardInput{
+		ShotAt:     "2026-08-01",
+		ShotScores: scores,
+		ShotXs:     xs,
+	}, 225, 0)
+	require.NoError(t, err)
+	require.NotNil(t, kept.LeagueRoundID)
+	assert.Equal(t, roundID, *kept.LeagueRoundID)
+	assert.Equal(t, "pending", kept.Verification)
+
+	detach := ""
+	detached, err := repo.Update(ctx, card.ID, userID, &model.UpdateScoreCardInput{
+		ShotAt:        "2026-08-01",
+		ShotScores:    scores,
+		ShotXs:        xs,
+		LeagueRoundID: &detach,
+	}, 225, 0)
+	require.NoError(t, err)
+	assert.Nil(t, detached.LeagueRoundID)
+	assert.Equal(t, "verified", detached.Verification)
+
+	// The round is free again, which is the point of detaching rather than
+	// leaving an unsubmittable card parked on the cap.
+	replacement, err := repo.Create(ctx, userID, &model.CreateScoreCardInput{
+		ShotAt:        "2026-08-02",
+		ShotScores:    scores,
+		ShotXs:        xs,
+		LeagueRoundID: &roundID,
+	}, 225, 0, 1)
+	require.NoError(t, err)
+	require.NotNil(t, replacement.LeagueRoundID)
+}

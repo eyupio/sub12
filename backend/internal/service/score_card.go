@@ -580,11 +580,16 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	if err := s.ensureNotLockedCard(ctx, card); err != nil {
 		return nil, err
 	}
+	if err := s.resolveLeagueDetach(card, input); err != nil {
+		return nil, err
+	}
 	// Editing a rejected league card is the shooter's recourse, but it must
 	// leave a trace: the silent rejected → pending flip the update performs is
-	// recorded as an owner reopen in the audit trail.
+	// recorded as an owner reopen in the audit trail. A card on its way out of
+	// the league is not reopened — it stops being a league card entirely.
 	wasRejectedLeagueCard := card.Verification == "rejected" &&
-		card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil
+		card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil &&
+		input.LeagueRoundID == nil
 
 	updated, err := s.cards.Update(ctx, id, userID, input, totalScore, xCount)
 	if err != nil {
@@ -621,6 +626,33 @@ func (s *ScoreCardService) Delete(ctx context.Context, id, userID string) error 
 		return err
 	}
 	return s.cards.Delete(ctx, id, userID)
+}
+
+// resolveLeagueDetach validates input.LeagueRoundID against the card's current
+// round and normalises it for the repository. An empty string detaches the card
+// so it is kept as a personal one — the escape hatch for a shooter whose round
+// is full or closed, who would otherwise be stuck with an unsubmittable card.
+// A non-empty value is only accepted when it names the round the card already
+// sits in (the refine form echoes it back); attaching a card to a league is
+// SubmitToLeague's job, which runs the membership and cap checks. Anything else
+// is rejected rather than silently ignored. Omitting the field, or repeating
+// the current round, clears it so the repository leaves the link alone.
+func (s *ScoreCardService) resolveLeagueDetach(card *model.ScoreCard, input *model.UpdateScoreCardInput) error {
+	if input.LeagueRoundID == nil {
+		return nil
+	}
+	current := ""
+	if card.LeagueRoundID != nil {
+		current = *card.LeagueRoundID
+	}
+	if *input.LeagueRoundID == current {
+		input.LeagueRoundID = nil
+		return nil
+	}
+	if *input.LeagueRoundID != "" {
+		return fmt.Errorf("%w: use submit-to-league to move a card to a different round", ErrInvalidCard)
+	}
+	return nil
 }
 
 // checkMaxSubmissionsPerRound enforces cfg.MaxSubmissionsPerRound (when set)
