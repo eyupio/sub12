@@ -15,6 +15,7 @@ import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/
 import { activityApi, ActivityItem as FeedItem } from '../api/activity'
 import { useAuthStore } from '../store/auth'
 import { UserAvatar } from '../components/UserAvatar'
+import { GettingStarted } from '../components/GettingStarted'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import {
   Section,
@@ -375,6 +376,14 @@ export default function Dashboard() {
     return `Tracking ${c} card${c !== 1 ? 's' : ''} across ${r} rifle${r !== 1 ? 's' : ''}`
   })()
 
+  const gettingStartedProgress = {
+    profileComplete: Boolean(user?.avatar_url || user?.bio || user?.location),
+    hasRifle: rifles.length > 0,
+    hasScoreCard: (stats?.cards_logged ?? 0) > 0,
+    hasCommunity: myClubs.length + myLeagues.length + myEvents.length > 0,
+    hasPelletTest: (pelletTestStats?.total_tests ?? 0) > 0,
+  }
+
   return (
     <div className="mx-auto max-w-[1100px] px-5 py-6 lg:px-12 lg:pt-7 lg:pb-20 space-y-5 lg:space-y-6">
 
@@ -435,6 +444,12 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* ── First-run checklist ──────────────────────────────────── */}
+      <GettingStarted
+        progress={gettingStartedProgress}
+        cardsLogged={stats?.cards_logged ?? 0}
+      />
 
       {/* ── Hero stat tiles ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
