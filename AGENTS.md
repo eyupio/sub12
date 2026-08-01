@@ -203,7 +203,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Rifles:** CRUD + image upload
 - **Pellets:** CRUD + image upload
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
-- **Leagues:** Create, join, standings, scores, config, members, seasons, rounds, join requests, score verification (confirm/amend/reject + audit trail)
+- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (confirm/amend/reject/reopen + audit trail)
 - **Clubs:** Create, join, members, image upload
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users

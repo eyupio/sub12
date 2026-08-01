@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, Lock, Trophy, X, FileText } from 'lucide-react'
+import { Plus, Users, Lock, Trophy, X, Check } from 'lucide-react'
 import { leagueApi, CreateLeaguePayload, MyLeagueSummary, type League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -17,7 +17,7 @@ import {
 } from '../components/leagues'
 import { StatTile } from '../components/dashboard'
 
-type Filter = 'all' | 'active' | 'joined' | 'owned' | 'closed'
+type Filter = 'all' | 'joined' | 'owned'
 
 function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -216,14 +216,10 @@ export default function Leagues() {
         const codeMatch = !!l.join_code && l.join_code.toLowerCase().includes(q)
         if (!nameMatch && !codeMatch) return false
       }
-      const isJoined = myLeagueMap.has(l.id)
-      const isOwned = user?.id === l.created_by
       switch (filter) {
-        case 'all': return true
-        case 'active': return true
-        case 'joined': return isJoined
-        case 'owned': return isOwned
-        case 'closed': return false
+        case 'joined': return myLeagueMap.has(l.id)
+        case 'owned': return user?.id === l.created_by
+        case 'all':
         default: return true
       }
     })
@@ -236,8 +232,10 @@ export default function Leagues() {
       0,
     )
     const bestRankLeague = (myLeagues?.items ?? []).find((l) => l.user_rank === bestRank && bestRank > 0)
-    const available = data?.items?.length ?? 0
-    const owned = (data?.items ?? []).filter((l) => l.created_by === user?.id).length
+    // While a code lookup is active the list holds a single match, so the
+    // directory-wide tiles would read "1 available" — leave them blank instead.
+    const available = code ? null : (data?.items?.length ?? 0)
+    const owned = code ? null : (data?.items ?? []).filter((l) => l.created_by === user?.id).length
     return {
       joined,
       bestRank,
@@ -245,7 +243,7 @@ export default function Leagues() {
       available,
       owned,
     }
-  }, [myLeagues, data, user])
+  }, [myLeagues, data, user, code])
 
   return (
     <PageGrid>
@@ -273,8 +271,8 @@ export default function Leagues() {
             unit={stats.bestRank > 0 ? <sup style={{ fontSize: 11 }}>{ordinalSuffix(stats.bestRank)}</sup> : undefined}
             sub={stats.bestRankLeague?.name}
           />
-          <StatTile label="Available" value={String(stats.available)} sub="leagues" />
-          <StatTile label="Owned" value={String(stats.owned)} sub="created by you" />
+          <StatTile label="Available" value={stats.available == null ? '—' : String(stats.available)} sub="leagues" />
+          <StatTile label="Owned" value={stats.owned == null ? '—' : String(stats.owned)} sub="created by you" />
         </div>
         <FilterRow<Filter>
           search={search}
@@ -283,10 +281,8 @@ export default function Leagues() {
           placeholder="Search by name or code…"
           chips={[
             { value: 'all', label: 'All' },
-            { value: 'active', label: 'Active' },
             { value: 'joined', label: 'Joined' },
             { value: 'owned', label: 'Owned' },
-            { value: 'closed', label: 'Closed' },
           ]}
           activeChip={filter}
           onChip={setFilter}
@@ -344,8 +340,8 @@ export default function Leagues() {
               const code = shortCode(league.join_code)
               const meta = [
                 { icon: <Users size={12} />, text: `${league.member_count} shooter${league.member_count !== 1 ? 's' : ''}` },
-                { icon: <FileText size={12} />, text: `${league.member_count > 0 ? '—' : '0'} cards` },
                 { icon: <VisibilityDot visibility={visibility} />, text: visibility },
+                ...(myInfo ? [{ icon: <Check size={12} />, text: 'joined' }] : []),
                 ...(code ? [{ icon: null, text: <span className="lc-code-chip"><span className="lc-code-label">CODE</span>{code}</span> }] : []),
               ]
               return (

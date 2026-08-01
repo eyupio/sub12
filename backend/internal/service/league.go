@@ -29,8 +29,13 @@ var (
 	ErrReasonRequired   = errors.New("reason is required for rejection")
 	ErrNotClubMember    = errors.New("club membership required")
 	ErrLeagueLastAdmin  = errors.New("cannot leave as the last admin; promote another member first")
+	ErrLeagueOnlyAdmin  = errors.New("cannot demote the last admin; promote another member first")
 	ErrUnauthenticated  = errors.New("authentication required")
 	ErrInvalidAmend     = errors.New("invalid amendment")
+
+	ErrVerificationDisabled = errors.New("this league does not use peer verification")
+	ErrScoreRejected        = errors.New("this score has been rejected by an admin")
+	ErrScoreNotRejected     = errors.New("only a rejected score can be reopened")
 )
 
 type LeagueService struct {
@@ -98,6 +103,30 @@ func (s *LeagueService) RemoveMember(ctx context.Context, leagueID, adminID, mem
 		return err
 	}
 	return s.leagues.RemoveMember(ctx, leagueID, memberID)
+}
+
+// UpdateMemberRole lets a league admin promote another member to admin, or
+// demote a co-admin. The last remaining admin cannot be demoted — otherwise
+// the league would be left with nobody able to manage it.
+func (s *LeagueService) UpdateMemberRole(ctx context.Context, leagueID, requesterID, targetID string, isAdmin bool) error {
+	if err := s.requireAdmin(ctx, leagueID, requesterID); err != nil {
+		return err
+	}
+	if isAdmin {
+		err := s.leagues.PromoteMember(ctx, leagueID, targetID)
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrNotMember
+		}
+		return err
+	}
+	err := s.leagues.DemoteMemberGuarded(ctx, leagueID, targetID)
+	if errors.Is(err, repository.ErrLeagueLastAdmin) {
+		return ErrLeagueOnlyAdmin
+	}
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrNotMember
+	}
+	return err
 }
 
 // LeaveLeague allows a member to remove themselves. The last admin must
@@ -277,6 +306,7 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		return true, false, nil
 
 	case "invite_code":
+		joinCode = strings.TrimSpace(joinCode)
 		if joinCode == "" {
 			return false, false, ErrInvalidJoinCode
 		}
@@ -408,7 +438,12 @@ func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID strin
 	return season, nil
 }
 
-func (s *LeagueService) ListSeasons(ctx context.Context, leagueID string) ([]*model.Season, error) {
+// ListSeasons returns a league's seasons. Access mirrors the league itself, so
+// season names of a private or club league are not readable by outsiders.
+func (s *LeagueService) ListSeasons(ctx context.Context, leagueID, viewerID, viewerRole string) ([]*model.Season, error) {
+	if _, err := s.GetByID(ctx, leagueID, viewerID, viewerRole); err != nil {
+		return nil, err
+	}
 	return s.leagues.ListSeasons(ctx, leagueID)
 }
 
@@ -443,7 +478,11 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	return round, nil
 }
 
-func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*model.Round, error) {
+// ListRounds returns a season's rounds, gated on access to the parent league.
+func (s *LeagueService) ListRounds(ctx context.Context, leagueID, seasonID, viewerID, viewerRole string) ([]*model.Round, error) {
+	if _, err := s.GetByID(ctx, leagueID, viewerID, viewerRole); err != nil {
+		return nil, err
+	}
 	return s.leagues.ListRounds(ctx, seasonID)
 }
 
@@ -451,20 +490,20 @@ func (s *LeagueService) ListRounds(ctx context.Context, seasonID string) ([]*mod
 // lazily creating a default season+round if none exists. Any league member
 // may call this so that submitting a score does not require admin help to
 // bootstrap an empty league.
-func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID string) (string, error) {
+func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID string) (*model.ActiveRound, error) {
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
-		return "", ErrLeagueNotFound
+		return nil, ErrLeagueNotFound
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !isMember {
-		return "", ErrNotMember
+		return nil, ErrNotMember
 	}
 	return s.leagues.GetOrCreateDefaultRound(ctx, leagueID)
 }
@@ -480,6 +519,18 @@ func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, 
 		return nil, err
 	}
 	return s.leagues.ListScores(ctx, leagueID, limit, offset, verification)
+}
+
+// CountScores returns the per-verification-status tally of submitted cards.
+func (s *LeagueService) CountScores(ctx context.Context, leagueID string) (*model.LeagueScoreCounts, error) {
+	_, err := s.leagues.GetByID(ctx, leagueID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrLeagueNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.leagues.CountScores(ctx, leagueID)
 }
 
 // GetLeagueForScoreCard resolves the league that a score card belongs to.
@@ -600,8 +651,20 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 		return ErrNotMember
 	}
 
-	// Verify not confirming own score
-	ownerID, err := s.leagues.GetScoreCardOwner(ctx, scoreCardID)
+	// Peer confirmation is only meaningful where the league asked for it —
+	// otherwise it records endorsements that can never verify anything.
+	cfg, err := s.leagues.GetConfig(ctx, league.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrLeagueNotFound
+		}
+		return err
+	}
+	if !cfg.RequireScoreVerification {
+		return ErrVerificationDisabled
+	}
+
+	ownerID, verification, err := s.leagues.GetScoreCardOwner(ctx, scoreCardID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrLeagueNotFound
 	}
@@ -610,6 +673,12 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 	}
 	if ownerID == userID {
 		return ErrCannotConfirmOwn
+	}
+	// An admin has already ruled on a rejected card. Confirmations must not
+	// accumulate against it, or the threshold check below would quietly
+	// overturn the rejection.
+	if verification == "rejected" {
+		return ErrScoreRejected
 	}
 
 	// Insert confirmation
@@ -624,24 +693,40 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 	// Check if confirmation threshold is met. The confirmation row is already
 	// persisted; surface lookup failures so the caller knows auto-verification
 	// did not run (a retry is safe — the unique constraint dedupes).
-	cfg, err := s.leagues.GetConfig(ctx, league.ID)
-	if err != nil {
-		return err
-	}
-
-	if cfg.RequireScoreVerification && cfg.RequiredConfirmations > 0 {
+	if cfg.RequiredConfirmations > 0 {
 		count, err := s.leagues.GetConfirmationCount(ctx, scoreCardID)
 		if err != nil {
 			return err
 		}
 		if count >= int(cfg.RequiredConfirmations) {
-			if err := s.leagues.UpdateScoreVerification(ctx, scoreCardID, "verified"); err != nil {
+			// Guarded so a rejection landing between the read above and this
+			// write is not overwritten.
+			if _, err := s.leagues.VerifyIfPending(ctx, scoreCardID); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// ReopenScore returns a rejected card to the pending queue. League admins only.
+func (s *LeagueService) ReopenScore(ctx context.Context, scoreCardID, adminID string, input *model.ReopenScoreInput) error {
+	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrNotAdmin
+	}
+	err = s.leagues.ReopenScore(ctx, scoreCardID, adminID, input.Reason)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrScoreNotRejected
+	}
+	return err
 }
 
 func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error {

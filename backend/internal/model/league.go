@@ -122,6 +122,20 @@ type CreateRoundInput struct {
 	ClosesAt *string `json:"closes_at"`
 }
 
+// ActiveRound identifies the round new submissions land in, named so the UI can
+// tell the shooter where their card is going.
+type ActiveRound struct {
+	ID         string `json:"round_id"`
+	Name       string `json:"round_name"`
+	SeasonName string `json:"season_name"`
+}
+
+// ReopenScoreInput carries the optional note recorded when an admin returns a
+// rejected card to the review queue.
+type ReopenScoreInput struct {
+	Reason *string `json:"reason"`
+}
+
 type JoinRequest struct {
 	ID          string     `json:"id"`
 	LeagueID    string     `json:"league_id"`
@@ -170,6 +184,19 @@ type LeagueMember struct {
 	DisplayName string    `json:"display_name"`
 	IsAdmin     bool      `json:"is_admin"`
 	JoinedAt    time.Time `json:"joined_at"`
+}
+
+// UpdateLeagueMemberInput carries a member role change (promote/demote).
+type UpdateLeagueMemberInput struct {
+	IsAdmin *bool `json:"is_admin"`
+}
+
+// LeagueScoreCounts is the per-status tally of submitted cards in a league.
+type LeagueScoreCounts struct {
+	All      int `json:"all"`
+	Pending  int `json:"pending"`
+	Verified int `json:"verified"`
+	Rejected int `json:"rejected"`
 }
 
 // ScoreCardLeague is a lightweight league reference resolved from a score card.

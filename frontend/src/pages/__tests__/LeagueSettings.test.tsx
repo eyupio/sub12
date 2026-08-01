@@ -78,6 +78,7 @@ describe('LeagueSettings rules save flow', () => {
 
     vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
     vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
     vi.spyOn(leagueApi, 'updateConfig').mockResolvedValue(makeConfig({ ends_on: '2026-12-01' }))
   })
@@ -110,5 +111,129 @@ describe('LeagueSettings rules save flow', () => {
     await waitFor(() => {
       expect(queryClient.getQueryState(['my-leagues'])?.isInvalidated).toBe(true)
     })
+  })
+})
+
+describe('LeagueSettings seasons and rounds', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-1', email: 'admin@example.com', display_name: 'Admin User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  it('creates a season with its start date', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    const createSeason = vi.spyOn(leagueApi, 'createSeason').mockResolvedValue({
+      id: 'season-1',
+      league_id: 'league-1',
+      name: 'Winter 2026',
+      starts_on: '2026-10-01',
+      is_active: true,
+      created_at: '2026-08-01T00:00:00Z',
+    })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [] })
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ add season/i }))
+    fireEvent.change(screen.getByPlaceholderText(/season name/i), { target: { value: 'Winter 2026' } })
+    fireEvent.change(screen.getByLabelText(/^starts$/i), { target: { value: '2026-10-01' } })
+    fireEvent.click(screen.getByRole('button', { name: /add season/i }))
+
+    await waitFor(() =>
+      expect(createSeason).toHaveBeenCalledWith('league-1', {
+        name: 'Winter 2026',
+        starts_on: '2026-10-01',
+        ends_on: undefined,
+      }),
+    )
+  })
+})
+
+describe('LeagueSettings member roles', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-1', email: 'admin@example.com', display_name: 'Admin User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'updateMember').mockResolvedValue({ updated: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  function renderSettings() {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+  }
+
+  it('promotes another member to admin', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: false })],
+    })
+
+    renderSettings()
+
+    fireEvent.click(await screen.findByRole('button', { name: /promote second shooter to admin/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^promote$/i }))
+
+    await waitFor(() =>
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: true }),
+    )
+  })
+
+  it('demotes a co-admin back to member', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
+    })
+
+    renderSettings()
+
+    fireEvent.click(await screen.findByRole('button', { name: /demote second shooter to member/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^demote$/i }))
+
+    await waitFor(() =>
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: false }),
+    )
+  })
+
+  // Removing a member is destructive and must stay behind its own confirm
+  // step — never share the role dialog's confirm button.
+  it('does not offer a remove control for co-admins', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
+    })
+
+    renderSettings()
+
+    await screen.findByRole('button', { name: /demote second shooter to member/i })
+    expect(screen.queryByRole('button', { name: /remove second shooter from league/i })).toBeNull()
   })
 })

@@ -397,6 +397,13 @@ export default function ScoreEntry() {
           <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
           <span className="t-section-title">·</span>
           <span className="text-xs text-secondary">{league.name}</span>
+          {/* Which round this lands in is not obvious once a league runs a
+              schedule, and it decides which submission cap applies. */}
+          {!roundIdParam && ensuredRound && (
+            <span className="ml-auto text-[10px] tracking-widest uppercase text-muted truncate">
+              {ensuredRound.season_name} · {ensuredRound.round_name}
+            </span>
+          )}
         </div>
       )}
       {requireImage && !imageFile && (

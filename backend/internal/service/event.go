@@ -46,7 +46,7 @@ type ScoreVerificationRepo interface {
 	UpdateScoreVerification(ctx context.Context, scoreCardID, status string) error
 	AmendScore(ctx context.Context, scoreCardID, adminID string, input *model.AmendScoreInput) error
 	RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error
-	GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error)
+	GetScoreCardOwner(ctx context.Context, scoreCardID string) (ownerID, verification string, err error)
 }
 
 // CardReader exposes the score-card lookup needed by event-side verification.
@@ -795,7 +795,7 @@ func (s *EventService) ConfirmCard(ctx context.Context, slug, scoreCardID, userI
 	if err := s.EnsureCanVerifyEventCard(ctx, ev, userID); err != nil {
 		return err
 	}
-	ownerID, err := s.verifyRepo.GetScoreCardOwner(ctx, card.ID)
+	ownerID, _, err := s.verifyRepo.GetScoreCardOwner(ctx, card.ID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrEventNotFound
 	}

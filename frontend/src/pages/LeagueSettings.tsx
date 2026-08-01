@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2, Flag } from 'lucide-react'
-import { leagueApi, LeagueConfig, League, LeagueMember } from '../api/leagues'
+import { ChevronLeft, RefreshCw, Check, X, Shield, ShieldOff, Camera, Trash2, Flag, CalendarRange } from 'lucide-react'
+import { leagueApi, LeagueConfig, League, LeagueMember, Round } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -467,7 +467,12 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 // Join Policy Section
 // ---------------------------------------------------------------------------
 
-function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; config: LeagueConfig; joinCode?: string }) {
+function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
+  leagueId: string
+  config: LeagueConfig
+  joinCode?: string
+  isClubLeague: boolean
+}) {
   const queryClient = useQueryClient()
   const [joinPolicy, setJoinPolicy] = useState(config.join_policy)
 
@@ -494,6 +499,13 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
     <div className={sectionCls}>
       <h2 className="t-section-title">Join Policy</h2>
 
+      {isClubLeague && (
+        <p className="text-[10px] text-muted -mt-2">
+          Club league — only club members can join, whatever this policy says.
+          Members reach it from the club page.
+        </p>
+      )}
+
       <div className="space-y-2">
         {(['open', 'invite_code', 'approval'] as const).map(policy => (
           <button
@@ -513,7 +525,7 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
         ))}
       </div>
 
-      {joinPolicy === 'invite_code' && (
+      {joinPolicy === 'invite_code' && !isClubLeague && (
         <div className="flex items-center gap-2 bg-surface rounded p-3">
           <span className="t-section-title">Code:</span>
           <code className="font-mono text-sm text-[var(--brass)] flex-1">{joinCode || '—'}</code>
@@ -532,7 +544,12 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
         {saveMutation.isPending ? 'Saving…' : 'Save Join Policy'}
       </button>
 
-      {joinPolicy === 'approval' && <JoinRequestsList leagueId={leagueId} />}
+      {/* Keyed off the saved policy as well as the local selection: requests
+          raised under a previous "approval" policy still need deciding even
+          after an admin clicks a different radio. */}
+      {(joinPolicy === 'approval' || config.join_policy === 'approval') && (
+        <JoinRequestsList leagueId={leagueId} />
+      )}
     </div>
   )
 }
@@ -599,6 +616,255 @@ function JoinRequestsList({ leagueId }: { leagueId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Seasons & Rounds Section
+// ---------------------------------------------------------------------------
+
+/** True when now falls inside the round's open/close window. */
+function isRoundOpen(round: Round): boolean {
+  const now = Date.now()
+  if (round.opens_at && new Date(round.opens_at).getTime() > now) return false
+  if (round.closes_at && new Date(round.closes_at).getTime() <= now) return false
+  return true
+}
+
+function RoundList({ leagueId, seasonId }: { leagueId: string; seasonId: string }) {
+  const queryClient = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [opensAt, setOpensAt] = useState('')
+  const [closesAt, setClosesAt] = useState('')
+
+  const { data } = useQuery({
+    queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'],
+    queryFn: () => leagueApi.listRounds(leagueId, seasonId),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      leagueApi.createRound(leagueId, seasonId, {
+        name: name.trim(),
+        // datetime-local has no zone; treat what the admin typed as their
+        // local wall clock and send the resolved instant.
+        opens_at: opensAt ? new Date(opensAt).toISOString() : undefined,
+        closes_at: closesAt ? new Date(closesAt).toISOString() : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'] })
+      // Which round new cards land in can change the moment a round opens.
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'ensure-round'] })
+      setAdding(false)
+      setName('')
+      setOpensAt('')
+      setClosesAt('')
+      toast('Round created', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to create round', 'error'),
+  })
+
+  const rounds = data?.items ?? []
+
+  return (
+    <div className="pl-3 border-l border-subtle space-y-2">
+      {rounds.length === 0 && !adding && (
+        <p className="text-[11px] text-muted">No rounds in this season.</p>
+      )}
+      {rounds.map(round => (
+        <div key={round.id} className="flex items-center gap-2 text-xs">
+          <span className="text-secondary">{round.name}</span>
+          {isRoundOpen(round) ? (
+            <span className="text-[9px] tracking-widest uppercase text-green-500">Open</span>
+          ) : (
+            <span className="text-[9px] tracking-widest uppercase text-muted">Closed</span>
+          )}
+          <span className="ml-auto text-[10px] text-muted font-mono">
+            {round.opens_at ? round.opens_at.slice(0, 10) : 'always'}
+            {round.closes_at ? ` → ${round.closes_at.slice(0, 10)}` : ''}
+          </span>
+        </div>
+      ))}
+
+      {adding ? (
+        <div className="space-y-2 pt-1">
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Round name"
+            className={inputCls}
+            autoFocus
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label htmlFor={`round-opens-${seasonId}`} className="text-[10px] text-muted">Opens</label>
+              <input
+                id={`round-opens-${seasonId}`}
+                type="datetime-local"
+                value={opensAt}
+                onChange={e => setOpensAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor={`round-closes-${seasonId}`} className="text-[10px] text-muted">Closes</label>
+              <input
+                id={`round-closes-${seasonId}`}
+                type="datetime-local"
+                value={closesAt}
+                onChange={e => setClosesAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => createMutation.mutate()}
+              disabled={!name.trim() || createMutation.isPending}
+              className={btnPrimary}
+            >
+              {createMutation.isPending ? 'Adding…' : 'Add Round'}
+            </button>
+            <button onClick={() => setAdding(false)} className="text-[11px] tracking-widest uppercase text-muted px-3">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="text-[10px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+        >
+          + Add round
+        </button>
+      )}
+    </div>
+  )
+}
+
+function SeasonsSection({ leagueId }: { leagueId: string }) {
+  const queryClient = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [startsOn, setStartsOn] = useState('')
+  const [endsOn, setEndsOn] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const { data } = useQuery({
+    queryKey: ['leagues', leagueId, 'seasons'],
+    queryFn: () => leagueApi.listSeasons(leagueId),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      leagueApi.createSeason(leagueId, {
+        name: name.trim(),
+        starts_on: startsOn,
+        ends_on: endsOn || undefined,
+      }),
+    onSuccess: (season) => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons'] })
+      setAdding(false)
+      setName('')
+      setStartsOn('')
+      setEndsOn('')
+      setExpanded(season.id)
+      toast('Season created', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to create season', 'error'),
+  })
+
+  const seasons = data?.items ?? []
+
+  return (
+    <div className={sectionCls}>
+      <div className="flex items-center justify-between">
+        <h2 className="t-section-title">Seasons &amp; Rounds</h2>
+        <span className="text-[11px] text-muted font-mono">{seasons.length}</span>
+      </div>
+      <p className="text-[10px] text-muted -mt-2">
+        New cards land in whichever round is open now. Leave a round&rsquo;s dates
+        blank to keep it permanently open — a league with a single open round
+        behaves exactly as before.
+      </p>
+
+      {seasons.map(season => (
+        <div key={season.id} className="space-y-2 py-2 border-b border-subtle last:border-0">
+          <button
+            onClick={() => setExpanded(expanded === season.id ? null : season.id)}
+            className="flex items-center gap-2 w-full text-left"
+            aria-expanded={expanded === season.id}
+          >
+            <CalendarRange size={13} className="text-[var(--brass)] shrink-0" />
+            <span className="text-sm text-secondary">{season.name}</span>
+            <span className="ml-auto text-[10px] text-muted font-mono">
+              {season.starts_on}{season.ends_on ? ` → ${season.ends_on}` : ''}
+            </span>
+            <ChevronLeft
+              size={14}
+              className={`text-muted transition-transform ${expanded === season.id ? '-rotate-90' : 'rotate-180'}`}
+            />
+          </button>
+          {expanded === season.id && <RoundList leagueId={leagueId} seasonId={season.id} />}
+        </div>
+      ))}
+
+      {adding ? (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Season name (e.g. Winter 2026)"
+            className={inputCls}
+            autoFocus
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label htmlFor="season-starts-on" className="text-[10px] text-muted">Starts</label>
+              <input
+                id="season-starts-on"
+                type="date"
+                value={startsOn}
+                onChange={e => setStartsOn(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="season-ends-on" className="text-[10px] text-muted">Ends (optional)</label>
+              <input
+                id="season-ends-on"
+                type="date"
+                value={endsOn}
+                onChange={e => setEndsOn(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => createMutation.mutate()}
+              disabled={!name.trim() || !startsOn || createMutation.isPending}
+              className={btnPrimary}
+            >
+              {createMutation.isPending ? 'Adding…' : 'Add Season'}
+            </button>
+            <button onClick={() => setAdding(false)} className="text-[11px] tracking-widest uppercase text-muted px-3">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity"
+        >
+          + Add season
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Members Section
 // ---------------------------------------------------------------------------
 
@@ -606,6 +872,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
   const queryClient = useQueryClient()
   const prefs = useRegionalPrefs()
   const [pendingRemove, setPendingRemove] = useState<LeagueMember | null>(null)
+  const [pendingRole, setPendingRole] = useState<LeagueMember | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
@@ -626,7 +893,22 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
     },
   })
 
+  const roleMutation = useMutation({
+    mutationFn: (member: LeagueMember) =>
+      leagueApi.updateMember(leagueId, member.user_id, { is_admin: !member.is_admin }),
+    onSuccess: (_data, member) => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      toast(member.is_admin ? 'Demoted from admin' : 'Promoted to admin', 'success')
+      setPendingRole(null)
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to update role', 'error')
+      setPendingRole(null)
+    },
+  })
+
   const members = data?.items ?? []
+  const adminCount = members.filter(m => m.is_admin).length
 
   return (
     <div className={sectionCls}>
@@ -634,35 +916,54 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
         <h2 className="t-section-title">Members</h2>
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
+      <p className="text-[10px] text-muted -mt-2">
+        Promote a co-admin so league admin never rests on one account — the last
+        admin cannot leave or be demoted.
+      </p>
 
-      {members.map(member => (
-        <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-secondary">{member.display_name}</span>
-            {member.is_admin && (
-              <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass-dim)] px-1.5 py-0.5 rounded">
-                <Shield size={10} /> Admin
+      {members.map(member => {
+        const isSelf = member.user_id === currentUserId
+        const lastAdmin = member.is_admin && adminCount <= 1
+        return (
+          <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-secondary">{member.display_name}</span>
+              {member.is_admin && (
+                <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass-dim)] px-1.5 py-0.5 rounded">
+                  <Shield size={10} /> Admin
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-muted font-mono">
+                {formatDate(member.joined_at, prefs)}
               </span>
-            )}
+              {!isSelf && (
+                <button
+                  onClick={() => setPendingRole(member)}
+                  disabled={roleMutation.isPending || lastAdmin}
+                  className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass-dim)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={lastAdmin ? 'Cannot demote the last admin' : member.is_admin ? 'Demote to member' : 'Promote to admin'}
+                  aria-label={member.is_admin ? `Demote ${member.display_name} to member` : `Promote ${member.display_name} to admin`}
+                >
+                  {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
+                </button>
+              )}
+              {!member.is_admin && !isSelf && (
+                <button
+                  onClick={() => setPendingRemove(member)}
+                  disabled={removeMutation.isPending}
+                  className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Remove member"
+                  aria-label={`Remove ${member.display_name} from league`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-muted font-mono">
-              {formatDate(member.joined_at, prefs)}
-            </span>
-            {!member.is_admin && member.user_id !== currentUserId && (
-              <button
-                onClick={() => setPendingRemove(member)}
-                disabled={removeMutation.isPending}
-                className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove member"
-                aria-label={`Remove ${member.display_name} from league`}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+        )
+      })}
 
       <ConfirmDialog
         open={pendingRemove !== null}
@@ -677,6 +978,23 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
           if (pendingRemove) removeMutation.mutate(pendingRemove.user_id)
         }}
         onCancel={() => setPendingRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingRole !== null}
+        title={pendingRole?.is_admin ? 'Demote to member?' : 'Promote to admin?'}
+        message={
+          pendingRole
+            ? pendingRole.is_admin
+              ? `${pendingRole.display_name} will no longer manage this league's settings, members or score reviews.`
+              : `${pendingRole.display_name} will be able to manage this league's settings, members and score reviews.`
+            : ''
+        }
+        confirmLabel={pendingRole?.is_admin ? 'Demote' : 'Promote'}
+        onConfirm={() => {
+          if (pendingRole) roleMutation.mutate(pendingRole)
+        }}
+        onCancel={() => setPendingRole(null)}
       />
     </div>
   )
@@ -755,8 +1073,9 @@ export default function LeagueSettings() {
       <GeneralInfoSection leagueId={id} league={league} />
       <PrivacySection leagueId={id} league={league} />
       <RulesSection leagueId={id} config={config} />
+      <SeasonsSection leagueId={id} />
       <RegionalSection leagueId={id} league={league} />
-      <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} />
+      <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} isClubLeague={!!league.club_id} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
 
       <Link

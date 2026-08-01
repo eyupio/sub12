@@ -382,8 +382,19 @@ func (h *LeagueHandler) ListSeasons(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	seasons, err := h.svc.ListSeasons(r.Context(), leagueID)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+
+	seasons, err := h.svc.ListSeasons(r.Context(), leagueID, viewerID, viewerRole)
 	if err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list seasons")
 		return
 	}
@@ -438,14 +449,30 @@ func (h *LeagueHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/leagues/{id}/seasons/{seasonId}/rounds
 func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
 	seasonID := chi.URLParam(r, "seasonId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
 	if !isUUID(seasonID) {
 		writeInvalidUUIDError(w, "season id")
 		return
 	}
 
-	rounds, err := h.svc.ListRounds(r.Context(), seasonID)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+
+	rounds, err := h.svc.ListRounds(r.Context(), leagueID, seasonID, viewerID, viewerRole)
 	if err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to list rounds")
 		return
 	}
@@ -470,7 +497,7 @@ func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	roundID, err := h.svc.EnsureDefaultRound(r.Context(), leagueID, userID)
+	round, err := h.svc.EnsureDefaultRound(r.Context(), leagueID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotMember) {
 			writeError(w, http.StatusForbidden, "league membership required")
@@ -484,7 +511,7 @@ func (h *LeagueHandler) EnsureDefaultRound(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"round_id": roundID})
+	writeJSON(w, http.StatusOK, round)
 }
 
 // GET /api/v1/leagues/{id}/scores
@@ -528,6 +555,43 @@ func (h *LeagueHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 		scores = []*model.LeagueScore{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": scores})
+}
+
+// GET /api/v1/leagues/{id}/score-counts
+func (h *LeagueHandler) ScoreCounts(w http.ResponseWriter, r *http.Request) {
+	leagueID := chi.URLParam(r, "id")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+
+	// Gate: verify access (club membership / private league check)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	if _, err := h.svc.GetByID(r.Context(), leagueID, viewerID, viewerRole); err != nil {
+		if errors.Is(err, service.ErrUnauthenticated) {
+			writeError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to verify league access")
+		return
+	}
+
+	counts, err := h.svc.CountScores(r.Context(), leagueID)
+	if err != nil {
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "league not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to count league scores")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, counts)
 }
 
 // ---------------------------------------------------------------------------
@@ -633,6 +697,55 @@ func (h *LeagueHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/leagues/{id}/members/{userId}
+func (h *LeagueHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
+	requesterID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	targetID := chi.URLParam(r, "userId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(targetID) {
+		writeInvalidUUIDError(w, "member id")
+		return
+	}
+
+	var input model.UpdateLeagueMemberInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if input.IsAdmin == nil {
+		writeError(w, http.StatusBadRequest, "is_admin field is required")
+		return
+	}
+
+	if err := h.svc.UpdateMemberRole(r.Context(), leagueID, requesterID, targetID, *input.IsAdmin); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
+		if errors.Is(err, service.ErrLeagueOnlyAdmin) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotMember) {
+			writeError(w, http.StatusNotFound, "member not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to update member")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"updated": true})
 }
 
 // ---------------------------------------------------------------------------
@@ -874,6 +987,14 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "already confirmed this score")
 			return
 		}
+		if errors.Is(err, service.ErrVerificationDisabled) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrScoreRejected) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrLeagueNotFound) {
 			writeError(w, http.StatusNotFound, "score card not found")
 			return
@@ -883,6 +1004,44 @@ func (h *LeagueHandler) ConfirmScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"confirmed": true})
+}
+
+// POST /api/v1/score-cards/{id}/reopen
+func (h *LeagueHandler) ReopenScore(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	scoreCardID := chi.URLParam(r, "id")
+	if !isUUID(scoreCardID) {
+		writeInvalidUUIDError(w, "score card id")
+		return
+	}
+
+	var input model.ReopenScoreInput
+	// Body is optional — the reason is a note, not a requirement.
+	_ = decodeJSON(r, &input)
+
+	if err := h.svc.ReopenScore(r.Context(), scoreCardID, userID, &input); err != nil {
+		if errors.Is(err, service.ErrNotAdmin) {
+			writeError(w, http.StatusForbidden, "not a league admin")
+			return
+		}
+		if errors.Is(err, service.ErrScoreNotRejected) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrLeagueNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to reopen score")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"reopened": true})
 }
 
 // GET /api/v1/score-cards/{id}/audit-trail
