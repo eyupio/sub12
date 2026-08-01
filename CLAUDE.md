@@ -114,7 +114,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **105** (000001–000105). Latest: `000105_score_card_action_reopen`.
+Current migration count: **106** (000001–000106). Latest: `000106_gear_comparison_showcase`.
 
 ## Critical Migration Rules
 
@@ -200,8 +200,9 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 ### Protected (requires `Authorization: Bearer <jwt>`)
 
 - **Score cards:** CRUD + image upload + comments (write)
-- **Rifles:** CRUD + image upload
-- **Pellets:** CRUD + image upload
+- **Rifles:** CRUD + image upload + showcase (`GET /rifles/{id}/showcase`)
+- **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
+- **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
 - **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (confirm/amend/reject/reopen + audit trail)
 - **Clubs:** Create, join, members, image upload
@@ -217,6 +218,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
 - **Email:** SMTP settings (get/patch/test), email templates (list/get/patch/preview)
 - **Users:** List, get, update role, delete
+- **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List, get, update, delete, members management
 - **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Each persona gets a rifle + pellet and a stable personality that biases action selection. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.

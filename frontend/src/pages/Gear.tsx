@@ -1,13 +1,13 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Camera, Pencil, Check, X, Loader2 } from 'lucide-react'
+import { Plus, Check, X } from 'lucide-react'
 import { gearApi, Rifle, Pellet, CreateRiflePayload, CreatePelletPayload } from '../api/gear'
 import { statsApi, RifleStats } from '../api/stats'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ImageEditor } from '../components/ImageEditor'
 import { CatalogSearch } from '../components/CatalogSearch'
 import { RifleProfileCard } from '../components/RifleProfileCard'
+import { PelletProfileCard } from '../components/PelletProfileCard'
 import { RIFLE_CATALOG, RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, PelletCatalogEntry } from '../catalog/pelletCatalog'
 import { rifleImage, pelletImage, UNKNOWN_BRAND_IMAGE } from '../catalog/brandImages'
@@ -30,63 +30,6 @@ const inputCls =
 
 const selectCls =
   'w-full bg-surface border border-subtle rounded px-2 py-1.5 text-primary text-xs tracking-wide focus:outline-none focus:border-[var(--brass)]/50'
-
-function GearImage({ imageUrl, onUpload, isPending }: { imageUrl?: string; onUpload: (file: File) => void; isPending: boolean }) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [editingFile, setEditingFile] = useState<File | null>(null)
-
-  function onEdited(file: File) {
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Image must be under 5 MB', 'error')
-      setEditingFile(null)
-      return
-    }
-    setEditingFile(null)
-    onUpload(file)
-  }
-
-  return (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={e => {
-          const file = e.target.files?.[0]
-          if (file) setEditingFile(file)
-          e.target.value = ''
-        }}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isPending}
-        className="relative w-10 h-10 rounded overflow-hidden border border-subtle hover:border-[var(--brass)]/50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-        aria-label="Upload image"
-      >
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full bg-surface-hover flex items-center justify-center">
-            <Camera size={14} className="text-muted" />
-          </div>
-        )}
-        {isPending && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <Loader2 size={16} className="text-white animate-spin" />
-          </div>
-        )}
-      </button>
-      {editingFile && (
-        <ImageEditor
-          file={editingFile}
-          onSave={onEdited}
-          onCancel={() => setEditingFile(null)}
-        />
-      )}
-    </>
-  )
-}
 
 // ─── Rifle section ────────────────────────────────────────────────────────────
 
@@ -538,33 +481,14 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
   }
 
   return (
-    <div className="flex items-center gap-3 p-3 lg:p-4 rounded border border-subtle bg-surface">
-      <GearImage imageUrl={pellet.image_url} onUpload={file => imgMutation.mutate(file)} isPending={imgMutation.isPending} />
-      <div className="flex-1 min-w-0">
-        <p className="text-secondary text-sm font-medium">{pellet.brand} {pellet.model}</p>
-        <p className="text-[11px] text-muted tracking-wide">
-          {[
-            pellet.head_size_mm != null && `${pellet.head_size_mm}mm`,
-            pellet.weight_grains != null && `${pellet.weight_grains}gr`,
-            pellet.batch_code,
-          ].filter(Boolean).join(' · ')}
-        </p>
-      </div>
-      <button
-        onClick={() => { setForm({ brand: pellet.brand, model: pellet.model, head_size_mm: pellet.head_size_mm, weight_grains: pellet.weight_grains, batch_code: pellet.batch_code ?? '' }); setEditing(true) }}
-        className="text-muted hover:text-[var(--brass)] transition-colors"
-        aria-label="Edit pellet"
-      >
-        <Pencil size={15} />
-      </button>
-      <button
-        onClick={() => setConfirmDelete(true)}
-        disabled={del.isPending}
-        className="text-muted hover:text-[var(--error-text)] transition-colors"
-        aria-label="Delete pellet"
-      >
-        <Trash2 size={15} />
-      </button>
+    <>
+      <PelletProfileCard
+        pellet={pellet}
+        onUploadImage={file => imgMutation.mutate(file)}
+        isUploadPending={imgMutation.isPending}
+        onEdit={() => { setForm({ brand: pellet.brand, model: pellet.model, head_size_mm: pellet.head_size_mm, weight_grains: pellet.weight_grains, batch_code: pellet.batch_code ?? '' }); setEditing(true) }}
+        onDelete={() => setConfirmDelete(true)}
+      />
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete ${pellet.brand} ${pellet.model}?`}
@@ -572,7 +496,7 @@ function PelletRow({ pellet }: { pellet: Pellet }) {
         onConfirm={() => { setConfirmDelete(false); del.mutate() }}
         onCancel={() => setConfirmDelete(false)}
       />
-    </div>
+    </>
   )
 }
 
@@ -582,7 +506,7 @@ function PelletsTab() {
   const pellets = data?.items ?? []
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {!adding && (
         <button onClick={() => setAdding(true)} className="flex items-center gap-2 text-[11px] tracking-widest uppercase text-[var(--brass)] hover:opacity-80 transition-opacity">
           <Plus size={13} /> Add Pellet
@@ -591,7 +515,9 @@ function PelletsTab() {
       {adding && <AddPelletForm onDone={() => setAdding(false)} />}
       {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
       {isError && <p className="text-[var(--error-text)] text-sm">Failed to load pellets. Please try again.</p>}
-      {pellets.map(p => <PelletRow key={p.id} pellet={p} />)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {pellets.map(p => <PelletRow key={p.id} pellet={p} />)}
+      </div>
       {!isLoading && !isError && pellets.length === 0 && !adding && (
         <p className="text-muted text-sm">No pellets added yet.</p>
       )}

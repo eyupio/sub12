@@ -23,6 +23,8 @@ const LazyScoreCompare = lazy(() => import('./pages/ScoreCompare'))
 const LazyScoreCardDetail = lazy(() => import('./pages/ScoreCardDetail'))
 const LazyScoreTrends = lazy(() => import('./pages/ScoreTrends'))
 const LazyGear = lazy(() => import('./pages/Gear'))
+const LazyRifleShowcase = lazy(() => import('./pages/GearShowcase').then(m => ({ default: m.RifleShowcase })))
+const LazyPelletShowcase = lazy(() => import('./pages/GearShowcase').then(m => ({ default: m.PelletShowcase })))
 const LazyLocations = lazy(() => import('./pages/Locations'))
 const LazyLeagues = lazy(() => import('./pages/Leagues'))
 const LazyLeagueDetail = lazy(() => import('./pages/LeagueDetail'))
@@ -59,6 +61,7 @@ const LazyAdminClubDetail = lazy(() => import('./pages/AdminClubDetail'))
 const LazyAdminSitemap = lazy(() => import('./pages/AdminSitemap'))
 const LazyAdminBackup = lazy(() => import('./pages/AdminBackup'))
 const LazyAdminSimulation = lazy(() => import('./pages/AdminSimulation'))
+const LazyAdminGear = lazy(() => import('./pages/AdminGearStats'))
 const LazyAdminReportsQueue = lazy(() => import('./pages/AdminReportsQueue'))
 const LazyAdminSupportInbox = lazy(() => import('./pages/AdminSupportInbox'))
 const LazyAdminSupportTicketDetail = lazy(() => import('./pages/AdminSupportTicketDetail'))
@@ -200,6 +203,18 @@ const gearRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/gear',
   component: lz(LazyGear),
+})
+
+const rifleShowcaseRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/gear/rifles/$id',
+  component: lz(LazyRifleShowcase),
+})
+
+const pelletShowcaseRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/gear/pellets/$id',
+  component: lz(LazyPelletShowcase),
 })
 
 const locationsRoute = createRoute({
@@ -527,6 +542,12 @@ const adminSimulationRoute = createRoute({
   component: lz(LazyAdminSimulation),
 })
 
+const adminGearRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/gear',
+  component: lz(LazyAdminGear),
+})
+
 const adminReportsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/reports',
@@ -682,6 +703,8 @@ export const routeTree = rootRoute.addChildren([
     batchReportRoute,
     comboAnalyticsRoute,
     gearRoute,
+    rifleShowcaseRoute,
+    pelletShowcaseRoute,
     locationsRoute,
     leaguesRoute,
     leagueDetailRoute,
@@ -716,6 +739,7 @@ export const routeTree = rootRoute.addChildren([
     adminSitemapRoute,
     adminBackupRoute,
     adminSimulationRoute,
+    adminGearRoute,
     adminReportsRoute,
     adminSupportRoute,
     adminSupportTicketDetailRoute,
