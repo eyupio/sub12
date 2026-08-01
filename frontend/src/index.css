@@ -524,7 +524,12 @@
   .u-nudge:hover { transform: translateX(2px); }
 
   /* Brass sheen that sweeps across a primary control on hover. */
-  .u-sheen { position: relative; overflow: hidden; isolation: isolate; }
+  .u-sheen { overflow: hidden; isolation: isolate; }
+  /* Zero-specificity so the sheen only supplies a containing block when the
+     element has no position of its own. A plain `.u-sheen { position: relative }`
+     sits later in the utilities layer than Tailwind's own position utilities and
+     silently beat them — which dropped `fixed` elements back into normal flow. */
+  :where(.u-sheen) { position: relative; }
   .u-sheen::after {
     content: '';
     position: absolute;
