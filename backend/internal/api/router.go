@@ -409,6 +409,7 @@ func NewRouter(
 			r.Get("/score-cards/{id}/league", lh.GetLeagueForScoreCard)
 			r.Post("/score-cards/{id}/confirmations", lh.ConfirmScore)
 			r.Get("/score-cards/{id}/audit-trail", lh.GetScoreAuditTrail)
+			r.Post("/score-cards/{id}/reopen", lh.ReopenScore)
 			r.Post("/score-cards/{id}/amend", lh.AmendScore)
 			r.Post("/score-cards/{id}/reject", lh.RejectScore)
 

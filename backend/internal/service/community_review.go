@@ -30,7 +30,7 @@ type CommunityReviewRepo interface {
 // ScoreConfirmationRepo is the persistence interface for the shared
 // score_confirmations table (originally added for leagues, reused here).
 type ScoreConfirmationRepo interface {
-	GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error)
+	GetScoreCardOwner(ctx context.Context, scoreCardID string) (ownerID, verification string, err error)
 	ConfirmScore(ctx context.Context, scoreCardID, userID string) (*model.ScoreConfirmation, error)
 	ListConfirmations(ctx context.Context, scoreCardID string) ([]*model.ScoreConfirmation, error)
 	GetConfirmationCount(ctx context.Context, scoreCardID string) (int, error)
@@ -138,7 +138,7 @@ func (s *CommunityReviewService) ConfirmCard(ctx context.Context, scoreCardID, r
 		return ErrReviewRequestNotFound
 	}
 
-	ownerID, err := s.confirms.GetScoreCardOwner(ctx, scoreCardID)
+	ownerID, _, err := s.confirms.GetScoreCardOwner(ctx, scoreCardID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrReviewRequestNotFound
 	}

@@ -134,7 +134,11 @@ function VerificationBadge({ status }: { status: string }) {
   )
 }
 
-function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; cardOwnerID: string }) {
+function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
+  scoreCardId: string
+  cardOwnerID: string
+  verification?: string
+}) {
   const queryClient = useQueryClient()
   const currentUser = useAuthStore(s => s.user)
   const prefs = useRegionalPrefs()
@@ -163,6 +167,14 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
     queryFn: () => leagueApi.getAuditTrail(scoreCardId),
   })
 
+  // Peer confirmation only counts towards anything when the league asked for
+  // it, so the button is hidden rather than left to fail server-side.
+  const { data: leagueConfig } = useQuery({
+    queryKey: ['leagues', league?.id ?? '', 'config'],
+    queryFn: () => leagueApi.getConfig(league!.id),
+    enabled: !!league?.id,
+  })
+
   const confirmMutation = useMutation({
     mutationFn: () => leagueApi.confirmScore(scoreCardId),
     onSuccess: () => {
@@ -171,8 +183,22 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
       toast('Score confirmed', 'success')
     },
     onError: (err) => {
-      toast(err instanceof ApiError && err.status === 409 ? 'Already confirmed' : 'Failed to confirm score', 'error')
+      toast(err instanceof ApiError && err.status === 409 ? (err.message || 'Already confirmed') : 'Failed to confirm score', 'error')
     },
+  })
+
+  const reopenMutation = useMutation({
+    mutationFn: () => leagueApi.reopenScore(scoreCardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId] })
+      queryClient.invalidateQueries({ queryKey: ['score-cards', scoreCardId, 'audit-trail'] })
+      if (league?.id) {
+        queryClient.invalidateQueries({ queryKey: ['leagues', league.id, 'score-counts'] })
+        queryClient.invalidateQueries({ queryKey: ['leagues', league.id, 'standings'] })
+      }
+      toast('Score reopened for review', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to reopen score', 'error'),
   })
 
   const amendMutation = useMutation({
@@ -249,11 +275,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
           {actions.map((action: ScoreCardAction) => (
             <div key={action.id} className="bg-surface rounded p-2.5 space-y-1">
               <div className="flex items-center gap-2">
-                {action.action === 'amend' ? (
-                  <Edit3 size={13} className="text-amber-600 dark:text-amber-400" />
-                ) : (
-                  <XCircle size={13} className="text-[var(--error-text)]" />
-                )}
+                {action.action === 'amend' && <Edit3 size={13} className="text-amber-600 dark:text-amber-400" />}
+                {action.action === 'reject' && <XCircle size={13} className="text-[var(--error-text)]" />}
+                {action.action === 'reopen' && <RotateCcw size={13} className="text-[var(--brass)]" />}
                 <span className="text-sm text-secondary">
                   {action.display_name} \u2014 <span className="uppercase text-[11px]">{action.action}</span>
                 </span>
@@ -281,8 +305,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
         <p className="text-muted text-xs">No verification activity yet.</p>
       )}
 
-      {/* Confirm button — visible to league members who don't own the score */}
-      {!isOwnScore && isMember && (
+      {/* Confirm button — league members who don't own the score, in leagues
+          that actually use peer verification, on a card still under review. */}
+      {!isOwnScore && isMember && leagueConfig?.require_score_verification && verification !== 'rejected' && (
         <div className="space-y-2">
           <button
             onClick={() => confirmMutation.mutate()}
@@ -294,11 +319,23 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
           {confirmMutation.isError && (
             <p className="text-[var(--error-text)] text-xs">
               {confirmMutation.error instanceof ApiError && confirmMutation.error.status === 409
-                ? 'Already confirmed.'
+                ? (confirmMutation.error.message || 'Already confirmed.')
                 : 'Failed to confirm.'}
             </p>
           )}
         </div>
+      )}
+
+      {/* A rejection used to be permanent — admins can return the card to the
+          review queue, e.g. once the shooter supplies the missing photo. */}
+      {isAdmin && verification === 'rejected' && (
+        <button
+          onClick={() => reopenMutation.mutate()}
+          disabled={reopenMutation.isPending}
+          className="text-[11px] tracking-widest uppercase border border-[var(--brass)]/40 text-[var(--brass)] hover:bg-[var(--brass)]/10 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded transition-colors"
+        >
+          {reopenMutation.isPending ? 'Reopening…' : 'Reopen for review'}
+        </button>
       )}
 
       {/* Amend/Reject buttons — visible only to league admins */}
@@ -313,14 +350,16 @@ function AuditTrailSection({ scoreCardId, cardOwnerID }: { scoreCardId: string; 
                 Amend
               </button>
             </Tooltip>
-            <Tooltip content={tips.scoreReject}>
-              <button
-                onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
-                className="text-[11px] tracking-widest uppercase border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 px-3 py-1.5 rounded transition-colors"
-              >
-                Reject
-              </button>
-            </Tooltip>
+            {verification !== 'rejected' && (
+              <Tooltip content={tips.scoreReject}>
+                <button
+                  onClick={() => { setShowReject(!showReject); setShowAmend(false) }}
+                  className="text-[11px] tracking-widest uppercase border border-[var(--error-text)]/30 text-[var(--error-text)] hover:bg-[var(--error-text)]/10 px-3 py-1.5 rounded transition-colors"
+                >
+                  Reject
+                </button>
+              </Tooltip>
+            )}
           </div>
 
           {showAmend && (
@@ -1778,7 +1817,7 @@ export default function ScoreCardDetail() {
 
       {/* Audit Trail \u2014 only shown for league cards */}
       {card.league_round_id && (
-        <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} />
+        <AuditTrailSection scoreCardId={id} cardOwnerID={card.user_id} verification={card.verification} />
       )}
 
       {/* Community review \u2014 personal practice cards only */}

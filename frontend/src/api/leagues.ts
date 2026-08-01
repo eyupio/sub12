@@ -123,7 +123,7 @@ export interface ScoreConfirmation {
 export interface ScoreCardAction {
   id: string
   score_card_id: string
-  action: 'amend' | 'reject'
+  action: 'amend' | 'reject' | 'reopen'
   performed_by: string
   display_name: string
   reason?: string
@@ -144,6 +144,13 @@ export interface LeagueScore {
   x_count: number
   verification: string
   created_at: string
+}
+
+/** The round a new submission will land in, named for display. */
+export interface ActiveRound {
+  round_id: string
+  round_name: string
+  season_name: string
 }
 
 export interface LeagueScoreCounts {
@@ -285,6 +292,10 @@ export const leagueApi = {
   rejectScore: (scoreCardId: string, reason: string) =>
     api.post(`/score-cards/${scoreCardId}/reject`, { reason }),
 
+  // Returns a rejected card to the pending queue (league admins only).
+  reopenScore: (scoreCardId: string, reason?: string) =>
+    api.post<{ reopened: boolean }>(`/score-cards/${scoreCardId}/reopen`, { reason }),
+
   // League scores
   listScores: (id: string, limit = 50, offset = 0, verification?: string) => {
     let url = `/leagues/${id}/scores?limit=${limit}&offset=${offset}`
@@ -298,7 +309,7 @@ export const leagueApi = {
     api.get<LeagueScoreCounts>(`/leagues/${id}/score-counts`),
 
   ensureDefaultRound: (id: string) =>
-    api.post<{ round_id: string }>(`/leagues/${id}/ensure-round`, {}),
+    api.post<ActiveRound>(`/leagues/${id}/ensure-round`, {}),
 
   uploadImage: (id: string, file: File) => {
     const formData = new FormData()

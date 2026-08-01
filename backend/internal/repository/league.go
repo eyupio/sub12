@@ -65,9 +65,17 @@ func (r *LeagueRepository) Create(ctx context.Context, userID string, input *mod
 		return nil, fmt.Errorf("insert league config: %w", err)
 	}
 
-	// Generate a join code when join_policy is invite_code or league type is private.
-	needsCode := (input.JoinPolicy != nil && *input.JoinPolicy == "invite_code") ||
-		(input.Type == "private" && (input.JoinPolicy == nil || *input.JoinPolicy != "open"))
+	// Generate a join code when join_policy is invite_code, or when a private
+	// league needs a discovery handle (it is absent from the public directory,
+	// so the code is the only way to find it).
+	//
+	// Club leagues are excluded: joining one is gated on club membership no
+	// matter what the code says, and members reach it from the club page — so
+	// a code there is a dead control that only invites confusion.
+	isClubLeague := input.ClubID != nil && *input.ClubID != ""
+	needsCode := !isClubLeague &&
+		((input.JoinPolicy != nil && *input.JoinPolicy == "invite_code") ||
+			(input.Type == "private" && (input.JoinPolicy == nil || *input.JoinPolicy != "open")))
 	if needsCode {
 		b := make([]byte, 4)
 		if _, err := rand.Read(b); err != nil {
@@ -697,30 +705,38 @@ func (r *LeagueRepository) ListRounds(ctx context.Context, seasonID string) ([]*
 	return rounds, rows.Err()
 }
 
-// GetOrCreateDefaultRound returns a round ID for this league, creating a
-// default "General" season and "Submissions" round if none exist.
-func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID string) (string, error) {
-	// Try to find an existing round for this league.
-	var roundID string
+// GetOrCreateDefaultRound returns the round new submissions should land in,
+// creating a default "General" season and "Submissions" round if the league has
+// none. Rounds whose window is currently open win over closed or not-yet-open
+// ones, and among those the one that opened most recently wins — so once an
+// admin schedules rounds, submissions follow the schedule instead of piling
+// into whichever round happened to be created first.
+func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID string) (*model.ActiveRound, error) {
+	var round model.ActiveRound
 	err := r.db.QueryRow(ctx, `
-		SELECT rd.id
+		SELECT rd.id, rd.name, s.name
 		FROM rounds rd
 		JOIN seasons s ON s.id = rd.season_id
 		WHERE s.league_id = $1
-		ORDER BY rd.created_at ASC
+		ORDER BY
+			(rd.opens_at IS NULL OR rd.opens_at <= NOW())
+				AND (rd.closes_at IS NULL OR rd.closes_at > NOW()) DESC,
+			s.is_active DESC,
+			rd.opens_at DESC NULLS LAST,
+			rd.created_at ASC
 		LIMIT 1
-	`, leagueID).Scan(&roundID)
+	`, leagueID).Scan(&round.ID, &round.Name, &round.SeasonName)
 	if err == nil {
-		return roundID, nil
+		return &round, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("find existing round: %w", err)
+		return nil, fmt.Errorf("find existing round: %w", err)
 	}
 
 	// No rounds exist — create default season + round in a transaction.
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return "", fmt.Errorf("begin tx: %w", err)
+		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -731,22 +747,24 @@ func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID
 		RETURNING id
 	`, leagueID).Scan(&seasonID)
 	if err != nil {
-		return "", fmt.Errorf("insert default season: %w", err)
+		return nil, fmt.Errorf("insert default season: %w", err)
 	}
 
 	err = tx.QueryRow(ctx, `
 		INSERT INTO rounds (season_id, name)
 		VALUES ($1, 'Submissions')
 		RETURNING id
-	`, seasonID).Scan(&roundID)
+	`, seasonID).Scan(&round.ID)
 	if err != nil {
-		return "", fmt.Errorf("insert default round: %w", err)
+		return nil, fmt.Errorf("insert default round: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("commit tx: %w", err)
+		return nil, fmt.Errorf("commit tx: %w", err)
 	}
-	return roundID, nil
+	round.Name = "Submissions"
+	round.SeasonName = "General"
+	return &round, nil
 }
 
 // ListScores returns score cards submitted to a league (linked via rounds),
@@ -1299,17 +1317,65 @@ func (r *LeagueRepository) IsAdminForScoreCard(ctx context.Context, scoreCardID,
 	return isAdmin, leagueID, nil
 }
 
-// GetScoreCardOwner returns the user_id of a score card.
-func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID string) (string, error) {
-	var userID string
-	err := r.db.QueryRow(ctx, `SELECT user_id FROM score_cards WHERE id = $1`, scoreCardID).Scan(&userID)
+// GetScoreCardOwner returns the user_id and current verification status of a
+// score card.
+func (r *LeagueRepository) GetScoreCardOwner(ctx context.Context, scoreCardID string) (userID, verification string, err error) {
+	err = r.db.QueryRow(ctx,
+		`SELECT user_id, verification::text FROM score_cards WHERE id = $1`,
+		scoreCardID,
+	).Scan(&userID, &verification)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrNotFound
+		return "", "", ErrNotFound
 	}
 	if err != nil {
-		return "", fmt.Errorf("get score card owner: %w", err)
+		return "", "", fmt.Errorf("get score card owner: %w", err)
 	}
-	return userID, nil
+	return userID, verification, nil
+}
+
+// VerifyIfPending promotes a card to 'verified' only when it is still pending,
+// so a confirmation racing an admin rejection cannot silently undo it.
+// Reports whether the transition happened.
+func (r *LeagueRepository) VerifyIfPending(ctx context.Context, scoreCardID string) (bool, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE score_cards SET verification = 'verified', updated_at = NOW()
+		WHERE id = $1 AND verification = 'pending'
+	`, scoreCardID)
+	if err != nil {
+		return false, fmt.Errorf("verify pending score card: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// ReopenScore returns a rejected card to the pending queue and records the
+// action in the audit trail. Returns ErrNotFound when the card is not rejected.
+func (r *LeagueRepository) ReopenScore(ctx context.Context, scoreCardID, adminID string, reason *string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE score_cards SET verification = 'pending', updated_at = NOW()
+		WHERE id = $1 AND verification = 'rejected'
+	`, scoreCardID)
+	if err != nil {
+		return fmt.Errorf("reopen score card: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO score_card_actions (score_card_id, action, performed_by, reason)
+		VALUES ($1, 'reopen', $2, $3)
+	`, scoreCardID, adminID, reason)
+	if err != nil {
+		return fmt.Errorf("insert reopen action: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetConfigByRoundID looks up the league config for the league that owns the given round.

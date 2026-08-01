@@ -114,7 +114,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **104** (000001–000104). Latest: `000104_league_lookup_indexes`.
+Current migration count: **105** (000001–000105). Latest: `000105_score_card_action_reopen`.
 
 ## Critical Migration Rules
 
@@ -203,7 +203,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Rifles:** CRUD + image upload
 - **Pellets:** CRUD + image upload
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
-- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (confirm/amend/reject + audit trail)
+- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote admin), seasons, rounds, join requests, score verification (confirm/amend/reject/reopen + audit trail)
 - **Clubs:** Create, join, members, image upload
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users

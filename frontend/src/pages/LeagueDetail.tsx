@@ -227,7 +227,17 @@ export default function LeagueDetail() {
   const podium = standingsRows.slice(0, 3)
 
   const visibility: 'public' | 'private' = league?.type === 'private' ? 'private' : 'public'
-  const code = league?.join_code
+  // A club league's code is inert — joining is gated on club membership — so
+  // showing one would just be a control that does nothing.
+  const code = league?.club_id ? undefined : league?.join_code
+
+  // Which round a new card lands in. Members only: the call creates the
+  // default round on first use, so it must not fire for onlookers.
+  const { data: activeRound } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'ensure-round'],
+    queryFn: () => leagueApi.ensureDefaultRound(leagueId!),
+    enabled: !!leagueId && isMember,
+  })
 
   async function copyCode() {
     if (!code) return
@@ -381,9 +391,16 @@ export default function LeagueDetail() {
       <div className="lc-stack-lg">
         {/* Submit Score CTA */}
         {(isMember || joinSuccess) && (
-          <Link to="/scores/new" search={{ leagueId, roundId: undefined }} className="lc-cta" style={{ textDecoration: 'none' }}>
-            <PenLine size={16} /> Submit Score
-          </Link>
+          <div>
+            <Link to="/scores/new" search={{ leagueId, roundId: undefined }} className="lc-cta" style={{ textDecoration: 'none' }}>
+              <PenLine size={16} /> Submit Score
+            </Link>
+            {activeRound && (
+              <p style={{ marginTop: 6, textAlign: 'center', fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Submitting to {activeRound.season_name} · {activeRound.round_name}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Join action */}

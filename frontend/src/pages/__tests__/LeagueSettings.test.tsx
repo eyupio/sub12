@@ -78,6 +78,7 @@ describe('LeagueSettings rules save flow', () => {
 
     vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
     vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
     vi.spyOn(leagueApi, 'updateConfig').mockResolvedValue(makeConfig({ ends_on: '2026-12-01' }))
   })
@@ -113,6 +114,58 @@ describe('LeagueSettings rules save flow', () => {
   })
 })
 
+describe('LeagueSettings seasons and rounds', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-1', email: 'admin@example.com', display_name: 'Admin User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  it('creates a season with its start date', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    const createSeason = vi.spyOn(leagueApi, 'createSeason').mockResolvedValue({
+      id: 'season-1',
+      league_id: 'league-1',
+      name: 'Winter 2026',
+      starts_on: '2026-10-01',
+      is_active: true,
+      created_at: '2026-08-01T00:00:00Z',
+    })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [] })
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ add season/i }))
+    fireEvent.change(screen.getByPlaceholderText(/season name/i), { target: { value: 'Winter 2026' } })
+    fireEvent.change(screen.getByLabelText(/^starts$/i), { target: { value: '2026-10-01' } })
+    fireEvent.click(screen.getByRole('button', { name: /add season/i }))
+
+    await waitFor(() =>
+      expect(createSeason).toHaveBeenCalledWith('league-1', {
+        name: 'Winter 2026',
+        starts_on: '2026-10-01',
+        ends_on: undefined,
+      }),
+    )
+  })
+})
+
 describe('LeagueSettings member roles', () => {
   beforeEach(() => {
     useAuthStore.setState({
@@ -123,6 +176,7 @@ describe('LeagueSettings member roles', () => {
 
     vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
     vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'updateMember').mockResolvedValue({ updated: true })
   })
 

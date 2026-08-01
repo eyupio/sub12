@@ -122,6 +122,20 @@ type CreateRoundInput struct {
 	ClosesAt *string `json:"closes_at"`
 }
 
+// ActiveRound identifies the round new submissions land in, named so the UI can
+// tell the shooter where their card is going.
+type ActiveRound struct {
+	ID         string `json:"round_id"`
+	Name       string `json:"round_name"`
+	SeasonName string `json:"season_name"`
+}
+
+// ReopenScoreInput carries the optional note recorded when an admin returns a
+// rejected card to the review queue.
+type ReopenScoreInput struct {
+	Reason *string `json:"reason"`
+}
+
 type JoinRequest struct {
 	ID          string     `json:"id"`
 	LeagueID    string     `json:"league_id"`
