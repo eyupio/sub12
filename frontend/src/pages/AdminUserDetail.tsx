@@ -8,7 +8,7 @@ import { formatDate, useRegionalPrefs } from '../utils/date'
 import { UserAvatar } from '../components/UserAvatar'
 
 const labelCls = 't-section-title'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const btnDanger = 'border border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-bg)] text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
 
@@ -120,8 +120,8 @@ export default function AdminUserDetail() {
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-4">
-        <div className="h-6 w-32 rounded bg-surface animate-pulse" />
-        <div className="h-40 rounded bg-surface animate-pulse" />
+        <div className="h-6 w-32 rounded skeleton" />
+        <div className="h-40 rounded skeleton" />
       </div>
     )
   }

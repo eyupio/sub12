@@ -25,6 +25,7 @@ import {
   Section,
   Badge,
   EmptyState,
+  LoadingRows,
   Avatar,
   EntityCard,
   LeagueTable,
@@ -406,7 +407,7 @@ export default function ClubDetail() {
         <div className="lc-grid-2">
           <Section title="Top Performers" icon={<Trophy size={12} />}>
             {standingsLoading ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
+              <LoadingRows rows={5} />
             ) : standingsRows.length === 0 ? (
               <EmptyState icon={<Trophy size={36} />} title="No scores yet" body="Members need verified score cards to appear here." />
             ) : (

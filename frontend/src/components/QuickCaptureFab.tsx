@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Zap } from 'lucide-react'
+import { haptics } from '../utils/haptics'
 
 interface QuickCaptureFabProps {
   /** Overrides the default Quick Capture destination. Use to pre-select
@@ -17,10 +18,19 @@ export default function QuickCaptureFab({ to = '/quick-capture', label = 'Quick 
     <Link
       to={to}
       aria-label={label}
-      className="fixed z-30 bottom-[calc(var(--mobile-nav-offset)+1rem)] right-4 lg:bottom-6 lg:right-6 flex items-center gap-2 px-4 py-3 rounded-full bg-[var(--brass)] text-black shadow-lg hover:scale-105 active:scale-95 transition-transform font-medium tracking-wide"
+      onClick={() => haptics.tapMedium()}
+      className="group fixed z-30 bottom-[calc(var(--mobile-nav-offset)+1rem)] right-4 lg:bottom-6 lg:right-6 flex items-center gap-2 px-4 py-3 rounded-full text-black shadow-gold hover:shadow-float u-press u-sheen font-medium tracking-wide transition-shadow"
+      style={{ background: 'linear-gradient(135deg, var(--gold-2), var(--gold))' }}
     >
-      <Zap size={18} />
-      <span className="text-sm">Quick capture</span>
+      {/* Soft halo that expands on hover — marks the FAB as the app's one
+          always-available primary action without adding chrome. */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{ boxShadow: '0 0 0 6px var(--ring)' }}
+      />
+      <Zap size={18} className="relative transition-transform duration-300 group-hover:rotate-12" />
+      <span className="relative text-sm">Quick capture</span>
     </Link>
   )
 }

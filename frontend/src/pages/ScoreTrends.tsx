@@ -179,7 +179,7 @@ export default function ScoreTrends() {
         <h2 className="t-section-title">Average Score</h2>
 
         {isLoading && (
-          <div className="h-64 animate-pulse bg-card rounded" />
+          <div className="h-64 skeleton rounded" />
         )}
 
         {!isLoading && points.length === 0 && (

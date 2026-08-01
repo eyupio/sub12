@@ -7,6 +7,7 @@ import { toast } from '../store/toast'
 import { usersApi, FollowListItem } from '../api/users'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { identiconDataUri } from '../utils/identicon'
+import { SkeletonList } from '../components/Skeleton'
 
 type Tab = 'following' | 'followers'
 
@@ -196,7 +197,7 @@ export default function FollowManagement() {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-muted text-center py-8">Loading…</p>
+        <SkeletonList count={5} />
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted text-center py-8 tracking-wide">
           {activeItems.length === 0

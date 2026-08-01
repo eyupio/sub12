@@ -40,9 +40,27 @@
 
     --radius: 6px;
     --radius-lg: 10px;
+    --radius-xl: 16px;
     --shadow-sm: 0 1px 2px rgba(42, 42, 40, 0.04);
     --shadow-md: 0 4px 12px rgba(42, 42, 40, 0.08);
+    --shadow-lg: 0 12px 32px -8px rgba(42, 42, 40, 0.18), 0 2px 8px rgba(42, 42, 40, 0.06);
+    --shadow-xl: 0 24px 60px -12px rgba(42, 42, 40, 0.28), 0 4px 12px rgba(42, 42, 40, 0.08);
+    --shadow-gold: 0 8px 24px -6px rgba(160, 123, 44, 0.35);
+    --ring: rgba(160, 123, 44, 0.18);
     --mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Motion system — one vocabulary for every transition in the app. */
+    --dur-instant: 90ms;
+    --dur-fast: 150ms;
+    --dur-base: 220ms;
+    --dur-slow: 380ms;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Skeleton shimmer track */
+    --skeleton-base: rgba(42, 42, 40, 0.07);
+    --skeleton-sheen: rgba(255, 255, 255, 0.55);
 
     /* Legacy aliases — keep existing pages working with new palette */
     --gunmetal: var(--bg);
@@ -113,6 +131,13 @@
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.40);
+    --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.60), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --shadow-xl: 0 24px 60px -12px rgba(0, 0, 0, 0.72), 0 4px 12px rgba(0, 0, 0, 0.40);
+    --shadow-gold: 0 8px 24px -6px rgba(212, 164, 74, 0.30);
+    --ring: rgba(212, 164, 74, 0.22);
+
+    --skeleton-base: rgba(236, 230, 212, 0.06);
+    --skeleton-sheen: rgba(236, 230, 212, 0.13);
 
     --gunmetal: var(--bg);
     --carbon: var(--surface);
@@ -194,6 +219,9 @@
     background: radial-gradient(circle, var(--brass-glow) 0%, transparent 55%);
     pointer-events: none;
     z-index: 0;
+    /* Very slow, very low-amplitude drift keeps the backdrop from reading as a
+       static gradient without ever competing with content for attention. */
+    animation: aurora-drift 24s var(--ease-in-out) infinite;
   }
 
   /* All content sits above the background layers */
@@ -210,7 +238,75 @@
   :focus-visible {
     outline: 2px solid var(--brass);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: 3px;
+    box-shadow: 0 0 0 4px var(--ring);
+    transition: box-shadow var(--dur-fast) var(--ease-out);
+  }
+
+  /* Text selection picks up the brand accent instead of the OS default. */
+  ::selection {
+    background: var(--brass);
+    color: var(--text-inverse);
+  }
+
+  /* Slim, theme-aware scrollbars. The browser default light-grey bar reads as
+     a foreign element against the warm surfaces. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Touch targets: pointer-coarse devices get a comfortable minimum so the
+     dense desktop-first controls stay tappable on phones. */
+  @media (pointer: coarse) {
+    button:not(.no-min-target),
+    [role='button']:not(.no-min-target),
+    a[class*='rounded']:not(.no-min-target) {
+      min-height: 40px;
+    }
+  }
+
+  /* Inside the Capacitor WebView the page should behave like an app rather
+     than a document: no long-press text selection or callout menus on
+     chrome, no rubber-band overscroll revealing a blank gutter behind the
+     app shell. Real content (posts, comments, notes) opts back in below. */
+  .native-app body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior-y: none;
+  }
+  .native-app input,
+  .native-app textarea,
+  .native-app [contenteditable='true'],
+  .native-app .selectable {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Honour the OS "reduce motion" preference everywhere. Transitions are kept
+     at a near-zero duration rather than removed so state changes still commit
+     through the same code paths. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -294,14 +390,69 @@
   }
 }
 
+/* ───────────────────────── Motion keyframes ─────────────────────────────
+   A single shared set so every surface in the app enters and leaves the
+   same way. Anything that appears, appears from one of these.            */
+
 @keyframes slide-in {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-slide-in {
-  animation: slide-in 0.2s ease-out;
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@keyframes pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast dismiss countdown — the bar drains over the toast's own lifetime and
+   pauses (via animation-play-state) while the pointer rests on it. */
+@keyframes toast-countdown {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* Slow drift used by the hero/auth backdrop so the brass glow feels alive. */
+@keyframes aurora-drift {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50%      { transform: translate(-48%, -52%) scale(1.08); opacity: 0.85; }
+}
+
+.animate-slide-in  { animation: slide-in var(--dur-base) var(--ease-out); }
+.animate-fade-in   { animation: fade-in var(--dur-base) var(--ease-out); }
+.animate-fade-in-up{ animation: fade-in-up var(--dur-slow) var(--ease-out) both; }
+.animate-scale-in  { animation: scale-in var(--dur-base) var(--ease-spring); }
+.animate-sheet-up  { animation: sheet-up var(--dur-base) var(--ease-out); }
+.animate-pop       { animation: pop var(--dur-slow) var(--ease-spring); }
 
 @layer utilities {
   /* Brand colours */
@@ -342,4 +493,268 @@
   .border-gold   { border-color: var(--gold); }
   .shadow-card       { box-shadow: var(--shadow-sm); }
   .shadow-card-hover { box-shadow: var(--shadow-md); }
+  .shadow-float      { box-shadow: var(--shadow-lg); }
+  .shadow-overlay    { box-shadow: var(--shadow-xl); }
+  .shadow-gold       { box-shadow: var(--shadow-gold); }
+
+  /* ── Interaction utilities ───────────────────────────────────────────
+     These are the app's shared "feel". Anything clickable should pick up
+     one of them so hover/press behaviour is identical across surfaces. */
+
+  /* Cards and tiles that link somewhere: lift + deepen on hover, settle on
+     press. */
+  .u-lift {
+    transition: transform var(--dur-base) var(--ease-out),
+                box-shadow var(--dur-base) var(--ease-out),
+                border-color var(--dur-base) var(--ease-out);
+  }
+  .u-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--border-strong);
+  }
+  .u-lift:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+
+  /* Buttons and icon controls: a small, quick physical response. */
+  .u-press { transition: transform var(--dur-instant) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+  .u-press:active { transform: scale(0.96); }
+
+  /* Nav/list rows: nudge toward the reading direction on hover. */
+  .u-nudge { transition: transform var(--dur-base) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+  .u-nudge:hover { transform: translateX(2px); }
+
+  /* Brass sheen that sweeps across a primary control on hover. */
+  .u-sheen { position: relative; overflow: hidden; isolation: isolate; }
+  .u-sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform var(--dur-slow) var(--ease-out);
+    pointer-events: none;
+  }
+  .u-sheen:hover::after { transform: translateX(120%); }
+
+  /* Headline treatment for hero numbers and brand moments. */
+  .u-text-gold-gradient {
+    background: linear-gradient(135deg, var(--gold-2) 0%, var(--gold) 45%, var(--gold-soft) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Hairline separator that fades out at both ends — softer than a border. */
+  .u-hairline {
+    height: 1px;
+    border: 0;
+    background: linear-gradient(90deg, transparent, var(--line-2), transparent);
+  }
+
+  /* Entrance choreography: children fade up in sequence. Applied to lists and
+     dashboard grids so a page assembles rather than snapping into place. */
+  .u-stagger > * { animation: fade-in-up var(--dur-slow) var(--ease-out) both; }
+  .u-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .u-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .u-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .u-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .u-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .u-stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .u-stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .u-stagger > *:nth-child(8) { animation-delay: 280ms; }
+  .u-stagger > *:nth-child(n + 9) { animation-delay: 320ms; }
+
+  /* Numeric columns stay aligned as values change. */
+  .u-tnum { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  /* ── Buttons ─────────────────────────────────────────────────────────
+     Shared button vocabulary. Existing pages compose Tailwind directly;
+     these classes give new and refreshed surfaces one consistent shape,
+     weight and press behaviour.                                          */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    font-family: var(--ui);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-base) var(--ease-out),
+                transform var(--dur-instant) var(--ease-out);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled,
+  .btn[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold-2), var(--gold));
+    color: #fff;
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-primary:hover:not(:disabled) { box-shadow: var(--shadow-gold); }
+
+  .btn-secondary {
+    background: var(--surface);
+    border-color: var(--line);
+    color: var(--ink-2);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--line-2);
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+
+  .btn-ghost { background: transparent; color: var(--gold); }
+  .btn-ghost:hover:not(:disabled) { background: var(--gold-tint); }
+
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.6875rem; }
+  .btn-lg { padding: 0.85rem 1.4rem; font-size: 0.8125rem; }
+
+  /* Pages across the app compose their own primary button (their own padding,
+     tracking and radius) over a flat brass fill. `.btn-brass` swaps in the
+     shared gradient, gold shadow and press response without disturbing that
+     composition, so a full rewrite of every call site isn't needed. */
+  .btn-brass {
+    background: linear-gradient(135deg, var(--gold-2), var(--gold));
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-brass:hover:not(:disabled) { filter: brightness(1.06); box-shadow: var(--shadow-gold); }
+  .btn-brass:active:not(:disabled) { transform: scale(0.97); }
+  .btn-brass:disabled { box-shadow: none; }
+
+  /* ── Surfaces ────────────────────────────────────────────────────── */
+  .surface-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Fields ──────────────────────────────────────────────────────── */
+  .field {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--ink);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .field::placeholder { color: var(--muted-2); }
+  .field:hover:not(:disabled) { border-color: var(--line-2); }
+  .field:focus {
+    outline: none;
+    border-color: var(--gold-soft);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  /* ── Skeletons ───────────────────────────────────────────────────────
+     A shimmering placeholder shaped like the content it stands in for.
+     Replaces bare "Loading…" text so the layout doesn't jump when data
+     lands.                                                               */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--skeleton-base);
+    border-radius: var(--radius);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    animation: shimmer 1.4s var(--ease-in-out) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton::after { animation: none; }
+  }
+
+  /* ── Spinner ─────────────────────────────────────────────────────── */
+  .spinner {
+    display: inline-block;
+    border-radius: 50%;
+    border: 2px solid var(--line-2);
+    border-top-color: var(--gold);
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* ── Scroll-aware app chrome ─────────────────────────────────────────
+     The sticky mobile header is flat while the page is at the top and
+     gains a shadow once content slides underneath it.                    */
+  .app-mobile-header {
+    transition: box-shadow var(--dur-base) var(--ease-out),
+                background-color var(--dur-base) var(--ease-out);
+  }
+  .app-mobile-header[data-scrolled='true'] { box-shadow: var(--shadow-md); }
+
+  /* ── Mobile bottom-nav tabs ──────────────────────────────────────────
+     Each tab carries two markers that are scaled to nothing when inactive,
+     so switching tabs animates them in rather than repainting the bar.    */
+  .app-tab .nav-pill {
+    position: absolute;
+    inset: 8px 6px;
+    border-radius: var(--radius-lg);
+    background: var(--brass-dim);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity var(--dur-base) var(--ease-out),
+                transform var(--dur-base) var(--ease-spring);
+    pointer-events: none;
+  }
+  .app-tab.is-active .nav-pill { opacity: 1; transform: scale(1); }
+
+  .app-tab .nav-dot {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: var(--brass);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--dur-base) var(--ease-out),
+                transform var(--dur-base) var(--ease-spring);
+    pointer-events: none;
+  }
+  .app-tab.is-active .nav-dot { opacity: 1; transform: translateY(0); }
+  .app-tab.is-active svg { transform: translateY(-1px); }
+
+  /* ── Skip link ───────────────────────────────────────────────────── */
+  .skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 200;
+    transform: translateY(calc(-100% - 1rem));
+    background: var(--surface);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+  .skip-link:focus { transform: translateY(0); }
 }

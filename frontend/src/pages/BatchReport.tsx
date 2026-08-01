@@ -27,7 +27,7 @@ export default function BatchReport() {
 
       {isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded bg-surface animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded skeleton" />)}
         </div>
       ) : items.length === 0 ? (
         <div className="text-center py-12">

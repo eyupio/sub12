@@ -191,11 +191,25 @@ export function StatTile({
 
   const inner = (
     <>
+      {/* Headline tiles carry a brass hairline along the top edge — enough to
+          rank them above their neighbours without a heavier treatment. */}
+      {gold && (
+        <span
+          aria-hidden="true"
+          className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[10px]"
+          style={{ background: 'linear-gradient(90deg, var(--gold-2), var(--gold-soft))' }}
+        />
+      )}
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] tracking-[0.16em] uppercase text-muted">{label}</p>
-        {to && <ChevronRight size={12} className="text-muted-2 shrink-0 mt-0.5" />}
+        {to && (
+          <ChevronRight
+            size={12}
+            className="text-muted-2 shrink-0 mt-0.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-gold"
+          />
+        )}
       </div>
-      <p className={`${valueClass} ${valueColor} mt-1.5 truncate`}>
+      <p className={`${valueClass} ${valueColor} mt-1.5 truncate u-tnum`}>
         {value}
         {unit && (
           <span className="font-mono text-[14px] text-muted ml-0.5 align-baseline">{unit}</span>
@@ -211,8 +225,8 @@ export function StatTile({
   )
 
   const baseClass =
-    'bg-surface border border-line rounded-[10px] p-4 shadow-card flex flex-col min-w-0'
-  const linkClass = `${baseClass} hover:-translate-y-px hover:shadow-card-hover hover:border-line-2 transition-all duration-150`
+    `relative overflow-hidden bg-surface border rounded-[10px] p-4 shadow-card flex flex-col min-w-0 ${gold ? 'border-[var(--gold-soft)]/40' : 'border-line'}`
+  const linkClass = `group ${baseClass} u-lift`
 
   if (to) {
     return (

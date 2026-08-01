@@ -29,7 +29,7 @@ export default function PostDetail() {
       </div>
 
       {isLoading && (
-        <div className="h-40 rounded border border-subtle bg-surface animate-pulse" />
+        <div className="h-40 rounded border border-subtle skeleton" />
       )}
 
       {notFound && (

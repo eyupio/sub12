@@ -1,0 +1,198 @@
+name: Android APK
+
+# Builds the Capacitor Android app and publishes the APK as a downloadable
+# asset.
+#
+#   pull_request  → debug APK, uploaded as a workflow artifact only
+#   push to main  → release APK attached to the rolling `android-latest`
+#                   pre-release, so there is always one stable download URL:
+#                   https://github.com/<owner>/<repo>/releases/download/android-latest/sub12.apk
+#   tag v*        → release APK attached to that version's GitHub Release
+#   manual run    → release APK as an artifact
+#
+# Signing uses the ANDROID_KEYSTORE_* secrets when they are configured. Without
+# them the job generates a throwaway keystore so the workflow still produces an
+# installable APK — those builds are for testing only, since a new signing key
+# each run means installs can't be upgraded in place.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/android.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+
+    env:
+      # Monotonic across runs so Android accepts each build as an upgrade.
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve build variant and version name
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "variant=debug" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=assembleDebug" >> "$GITHUB_OUTPUT"
+            echo "apk_path=frontend/android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "variant=release" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=assembleRelease" >> "$GITHUB_OUTPUT"
+            echo "apk_path=frontend/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Tags carry their own version; every other build is stamped with the
+          # run number and short SHA so an installed APK is traceable to a commit.
+          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          else
+            version="0.0.${{ github.run_number }}-${GITHUB_SHA::7}"
+          fi
+          echo "version_name=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build web bundle
+        working-directory: frontend
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        working-directory: frontend
+        run: npx cap sync android
+
+      - name: Configure release signing
+        if: steps.vars.outputs.variant == 'release'
+        working-directory: frontend/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$(pwd)/release.keystore"
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "Signing with the configured release keystore."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+            store_password="$KEYSTORE_PASSWORD"
+            key_alias="$KEY_ALIAS"
+            key_password="$KEY_PASSWORD"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret set — generating a throwaway key. This APK installs, but cannot upgrade a previously installed build."
+            store_password="sub12ci"
+            key_alias="sub12ci"
+            key_password="sub12ci"
+            keytool -genkeypair -v \
+              -keystore "$keystore" \
+              -alias "$key_alias" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$store_password" -keypass "$key_password" \
+              -dname "CN=SUB12 CI, OU=CI, O=SUB12, C=GB"
+          fi
+          # build.gradle reads this file from the android/ project root and falls
+          # back to the debug keystore when it's absent.
+          cat > keystore.properties <<EOF
+          storeFile=$keystore
+          storePassword=$store_password
+          keyAlias=$key_alias
+          keyPassword=$key_password
+          EOF
+
+      - name: Build ${{ steps.vars.outputs.variant }} APK
+        working-directory: frontend/android
+        env:
+          ANDROID_VERSION_NAME: ${{ steps.vars.outputs.version_name }}
+        run: |
+          chmod +x gradlew
+          ./gradlew ${{ steps.vars.outputs.gradle_task }} --no-daemon --stacktrace
+
+      - name: Stage APK for upload
+        id: stage
+        run: |
+          set -euo pipefail
+          mkdir -p dist-apk
+          name="sub12-${{ steps.vars.outputs.version_name }}-${{ steps.vars.outputs.variant }}.apk"
+          cp "${{ steps.vars.outputs.apk_path }}" "dist-apk/$name"
+          # A fixed filename alongside the versioned one keeps the rolling
+          # download URL stable across releases.
+          cp "${{ steps.vars.outputs.apk_path }}" "dist-apk/sub12.apk"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          ls -lh dist-apk
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f frontend/android/keystore.properties frontend/android/release.keystore
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sub12-apk-${{ steps.vars.outputs.variant }}
+          path: dist-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ── Publish ───────────────────────────────────────────────────────────
+      # main pushes refresh a single rolling pre-release so the "download the
+      # Android app" link never has to change.
+      - name: Publish rolling android-latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Android APK (latest main)
+          body: |
+            Automatically built from `main` — commit ${{ github.sha }}.
+
+            **Download:** `sub12.apk` below, or the versioned
+            `${{ steps.stage.outputs.name }}`.
+
+            Android blocks installs from outside the Play Store by default;
+            allow installs from your browser or file manager when prompted.
+          prerelease: true
+          make_latest: false
+          files: dist-apk/*.apk
+
+      # Version tags attach the APK to that tag's own release.
+      - name: Attach APK to tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist-apk/*.apk

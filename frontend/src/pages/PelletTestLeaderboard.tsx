@@ -69,7 +69,7 @@ export default function PelletTestLeaderboard() {
         </div>
       ) : isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-16 rounded bg-surface animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-16 rounded skeleton" />)}
         </div>
       ) : entries.length === 0 ? (
         <div className="text-center py-12">

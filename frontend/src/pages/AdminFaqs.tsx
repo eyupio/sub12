@@ -14,13 +14,14 @@ import {
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { SkeletonList } from '../components/Skeleton'
 
 const inputCls =
   'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const textareaCls = `${inputCls} min-h-[260px] font-mono`
 const labelCls = 't-section-title'
 const btnPrimary =
-  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+  'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const btnSecondary =
   'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 const btnDanger =
@@ -324,7 +325,7 @@ export default function AdminFaqs() {
         </aside>
 
         <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
-          {listQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
+          {listQuery.isLoading && <SkeletonList count={3} />}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {serverError && <p className="text-sm text-[var(--error-text)]">{serverError}</p>}

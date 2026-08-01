@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, Send, RefreshCw, CheckCircle, XCircle, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { adminSitemapApi, SitemapSubmission } from '../api/adminSitemap'
+import { SkeletonStats, SkeletonTable } from '../components/Skeleton'
 
 const PAGE_SIZE = 20
 
@@ -10,7 +11,7 @@ const engines = [
 ] as const
 
 const btnPrimary =
-  'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity inline-flex items-center gap-2'
+  'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all inline-flex items-center gap-2'
 
 function parseError(error: unknown) {
   if (!(error instanceof Error)) return 'Request failed.'
@@ -81,7 +82,7 @@ export default function AdminSitemap() {
       {/* Stats card */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="t-section-title">Sitemap Overview</h2>
-        {statsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
+        {statsQuery.isLoading && <SkeletonStats count={4} />}
         {statsQuery.error && (
           <p className="text-sm text-[var(--error-text)]">{parseError(statsQuery.error)}</p>
         )}
@@ -181,7 +182,7 @@ export default function AdminSitemap() {
       {/* Submission history */}
       <section className="bg-surface border border-subtle rounded-lg p-5 space-y-4">
         <h2 className="t-section-title">Submission History</h2>
-        {submissionsQuery.isLoading && <p className="text-sm text-muted">Loading…</p>}
+        {submissionsQuery.isLoading && <SkeletonTable rows={4} columns={3} />}
         {submissionsQuery.error && (
           <p className="text-sm text-[var(--error-text)]">{parseError(submissionsQuery.error)}</p>
         )}

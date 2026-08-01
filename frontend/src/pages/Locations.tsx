@@ -14,6 +14,7 @@ import { toast } from '../store/toast'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
 import { MapLocationPicker, type PickedLocation } from '../components/MapLocationPicker'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { SkeletonList } from '../components/Skeleton'
 
 const EMPTY_FORM: CreateLocationInput = {
   name: '',
@@ -176,7 +177,7 @@ export default function Locations() {
         </button>
       </div>
 
-      {isLoading && <p className="text-muted text-sm">Loading…</p>}
+      {isLoading && <SkeletonList count={4} />}
 
       {!isLoading && locations.length === 0 && (
         <div className="text-center py-12 text-muted">

@@ -6,10 +6,11 @@ import { adminLeaguesApi } from '../api/adminLeagues'
 import { adminSimulationApi, type SimulatedPersona } from '../api/adminSimulation'
 import type { League } from '../api/leagues'
 import { formatDate, useRegionalPrefs } from '../utils/date'
+import { SkeletonList } from '../components/Skeleton'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const sectionCls = 'border border-subtle bg-surface rounded-lg p-4 lg:p-5 space-y-4'
 
 function parseError(error: unknown) {
@@ -98,7 +99,7 @@ function AddSimulatedMemberDialog({ leagueId, pending, onAdd, onCancel }: {
           Enrol a simulated persona directly, bypassing the join policy, so it can interact with the league's content.
         </p>
         {isLoading ? (
-          <p className="text-sm text-muted">Loading personas…</p>
+          <SkeletonList count={3} />
         ) : personas.length === 0 ? (
           <p className="text-sm text-muted">No simulated personas available.</p>
         ) : (
@@ -246,8 +247,8 @@ export default function AdminLeagueDetail() {
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-4">
-        <div className="h-6 w-32 rounded bg-surface animate-pulse" />
-        <div className="h-40 rounded bg-surface animate-pulse" />
+        <div className="h-6 w-32 rounded skeleton" />
+        <div className="h-40 rounded skeleton" />
       </div>
     )
   }

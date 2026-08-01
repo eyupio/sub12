@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Heart } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import { likeApi } from '../api/likes'
+import { haptics } from '../utils/haptics'
 
 type LikeTarget = 'score_card' | 'comment' | 'post' | 'activity'
 
@@ -55,6 +56,7 @@ export function LikeButton({ targetId, targetType, initialLiked, initialCount, s
 
   function toggle() {
     if (pending) return
+    haptics.tapLight()
     if (liked) {
       unlikeMutation.mutate()
     } else {
@@ -75,16 +77,19 @@ export function LikeButton({ targetId, targetType, initialLiked, initialCount, s
       onClick={toggle}
       disabled={pending}
       aria-busy={pending}
-      className="flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="group flex items-center gap-1.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed u-press no-min-target"
       aria-pressed={liked}
       aria-label={ariaLabel}
     >
+      {/* Keying the heart on `liked` remounts it, so the pop animation replays
+          on every like rather than only on first paint. */}
       <Heart
+        key={String(liked)}
         size={size}
-        className={liked ? 'fill-red-500 text-red-500' : 'text-muted hover:text-red-400'}
+        className={`transition-colors ${liked ? 'fill-red-500 text-red-500 animate-pop' : 'text-muted group-hover:text-red-400'}`}
       />
       {count > 0 && (
-        <span className={liked ? 'text-red-500 font-medium' : 'text-muted'}>{count}</span>
+        <span className={`u-tnum ${liked ? 'text-red-500 font-medium' : 'text-muted'}`}>{count}</span>
       )}
     </button>
   )

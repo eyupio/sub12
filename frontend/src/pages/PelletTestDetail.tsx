@@ -286,9 +286,9 @@ export default function PelletTestDetail() {
   if (isLoading) {
     return (
       <div className="p-4 lg:p-8 max-w-lg lg:max-w-3xl mx-auto">
-        <div className="h-8 w-48 rounded bg-surface animate-pulse mb-6" />
+        <div className="h-8 w-48 rounded skeleton mb-6" />
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded bg-surface animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded skeleton" />)}
         </div>
       </div>
     )
