@@ -59,17 +59,6 @@ export function PelletProfileCard({
 
           <div className="relative px-4 pt-5 pb-3">
             <div className="absolute left-3 top-5 flex flex-col gap-2.5">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => {
-                  const file = e.target.files?.[0]
-                  e.target.value = ''
-                  if (file) setEditingFile(file)
-                }}
-              />
               <button
                 onClick={e => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}
                 disabled={isUploadPending}
@@ -132,6 +121,19 @@ export function PelletProfileCard({
           </div>
         </div>
       </Link>
+      {/* Outside the link: the click() we fire on this input would otherwise
+          bubble to the anchor and navigate to the showcase. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) setEditingFile(file)
+        }}
+      />
       {editingFile && (
         <ImageEditor
           file={editingFile}
