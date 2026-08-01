@@ -40,3 +40,37 @@ export function findNearbyPlace<
   }
   return best
 }
+
+// The "51.500, -0.120" string the pickers fall back to when nothing better is
+// known. Recognising it lets a saved place's name take over a label that only
+// ever held coordinates.
+const COORD_LABEL_RE = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+
+export function isCoordinateLabel(label: string | undefined | null): boolean {
+  return typeof label === 'string' && COORD_LABEL_RE.test(label.trim())
+}
+
+export function formatCoordLabel(lat: number, lng: number): string {
+  return `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+}
+
+/**
+ * The label to show for a picked point. A saved place's name always wins so a
+ * location the user has named never renders as coordinates; failing that a
+ * label the user typed is kept, and coordinates are the last resort.
+ */
+export function resolveLocationLabel<
+  T extends { name: string; lat?: number | null; lng?: number | null },
+>(
+  label: string | undefined,
+  lat: number | undefined,
+  lng: number | undefined,
+  places: T[],
+): string {
+  const nearby = findNearbyPlace(lat, lng, places)
+  if (nearby) return nearby.name
+  const trimmed = label?.trim() ?? ''
+  if (trimmed && !isCoordinateLabel(trimmed)) return trimmed
+  if (typeof lat === 'number' && typeof lng === 'number') return formatCoordLabel(lat, lng)
+  return trimmed
+}

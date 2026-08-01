@@ -70,6 +70,7 @@ export interface QuickCreatePelletTestPayload {
   location?: string
   location_lat?: number
   location_lng?: number
+  location_id?: string
   wind_mph?: number
   temp_celsius?: number
   humidity_pct?: number

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Crosshair, Loader2, MapPin, X } from 'lucide-react'
+import { Crosshair, Loader2, MapPin, MapPinned, X } from 'lucide-react'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+import { useLocations } from '../api/locations'
 import { toast } from '../store/toast'
+import { findNearbyPlace, resolveLocationLabel } from '../utils/geo'
 import { requestPosition } from '../utils/geolocation'
 
 export interface PickedLocation {
@@ -79,6 +81,10 @@ export function MapLocationPicker({
   const mapRef = useRef<LeafletMap | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const { data: places = [] } = useLocations()
+  // The crosshair sitting on a saved place makes this that place, so the
+  // free-text label gives way to its name.
+  const nearbyPlace = findNearbyPlace(center[0], center[1], places)
 
   useEffect(() => {
     if (!open) return
@@ -134,12 +140,7 @@ export function MapLocationPicker({
     const currentCenter = mapRef.current?.getCenter()
     const lat = currentCenter?.lat ?? center[0]
     const lng = currentCenter?.lng ?? center[1]
-    const trimmed = label.trim()
-    onPick({
-      label: trimmed.length > 0 ? trimmed : `${formatCoord(lat)}, ${formatCoord(lng)}`,
-      lat,
-      lng,
-    })
+    onPick({ label: resolveLocationLabel(label, lat, lng, places), lat, lng })
   }
 
   if (!open) return null
@@ -215,14 +216,23 @@ export function MapLocationPicker({
             </button>
           </div>
           <div>
-            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">Label (optional)</label>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Range / club name"
-              className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
-            />
+            <label className="block text-[11px] tracking-widest uppercase text-muted mb-1">
+              {nearbyPlace ? 'Saved place' : 'Label (optional)'}
+            </label>
+            {nearbyPlace ? (
+              <p className="flex items-center gap-2 rounded border border-[var(--brass)]/30 bg-[var(--brass)]/5 px-3 py-2 text-sm text-primary">
+                <MapPinned size={14} className="text-[var(--brass)] shrink-0" />
+                <span className="truncate">{nearbyPlace.name}</span>
+              </p>
+            ) : (
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Range / club name"
+                className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
+              />
+            )}
           </div>
           <div className="flex gap-2 justify-end">
             <button
