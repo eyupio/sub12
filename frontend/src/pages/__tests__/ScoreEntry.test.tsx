@@ -209,8 +209,8 @@ describe('ScoreEntry changing a draft\'s context', () => {
     vi.spyOn(scoreCardApi, 'submitToLeague').mockResolvedValue(personalDraft())
     vi.spyOn(scoreCardApi, 'list').mockResolvedValue({ items: [] })
     vi.spyOn(leagueApi, 'listMine').mockResolvedValue({
-      items: [{ id: 'league-1', name: 'Test League', type: 'public', member_count: 2, role: 'member' }],
-    } as Awaited<ReturnType<typeof leagueApi.listMine>>)
+      items: [{ id: 'league-1', name: 'Test League', member_count: 2, user_rank: 1 }],
+    })
     vi.spyOn(leagueApi, 'get').mockResolvedValue({
       id: 'league-1', name: 'Test League', type: 'public', post_visibility: 'members',
       created_by: 'user-1', member_count: 2, date_format: 'DD/MM/YYYY', time_format: '24h',
