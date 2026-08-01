@@ -83,22 +83,44 @@ func (s *SitemapService) ResolveIndexNowKeyFile(requestedKey string) (string, bo
 	return info.Key, true
 }
 
-// staticPages returns the fixed application pages that should appear in every sitemap.
+// shareRef prefers the slug spelling of a share URL and falls back to the
+// UUID for rows that predate slug backfill. It mirrors the handler-side
+// helper of the same name, so the URL the sitemap advertises is byte-for-byte
+// the one ShareMeta emits as rel=canonical on that page.
+func shareRef(slug, id string) string {
+	if slug != "" {
+		return slug
+	}
+	return id
+}
+
+// staticPages returns the fixed application pages that should appear in every
+// sitemap.
+//
+// Every entry here must be a route anonymous visitors can actually reach —
+// that is, a child of `rootRoute`/`authRoute` in the frontend route tree, not
+// of `appRoute` (whose `beforeLoad: requireAuth` bounces a crawler to /login)
+// — and must not be disallowed by frontend/public/robots.txt. Listing a URL
+// that fails either test is what makes Search Console report "Blocked by
+// robots.txt" or a soft 404 against the sitemap.
 func (s *SitemapService) staticPages() []model.SitemapURL {
 	weekly := "weekly"
 	monthly := "monthly"
+	yearly := "yearly"
 	p1 := "1.0"
 	p08 := "0.8"
 	p06 := "0.6"
 	p05 := "0.5"
+	p03 := "0.3"
 
 	return []model.SitemapURL{
 		{Loc: s.siteURL + "/", ChangeFreq: &weekly, Priority: &p1},
-		{Loc: s.siteURL + "/login", ChangeFreq: &monthly, Priority: &p05},
+		{Loc: s.siteURL + "/pellet-leaderboard", ChangeFreq: &weekly, Priority: &p08},
 		{Loc: s.siteURL + "/register", ChangeFreq: &monthly, Priority: &p06},
-		{Loc: s.siteURL + "/leagues", ChangeFreq: &weekly, Priority: &p08},
-		{Loc: s.siteURL + "/clubs", ChangeFreq: &weekly, Priority: &p08},
-		{Loc: s.siteURL + "/pellet-tests/leaderboard", ChangeFreq: &weekly, Priority: &p06},
+		{Loc: s.siteURL + "/login", ChangeFreq: &monthly, Priority: &p05},
+		{Loc: s.siteURL + "/privacy", ChangeFreq: &yearly, Priority: &p03},
+		{Loc: s.siteURL + "/terms", ChangeFreq: &yearly, Priority: &p03},
+		{Loc: s.siteURL + "/cookies", ChangeFreq: &yearly, Priority: &p03},
 	}
 }
 
@@ -115,6 +137,14 @@ func (s *SitemapService) GenerateXML(ctx context.Context) ([]byte, error) {
 	p07 := "0.7"
 	p06 := "0.6"
 
+	// Entity URLs point at the public /share/* pages, never at the in-app
+	// /users/{id}, /leagues/{id} or /clubs/{id} routes. Those in-app routes
+	// sit behind requireAuth and /users/ is disallowed in robots.txt, so
+	// listing them produced exactly the "Blocked by robots.txt" and
+	// soft-404 reports Search Console raised against this sitemap. The
+	// /share/* pages are the ones the backend renders with per-entity
+	// metadata and a self-referencing rel=canonical.
+
 	// Public users
 	users, err := s.repo.ListPublicUserIDs(ctx)
 	if err != nil {
@@ -122,7 +152,7 @@ func (s *SitemapService) GenerateXML(ctx context.Context) ([]byte, error) {
 	}
 	for _, u := range users {
 		urlset.URLs = append(urlset.URLs, model.SitemapURL{
-			Loc:        s.siteURL + "/users/" + u.ID,
+			Loc:        s.siteURL + "/share/users/" + shareRef(u.Slug, u.ID),
 			LastMod:    &u.UpdatedAt,
 			ChangeFreq: &weekly,
 			Priority:   &p07,
@@ -136,7 +166,7 @@ func (s *SitemapService) GenerateXML(ctx context.Context) ([]byte, error) {
 	}
 	for _, l := range leagues {
 		urlset.URLs = append(urlset.URLs, model.SitemapURL{
-			Loc:        s.siteURL + "/leagues/" + l.ID,
+			Loc:        s.siteURL + "/share/leagues/" + shareRef(l.Slug, l.ID),
 			LastMod:    &l.UpdatedAt,
 			ChangeFreq: &weekly,
 			Priority:   &p07,
@@ -150,7 +180,7 @@ func (s *SitemapService) GenerateXML(ctx context.Context) ([]byte, error) {
 	}
 	for _, c := range clubs {
 		urlset.URLs = append(urlset.URLs, model.SitemapURL{
-			Loc:        s.siteURL + "/clubs/" + c.ID,
+			Loc:        s.siteURL + "/share/clubs/" + shareRef(c.Slug, c.ID),
 			LastMod:    &c.UpdatedAt,
 			ChangeFreq: &weekly,
 			Priority:   &p06,

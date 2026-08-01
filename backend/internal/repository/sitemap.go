@@ -19,18 +19,25 @@ func NewSitemapRepository(db *pgxpool.Pool) *SitemapRepository {
 	return &SitemapRepository{db: db}
 }
 
-// SitemapEntry is a lightweight struct for sitemap URL generation (id + updated_at).
+// SitemapEntry is a lightweight struct for sitemap URL generation
+// (id + slug + updated_at). Slug is empty for rows that predate slug
+// backfill; callers fall back to the ID spelling of the share URL.
 type SitemapEntry struct {
 	ID        string
+	Slug      string
 	UpdatedAt string // RFC 3339 date or date-time
 }
 
-// ListPublicUserIDs returns IDs and updated_at for users with public profiles.
+// ListPublicUserIDs returns IDs, slugs and updated_at for users with public
+// profiles. Simulated personas are excluded: their profiles are generated
+// content, and submitting them for indexing is what Google's spam policies
+// mean by auto-generated pages.
 func (r *SitemapRepository) ListPublicUserIDs(ctx context.Context) ([]SitemapEntry, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, updated_at::date::text
+		SELECT id, COALESCE(slug, ''), updated_at::date::text
 		FROM users
 		WHERE profile_visibility = 'public'
+		  AND NOT is_simulated
 		ORDER BY updated_at DESC
 	`)
 	if err != nil {
@@ -41,7 +48,7 @@ func (r *SitemapRepository) ListPublicUserIDs(ctx context.Context) ([]SitemapEnt
 	var entries []SitemapEntry
 	for rows.Next() {
 		var e SitemapEntry
-		if err := rows.Scan(&e.ID, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Slug, &e.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("sitemap scan user: %w", err)
 		}
 		entries = append(entries, e)
@@ -49,13 +56,16 @@ func (r *SitemapRepository) ListPublicUserIDs(ctx context.Context) ([]SitemapEnt
 	return entries, rows.Err()
 }
 
-// ListPublicLeagueIDs returns IDs and created_at for public leagues (not club-scoped).
+// ListPublicLeagueIDs returns IDs, slugs and updated_at for public leagues
+// (not club-scoped). lastmod tracks updated_at, not created_at: reporting the
+// creation date on a league whose standings move every week tells crawlers the
+// page is static and they stop coming back for the changes.
 func (r *SitemapRepository) ListPublicLeagueIDs(ctx context.Context) ([]SitemapEntry, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, created_at::date::text
+		SELECT id, COALESCE(slug, ''), updated_at::date::text
 		FROM leagues
 		WHERE type = 'public' AND club_id IS NULL
-		ORDER BY created_at DESC
+		ORDER BY updated_at DESC
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("sitemap list public leagues: %w", err)
@@ -65,7 +75,7 @@ func (r *SitemapRepository) ListPublicLeagueIDs(ctx context.Context) ([]SitemapE
 	var entries []SitemapEntry
 	for rows.Next() {
 		var e SitemapEntry
-		if err := rows.Scan(&e.ID, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Slug, &e.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("sitemap scan league: %w", err)
 		}
 		entries = append(entries, e)
@@ -73,13 +83,14 @@ func (r *SitemapRepository) ListPublicLeagueIDs(ctx context.Context) ([]SitemapE
 	return entries, rows.Err()
 }
 
-// ListPublicClubIDs returns IDs and created_at for public clubs.
+// ListPublicClubIDs returns IDs, slugs and updated_at for public clubs.
+// See ListPublicLeagueIDs on why lastmod tracks updated_at.
 func (r *SitemapRepository) ListPublicClubIDs(ctx context.Context) ([]SitemapEntry, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, created_at::date::text
+		SELECT id, COALESCE(slug, ''), updated_at::date::text
 		FROM clubs
 		WHERE type = 'public'
-		ORDER BY created_at DESC
+		ORDER BY updated_at DESC
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("sitemap list public clubs: %w", err)
@@ -89,7 +100,7 @@ func (r *SitemapRepository) ListPublicClubIDs(ctx context.Context) ([]SitemapEnt
 	var entries []SitemapEntry
 	for rows.Next() {
 		var e SitemapEntry
-		if err := rows.Scan(&e.ID, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Slug, &e.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("sitemap scan club: %w", err)
 		}
 		entries = append(entries, e)
@@ -97,10 +108,12 @@ func (r *SitemapRepository) ListPublicClubIDs(ctx context.Context) ([]SitemapEnt
 	return entries, rows.Err()
 }
 
-// CountPublicUsers returns the number of public-profile users.
+// CountPublicUsers returns the number of public-profile users, matching the
+// exclusions ListPublicUserIDs applies so the admin stats agree with the
+// sitemap the crawler actually receives.
 func (r *SitemapRepository) CountPublicUsers(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE profile_visibility = 'public'`).Scan(&n)
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE profile_visibility = 'public' AND NOT is_simulated`).Scan(&n)
 	return n, err
 }
 

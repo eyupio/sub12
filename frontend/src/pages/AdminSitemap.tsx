@@ -102,6 +102,12 @@ export default function AdminSitemap() {
             ))}
           </div>
         )}
+        <p className="text-xs text-muted">
+          Counts what the sitemap actually submits, so they read lower than the
+          totals elsewhere in admin. Profiles, leagues and clubs are listed at
+          their public <code>/share/…</code> URLs; private and simulated
+          profiles are left out, as are the signed-in-only pages.
+        </p>
         <a
           href="/sitemap.xml"
           target="_blank"

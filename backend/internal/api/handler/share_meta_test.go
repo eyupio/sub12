@@ -3,6 +3,9 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -178,9 +181,9 @@ func TestAbsoluteFromRequest_OnlyAcceptsHTTPOrHTTPS(t *testing.T) {
 	s := &ShareMeta{log: zerolog.Nop()} // siteURL intentionally blank
 
 	cases := []struct {
-		name    string
-		header  string
-		expect  string
+		name   string
+		header string
+		expect string
 	}{
 		{"https forwarded", "https", "https://example.test/x"},
 		{"http forwarded", "http", "http://example.test/x"},
@@ -412,4 +415,116 @@ func TestInjectOG_CanonicalUsesTheSlugURLEvenWhenServedTheUUIDOne(t *testing.T) 
 	assert.Contains(t, out, `<link rel="canonical" href="https://sub12.io/share/users/paul-jennings" />`)
 	assert.Contains(t, out, `property="og:url" content="https://sub12.io/share/users/paul-jennings"`)
 	assert.NotContains(t, out, "bb2c625d")
+}
+
+func TestStaticPage_GivesEachPageItsOwnCanonicalAndTitle(t *testing.T) {
+	// The SPA shell ships one hard-coded <title>, description and
+	// rel=canonical pointing at the site root. Served as-is, every public
+	// page declares itself a duplicate of the homepage, so Google drops the
+	// ones we submit in the sitemap. Each must claim its own URL instead.
+	shell := `<!doctype html>
+<html>
+  <head>
+    <title>SUB12 — Score Cards, Pellet Testing, Leagues &amp; Events for FT / HFT</title>
+    <meta name="description" content="site-wide blurb" />
+    <meta property="og:url" content="https://sub12.io/" />
+    <link rel="canonical" href="https://sub12.io/" />
+  </head>
+</html>`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(shell))
+	}))
+	defer ts.Close()
+
+	s := newShareMetaForTest(ts.URL, time.Minute)
+
+	page := StaticPageMeta{
+		Path:        "/pellet-leaderboard",
+		Title:       "Pellet Leaderboard — Tested Accuracy Rankings | SUB12",
+		Description: "Community pellet test results ranked by measured group size.",
+	}
+
+	rec := httptest.NewRecorder()
+	s.StaticPage(page)(rec, httptest.NewRequest(http.MethodGet, "/pellet-leaderboard", nil))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+
+	assert.Contains(t, body, `<link rel="canonical" href="https://example.com/pellet-leaderboard" />`)
+	assert.Contains(t, body, `property="og:url" content="https://example.com/pellet-leaderboard"`)
+	assert.Contains(t, body, "<title>"+page.Title+"</title>")
+	assert.Contains(t, body, `name="description" content="`+page.Description+`"`)
+
+	// The shell's homepage canonical must be gone, not merely joined.
+	assert.NotContains(t, body, `href="https://sub12.io/"`)
+	assert.Equal(t, 1, strings.Count(body, `rel="canonical"`))
+	assert.Equal(t, 1, strings.Count(body, "<title>"))
+}
+
+func TestStaticPage_DropsQueryStringFromCanonical(t *testing.T) {
+	// /login?next=/scores and /login are the same page. Without this they
+	// compete as separate URLs and split their own ranking signals.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<!doctype html><html><head><title>x</title>` +
+			`<link rel="canonical" href="https://sub12.io/" /></head></html>`))
+	}))
+	defer ts.Close()
+
+	s := newShareMetaForTest(ts.URL, time.Minute)
+	page := StaticPageMeta{Path: "/login", Title: "Sign In to SUB12", Description: "Sign in."}
+
+	rec := httptest.NewRecorder()
+	s.StaticPage(page)(rec, httptest.NewRequest(http.MethodGet, "/login?next=%2Fscores", nil))
+
+	assert.Contains(t, rec.Body.String(), `<link rel="canonical" href="https://example.com/login" />`)
+	assert.NotContains(t, rec.Body.String(), "next=")
+}
+
+func TestStaticPages_AreUniqueAndAbsolutePaths(t *testing.T) {
+	seen := map[string]bool{}
+	for _, page := range StaticPages {
+		assert.True(t, strings.HasPrefix(page.Path, "/"), "path must be rooted: %s", page.Path)
+		assert.NotEqual(t, "/", page.Path,
+			"the site root is served by nginx from the static bundle, not through ShareMeta")
+		assert.False(t, seen[page.Path], "duplicate static page %s", page.Path)
+		seen[page.Path] = true
+
+		assert.NotEmpty(t, page.Title, "%s needs its own title", page.Path)
+		assert.NotEmpty(t, page.Description, "%s needs its own description", page.Path)
+		// Search results truncate well before this; a description longer than
+		// ~160 characters is a sign it was written for the page, not the SERP.
+		assert.LessOrEqual(t, len(page.Description), 200,
+			"%s description is too long for a search snippet", page.Path)
+	}
+}
+
+// TestStaticPages_AreProxiedToTheBackend guards a silent failure mode: these
+// pages only get their own metadata if nginx actually forwards them here.
+// Miss one in the location regex and nginx serves the static shell instead —
+// the page keeps the homepage's canonical and quietly stays out of the index,
+// with nothing failing to show for it.
+func TestStaticPages_AreProxiedToTheBackend(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "frontend", "nginx.conf"))
+	if err != nil {
+		t.Skipf("nginx.conf not readable from this checkout: %v", err)
+	}
+
+	// The one `location ~ ^/(a|b|c)$ {` block listing fixed public pages.
+	re := regexp.MustCompile(`location\s+~\s+\^/\(([a-z0-9|-]+)\)\$`)
+	m := re.FindSubmatch(raw)
+	if m == nil {
+		t.Fatal("no fixed-public-page location block found in frontend/nginx.conf")
+	}
+
+	proxied := map[string]bool{}
+	for _, name := range strings.Split(string(m[1]), "|") {
+		proxied["/"+name] = true
+	}
+
+	for _, page := range StaticPages {
+		assert.True(t, proxied[page.Path],
+			"%s is in StaticPages but nginx does not proxy it to the backend", page.Path)
+	}
+	assert.Len(t, proxied, len(StaticPages),
+		"nginx proxies a path that StaticPages does not define metadata for")
 }

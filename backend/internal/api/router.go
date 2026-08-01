@@ -97,6 +97,15 @@ func NewRouter(
 	r.Get("/share/clubs/{id}", shareMeta.Club())
 	r.Get("/share/users/{id}", shareMeta.User())
 
+	// Fixed public pages. The SPA shell carries one hard-coded title,
+	// description and rel=canonical (the site root), so served straight from
+	// nginx every one of these pages declares itself a duplicate of the
+	// homepage and search engines drop it. Serving them through ShareMeta
+	// gives each its own metadata and a self-referencing canonical.
+	for _, page := range handler.StaticPages {
+		r.Get(page.Path, shareMeta.StaticPage(page))
+	}
+
 	// Branded OG preview images. Rendered per-entity PNGs that social
 	// platforms embed in link previews. Privacy checks mirror share-meta;
 	// private / missing entities fall through to the site default.
