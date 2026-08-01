@@ -64,7 +64,9 @@ export function notificationLink(n: Notification): string | null {
   }
 
   if (n.type === 'feature_request_state_changed') {
-    return '/feature-requests'
+    // Land on the idea that moved — its history explains the change — and fall
+    // back to the board for older notifications that carry no target.
+    return n.target_id ? `/feature-requests/${n.target_id}` : '/feature-requests'
   }
 
   if (n.target_type === 'score_card' && n.target_id) return `/scores/${n.target_id}`

@@ -2,12 +2,13 @@ import { FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Inbox, Lightbulb, Pencil, Trash2, X } from 'lucide-react'
-import { featureRequestsApi, type FeatureRequest, type FeatureRequestStatus } from '../api/featureRequests'
+import { featureRequestsApi, type FeatureRequest, type FeatureRequestPriority, type FeatureRequestStatus } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
 import { toast } from '../store/toast'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
 const featureStatuses: FeatureRequestStatus[] = ['submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done', 'implemented']
+const featurePriorities: FeatureRequestPriority[] = ['low', 'normal', 'high', 'urgent']
 
 export default function AdminSupportInbox() {
   const qc = useQueryClient()
@@ -144,7 +145,12 @@ export default function AdminSupportInbox() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="t-subsection-title">{feature.title}</p>
-                  <p className="text-xs text-muted">Ticket: {feature.ticket_id} · Votes: {feature.vote_count}</p>
+                  <p className="text-xs text-muted">
+                    {feature.scope_name ?? feature.scope_type} · {feature.priority} priority · Votes: {feature.vote_count} · Comments: {feature.comment_count}
+                  </p>
+                  <Link to="/feature-requests/$id" params={{ id: feature.id }} className="mt-1 inline-block text-xs text-[var(--brass)] hover:underline">
+                    View on board
+                  </Link>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <select
@@ -223,6 +229,7 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
   const [title, setTitle] = useState(feature.title)
   const [refinedDescription, setRefinedDescription] = useState(feature.refined_description)
   const [status, setStatus] = useState<FeatureRequestStatus>(feature.status)
+  const [priority, setPriority] = useState<FeatureRequestPriority>(feature.priority)
   const [ownerAdminID, setOwnerAdminID] = useState(feature.owner_admin_id ?? '')
 
   const updateMutation = useMutation({
@@ -230,6 +237,7 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
       title,
       refined_description: refinedDescription,
       status,
+      priority,
       owner_admin_id: ownerAdminID.trim() === '' ? undefined : ownerAdminID.trim(),
     }),
     onSuccess: () => {
@@ -280,6 +288,16 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
               onChange={(e) => setStatus(e.target.value as FeatureRequestStatus)}
             >
               {featureStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Priority
+            <select
+              className="mt-1 w-full rounded-md border border-subtle bg-transparent p-2"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as FeatureRequestPriority)}
+            >
+              {featurePriorities.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </label>
           <label className="block text-sm">
