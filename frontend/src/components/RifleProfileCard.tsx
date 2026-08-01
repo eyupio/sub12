@@ -38,6 +38,9 @@ function ScoreBar({ score, max = 250 }: { score: number; max?: number }) {
   )
 }
 
+const frameCls =
+  'relative bg-surface border border-subtle rounded-lg overflow-hidden hover:border-[var(--brass)]/30 transition-colors'
+
 export function RifleProfileCard({
   rifle,
   stats,
@@ -67,8 +70,21 @@ export function RifleProfileCard({
     onUploadImage?.(file)
   }
 
+  const actionCls =
+    'flex items-center justify-center gap-1.5 py-2.5 text-[11px] tracking-widest uppercase text-muted transition-colors hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed'
+
+  const image = rifle.image_url ? (
+    <img src={rifle.image_url} alt={`${rifle.make} ${rifle.model}`} className="w-full h-full object-cover" />
+  ) : (
+    <div className="w-full h-full flex items-center justify-center">
+      <Package size={28} className="text-muted opacity-40" />
+    </div>
+  )
+
+  const imageCls = 'w-20 h-20 lg:w-24 lg:h-24 rounded-full border-2 border-[var(--brass)]/30 mx-auto overflow-hidden bg-surface-hover'
+
   const cardContent = (
-    <div className="bg-surface border border-subtle rounded-lg overflow-hidden hover:border-[var(--brass)]/30 transition-colors">
+    <>
       {/* Header */}
       <div className="bg-[var(--brass)]/10 border-b border-[var(--brass)]/20 px-4 py-2">
         <p className="text-[10px] tracking-widest uppercase text-[var(--brass)] text-center font-medium">
@@ -77,45 +93,27 @@ export function RifleProfileCard({
       </div>
 
       {/* Image area */}
-      <div className="relative px-4 pt-5 pb-3">
-        {/* Action icons — gear mode only */}
-        {mode === 'gear' && (
-          <div className="absolute left-3 top-5 flex flex-col gap-2.5">
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}
-              disabled={isUploadPending}
-              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Upload image"
-            >
-              {isUploadPending ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
-            </button>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit?.() }}
-              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors"
-              aria-label="Edit rifle"
-            >
-              <Pencil size={13} />
-            </button>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete?.() }}
-              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--error-text)] hover:border-[var(--error-text)]/40 transition-colors"
-              aria-label="Delete rifle"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
+      <div className="px-4 pt-5 pb-3">
+        {mode === 'gear' ? (
+          // The photo is the obvious place to tap to change it, so it opens the
+          // picker rather than forming part of the showcase link.
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadPending}
+            aria-label="Change photo"
+            className={`tap-target group relative z-10 block ${imageCls} disabled:cursor-not-allowed`}
+          >
+            {image}
+            <span className="absolute inset-0 flex items-center justify-center bg-[var(--surface)]/70 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
+              {isUploadPending
+                ? <Loader2 size={18} className="animate-spin text-[var(--brass)]" />
+                : <Camera size={18} className="text-[var(--brass)]" />}
+            </span>
+          </button>
+        ) : (
+          <div className={imageCls}>{image}</div>
         )}
-
-        {/* Rifle image */}
-        <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-full border-2 border-[var(--brass)]/30 mx-auto overflow-hidden bg-surface-hover">
-          {rifle.image_url ? (
-            <img src={rifle.image_url} alt={`${rifle.make} ${rifle.model}`} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package size={28} className="text-muted opacity-40" />
-            </div>
-          )}
-        </div>
 
         {/* Name + sub-line */}
         <p className="text-base font-medium text-primary text-center mt-3">
@@ -143,33 +141,70 @@ export function RifleProfileCard({
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 
   if (mode === 'dashboard') {
-    return <Link to="/scores">{cardContent}</Link>
+    return <Link to="/scores" className={`${frameCls} block`}>{cardContent}</Link>
   }
 
-  // In the gear list the whole card opens the rifle showcase; the action icons
-  // inside stop propagation so they still work. The file input lives outside the
-  // link because the click() we fire on it would otherwise bubble to the anchor
-  // and navigate away before the picker returns.
-  const wrapped = mode === 'gear'
-    ? <Link to="/gear/rifles/$id" params={{ id: rifle.id }} className="block">{cardContent}</Link>
-    : cardContent
+  if (mode !== 'gear') {
+    return <div className={frameCls}>{cardContent}</div>
+  }
 
+  // In the gear list the card body opens the rifle showcase, but the link is a
+  // stretched anchor laid over that body rather than a wrapper around it: the
+  // photo button and the action bar sit above it, so no control can navigate.
+  // The file input stays outside the link too — the click() we fire on it used
+  // to bubble to the anchor and open the showcase before the picker returned.
   return (
     <>
-      {wrapped}
-      {mode === 'gear' && (
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
+      <div className={frameCls}>
+        {cardContent}
+
+        <Link
+          to="/gear/rifles/$id"
+          params={{ id: rifle.id }}
+          aria-label={`Open the ${rifle.make} ${rifle.model} showcase`}
+          className="absolute inset-0"
         />
-      )}
+
+        <div className="relative z-10 grid grid-cols-3 border-t border-subtle bg-surface">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadPending}
+            aria-label="Change photo"
+            className={`${actionCls} hover:text-[var(--brass)]`}
+          >
+            {isUploadPending ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />} Photo
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit rifle"
+            className={`${actionCls} border-l border-subtle hover:text-[var(--brass)]`}
+          >
+            <Pencil size={13} /> Edit
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Delete rifle"
+            className={`${actionCls} border-l border-subtle hover:text-[var(--error-text)]`}
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       {editingFile && (
         <ImageEditor
           file={editingFile}
