@@ -297,7 +297,7 @@ func (m *mockSimulationRepo) RandomFollowBackTarget(context.Context, string, boo
 func (m *mockSimulationRepo) RandomMutualFollowTarget(context.Context, string, bool) (string, error) {
 	return "", repository.ErrNotFound
 }
-func (m *mockSimulationRepo) RandomTopLevelComment(context.Context, string, string, string) (string, string, error) {
+func (m *mockSimulationRepo) RandomTopLevelComment(context.Context, string, string, string, bool) (string, string, error) {
 	return "", "", repository.ErrNotFound
 }
 func (m *mockSimulationRepo) RandomLikeableComment(context.Context, string, bool) (string, error) {

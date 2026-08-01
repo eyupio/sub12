@@ -251,13 +251,13 @@ func TestSimPersonaProvisioningAndTargets(t *testing.T) {
 		`, alice, cardID).Scan(&commentID))
 
 		// Bob can reply into Alice's thread, and is told who he is replying to.
-		id, author, err := repo.RandomTopLevelComment(ctx, cardID, "score_card", bob)
+		id, author, err := repo.RandomTopLevelComment(ctx, cardID, "score_card", bob, true)
 		require.NoError(t, err)
 		assert.Equal(t, commentID, id)
 		assert.Equal(t, "Sim Alice", author)
 
 		// Nobody replies to themselves, or likes their own comment.
-		_, _, err = repo.RandomTopLevelComment(ctx, cardID, "score_card", alice)
+		_, _, err = repo.RandomTopLevelComment(ctx, cardID, "score_card", alice, true)
 		assert.ErrorIs(t, err, ErrNotFound)
 		_, err = repo.RandomLikeableComment(ctx, alice, true)
 		assert.ErrorIs(t, err, ErrNotFound)
@@ -265,6 +265,32 @@ func TestSimPersonaProvisioningAndTargets(t *testing.T) {
 		likeable, err := repo.RandomLikeableComment(ctx, bob, true)
 		require.NoError(t, err)
 		assert.Equal(t, commentID, likeable)
+
+		// A real user commenting on a simulated card must not become a reply
+		// target while interact_with_real_users is off. The card being
+		// simulated says nothing about who commented on it.
+		real := simTestActor(t, pool)
+		_, err = pool.Exec(ctx, `
+			INSERT INTO comments (user_id, target_id, target_type, body)
+			VALUES ($1, $2, 'score_card', 'real person here')
+		`, real, cardID)
+		require.NoError(t, err)
+
+		for i := 0; i < 20; i++ {
+			id, _, err := repo.RandomTopLevelComment(ctx, cardID, "score_card", bob, true)
+			require.NoError(t, err)
+			assert.Equal(t, commentID, id, "picked a real user's comment to reply to")
+		}
+		// With the restriction lifted, the real user's comment is fair game.
+		sawReal := false
+		for i := 0; i < 40; i++ {
+			id, _, err := repo.RandomTopLevelComment(ctx, cardID, "score_card", bob, false)
+			require.NoError(t, err)
+			if id != commentID {
+				sawReal = true
+			}
+		}
+		assert.True(t, sawReal, "with real-user interaction on, real comments should be reachable")
 	})
 
 	t.Run("empty surfaces report not found rather than erroring", func(t *testing.T) {

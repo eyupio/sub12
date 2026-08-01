@@ -60,7 +60,7 @@ type simulationRepo interface {
 	RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
 	RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
 	RandomFollowedUser(ctx context.Context, followerID string, simulatedOnly bool) (string, error)
-	RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string) (string, string, error)
+	RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string, simulatedOnly bool) (string, string, error)
 	RandomLikeableComment(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
 	RecordAudit(ctx context.Context, event, actorID string, detail string) error
 	ListAudit(ctx context.Context, limit, offset int) ([]*model.SimulationAudit, int, error)
@@ -968,7 +968,7 @@ func (s *SimulationService) doComment(ctx context.Context, settings *model.Simul
 	var parentID *string
 	var body string
 	if s.randFloat(1) < replyChance(settings.ReplyChance, t.loquacious) {
-		if id, author, err := s.repo.RandomTopLevelComment(ctx, targetID, targetType, actor); err == nil {
+		if id, author, err := s.repo.RandomTopLevelComment(ctx, targetID, targetType, actor, simulatedOnly); err == nil {
 			parentID = &id
 			body = s.replyBody(actor, t, author)
 		}

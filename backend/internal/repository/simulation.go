@@ -757,14 +757,21 @@ func (r *SimulationRepository) RandomActivity(ctx context.Context, excludeUserID
 // RandomTopLevelComment picks a random top-level comment on the given target
 // that excludeUserID did not write, so a persona can reply into an existing
 // thread instead of only ever adding another top-level remark. Returns the
-// comment id and its author's display name. ErrNotFound when the target has no
-// comment worth replying to.
-func (r *SimulationRepository) RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string) (string, string, error) {
+// comment id and its author's display name. When simulatedOnly is true only
+// comments by simulated accounts are eligible: the target being simulated says
+// nothing about who commented on it, and replying would pull a real user into
+// a conversation they did not ask for. ErrNotFound when there is nothing to
+// reply to.
+func (r *SimulationRepository) RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string, simulatedOnly bool) (string, string, error) {
+	where := `c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL AND c.user_id <> $3`
+	if simulatedOnly {
+		where += ` AND u.is_simulated`
+	}
 	var id, author string
 	err := r.randomRow(ctx,
 		`comments c JOIN users u ON u.id = c.user_id`,
 		`c.id::text, u.display_name`,
-		`c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL AND c.user_id <> $3`,
+		where,
 		"",
 		[]any{targetID, targetType, excludeUserID},
 		&id, &author,
