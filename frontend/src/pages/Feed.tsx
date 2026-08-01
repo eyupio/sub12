@@ -555,7 +555,7 @@ function FeedComposer() {
             <span style={{ marginLeft: 8, fontSize: 12 }}>
               {linked.kind === 'card' ? 'Card' : 'Pellet test'}: {linked.label}
             </span>
-            <button type="button" aria-label="Remove link" onClick={() => setLinked(null)}>
+            <button type="button" className="tap-target" aria-label="Remove link" onClick={() => setLinked(null)}>
               <X size={12} />
             </button>
           </div>
@@ -566,7 +566,7 @@ function FeedComposer() {
           {attachments.map((a, idx) => (
             <div key={idx} className="composer-attachment">
               <img src={a.image_url} alt="" />
-              <button type="button" aria-label="Remove attachment" onClick={() => removeAttachment(idx)}>
+              <button type="button" className="tap-target" aria-label="Remove attachment" onClick={() => removeAttachment(idx)}>
                 <X size={12} />
               </button>
             </div>

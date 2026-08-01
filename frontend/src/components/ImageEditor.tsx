@@ -520,7 +520,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 text-white">
-        <button type="button" onClick={onCancel} aria-label="Cancel" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+        <button type="button" onClick={onCancel} aria-label="Cancel" className="tap-target w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
           <XIcon size={18} />
         </button>
         <h2 className="text-sm font-semibold tracking-widest uppercase flex items-center gap-2">
@@ -531,7 +531,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
           onClick={apply}
           disabled={busy || !imageUrl || !crop}
           aria-label="Apply"
-          className="px-3 h-9 rounded-full bg-[var(--brass)] text-inverse text-xs font-semibold tracking-widest uppercase flex items-center gap-1.5 disabled:opacity-50"
+          className="tap-target px-3 h-9 rounded-full bg-[var(--brass)] text-inverse text-xs font-semibold tracking-widest uppercase flex items-center gap-1.5 disabled:opacity-50"
         >
           <Check size={16} /> Apply
         </button>

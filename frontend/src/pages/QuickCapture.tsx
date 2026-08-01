@@ -233,7 +233,7 @@ export default function QuickCapture() {
                 <button
                   type="button"
                   onClick={clearPhoto}
-                  className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+                  className="tap-target absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
                   aria-label="Remove photo"
                 >
                   <X size={16} />

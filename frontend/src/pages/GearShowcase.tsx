@@ -316,7 +316,7 @@ function ComparisonOptInCard({ optedIn, isPending, onToggle }: {
           aria-label="Include this item in public comparison"
           disabled={isPending}
           onClick={() => onToggle(!optedIn)}
-          className={`relative w-11 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${optedIn ? 'bg-[var(--brass)]' : 'bg-surface-hover border border-subtle'}`}
+          className={`tap-target relative w-11 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${optedIn ? 'bg-[var(--brass)]' : 'bg-surface-hover border border-subtle'}`}
         >
           <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${optedIn ? 'left-[22px]' : 'left-0.5'}`} />
         </button>

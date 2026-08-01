@@ -132,7 +132,7 @@ export default function ScoredImageCard({
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onOpen() }}
-          className="absolute bottom-1 left-1 bg-page/80 backdrop-blur rounded-full p-1 text-[var(--brass)] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="tap-target absolute bottom-1 left-1 bg-page/80 backdrop-blur rounded-full p-1 text-[var(--brass)] opacity-0 group-hover:opacity-100 transition-opacity"
           aria-label="Measure image"
           title="Open measurement tool"
         >
@@ -140,7 +140,7 @@ export default function ScoredImageCard({
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className="absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
+          className="tap-target absolute top-1 right-1 bg-page/80 backdrop-blur rounded-full p-0.5 text-muted hover:text-primary transition-colors"
           aria-label="Remove photo"
         >
           <X size={14} />
@@ -148,7 +148,7 @@ export default function ScoredImageCard({
         {onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit() }}
-            className="absolute bottom-1 right-1 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+            className="tap-target absolute bottom-1 right-1 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
             aria-label="Edit photo"
             title="Rotate / crop photo"
           >

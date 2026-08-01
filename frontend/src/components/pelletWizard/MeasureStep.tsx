@@ -120,7 +120,7 @@ export function MeasureStep({
             type="button"
             onClick={goPrev}
             disabled={currentIndex <= 0}
-            className="p-1.5 rounded-full border border-line text-muted hover:text-ink-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="tap-target p-1.5 rounded-full border border-line text-muted hover:text-ink-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Previous photo"
           >
             <ChevronLeft size={14} />
@@ -132,7 +132,7 @@ export function MeasureStep({
             type="button"
             onClick={goNext}
             disabled={currentIndex >= images.length - 1}
-            className="p-1.5 rounded-full border border-line text-muted hover:text-ink-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="tap-target p-1.5 rounded-full border border-line text-muted hover:text-ink-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Next photo"
           >
             <ChevronRight size={14} />

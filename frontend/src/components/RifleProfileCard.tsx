@@ -91,21 +91,21 @@ export function RifleProfileCard({
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}
               disabled={isUploadPending}
-              className="w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Upload image"
             >
               {isUploadPending ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
             </button>
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit?.() }}
-              className="w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors"
+              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors"
               aria-label="Edit rifle"
             >
               <Pencil size={13} />
             </button>
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete?.() }}
-              className="w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--error-text)] hover:border-[var(--error-text)]/40 transition-colors"
+              className="tap-target w-8 h-8 rounded-full border border-subtle bg-surface-hover flex items-center justify-center text-muted hover:text-[var(--error-text)] hover:border-[var(--error-text)]/40 transition-colors"
               aria-label="Delete rifle"
             >
               <Trash2 size={13} />

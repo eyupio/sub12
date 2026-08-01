@@ -331,6 +331,7 @@ export default function ClubDetail() {
               <>
                 <button
                   onClick={() => fileRef.current?.click()}
+                  className="tap-target"
                   style={{ position: 'absolute', bottom: -4, right: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--lc-surface)', border: '1px solid var(--line)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                   title="Upload club image"
                 >
