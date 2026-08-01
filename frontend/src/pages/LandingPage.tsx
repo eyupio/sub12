@@ -264,7 +264,7 @@ function HeroMockup() {
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--brass)]/40" />
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--brass)]/25" />
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--brass)]/18" />
-          <div className="ml-3 rounded-full border border-subtle px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-muted">
+          <div className="ml-3 min-w-0 truncate whitespace-nowrap rounded-full border border-subtle px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted sm:tracking-[0.18em]">
             Air Arms S510 / JSB Exact 8.44 / 45m
           </div>
         </div>
@@ -277,22 +277,22 @@ function HeroMockup() {
                   <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Performance Overview</p>
                   <h3 className="mt-2 text-lg font-semibold text-primary">Repeatable improvement, not guesswork</h3>
                 </div>
-                <div className="rounded-full border border-[var(--brass)]/20 bg-[var(--brass)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
+                <div className="shrink-0 whitespace-nowrap rounded-full border border-[var(--brass)]/20 bg-[var(--brass)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
                   7 sessions
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                 <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best Group</p>
+                  <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Best Group</p>
                   <p className="mt-2 font-mono text-base font-semibold text-[var(--brass)] sm:text-xl">7.82<span className="text-xs">mm</span></p>
                 </div>
                 <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
+                  <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Average</p>
                   <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-xl">9.64<span className="text-xs">mm</span></p>
                 </div>
                 <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Confidence</p>
+                  <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Confidence</p>
                   <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-primary">High</p>
                 </div>
               </div>
@@ -303,7 +303,7 @@ function HeroMockup() {
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Group Trend</p>
                     <p className="mt-1 text-sm text-secondary">Best session value by date</p>
                   </div>
-                  <div className="rounded-full bg-[var(--brass)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
+                  <div className="shrink-0 whitespace-nowrap rounded-full bg-[var(--brass)]/10 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
                     Down 1.8mm
                   </div>
                 </div>
@@ -347,7 +347,7 @@ function HeroMockup() {
                       <p className="text-sm font-semibold text-primary">JSB Exact 8.44</p>
                       <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">Batch A21 / 4.52 head</p>
                     </div>
-                    <div className="rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
+                    <div className="shrink-0 whitespace-nowrap rounded-full bg-[var(--brass)]/12 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--brass)]">
                       Ranked #1
                     </div>
                   </div>
@@ -748,7 +748,7 @@ export default function LandingPage() {
                     <div className="rounded-[24px] border border-subtle bg-page p-4">
                       <div className="flex items-center justify-between">
                         <p className="text-[11px] uppercase tracking-[0.18em] text-muted">Measured Target</p>
-                        <span className="rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--brass)]">
+                        <span className="shrink-0 whitespace-nowrap rounded-full border border-[var(--brass)]/30 bg-[var(--brass)]/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--brass)]">
                           Analysed &middot; 92%
                         </span>
                       </div>
@@ -787,15 +787,15 @@ export default function LandingPage() {
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                         <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Group</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:tracking-[0.14em]">Group</p>
                           <p className="mt-0.5 font-mono text-xs font-semibold text-[var(--brass)]">8.31 mm</p>
                         </div>
                         <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">MOA</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:tracking-[0.14em]">MOA</p>
                           <p className="mt-0.5 font-mono text-xs font-semibold text-primary">0.63</p>
                         </div>
                         <div className="rounded-lg border border-subtle bg-surface px-2 py-1.5">
-                          <p className="text-[9px] uppercase tracking-[0.14em] text-muted">Distance</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:tracking-[0.14em]">Distance</p>
                           <p className="mt-0.5 font-mono text-xs font-semibold text-primary">45 m</p>
                         </div>
                       </div>
@@ -811,15 +811,15 @@ export default function LandingPage() {
                       </div>
                       <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                         <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Best</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Best</p>
                           <p className="mt-2 font-mono text-base font-semibold text-[var(--brass)] sm:text-lg">8.31<span className="text-xs">mm</span></p>
                         </div>
                         <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Average</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Average</p>
                           <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-lg">10.02<span className="text-xs">mm</span></p>
                         </div>
                         <div className="rounded-2xl border border-subtle bg-surface px-2 py-3 sm:px-3">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Spread</p>
+                          <p className="text-[9px] uppercase tracking-[0.08em] text-muted sm:text-[10px] sm:tracking-[0.18em]">Spread</p>
                           <p className="mt-2 font-mono text-base font-semibold text-primary sm:text-lg">1.71<span className="text-xs">mm</span></p>
                         </div>
                       </div>
