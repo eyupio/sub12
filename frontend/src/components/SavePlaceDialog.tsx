@@ -5,8 +5,10 @@ import {
   type CreateLocationInput,
   type Location,
 } from '../api/locations'
+import { useReverseGeocode } from '../api/geo'
 import { TARGET_PRESETS } from '../config/targetPresets'
 import { toast } from '../store/toast'
+import { isCoordinateLabel } from '../utils/geo'
 
 interface SavePlaceDialogProps {
   open: boolean
@@ -56,6 +58,19 @@ export function SavePlaceDialog({
     setDefaultTargetPreset('')
     setNotes('')
   }, [open, initialName, initialAddress, initialDistanceM, initialDistanceUnit])
+
+  // Opened from a point with nothing but coordinates to go on — offer the
+  // geocoder's name and address so the user confirms a place instead of
+  // typing one from scratch.
+  const needsName = open && (initialName.trim() === '' || isCoordinateLabel(initialName))
+  const { data: suggestion } = useReverseGeocode(initialLat, initialLng, needsName)
+  useEffect(() => {
+    if (!needsName || !suggestion) return
+    setName(current => (current.trim() === '' || isCoordinateLabel(current) ? suggestion.name : current))
+    setAddress(current =>
+      current.trim() === '' || isCoordinateLabel(current) ? suggestion.address ?? '' : current,
+    )
+  }, [needsName, suggestion])
 
   if (!open) return null
 

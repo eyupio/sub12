@@ -18,6 +18,8 @@ import { ImageEditor } from '../components/ImageEditor'
 import { LikeButton } from '../components/LikeButton'
 import { type LocationValue } from '../components/LocationField'
 import { PlaceSelector } from '../components/PlaceSelector'
+import { CardContextPicker } from '../components/CardContextPicker'
+import { contextChangePlan, contextOfCard, type CardContext } from '../utils/cardContext'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { Tooltip } from '../components/Tooltip'
 import { tips } from '../components/tooltips'
@@ -1083,6 +1085,12 @@ export default function ScoreCardDetail() {
   const [editMeta, setEditMeta] = useState({ shot_at: '', location: '', notes: '', rifle_id: '', pellet_id: '', distance_m: '', discipline: '' })
   const [editLocation, setEditLocation] = useState<LocationValue>({ label: '' })
   const [editLocationId, setEditLocationId] = useState<string | null>(null)
+  // The card's context is editable here too, so a card that went to the wrong
+  // league — or one that should never have been a league entry — can be moved
+  // without deleting and re-entering it.
+  const [editContext, setEditContext] = useState<CardContext>('personal')
+  const [editLeagueId, setEditLeagueId] = useState<string | null>(null)
+  const [editClubId, setEditClubId] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [showSubmitLeague, setShowSubmitLeague] = useState(false)
@@ -1148,9 +1156,30 @@ export default function ScoreCardDetail() {
     enabled: !!card?.league_round_id,
   })
 
+  // The round a newly picked league resolves to. Only asked for once the user
+  // has actually picked a different league in edit mode.
+  const movingToLeague = editing && editContext === 'league' && !!editLeagueId && editLeagueId !== cardLeague?.id
+  const { data: editEnsuredRound } = useQuery({
+    queryKey: ['leagues', editLeagueId, 'ensure-round'],
+    queryFn: () => leagueApi.ensureDefaultRound(editLeagueId!),
+    enabled: movingToLeague,
+  })
+  const editTargetRoundId = editContext === 'league'
+    ? (movingToLeague ? editEnsuredRound?.round_id : card?.league_round_id)
+    : undefined
+  const editContextIncomplete =
+    (editContext === 'league' && !editLeagueId) || (editContext === 'club' && !editClubId)
+
   const updateMutation = useMutation({
     mutationFn: async () => {
       const distanceParsed = editMeta.distance_m.trim() === '' ? undefined : Number(editMeta.distance_m)
+      const plan = contextChangePlan({
+        target: editContext,
+        targetRoundId: editTargetRoundId,
+        targetClubId: editClubId,
+        currentRoundId: card?.league_round_id,
+        currentClubId: card?.club_id,
+      })
       const updated = await scoreCardApi.update(id, {
         shot_at: editMeta.shot_at,
         shot_scores: editShots.map(s => s.score),
@@ -1164,7 +1193,11 @@ export default function ScoreCardDetail() {
         pellet_id: editMeta.pellet_id || undefined,
         distance_m: Number.isFinite(distanceParsed) ? (distanceParsed as number) : undefined,
         discipline: editMeta.discipline.trim() ? editMeta.discipline.trim() : undefined,
+        ...plan.patch,
       })
+      if (plan.submitRoundId) {
+        await scoreCardApi.submitToLeague(id, plan.submitRoundId)
+      }
       if (imageFile) {
         await scoreCardApi.uploadImage(id, imageFile)
       }
@@ -1179,13 +1212,18 @@ export default function ScoreCardDetail() {
       // until it lapses.
       queryClient.invalidateQueries({ queryKey: ['score-cards'] })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
+      // A context change moves the card in or out of standings, so the league
+      // views it left and the one it joined both need refetching.
+      queryClient.invalidateQueries({ queryKey: ['leagues'] })
       clearImage()
       setEditing(false)
       toast('Score card updated', 'success')
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 403) {
-        toast('This card is locked — the league has disabled edits after verification.', 'error')
+        toast(err.message || 'This card is locked — the league has disabled edits after verification.', 'error')
+      } else if (err instanceof ApiError) {
+        toast(err.message || 'Failed to update score card', 'error')
       }
     },
   })
@@ -1284,6 +1322,9 @@ export default function ScoreCardDetail() {
       lng: card.location_lng ?? undefined,
     })
     setEditLocationId(card.location_id ?? null)
+    setEditContext(contextOfCard(card))
+    setEditLeagueId(cardLeague?.id ?? null)
+    setEditClubId(card.club_id ?? null)
     setEditing(true)
   }
 
@@ -1398,6 +1439,30 @@ export default function ScoreCardDetail() {
               <AlertCircle size={14} /> Editing will reset verification to pending
             </div>
           )}
+
+          <div className="space-y-2 border-b border-subtle pb-4">
+            <label className="block t-section-title">Context</label>
+            <CardContextPicker
+              context={editContext}
+              onContextChange={setEditContext}
+              leagueId={editLeagueId}
+              onLeagueChange={setEditLeagueId}
+              clubId={editClubId}
+              onClubChange={setEditClubId}
+            />
+            {editContext === 'personal' && card.league_round_id && (
+              <p className="text-xs text-muted">
+                Saving takes this card out of {cardLeague?.name ?? 'its league'} and keeps it as a
+                personal card. Its standings entry and verification history go with it.
+              </p>
+            )}
+            {movingToLeague && (
+              <p className="text-xs text-muted">
+                Saving moves this card to the new league&apos;s current round and starts its
+                verification again.
+              </p>
+            )}
+          </div>
 
           <EditScoreGrid shots={editShots} onUpdate={setEditShots} />
 
@@ -1549,7 +1614,7 @@ export default function ScoreCardDetail() {
           {updateMutation.isError && <p className="text-[var(--error-text)] text-sm">Failed to save changes. Please try again.</p>}
 
           <div className="flex gap-2">
-            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !editMeta.shot_at} className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !editMeta.shot_at || editContextIncomplete} className="flex-1 py-2.5 rounded bg-[var(--brass)] text-inverse text-sm font-medium tracking-widest uppercase disabled:opacity-50 disabled:cursor-not-allowed">
               {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
             </button>
             <button onClick={() => setEditing(false)} disabled={updateMutation.isPending} className="px-4 py-2.5 rounded border border-subtle text-muted text-sm hover:text-secondary transition-colors">Cancel</button>

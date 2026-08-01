@@ -47,6 +47,9 @@ services:
       SITE_URL: ${SITE_URL:-https://sub12.io}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-https://sub12.io/reset-password}
       EVENT_INVITATION_URL: ${EVENT_INVITATION_URL:-https://sub12.io/events/invitations}
+      # Reverse geocoding for picked locations. Empty disables the lookup and
+      # the app falls back to showing coordinates.
+      GEOCODE_URL: ${GEOCODE_URL:-https://nominatim.openstreetmap.org}
     # No host port — the frontend nginx proxies /api/ to this container
     # internally. Expose 8080 here only if you need direct curl access.
     depends_on:

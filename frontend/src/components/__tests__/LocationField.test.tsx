@@ -7,6 +7,7 @@ import { LocationField, type LocationValue } from '../LocationField'
 import { scoreCardApi } from '../../api/scoreCards'
 import { pelletTestApi } from '../../api/pelletTesting'
 import { locationsApi, type Location } from '../../api/locations'
+import { geoApi } from '../../api/geo'
 
 function makePlace(partial: Partial<Location> = {}): Location {
   return {
@@ -75,6 +76,8 @@ describe('LocationField', () => {
     vi.spyOn(scoreCardApi, 'list').mockResolvedValue({ items: [] } as Awaited<ReturnType<typeof scoreCardApi.list>>)
     vi.spyOn(pelletTestApi, 'list').mockResolvedValue({ items: [] } as Awaited<ReturnType<typeof pelletTestApi.list>>)
     vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [] })
+    // Default: the geocoder knows nowhere, so coordinates stand.
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -128,6 +131,50 @@ describe('LocationField', () => {
     await waitFor(() =>
       expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0].label).toBe('Ilkley Range'),
     )
+  })
+
+  it('names the point from the map when geolocation lands nowhere the user has saved', async () => {
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue({ name: 'Otley Sports Ground, Otley' })
+    mockGeolocation(53.862, -1.958)
+
+    const { onChange } = renderField()
+    fireEvent.click(screen.getByRole('button', { name: /use my location/i }))
+    await waitFor(() =>
+      expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0].label).toBe(
+        'Otley Sports Ground, Otley',
+      ),
+    )
+    expect(geoApi.reverse).toHaveBeenCalledWith(53.862, -1.958)
+  })
+
+  it('lists a recent card whose label is raw coordinates under the geocoded place name', async () => {
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue({ name: 'Otley Sports Ground, Otley' })
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'a',
+          shot_at: '2026-01-01',
+          total_score: 0,
+          x_count: 0,
+          location: '53.862, -1.958',
+          location_lat: 53.862,
+          location_lng: -1.958,
+          verification: 'verified',
+          is_draft: false,
+          created_at: '',
+        },
+      ],
+    } as Awaited<ReturnType<typeof scoreCardApi.list>>)
+
+    const { onChange } = renderField()
+    const chip = await screen.findByRole('button', { name: 'Otley Sports Ground, Otley' })
+    expect(screen.queryByRole('button', { name: '53.862, -1.958' })).not.toBeInTheDocument()
+    fireEvent.click(chip)
+    expect(onChange).toHaveBeenCalledWith({
+      label: 'Otley Sports Ground, Otley',
+      lat: 53.862,
+      lng: -1.958,
+    })
   })
 
   it('lists a recent card shot at a saved place under that place name', async () => {

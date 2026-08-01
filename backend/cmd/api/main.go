@@ -110,6 +110,7 @@ func main() {
 
 	scoreCardSvc := service.NewScoreCardService(scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 	scoreCardSvc.SetUserReader(userRepo)
+	scoreCardSvc.SetClubRepo(clubRepo)
 	scoreCardSvc.SetLogger(log.Logger)
 
 	statsRepo := repository.NewStatsRepository(pool)
@@ -123,6 +124,7 @@ func main() {
 
 	locationRepo := repository.NewLocationRepository(pool)
 	locationSvc := service.NewLocationService(locationRepo)
+	geocodeSvc := service.NewGeocodeService(cfg.GeocodeURL, cfg.GeocodeUserAgent, rdb, log.Logger)
 
 	leagueSvc := service.NewLeagueService(leagueRepo, clubRepo, activitySvc)
 
@@ -236,6 +238,7 @@ func main() {
 		ReportPerMin:       cfg.RateLimitReportPerMin,
 		LikePerMin:         cfg.RateLimitLikePerMin,
 		SocialTogglePerMin: cfg.RateLimitSocialTogglePerMin,
+		GeocodePerMin:      cfg.RateLimitGeocodePerMin,
 		AuthPerMin:         cfg.RateLimitAuthPerMin,
 	}, rdb)
 
@@ -290,7 +293,7 @@ func main() {
 	adminGearSvc := service.NewAdminGearService(repository.NewAdminGearRepository(pool))
 	go service.NewSimulationRunner(simulationSvc, log.Logger).Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc, geocodeSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

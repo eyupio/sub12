@@ -139,8 +139,13 @@ type UpdateScoreCardInput struct {
 	// LeagueRoundID detaches the card from its league round when set to the
 	// empty string, turning it into a personal card. Omit to keep the current
 	// round. A non-empty value must match the round the card already sits in —
-	// attaching a card to a league is POST /score-cards/{id}/submit-to-league.
+	// attaching a card to a league (or moving it between rounds) is
+	// POST /score-cards/{id}/submit-to-league.
 	LeagueRoundID *string `json:"league_round_id"`
+	// ClubID re-homes the card to another club, or takes it out of one when
+	// set to the empty string. Omit to keep the current club. The caller must
+	// be a member of any club they name.
+	ClubID *string `json:"club_id"`
 }
 
 // Comment is a user comment on any content type (score_card, post, etc.).

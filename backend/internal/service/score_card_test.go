@@ -282,6 +282,77 @@ func TestUpdate_MoveToDifferentRoundRejected(t *testing.T) {
 	assert.False(t, repo.updateCalled)
 }
 
+// --- club re-homing ---
+
+type mockClubRepo struct {
+	isMember bool
+	called   bool
+}
+
+func (m *mockClubRepo) IsMember(_ context.Context, _, _ string) (bool, error) {
+	m.called = true
+	return m.isMember, nil
+}
+
+func updateWithClub(clubID string) *model.UpdateScoreCardInput {
+	return &model.UpdateScoreCardInput{
+		ShotAt:     "2025-01-01",
+		ShotScores: make([]int16, 25),
+		ShotXs:     make([]bool, 25),
+		ClubID:     &clubID,
+	}
+}
+
+// A card captured against a club must be movable to another club the shooter
+// belongs to — the context picker offers every club they are in.
+func TestUpdate_RehomeToAnotherClub(t *testing.T) {
+	current := "club-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", ClubID: &current}}
+	svc := &ScoreCardService{cards: repo, clubs: &mockClubRepo{isMember: true}}
+
+	_, err := svc.Update(context.Background(), "card1", "user1", updateWithClub("club-2"))
+	require.NoError(t, err)
+	require.NotNil(t, repo.lastUpdateInput.ClubID)
+	assert.Equal(t, "club-2", *repo.lastUpdateInput.ClubID)
+}
+
+// The empty string takes the card out of its club, the same "omit to keep,
+// empty to clear" convention the league round uses.
+func TestUpdate_DetachFromClub(t *testing.T) {
+	current := "club-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", ClubID: &current}}
+	clubs := &mockClubRepo{isMember: true}
+	svc := &ScoreCardService{cards: repo, clubs: clubs}
+
+	_, err := svc.Update(context.Background(), "card1", "user1", updateWithClub(""))
+	require.NoError(t, err)
+	require.NotNil(t, repo.lastUpdateInput.ClubID)
+	assert.Equal(t, "", *repo.lastUpdateInput.ClubID)
+	assert.False(t, clubs.called, "leaving a club needs no membership check")
+}
+
+// Echoing the card's own club back reads as "leave it alone".
+func TestUpdate_SameClubIsNoChange(t *testing.T) {
+	current := "club-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", ClubID: &current}}
+	clubs := &mockClubRepo{isMember: true}
+	svc := &ScoreCardService{cards: repo, clubs: clubs}
+
+	_, err := svc.Update(context.Background(), "card1", "user1", updateWithClub(current))
+	require.NoError(t, err)
+	assert.Nil(t, repo.lastUpdateInput.ClubID)
+	assert.False(t, clubs.called)
+}
+
+func TestUpdate_ClubRequiresMembership(t *testing.T) {
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1"}}
+	svc := &ScoreCardService{cards: repo, clubs: &mockClubRepo{isMember: false}}
+
+	_, err := svc.Update(context.Background(), "card1", "user1", updateWithClub("club-2"))
+	assert.ErrorIs(t, err, ErrNotClubMember)
+	assert.False(t, repo.updateCalled)
+}
+
 func TestUpdate_InvalidShotCount(t *testing.T) {
 	svc := newTestService(&mockScoreCardRepo{})
 
@@ -604,27 +675,84 @@ func TestCreate_LeagueSubmission_MemberSucceeds(t *testing.T) {
 }
 
 // --- SubmitToLeague tests ---
-// SubmitToLeague is a parallel submission path that re-enforces the same
-// business rules as Create (membership, max submissions, image required) plus
-// two guards unique to the post-hoc path (no drafts, no double-submission).
+// SubmitToLeague is the one path that attaches a card to a round — from a
+// draft, from a personal card, or from another round — so it re-enforces the
+// same business rules as Create (membership, max submissions, image required).
 // These tests pin each rule independently so a refactor that removes any one
 // guard will surface immediately.
 
-func TestSubmitToLeague_DraftCardRejected(t *testing.T) {
+// A draft can be pointed at a round: that is how the refine flow moves a
+// quick-capture card into a league without graduating it first. The cap and
+// image rules are graduation's job, so a full round must not refuse it.
+func TestSubmitToLeague_DraftCardAccepted(t *testing.T) {
 	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "draft-1", IsDraft: true}}
-	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{
+			isMember:        true,
+			submissionCount: 2,
+			cfg:             &model.LeagueConfig{MaxSubmissionsPerRound: 2, RequireImageUpload: true},
+		},
+	}
 
 	_, err := svc.SubmitToLeague(context.Background(), "draft-1", "user1", "round-1")
-	assert.ErrorIs(t, err, ErrInvalidCard)
-	assert.False(t, repo.submitToLeagueCalled)
+	require.NoError(t, err)
+	assert.True(t, repo.submitToLeagueCalled)
 }
 
-func TestSubmitToLeague_AlreadySubmittedRejected(t *testing.T) {
+// Moving a card from one round to another is the same call — the shooter who
+// picked the wrong league must be able to correct it.
+func TestSubmitToLeague_MovesBetweenRounds(t *testing.T) {
 	existing := "round-1"
 	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false, LeagueRoundID: &existing}}
 	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
 
 	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-2")
+	require.NoError(t, err)
+	assert.True(t, repo.submitToLeagueCalled)
+}
+
+// Re-submitting to the round the card already sits in is a no-op rather than
+// an error, so a form that echoes the current round back is harmless.
+func TestSubmitToLeague_SameRoundIsNoOp(t *testing.T) {
+	existing := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card-1", IsDraft: false, LeagueRoundID: &existing}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
+
+	card, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
+	require.NoError(t, err)
+	assert.Equal(t, "card-1", card.ID)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+// A league that locks decided cards keeps them: a verified card cannot be
+// quietly moved to another league.
+func TestSubmitToLeague_LockedCardCannotMove(t *testing.T) {
+	existing := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{
+		ID: "card-1", IsDraft: false, LeagueRoundID: &existing, Verification: "verified",
+	}}
+	svc := &ScoreCardService{
+		cards: repo,
+		leagueRepo: &mockLeagueRepo{
+			isMember: true,
+			cfg:      &model.LeagueConfig{LockEditsAfterVerification: true},
+		},
+	}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-2")
+	assert.ErrorIs(t, err, ErrEditsLocked)
+	assert.False(t, repo.submitToLeagueCalled)
+}
+
+func TestSubmitToLeague_EventCardRejected(t *testing.T) {
+	participant := "participant-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{
+		ID: "card-1", IsDraft: false, EventParticipantID: &participant,
+	}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{isMember: true}}
+
+	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
 	assert.ErrorIs(t, err, ErrInvalidCard)
 	assert.False(t, repo.submitToLeagueCalled)
 }

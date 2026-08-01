@@ -208,6 +208,52 @@ stable name and keep their UUID.
   redirecting a signed-in user, since the detail pages pass the route param
   straight to endpoints that don't resolve slugs.
 
+### A card's context is never final
+
+A score card is a personal card, a league entry or a club card, and the answer
+given at quick capture must stay changeable — a card captured against the wrong
+league, or one whose round filled up, is moved rather than re-shot. The same
+`CardContextPicker` therefore appears in quick capture, the refine form
+(`ScoreEntry`) and the card's own edit mode (`ScoreCardDetail`).
+
+- **Leaving** a league is a `PATCH` with `league_round_id: ""`; leaving a club
+  is `club_id: ""`. Both follow the "omit to keep, empty string to clear"
+  convention.
+- **Joining or moving** is always `POST /score-cards/{id}/submit-to-league`,
+  which is where league membership, the per-round submission cap and the
+  league's image rule are enforced. `PATCH` refuses a round the card is not
+  already in so those checks can't be bypassed. Submitting to the round the
+  card already sits in is a no-op, not an error.
+- A **draft** can be pointed at a round: that is how the refine flow moves a
+  quick-capture card into a league. The cap and image rules are graduation's
+  job, so a full round never refuses a draft — it just can't graduate there.
+- A card that **moves between rounds** arrives with no history: the previous
+  league's confirmations, community-review request and `score_card_actions`
+  audit trail are cleared in the same transaction, and verification restarts.
+- **Locked** cards (verified or rejected under `lock_edits_after_verification`)
+  refuse both the detach and the move, the same as any other edit.
+- `frontend/src/utils/cardContext.ts` (`contextChangePlan`) is the single place
+  that decides what to send; both call sites just render its plan.
+
+### Naming a picked location
+
+A location the user picks must read as a place, not a grid reference. The rule
+lives in `frontend/src/api/geo.ts` (`nameForPick`) and applies everywhere a
+point is captured — quick capture, score entry, the pellet-test wizard, the map
+picker, the "save this as a new place" dialog, and the recent-location chips:
+
+1. a saved place within `NEARBY_PLACE_THRESHOLD_M` (150m) wins, by name;
+2. then whatever the user typed;
+3. then the reverse geocoder's name for the spot;
+4. and only then `53.862, -1.958`.
+
+`GET /api/v1/geo/reverse?lat=&lng=` fronts a Nominatim-compatible endpoint
+(`GEOCODE_URL`; empty disables the lookup). It caches hits *and* misses in Redis
+under coordinates rounded to three decimals (~110m), paces upstream calls to the
+one per second Nominatim's usage policy allows, and reports every failure as
+"nowhere named here" (204) — a flaky third party must never block saving a card,
+it just means the coordinates stand.
+
 ### Moderator roles
 
 Members a league or club **owner** promotes to help run it are **moderators**,
@@ -289,7 +335,7 @@ as invariants and lean on the tests that pin them.
 
 ### Protected (requires `Authorization: Bearer <jwt>`)
 
-- **Score cards:** CRUD + image upload + comments (write) + community review (`/score-cards/{id}/review-request` + `/confirm`): the owner of a public/followers personal card opens a peer-review request (drafts, private and league cards are refused); any non-owner can confirm, and at the request's `required_confirmations` the request flips to verified (guarded so racing confirms emit one event), notifying the owner. Feed activities inherit the card's visibility. Cancelling discards gathered confirmations and removes the feed post; submitting the card to a league clears both. `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in — moving a card between rounds stays with `submit-to-league`, which runs the membership and cap checks. The refine flow can also save a draft without graduating it, so a card with nowhere to go yet stays editable in Drafts.
+- **Score cards:** CRUD + image upload + comments (write) + community review (`/score-cards/{id}/review-request` + `/confirm`): the owner of a public/followers personal card opens a peer-review request (drafts, private and league cards are refused); any non-owner can confirm, and at the request's `required_confirmations` the request flips to verified (guarded so racing confirms emit one event), notifying the owner. Feed activities inherit the card's visibility. Cancelling discards gathered confirmations and removes the feed post; submitting the card to a league clears both. `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in, and `club_id` follows the same convention — joining or moving between rounds stays with `submit-to-league`, which runs the membership and cap checks (see "A card's context is never final"). The refine flow can also save a draft without graduating it, so a card with nowhere to go yet stays editable in Drafts.
 - **Rifles:** CRUD + image upload + showcase (`GET /rifles/{id}/showcase`)
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
@@ -305,6 +351,7 @@ as invariants and lean on the tests that pin them.
 - **Achievements:** List own + list for user
 - **Stats:** User stats, rifle stats, score trends
 - **Images:** Upload
+- **Geo:** `GET /geo/reverse?lat=&lng=` names a coordinate — see "Naming a picked location"
 
 ### Admin (requires `middleware.RequireAdmin`)
 
@@ -394,6 +441,8 @@ read as generated.
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `SEED_ADMIN` | `false` | Auto-seed admin user on startup |
 | `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
+| `GEOCODE_URL` | `https://nominatim.openstreetmap.org` | Nominatim-compatible endpoint used to name picked coordinates. Empty disables reverse geocoding; the UI then shows coordinates. |
+| `GEOCODE_USER_AGENT` | *(derived from `SITE_URL`)* | Identifies us to that endpoint, as Nominatim's usage policy requires. |
 | `FCM_CREDENTIALS_JSON` | *(empty)* | Firebase service-account JSON for push delivery (FCM HTTP v1). When empty, device tokens are still stored but no push is sent (no-op sender). |
 
 ## CI Pipeline

@@ -5,6 +5,7 @@ import type { Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { useLocations } from '../api/locations'
+import { useReverseGeocode } from '../api/geo'
 import { toast } from '../store/toast'
 import { findNearbyPlace, resolveLocationLabel } from '../utils/geo'
 import { requestPosition } from '../utils/geolocation'
@@ -85,6 +86,11 @@ export function MapLocationPicker({
   // The crosshair sitting on a saved place makes this that place, so the
   // free-text label gives way to its name.
   const nearbyPlace = findNearbyPlace(center[0], center[1], places)
+  // What the map says this point is called. Only asked once the pan settles
+  // (the tracker updates on moveend) and only when no saved place already
+  // names it. Offered as the label rather than forced, so anything the user
+  // types still wins.
+  const { data: suggestion } = useReverseGeocode(center[0], center[1], open && !nearbyPlace)
 
   useEffect(() => {
     if (!open) return
@@ -140,7 +146,8 @@ export function MapLocationPicker({
     const currentCenter = mapRef.current?.getCenter()
     const lat = currentCenter?.lat ?? center[0]
     const lng = currentCenter?.lng ?? center[1]
-    onPick({ label: resolveLocationLabel(label, lat, lng, places), lat, lng })
+    const typed = label.trim()
+    onPick({ label: resolveLocationLabel(typed || suggestion?.name, lat, lng, places), lat, lng })
   }
 
   if (!open) return null
@@ -229,7 +236,7 @@ export function MapLocationPicker({
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="Range / club name"
+                placeholder={suggestion?.name ?? 'Range / club name'}
                 className="w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-[var(--brass)]/50"
               />
             )}

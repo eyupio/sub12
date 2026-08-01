@@ -250,6 +250,10 @@ func (h *ScoreCardHandler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrNotClubMember) {
+			writeError(w, http.StatusForbidden, "you are not a member of that club")
+			return
+		}
 		if errors.Is(err, service.ErrEditsLocked) {
 			writeError(w, http.StatusForbidden, "this score card is locked by league policy")
 			return
@@ -360,6 +364,10 @@ func (h *ScoreCardHandler) SubmitToLeague(w http.ResponseWriter, r *http.Request
 		}
 		if errors.Is(err, service.ErrNotLeagueMember) {
 			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrEditsLocked) {
+			writeError(w, http.StatusForbidden, "this score card is locked by league policy")
 			return
 		}
 		if errors.Is(err, repository.ErrNotFound) {

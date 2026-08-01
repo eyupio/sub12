@@ -84,6 +84,9 @@ type Config struct {
 	// forgot/reset password). Keyed by client IP rather than user ID since
 	// the request is unauthenticated.
 	RateLimitAuthPerMin int `envconfig:"RATELIMIT_AUTH_PER_MIN" default:"10"`
+	// Reverse geocoding is one lookup per location pick, but a user panning a
+	// map picker can fire several in a row.
+	RateLimitGeocodePerMin int `envconfig:"RATELIMIT_GEOCODE_PER_MIN" default:"30"`
 
 	// Moderation flag grace window. When a comment or post is flagged by an
 	// admin, the author gets this long to amend (edit) before the sweeper
@@ -91,6 +94,14 @@ type Config struct {
 	ModerationFlagGrace time.Duration `envconfig:"MODERATION_FLAG_GRACE" default:"48h"`
 	// Interval at which the moderation sweeper runs.
 	ModerationSweepInterval time.Duration `envconfig:"MODERATION_SWEEP_INTERVAL" default:"15m"`
+
+	// Reverse geocoding. GeocodeURL is the base URL of a Nominatim-compatible
+	// endpoint used to turn picked coordinates into a place name; empty
+	// disables the lookup and the UI falls back to showing coordinates.
+	// GeocodeUserAgent identifies us to that endpoint (Nominatim's usage
+	// policy requires it) — leave empty to derive it from SiteURL.
+	GeocodeURL       string `envconfig:"GEOCODE_URL" default:"https://nominatim.openstreetmap.org"`
+	GeocodeUserAgent string `envconfig:"GEOCODE_USER_AGENT" default:""`
 
 	// Push notifications (Firebase Cloud Messaging, HTTP v1). FCMCredentialsJSON
 	// is the full service-account JSON (with client_email + private_key); the
@@ -155,6 +166,13 @@ func (c *Config) applyDerivedDefaults() {
 	}
 	if c.DefaultAvatarURL == "" && base != "" {
 		c.DefaultAvatarURL = base + "/default-avatar.svg"
+	}
+	if c.GeocodeUserAgent == "" {
+		if base != "" {
+			c.GeocodeUserAgent = "sub12 (+" + base + ")"
+		} else {
+			c.GeocodeUserAgent = "sub12"
+		}
 	}
 }
 
