@@ -2,17 +2,44 @@ package model
 
 import "time"
 
+// ClubDisciplines is the canonical set of shooting disciplines a club can
+// advertise. Kept server-side so the directory filter and the club editor
+// agree on spelling — anything outside this set is rejected.
+var ClubDisciplines = []string{
+	"air rifle",
+	"air pistol",
+	"benchrest",
+	"field target",
+	"hunter field target",
+	"rimfire",
+	"smallbore",
+	"fullbore",
+	"target sprint",
+	"silhouette",
+	"plinking",
+}
+
+// ClubProfileListLimit caps how many entries a club may list for each of
+// disciplines, distances and facilities.
+const ClubProfileListLimit = 20
+
 // ClubSummary is the minimal public-facing view of a club used to render a
-// "members-only" banner without leaking members, standings or posts.
+// "members-only" banner without leaking members, standings or posts. It
+// carries enough of the profile (where the club is, what it shoots) for a
+// prospective member to decide whether to request access.
 type ClubSummary struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Description    *string `json:"description,omitempty"`
-	ImageURL       *string `json:"image_url,omitempty"`
-	Type           string  `json:"type"`
-	JoinPolicy     string  `json:"join_policy"`
-	PostVisibility string  `json:"post_visibility"`
-	MemberCount    int     `json:"member_count"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Description    *string  `json:"description,omitempty"`
+	ImageURL       *string  `json:"image_url,omitempty"`
+	Type           string   `json:"type"`
+	JoinPolicy     string   `json:"join_policy"`
+	PostVisibility string   `json:"post_visibility"`
+	MemberCount    int      `json:"member_count"`
+	City           *string  `json:"city,omitempty"`
+	Region         *string  `json:"region,omitempty"`
+	Country        *string  `json:"country,omitempty"`
+	Disciplines    []string `json:"disciplines"`
 }
 
 type Club struct {
@@ -33,8 +60,68 @@ type Club struct {
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
 	MemberCount    int     `json:"member_count"`
+	LeagueCount    int     `json:"league_count"`
 	IsAdmin        bool    `json:"is_admin,omitempty"`
 	IsMember       bool    `json:"is_member,omitempty"`
+
+	// Real-world profile. All optional — an online-only club leaves them unset.
+	WebsiteURL      *string  `json:"website_url,omitempty"`
+	ContactEmail    *string  `json:"contact_email,omitempty"`
+	ContactPhone    *string  `json:"contact_phone,omitempty"`
+	AddressLine1    *string  `json:"address_line1,omitempty"`
+	AddressLine2    *string  `json:"address_line2,omitempty"`
+	City            *string  `json:"city,omitempty"`
+	Region          *string  `json:"region,omitempty"`
+	Postcode        *string  `json:"postcode,omitempty"`
+	Country         *string  `json:"country,omitempty"`
+	Latitude        *float64 `json:"latitude,omitempty"`
+	Longitude       *float64 `json:"longitude,omitempty"`
+	Disciplines     []string `json:"disciplines"`
+	Distances       []string `json:"distances"`
+	Facilities      []string `json:"facilities"`
+	MembershipInfo  *string  `json:"membership_info,omitempty"`
+	VisitorPolicy   *string  `json:"visitor_policy,omitempty"`
+	EstablishedYear *int     `json:"established_year,omitempty"`
+
+	// DistanceKM is populated only when the directory was queried with a
+	// viewer location.
+	DistanceKM *float64 `json:"distance_km,omitempty"`
+}
+
+// ClubOpeningHours is one published session slot for a club. DayOfWeek is
+// 0 = Monday through 6 = Sunday. A day with no rows is simply not published;
+// a row with IsClosed records an explicit "closed" (so a club can say
+// "Mondays: closed" rather than leaving it blank).
+type ClubOpeningHours struct {
+	ID        string  `json:"id"`
+	ClubID    string  `json:"club_id"`
+	DayOfWeek int     `json:"day_of_week"`
+	OpensAt   *string `json:"opens_at,omitempty"`
+	ClosesAt  *string `json:"closes_at,omitempty"`
+	IsClosed  bool    `json:"is_closed"`
+	Note      *string `json:"note,omitempty"`
+}
+
+// ClubOpeningHoursInput is one slot in a full-week replacement payload.
+type ClubOpeningHoursInput struct {
+	DayOfWeek int     `json:"day_of_week"`
+	OpensAt   *string `json:"opens_at"`
+	ClosesAt  *string `json:"closes_at"`
+	IsClosed  bool    `json:"is_closed"`
+	Note      *string `json:"note"`
+}
+
+// ClubDirectoryQuery filters the public club directory.
+type ClubDirectoryQuery struct {
+	Search     string
+	Discipline string
+	Latitude   *float64
+	Longitude  *float64
+	RadiusKM   *float64
+
+	// IncludePrivate lifts the public/membership visibility gate. Only the
+	// platform admin listing sets it.
+	IncludePrivate bool
 }
 
 type ClubMember struct {

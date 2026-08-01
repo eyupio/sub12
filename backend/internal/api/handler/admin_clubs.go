@@ -20,10 +20,13 @@ func NewAdminClubs(svc *service.ClubService) *AdminClubsHandler {
 
 // GET /api/v1/admin/clubs
 func (h *AdminClubsHandler) List(w http.ResponseWriter, r *http.Request) {
-	clubs, err := h.svc.List(r.Context(), "")
+	clubs, err := h.svc.AdminList(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list clubs")
 		return
+	}
+	if clubs == nil {
+		clubs = []*model.Club{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": clubs})
 }

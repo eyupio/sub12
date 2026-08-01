@@ -1,0 +1,22 @@
+DROP INDEX IF EXISTS idx_clubs_city_lower;
+DROP INDEX IF EXISTS idx_clubs_name_lower;
+DROP INDEX IF EXISTS idx_clubs_disciplines;
+DROP INDEX IF EXISTS idx_clubs_coords;
+
+ALTER TABLE clubs DROP COLUMN IF EXISTS established_year;
+ALTER TABLE clubs DROP COLUMN IF EXISTS visitor_policy;
+ALTER TABLE clubs DROP COLUMN IF EXISTS membership_info;
+ALTER TABLE clubs DROP COLUMN IF EXISTS facilities;
+ALTER TABLE clubs DROP COLUMN IF EXISTS distances;
+ALTER TABLE clubs DROP COLUMN IF EXISTS disciplines;
+ALTER TABLE clubs DROP COLUMN IF EXISTS longitude;
+ALTER TABLE clubs DROP COLUMN IF EXISTS latitude;
+ALTER TABLE clubs DROP COLUMN IF EXISTS country;
+ALTER TABLE clubs DROP COLUMN IF EXISTS postcode;
+ALTER TABLE clubs DROP COLUMN IF EXISTS region;
+ALTER TABLE clubs DROP COLUMN IF EXISTS city;
+ALTER TABLE clubs DROP COLUMN IF EXISTS address_line2;
+ALTER TABLE clubs DROP COLUMN IF EXISTS address_line1;
+ALTER TABLE clubs DROP COLUMN IF EXISTS contact_phone;
+ALTER TABLE clubs DROP COLUMN IF EXISTS contact_email;
+ALTER TABLE clubs DROP COLUMN IF EXISTS website_url;

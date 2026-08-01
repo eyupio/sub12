@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Users, X, Trophy, Lock } from 'lucide-react'
+import { Plus, Users, X, Trophy, Lock, MapPin, Navigation } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { ApiError } from '../api/client'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
+import { useDebouncedEffect } from '../hooks/useDebouncedEffect'
+import { requestPosition, type Coords } from '../utils/geolocation'
 import { toast } from '../store/toast'
 import {
   PageGrid,
@@ -107,10 +109,36 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+/** Chip values for the discipline filter; `all` clears it. */
+const DISCIPLINE_CHIPS = [
+  { value: 'all', label: 'All' },
+  { value: 'air rifle', label: 'Air Rifle' },
+  { value: 'air pistol', label: 'Air Pistol' },
+  { value: 'benchrest', label: 'Benchrest' },
+  { value: 'field target', label: 'Field Target' },
+  { value: 'hunter field target', label: 'HFT' },
+  { value: 'rimfire', label: 'Rimfire' },
+  { value: 'smallbore', label: 'Smallbore' },
+  { value: 'fullbore', label: 'Fullbore' },
+] as const
+
+type DisciplineChip = (typeof DISCIPLINE_CHIPS)[number]['value']
+
+/** Radius applied when a viewer asks for clubs near them. */
+const NEAR_ME_RADIUS_KM = 80
+
 export default function Clubs() {
   const [showCreate, setShowCreate] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [code, setCode] = useState('')
+  const [discipline, setDiscipline] = useState<DisciplineChip>('all')
+  const [coords, setCoords] = useState<Coords | null>(null)
+  const [locating, setLocating] = useState(false)
+
+  // Search now runs server-side so town, region and postcode match too — debounce
+  // so a keystroke doesn't become a request.
+  useDebouncedEffect(() => setDebouncedSearch(search), [search], 300)
 
   function handleSearch(v: string) {
     setSearch(v)
@@ -127,24 +155,42 @@ export default function Clubs() {
     setCode('')
   }
 
+  async function toggleNearMe() {
+    if (coords) { setCoords(null); return }
+    setLocating(true)
+    try {
+      setCoords(await requestPosition())
+    } catch {
+      toast('Could not get your location — check location permissions.', 'error')
+    } finally {
+      setLocating(false)
+    }
+  }
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['clubs', code || null],
-    queryFn: () => clubsApi.list(code ? { code } : undefined),
+    queryKey: ['clubs', code || null, debouncedSearch, discipline, coords],
+    queryFn: () => clubsApi.list(code
+      ? { code }
+      : {
+          q: debouncedSearch,
+          discipline: discipline === 'all' ? undefined : discipline,
+          lat: coords?.lat,
+          lng: coords?.lng,
+          radiusKm: coords ? NEAR_ME_RADIUS_KM : undefined,
+        }),
   })
 
-  const filtered: Club[] = useMemo(() => {
-    const all = data?.items ?? []
-    if (code) return all
-    const q = search.trim().toLowerCase()
-    if (!q) return all
-    return all.filter((c) => c.name.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q))
-  }, [data, search, code])
+  const filtered: Club[] = useMemo(() => data?.items ?? [], [data])
 
   const stats = useMemo(() => {
-    const total = data?.items?.length ?? 0
-    const totalMembers = (data?.items ?? []).reduce((s, c) => s + c.member_count, 0)
-    const totalLeagues = (data?.items ?? []).reduce((s, c) => s + (c.league_count ?? 0), 0)
-    return { total, totalMembers, totalLeagues }
+    const all = data?.items ?? []
+    const mine = all.filter((c) => c.is_member)
+    return {
+      mine: mine.length,
+      fellowMembers: mine.reduce((s, c) => s + c.member_count, 0),
+      leagues: mine.reduce((s, c) => s + c.league_count, 0),
+      directory: all.length,
+    }
   }, [data])
 
   return (
@@ -160,14 +206,37 @@ export default function Clubs() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatTile
             label="Member Of"
-            value={String(stats.total)}
-            sub={stats.total === 0 ? 'no clubs yet' : `${stats.total} club${stats.total !== 1 ? 's' : ''}`}
+            value={String(stats.mine)}
+            sub={stats.mine === 0 ? 'no clubs yet' : `${stats.mine} club${stats.mine !== 1 ? 's' : ''}`}
           />
-          <StatTile label="Total Shooters" value={String(stats.totalMembers)} sub="across your clubs" />
-          <StatTile label="Active Leagues" value={String(stats.totalLeagues)} sub="in your clubs" />
-          <StatTile label="Top Card" value="—" sub="best across clubs" />
+          <StatTile label="Fellow Members" value={String(stats.fellowMembers)} sub="across your clubs" />
+          <StatTile label="Club Leagues" value={String(stats.leagues)} sub="in your clubs" />
+          <StatTile
+            label="In Directory"
+            value={String(stats.directory)}
+            sub={coords ? `within ${NEAR_ME_RADIUS_KM} km` : 'clubs you can browse'}
+          />
         </div>
-        <FilterRow search={search} onSearch={handleSearch} onSubmit={handleCodeSubmit} placeholder="Search by name or code…" />
+        <FilterRow
+          search={search}
+          onSearch={handleSearch}
+          onSubmit={handleCodeSubmit}
+          placeholder="Search name, town, postcode or code…"
+          chips={DISCIPLINE_CHIPS.map((c) => ({ value: c.value, label: c.label }))}
+          activeChip={discipline}
+          onChip={(v) => setDiscipline(v)}
+        />
+
+        <button
+          type="button"
+          onClick={toggleNearMe}
+          disabled={locating}
+          className="lc-action-ghost self-start"
+          style={coords ? { background: 'var(--gold)', color: 'white' } : undefined}
+        >
+          <MapPin size={12} />
+          {locating ? 'Locating…' : coords ? `Near me · ${NEAR_ME_RADIUS_KM} km` : 'Near me'}
+        </button>
 
         {code && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
@@ -211,9 +280,12 @@ export default function Clubs() {
           <div className="lc-stack">
             {filtered.map((club) => {
               const isPrivate = club.type === 'private'
+              const place = [club.city, club.region].filter(Boolean).join(', ')
               const meta = [
                 { icon: <Users size={12} />, text: `${club.member_count} member${club.member_count !== 1 ? 's' : ''}` },
-                ...(club.league_count != null ? [{ icon: <Trophy size={12} />, text: `${club.league_count} league${club.league_count !== 1 ? 's' : ''}` }] : []),
+                ...(club.league_count > 0 ? [{ icon: <Trophy size={12} />, text: `${club.league_count} league${club.league_count !== 1 ? 's' : ''}` }] : []),
+                ...(place ? [{ icon: <MapPin size={12} />, text: place }] : []),
+                ...(club.distance_km != null ? [{ icon: <Navigation size={12} />, text: `${club.distance_km.toFixed(1)} km away` }] : []),
               ]
               return (
                 <EntityCard

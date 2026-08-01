@@ -26,6 +26,10 @@ type UpdateLeagueInput struct {
 
 // UpdateClubInput holds fields that a platform admin may change on any club,
 // plus fields that club admins may change via the club settings page.
+// Text fields follow an "omit to keep, empty string to clear" convention so a
+// description or phone number can actually be blanked out; arrays clear by
+// sending an empty array. Coordinates only clear via ClearCoordinates, since
+// 0/0 is a real (if unlikely) location.
 type UpdateClubInput struct {
 	Name           *string `json:"name"`
 	Description    *string `json:"description"`
@@ -35,4 +39,23 @@ type UpdateClubInput struct {
 	DateFormat     *string `json:"date_format"`
 	TimeFormat     *string `json:"time_format"`
 	Timezone       *string `json:"timezone"`
+
+	WebsiteURL       *string   `json:"website_url"`
+	ContactEmail     *string   `json:"contact_email"`
+	ContactPhone     *string   `json:"contact_phone"`
+	AddressLine1     *string   `json:"address_line1"`
+	AddressLine2     *string   `json:"address_line2"`
+	City             *string   `json:"city"`
+	Region           *string   `json:"region"`
+	Postcode         *string   `json:"postcode"`
+	Country          *string   `json:"country"`
+	Latitude         *float64  `json:"latitude"`
+	Longitude        *float64  `json:"longitude"`
+	ClearCoordinates bool      `json:"clear_coordinates"`
+	Disciplines      *[]string `json:"disciplines"`
+	Distances        *[]string `json:"distances"`
+	Facilities       *[]string `json:"facilities"`
+	MembershipInfo   *string   `json:"membership_info"`
+	VisitorPolicy    *string   `json:"visitor_policy"`
+	EstablishedYear  *int      `json:"established_year"`
 }

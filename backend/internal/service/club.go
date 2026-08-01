@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
@@ -22,16 +23,30 @@ var (
 	ErrClubPendingRequest = errors.New("join request already pending")
 	ErrClubInvalidCode    = errors.New("invalid join code")
 	ErrClubInvalidDecide  = errors.New("decision must be 'approved' or 'rejected'")
+	ErrClubValidation     = errors.New("invalid club details")
 )
 
+// clubInvalid builds a validation error that handlers surface verbatim as a
+// 422, so the club editor can point at the offending field.
+func clubInvalid(format string, a ...any) error {
+	return fmt.Errorf("%w: %s", ErrClubValidation, fmt.Sprintf(format, a...))
+}
+
 type ClubService struct {
-	repo         *repository.ClubRepository
-	activity     *ActivityService    // nil disables feed ingestion
-	achievements *AchievementService // nil disables achievement evaluation
+	repo          *repository.ClubRepository
+	activity      *ActivityService     // nil disables feed ingestion
+	achievements  *AchievementService  // nil disables achievement evaluation
+	notifications *NotificationService // nil disables notification fan-out
 }
 
 func NewClubService(repo *repository.ClubRepository, activity *ActivityService, achievements *AchievementService) *ClubService {
 	return &ClubService{repo: repo, activity: activity, achievements: achievements}
+}
+
+// SetNotifications wires notification fan-out. Optional — without it club
+// actions still succeed, they just notify nobody.
+func (s *ClubService) SetNotifications(n *NotificationService) {
+	s.notifications = n
 }
 
 func (s *ClubService) Create(ctx context.Context, userID string, input *model.CreateClubInput) (*model.Club, error) {
@@ -69,8 +84,15 @@ func (s *ClubService) GetByID(ctx context.Context, clubID, viewerID, viewerRole 
 	return club, nil
 }
 
-func (s *ClubService) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
-	clubs, err := s.repo.List(ctx, viewerID)
+// List returns the club directory for a viewer, narrowed by the supplied
+// filters. An unknown discipline yields an empty directory rather than an
+// error — the filter is a discovery aid, not a mutation.
+func (s *ClubService) List(ctx context.Context, viewerID string, q model.ClubDirectoryQuery) ([]*model.Club, error) {
+	// Proximity only makes sense with both coordinates; a lone one is ignored.
+	if q.Latitude == nil || q.Longitude == nil {
+		q.Latitude, q.Longitude, q.RadiusKM = nil, nil, nil
+	}
+	clubs, err := s.repo.List(ctx, viewerID, q)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +146,10 @@ func (s *ClubService) SummaryByID(ctx context.Context, clubID string) (*model.Cl
 		JoinPolicy:     club.JoinPolicy,
 		PostVisibility: club.PostVisibility,
 		MemberCount:    club.MemberCount,
+		City:           club.City,
+		Region:         club.Region,
+		Country:        club.Country,
+		Disciplines:    club.Disciplines,
 	}, nil
 }
 
@@ -285,15 +311,32 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 		if err := s.repo.Join(ctx, clubID, req.UserID); err != nil {
 			return err
 		}
+		club, clubErr := s.repo.GetByID(ctx, clubID, "")
 		if s.activity != nil {
 			// Skip the activity feed entry entirely if we can't resolve the
 			// club name — better to drop one best-effort entry than to write
 			// a blank-name "joined club" record that nobody can debug later.
-			if club, err := s.repo.GetByID(ctx, clubID, ""); err == nil && club != nil {
+			if clubErr == nil && club != nil {
 				cid, tt := clubID, "club"
 				meta := model.JoinedClubMeta{ClubName: club.Name}
 				go s.activity.Ingest(context.Background(), req.UserID, model.ActivityJoinedClub, &cid, &tt, meta, nil, &cid, "public")
 			}
+		}
+		if s.notifications != nil {
+			cid, tt := clubID, "club"
+			meta := map[string]any{}
+			if clubErr == nil && club != nil {
+				meta["club_name"] = club.Name
+			}
+			s.notifications.Fanout(ctx, NotifEvent{
+				RecipientID: req.UserID,
+				ActorID:     adminID,
+				Type:        model.NotificationTypeClubJoinApproved,
+				TargetID:    &cid,
+				TargetType:  &tt,
+				ClubID:      &cid,
+				Metadata:    meta,
+			})
 		}
 		if s.achievements != nil {
 			go s.achievements.EvaluateForClubJoin(context.Background(), req.UserID)
@@ -324,7 +367,7 @@ func (s *ClubService) UpdateImageURL(ctx context.Context, clubID, requesterID, u
 	return s.repo.UpdateImageURL(ctx, clubID, url)
 }
 
-// UpdateClub allows a club admin to update name/description.
+// UpdateClub allows a club admin to update the club's settings and profile.
 func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string, in *model.UpdateClubInput) (*model.Club, error) {
 	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
 	if err != nil {
@@ -333,26 +376,280 @@ func (s *ClubService) UpdateClub(ctx context.Context, clubID, requesterID string
 	if !isAdmin {
 		return nil, ErrClubNotAdmin
 	}
-	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
-		return nil, ErrInvalidClub
-	}
-	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
-		return nil, ErrInvalidClub
-	}
-	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
-		return nil, ErrInvalidClub
-	}
-	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
-		return nil, ErrInvalidClub
-	}
-	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
-		return nil, ErrInvalidClub
+	if err := ValidateClubUpdate(in); err != nil {
+		return nil, err
 	}
 	club, err := s.repo.AdminUpdate(ctx, clubID, in)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrClubNotFound, err)
 	}
 	return club, nil
+}
+
+// ValidateClubUpdate normalises and checks a club update in place. It is shared
+// by the club-admin and platform-admin paths so both enforce the same rules.
+func ValidateClubUpdate(in *model.UpdateClubInput) error {
+	if in.Name != nil {
+		*in.Name = strings.TrimSpace(*in.Name)
+		if *in.Name == "" {
+			return ErrInvalidClub
+		}
+	}
+	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
+		return ErrClubInvalidType
+	}
+	if in.JoinPolicy != nil && *in.JoinPolicy != "open" && *in.JoinPolicy != "invite_code" && *in.JoinPolicy != "approval" {
+		return ErrClubInvalidPolicy
+	}
+	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
+		return ErrInvalidClub
+	}
+	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
+		return ErrInvalidClub
+	}
+	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
+		return ErrInvalidClub
+	}
+	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
+		return ErrInvalidClub
+	}
+
+	// Free-text profile fields: trim, then bound so one club can't push a
+	// novel into the directory.
+	text := []struct {
+		field *string
+		name  string
+		max   int
+	}{
+		{in.Description, "description", 2000},
+		{in.WebsiteURL, "website_url", 500},
+		{in.ContactEmail, "contact_email", 254},
+		{in.ContactPhone, "contact_phone", 40},
+		{in.AddressLine1, "address_line1", 200},
+		{in.AddressLine2, "address_line2", 200},
+		{in.City, "city", 120},
+		{in.Region, "region", 120},
+		{in.Postcode, "postcode", 20},
+		{in.Country, "country", 120},
+		{in.MembershipInfo, "membership_info", 4000},
+		{in.VisitorPolicy, "visitor_policy", 4000},
+	}
+	for _, t := range text {
+		if t.field == nil {
+			continue
+		}
+		*t.field = strings.TrimSpace(*t.field)
+		if len([]rune(*t.field)) > t.max {
+			return clubInvalid("%s must be %d characters or fewer", t.name, t.max)
+		}
+	}
+
+	if in.WebsiteURL != nil && *in.WebsiteURL != "" {
+		if !strings.HasPrefix(*in.WebsiteURL, "http://") && !strings.HasPrefix(*in.WebsiteURL, "https://") {
+			return clubInvalid("website_url must start with http:// or https://")
+		}
+	}
+	if in.ContactEmail != nil && *in.ContactEmail != "" && !looksLikeEmail(*in.ContactEmail) {
+		return clubInvalid("contact_email must be a valid email address")
+	}
+
+	// Coordinates are only meaningful as a pair.
+	if !in.ClearCoordinates && (in.Latitude != nil) != (in.Longitude != nil) {
+		return clubInvalid("latitude and longitude must be set together")
+	}
+	if in.Latitude != nil && (*in.Latitude < -90 || *in.Latitude > 90) {
+		return clubInvalid("latitude must be between -90 and 90")
+	}
+	if in.Longitude != nil && (*in.Longitude < -180 || *in.Longitude > 180) {
+		return clubInvalid("longitude must be between -180 and 180")
+	}
+
+	if in.EstablishedYear != nil && *in.EstablishedYear != 0 {
+		// 0 is the agreed "clear this" value; anything else must be plausible.
+		if *in.EstablishedYear < 1800 || *in.EstablishedYear > time.Now().Year() {
+			return clubInvalid("established_year must be between 1800 and %d", time.Now().Year())
+		}
+	}
+
+	if in.Disciplines != nil {
+		normalised, err := normaliseDisciplines(*in.Disciplines)
+		if err != nil {
+			return err
+		}
+		*in.Disciplines = normalised
+	}
+	for _, l := range []struct {
+		list *[]string
+		name string
+	}{{in.Distances, "distances"}, {in.Facilities, "facilities"}} {
+		if l.list == nil {
+			continue
+		}
+		normalised, err := normaliseFreeList(*l.list, l.name)
+		if err != nil {
+			return err
+		}
+		*l.list = normalised
+	}
+
+	return nil
+}
+
+// looksLikeEmail is a shape check, not an RFC validator — the club editor just
+// needs to catch obvious typos in a published contact address.
+func looksLikeEmail(s string) bool {
+	at := strings.Index(s, "@")
+	if at <= 0 || at == len(s)-1 || strings.Count(s, "@") != 1 {
+		return false
+	}
+	domain := s[at+1:]
+	return strings.Contains(domain, ".") && !strings.HasPrefix(domain, ".") && !strings.HasSuffix(domain, ".") &&
+		!strings.ContainsAny(s, " \t")
+}
+
+// normaliseDisciplines lower-cases, de-duplicates and validates the supplied
+// disciplines against model.ClubDisciplines so directory filters match.
+func normaliseDisciplines(in []string) ([]string, error) {
+	if len(in) > model.ClubProfileListLimit {
+		return nil, clubInvalid("disciplines is limited to %d entries", model.ClubProfileListLimit)
+	}
+	allowed := make(map[string]struct{}, len(model.ClubDisciplines))
+	for _, d := range model.ClubDisciplines {
+		allowed[d] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		d := strings.ToLower(strings.TrimSpace(raw))
+		if d == "" {
+			continue
+		}
+		if _, ok := allowed[d]; !ok {
+			return nil, clubInvalid("%q is not a recognised discipline", raw)
+		}
+		if _, dup := seen[d]; dup {
+			continue
+		}
+		seen[d] = struct{}{}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+// normaliseFreeList trims, de-duplicates and bounds a free-text profile list
+// such as distances or facilities.
+func normaliseFreeList(in []string, name string) ([]string, error) {
+	if len(in) > model.ClubProfileListLimit {
+		return nil, clubInvalid("%s is limited to %d entries", name, model.ClubProfileListLimit)
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		v := strings.TrimSpace(raw)
+		if v == "" {
+			continue
+		}
+		if len([]rune(v)) > 60 {
+			return nil, clubInvalid("each %s entry must be 60 characters or fewer", name)
+		}
+		key := strings.ToLower(v)
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// GetOpeningHours returns a club's published week. Private clubs are gated to
+// members; site admins bypass the gate.
+func (s *ClubService) GetOpeningHours(ctx context.Context, clubID, viewerID, viewerRole string) ([]*model.ClubOpeningHours, error) {
+	if err := s.ensureClubAccess(ctx, clubID, viewerID, viewerRole); err != nil {
+		return nil, err
+	}
+	return s.repo.ListOpeningHours(ctx, clubID)
+}
+
+// ReplaceOpeningHours swaps a club's whole published week. Club admins only.
+func (s *ClubService) ReplaceOpeningHours(ctx context.Context, clubID, requesterID string, slots []model.ClubOpeningHoursInput) ([]*model.ClubOpeningHours, error) {
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	if !isAdmin {
+		return nil, ErrClubNotAdmin
+	}
+	if err := ValidateOpeningHours(slots); err != nil {
+		return nil, err
+	}
+	if err := s.repo.ReplaceOpeningHours(ctx, clubID, slots); err != nil {
+		return nil, err
+	}
+	return s.repo.ListOpeningHours(ctx, clubID)
+}
+
+// ClubOpeningHoursLimit caps how many slots a club may publish across the week
+// (three per day is enough for morning/afternoon/evening sessions).
+const ClubOpeningHoursLimit = 21
+
+// ValidateOpeningHours normalises and checks a full-week opening hours payload
+// in place.
+func ValidateOpeningHours(slots []model.ClubOpeningHoursInput) error {
+	if len(slots) > ClubOpeningHoursLimit {
+		return clubInvalid("opening hours are limited to %d slots per week", ClubOpeningHoursLimit)
+	}
+	for i := range slots {
+		s := &slots[i]
+		if s.DayOfWeek < 0 || s.DayOfWeek > 6 {
+			return clubInvalid("day_of_week must be between 0 (Monday) and 6 (Sunday)")
+		}
+		if s.Note != nil {
+			*s.Note = strings.TrimSpace(*s.Note)
+			if len([]rune(*s.Note)) > 120 {
+				return clubInvalid("opening hours note must be 120 characters or fewer")
+			}
+		}
+		if s.IsClosed {
+			// A closed day carries no times, whatever the client sent.
+			s.OpensAt, s.ClosesAt = nil, nil
+			continue
+		}
+		if s.OpensAt == nil || s.ClosesAt == nil {
+			return clubInvalid("opens_at and closes_at are required unless the day is marked closed")
+		}
+		opens, err := time.Parse("15:04", strings.TrimSpace(*s.OpensAt))
+		if err != nil {
+			return clubInvalid("opens_at must be a 24-hour HH:MM time")
+		}
+		closes, err := time.Parse("15:04", strings.TrimSpace(*s.ClosesAt))
+		if err != nil {
+			return clubInvalid("closes_at must be a 24-hour HH:MM time")
+		}
+		if !closes.After(opens) {
+			return clubInvalid("closes_at must be later than opens_at")
+		}
+		*s.OpensAt = opens.Format("15:04")
+		*s.ClosesAt = closes.Format("15:04")
+	}
+	return nil
+}
+
+// DeleteClub lets a club admin delete their own club. Everything hanging off
+// the club (members, join requests, opening hours, posts) cascades; leagues
+// are detached rather than deleted, per the club_id FK.
+func (s *ClubService) DeleteClub(ctx context.Context, clubID, requesterID string) error {
+	isAdmin, err := s.repo.IsAdmin(ctx, clubID, requesterID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrClubNotAdmin
+	}
+	if err := s.repo.AdminDelete(ctx, clubID); err != nil {
+		return fmt.Errorf("%w: %v", ErrClubNotFound, err)
+	}
+	return nil
 }
 
 // RegenerateJoinCode rotates the club's invite code. Admins only.
@@ -403,22 +700,17 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 	return s.repo.UpdateMemberRole(ctx, clubID, targetID, isAdmin)
 }
 
+// AdminList returns every club, private ones included, for the platform admin
+// console. Join codes are left intact — the admin console needs them to
+// support club owners.
+func (s *ClubService) AdminList(ctx context.Context) ([]*model.Club, error) {
+	return s.repo.List(ctx, "", model.ClubDirectoryQuery{IncludePrivate: true})
+}
+
 // AdminUpdateClub applies a partial update to any club without ownership checks.
 func (s *ClubService) AdminUpdateClub(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
-	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
-		return nil, ErrInvalidClub
-	}
-	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
-		return nil, ErrInvalidClub
-	}
-	if in.DateFormat != nil && !IsValidDateFormat(*in.DateFormat) {
-		return nil, ErrInvalidClub
-	}
-	if in.TimeFormat != nil && !IsValidTimeFormat(*in.TimeFormat) {
-		return nil, ErrInvalidClub
-	}
-	if in.Timezone != nil && !IsValidTimezone(*in.Timezone) {
-		return nil, ErrInvalidClub
+	if err := ValidateClubUpdate(in); err != nil {
+		return nil, err
 	}
 	club, err := s.repo.AdminUpdate(ctx, id, in)
 	if err != nil {

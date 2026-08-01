@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -27,6 +28,46 @@ type ClubRepository struct {
 
 func NewClubRepository(db *pgxpool.Pool) *ClubRepository {
 	return &ClubRepository{db: db}
+}
+
+// clubColumns is the shared club projection. Every club query selects these in
+// this order and scans them through scanClub, so adding a column is a
+// single-line change rather than six.
+const clubColumns = `
+	c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
+	c.type::text, c.join_policy::text, c.post_visibility,
+	c.date_format, c.time_format, c.timezone,
+	c.created_by, c.created_at::text, c.updated_at::text,
+	c.website_url, c.contact_email, c.contact_phone,
+	c.address_line1, c.address_line2, c.city, c.region, c.postcode, c.country,
+	c.latitude, c.longitude,
+	c.disciplines, c.distances, c.facilities,
+	c.membership_info, c.visitor_policy, c.established_year,
+	(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int,
+	(SELECT COUNT(*) FROM leagues WHERE club_id = c.id)::int`
+
+// rowScanner covers both pgx.Row and pgx.Rows so scanClub serves single-row
+// and multi-row queries alike.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanClub reads the clubColumns projection into club. Any columns a query
+// appends after the shared projection are scanned into extra, in order.
+func scanClub(row rowScanner, club *model.Club, extra ...any) error {
+	dest := []any{
+		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL, &club.JoinCode,
+		&club.Type, &club.JoinPolicy, &club.PostVisibility,
+		&club.DateFormat, &club.TimeFormat, &club.Timezone,
+		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.WebsiteURL, &club.ContactEmail, &club.ContactPhone,
+		&club.AddressLine1, &club.AddressLine2, &club.City, &club.Region, &club.Postcode, &club.Country,
+		&club.Latitude, &club.Longitude,
+		&club.Disciplines, &club.Distances, &club.Facilities,
+		&club.MembershipInfo, &club.VisitorPolicy, &club.EstablishedYear,
+		&club.MemberCount, &club.LeagueCount,
+	}
+	return row.Scan(append(dest, extra...)...)
 }
 
 func (r *ClubRepository) Create(ctx context.Context, userID string, input *model.CreateClubInput) (*model.Club, error) {
@@ -55,12 +96,14 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 		RETURNING id, name, coalesce(slug, ''), description, image_url, join_code,
 		          type::text, join_policy::text, post_visibility,
 		          date_format, time_format, timezone,
-		          created_by, created_at::text, updated_at::text
+		          created_by, created_at::text, updated_at::text,
+		          disciplines, distances, facilities
 	`, input.Name, input.Description, userID, clubType, joinPolicy).Scan(
 		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
 		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
 		&club.DateFormat, &club.TimeFormat, &club.Timezone,
 		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
+		&club.Disciplines, &club.Distances, &club.Facilities,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert club: %w", err)
@@ -92,52 +135,32 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 	if err != nil {
 		return nil, err
 	}
+	return r.getOne(ctx, "c.id = $1", clubID, viewerID)
+}
+
+// getOne fetches a single club matched by whereClause, which must reference the
+// club key as $1. When viewerID is non-empty, IsAdmin and IsMember are
+// populated for that viewer; otherwise the member/admin subqueries are skipped
+// so an empty string never reaches a UUID cast.
+func (r *ClubRepository) getOne(ctx context.Context, whereClause, key, viewerID string) (*model.Club, error) {
 	var club model.Club
+	var err error
+
 	if viewerID == "" {
-		// Unauthenticated: skip member/admin subqueries to avoid invalid UUID cast
-		err := r.db.QueryRow(ctx, `
-			SELECT
-				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-				c.type::text, c.join_policy::text, c.post_visibility,
-				c.date_format, c.time_format, c.timezone,
-				c.created_by, c.created_at::text, c.updated_at::text,
-				(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count
+		query := fmt.Sprintf(`SELECT %s FROM clubs c WHERE %s LIMIT 1`, clubColumns, whereClause)
+		err = scanClub(r.db.QueryRow(ctx, query, key), &club)
+	} else {
+		query := fmt.Sprintf(`
+			SELECT %s,
+				COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false),
+				EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid)
 			FROM clubs c
-			WHERE c.id = $1
-		`, clubID).Scan(
-			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-			&club.DateFormat, &club.TimeFormat, &club.Timezone,
-			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-			&club.MemberCount,
-		)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrNotFound
-			}
-			return nil, fmt.Errorf("get club: %w", err)
-		}
-		return &club, nil
+			WHERE %s
+			LIMIT 1
+		`, clubColumns, whereClause)
+		err = scanClub(r.db.QueryRow(ctx, query, key, viewerID), &club, &club.IsAdmin, &club.IsMember)
 	}
 
-	err = r.db.QueryRow(ctx, `
-		SELECT
-			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-			c.type::text, c.join_policy::text, c.post_visibility,
-			c.date_format, c.time_format, c.timezone,
-			c.created_by, c.created_at::text, c.updated_at::text,
-			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
-			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false) AS is_admin,
-			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid) AS is_member
-		FROM clubs c
-		WHERE c.id = $1
-	`, clubID, viewerID).Scan(
-		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-		&club.DateFormat, &club.TimeFormat, &club.Timezone,
-		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-		&club.MemberCount, &club.IsAdmin, &club.IsMember,
-	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -152,117 +175,73 @@ func (r *ClubRepository) GetByID(ctx context.Context, clubID, viewerID string) (
 // populated for the viewer; otherwise both are false. Returns ErrNotFound when
 // no row matches.
 func (r *ClubRepository) GetByJoinCode(ctx context.Context, code, viewerID string) (*model.Club, error) {
-	var club model.Club
-	if viewerID == "" {
-		err := r.db.QueryRow(ctx, `
-			SELECT
-				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-				c.type::text, c.join_policy::text, c.post_visibility,
-				c.date_format, c.time_format, c.timezone,
-				c.created_by, c.created_at::text, c.updated_at::text,
-				(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count
-			FROM clubs c
-			WHERE UPPER(c.join_code) = UPPER($1)
-			LIMIT 1
-		`, code).Scan(
-			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-			&club.DateFormat, &club.TimeFormat, &club.Timezone,
-			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-			&club.MemberCount,
-		)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrNotFound
-			}
-			return nil, fmt.Errorf("get club by join code: %w", err)
-		}
-		return &club, nil
-	}
-
-	err := r.db.QueryRow(ctx, `
-		SELECT
-			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-			c.type::text, c.join_policy::text, c.post_visibility,
-			c.date_format, c.time_format, c.timezone,
-			c.created_by, c.created_at::text, c.updated_at::text,
-			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
-			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false) AS is_admin,
-			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid) AS is_member
-		FROM clubs c
-		WHERE UPPER(c.join_code) = UPPER($1)
-		LIMIT 1
-	`, code, viewerID).Scan(
-		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-		&club.DateFormat, &club.TimeFormat, &club.Timezone,
-		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-		&club.MemberCount, &club.IsAdmin, &club.IsMember,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("get club by join code: %w", err)
-	}
-	return &club, nil
+	return r.getOne(ctx, "UPPER(c.join_code) = UPPER($1)", code, viewerID)
 }
 
-func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Club, error) {
-	if viewerID == "" {
-		// Public clubs directory: hide private clubs from unauthenticated viewers.
-		rows, err := r.db.Query(ctx, `
-			SELECT
-				c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-				c.type::text, c.join_policy::text, c.post_visibility,
-				c.date_format, c.time_format, c.timezone,
-				c.created_by, c.created_at::text, c.updated_at::text,
-				COUNT(cm.user_id)::int AS member_count
-			FROM clubs c
-			LEFT JOIN club_members cm ON cm.club_id = c.id
-			WHERE c.type = 'public'
-			GROUP BY c.id
-			ORDER BY c.created_at DESC
-		`)
-		if err != nil {
-			return nil, fmt.Errorf("list clubs: %w", err)
-		}
-		defer rows.Close()
-
-		var clubs []*model.Club
-		for rows.Next() {
-			var club model.Club
-			if err := rows.Scan(
-				&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-				&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-				&club.DateFormat, &club.TimeFormat, &club.Timezone,
-				&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-				&club.MemberCount,
-			); err != nil {
-				return nil, fmt.Errorf("scan club: %w", err)
-			}
-			clubs = append(clubs, &club)
-		}
-		return clubs, rows.Err()
+// List returns the club directory visible to viewerID — public clubs plus, for
+// authenticated viewers, the private clubs they belong to — narrowed by the
+// directory filters. When the query carries coordinates, DistanceKM is
+// populated for clubs that published a location and results come back
+// nearest-first.
+func (r *ClubRepository) List(ctx context.Context, viewerID string, q model.ClubDirectoryQuery) ([]*model.Club, error) {
+	var args []any
+	arg := func(v any) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
 	}
 
-	// Authenticated viewers see public clubs + private clubs they belong to.
-	rows, err := r.db.Query(ctx, `
-		SELECT
-			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-			c.type::text, c.join_policy::text, c.post_visibility,
-			c.date_format, c.time_format, c.timezone,
-			c.created_by, c.created_at::text, c.updated_at::text,
-			COUNT(cm.user_id)::int AS member_count,
-			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $1::uuid), false) AS is_admin,
-			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $1::uuid) AS is_member
-		FROM clubs c
-		LEFT JOIN club_members cm ON cm.club_id = c.id
-		WHERE c.type = 'public'
-		   OR EXISTS (SELECT 1 FROM club_members cm2 WHERE cm2.club_id = c.id AND cm2.user_id = $1::uuid)
-		GROUP BY c.id
-		ORDER BY c.created_at DESC
-	`, viewerID)
+	selects := clubColumns
+	extras := func(club *model.Club) []any { return nil }
+
+	visibility := "c.type = 'public'"
+	if q.IncludePrivate {
+		visibility = "TRUE"
+	}
+	if viewerID != "" && !q.IncludePrivate {
+		viewer := arg(viewerID)
+		visibility = fmt.Sprintf(
+			"(c.type = 'public' OR EXISTS (SELECT 1 FROM club_members cm WHERE cm.club_id = c.id AND cm.user_id = %s::uuid))",
+			viewer,
+		)
+		selects += fmt.Sprintf(`,
+			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = %s::uuid), false),
+			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = %s::uuid)`, viewer, viewer)
+		extras = func(club *model.Club) []any { return []any{&club.IsAdmin, &club.IsMember} }
+	}
+	where := []string{visibility}
+
+	if s := strings.TrimSpace(q.Search); s != "" {
+		p := arg("%" + s + "%")
+		where = append(where, fmt.Sprintf(
+			"(c.name ILIKE %[1]s OR c.city ILIKE %[1]s OR c.region ILIKE %[1]s OR c.postcode ILIKE %[1]s)", p))
+	}
+	if d := strings.TrimSpace(q.Discipline); d != "" {
+		where = append(where, fmt.Sprintf("c.disciplines @> ARRAY[%s]::text[]", arg(strings.ToLower(d))))
+	}
+
+	orderBy := "c.created_at DESC"
+	if q.Latitude != nil && q.Longitude != nil {
+		lat, lng := arg(*q.Latitude), arg(*q.Longitude)
+		// Great-circle distance in km. The clamp keeps acos in domain when
+		// floating point nudges the cosine a hair past ±1.
+		distance := fmt.Sprintf(`(6371 * acos(LEAST(1, GREATEST(-1,
+			cos(radians(%[1]s)) * cos(radians(c.latitude)) * cos(radians(c.longitude) - radians(%[2]s))
+			+ sin(radians(%[1]s)) * sin(radians(c.latitude))))))`, lat, lng)
+		selects += "\n\t\t\t, CASE WHEN c.latitude IS NULL OR c.longitude IS NULL THEN NULL ELSE " + distance + " END AS distance_km"
+		if q.RadiusKM != nil {
+			where = append(where, fmt.Sprintf(
+				"(c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND %s <= %s)", distance, arg(*q.RadiusKM)))
+		}
+		orderBy = "distance_km ASC NULLS LAST, c.created_at DESC"
+
+		base := extras
+		extras = func(club *model.Club) []any { return append(base(club), &club.DistanceKM) }
+	}
+
+	query := fmt.Sprintf(`SELECT %s FROM clubs c WHERE %s ORDER BY %s`,
+		selects, strings.Join(where, " AND "), orderBy)
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list clubs: %w", err)
 	}
@@ -271,13 +250,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 	var clubs []*model.Club
 	for rows.Next() {
 		var club model.Club
-		if err := rows.Scan(
-			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-			&club.DateFormat, &club.TimeFormat, &club.Timezone,
-			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-			&club.MemberCount, &club.IsAdmin, &club.IsMember,
-		); err != nil {
+		if err := scanClub(rows, &club, extras(&club)...); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
 		}
 		clubs = append(clubs, &club)
@@ -286,18 +259,12 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string) ([]*model.Cl
 }
 
 func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT
-			c.id, c.name, coalesce(c.slug, '') AS slug, c.description, c.image_url, c.join_code,
-			c.type::text, c.join_policy::text, c.post_visibility,
-			c.date_format, c.time_format, c.timezone,
-			c.created_by, c.created_at::text, c.updated_at::text,
-			(SELECT COUNT(*) FROM club_members WHERE club_id = c.id)::int AS member_count,
-			cm.is_admin
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT %s, cm.is_admin
 		FROM clubs c
 		JOIN club_members cm ON cm.club_id = c.id AND cm.user_id = $1
 		ORDER BY cm.joined_at DESC
-	`, userID)
+	`, clubColumns), userID)
 	if err != nil {
 		return nil, fmt.Errorf("list clubs by user: %w", err)
 	}
@@ -306,13 +273,7 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 	var clubs []*model.Club
 	for rows.Next() {
 		var club model.Club
-		if err := rows.Scan(
-			&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-			&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-			&club.DateFormat, &club.TimeFormat, &club.Timezone,
-			&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-			&club.MemberCount, &club.IsAdmin,
-		); err != nil {
+		if err := scanClub(rows, &club, &club.IsAdmin); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
 		}
 		club.IsMember = true
@@ -606,38 +567,61 @@ func (r *ClubRepository) LeaveClubGuarded(ctx context.Context, clubID, userID st
 	return nil
 }
 
-// AdminUpdate applies a partial update to any club.
+// AdminUpdate applies a partial update to any club. Text profile fields follow
+// the "omit to keep, empty string to clear" convention documented on
+// model.UpdateClubInput, which is why they can't just use COALESCE.
 func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.UpdateClubInput) (*model.Club, error) {
-	var club model.Club
-	err := r.db.QueryRow(ctx, `
-		UPDATE clubs
-		SET name            = COALESCE($2, name),
-		    description     = COALESCE($3, description),
-		    type            = COALESCE($4::club_type, type),
-		    join_policy     = COALESCE($5::club_join_policy, join_policy),
-		    post_visibility = COALESCE($6, post_visibility),
-		    date_format     = COALESCE($7, date_format),
-		    time_format     = COALESCE($8, time_format),
-		    timezone        = COALESCE($9, timezone),
-		    updated_at      = NOW()
-		WHERE id = $1
-		RETURNING id, name, coalesce(slug, ''), description, image_url, join_code,
-		          type::text, join_policy::text, post_visibility,
-		          date_format, time_format, timezone,
-		          created_by, created_at::text, updated_at::text,
-		          (SELECT COUNT(*) FROM club_members WHERE club_id = $1)::int
-	`, id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility, in.DateFormat, in.TimeFormat, in.Timezone).Scan(
-		&club.ID, &club.Name, &club.Slug, &club.Description, &club.ImageURL,
-		&club.JoinCode, &club.Type, &club.JoinPolicy, &club.PostVisibility,
-		&club.DateFormat, &club.TimeFormat, &club.Timezone,
-		&club.CreatedBy, &club.CreatedAt, &club.UpdatedAt,
-		&club.MemberCount,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
+	strSlice := func(v *[]string) any {
+		if v == nil {
+			return nil
 		}
+		return *v
+	}
+
+	if _, err := r.db.Exec(ctx, `
+		UPDATE clubs
+		SET name             = COALESCE($2, name),
+		    description      = CASE WHEN $3::text IS NULL THEN description ELSE NULLIF($3::text, '') END,
+		    type             = COALESCE($4::club_type, type),
+		    join_policy      = COALESCE($5::club_join_policy, join_policy),
+		    post_visibility  = COALESCE($6, post_visibility),
+		    date_format      = COALESCE($7, date_format),
+		    time_format      = COALESCE($8, time_format),
+		    timezone         = COALESCE($9, timezone),
+		    website_url      = CASE WHEN $10::text IS NULL THEN website_url   ELSE NULLIF($10::text, '') END,
+		    contact_email    = CASE WHEN $11::text IS NULL THEN contact_email ELSE NULLIF($11::text, '') END,
+		    contact_phone    = CASE WHEN $12::text IS NULL THEN contact_phone ELSE NULLIF($12::text, '') END,
+		    address_line1    = CASE WHEN $13::text IS NULL THEN address_line1 ELSE NULLIF($13::text, '') END,
+		    address_line2    = CASE WHEN $14::text IS NULL THEN address_line2 ELSE NULLIF($14::text, '') END,
+		    city             = CASE WHEN $15::text IS NULL THEN city          ELSE NULLIF($15::text, '') END,
+		    region           = CASE WHEN $16::text IS NULL THEN region        ELSE NULLIF($16::text, '') END,
+		    postcode         = CASE WHEN $17::text IS NULL THEN postcode      ELSE NULLIF($17::text, '') END,
+		    country          = CASE WHEN $18::text IS NULL THEN country       ELSE NULLIF($18::text, '') END,
+		    latitude         = CASE WHEN $21::boolean THEN NULL ELSE COALESCE($19::double precision, latitude)  END,
+		    longitude        = CASE WHEN $21::boolean THEN NULL ELSE COALESCE($20::double precision, longitude) END,
+		    disciplines      = COALESCE($22::text[], disciplines),
+		    distances        = COALESCE($23::text[], distances),
+		    facilities       = COALESCE($24::text[], facilities),
+		    membership_info  = CASE WHEN $25::text IS NULL THEN membership_info ELSE NULLIF($25::text, '') END,
+		    visitor_policy   = CASE WHEN $26::text IS NULL THEN visitor_policy  ELSE NULLIF($26::text, '') END,
+		    established_year = CASE WHEN $27::int IS NULL THEN established_year WHEN $27::int = 0 THEN NULL ELSE $27::int END,
+		    updated_at       = NOW()
+		WHERE id = $1
+	`,
+		id, in.Name, in.Description, in.Type, in.JoinPolicy, in.PostVisibility,
+		in.DateFormat, in.TimeFormat, in.Timezone,
+		in.WebsiteURL, in.ContactEmail, in.ContactPhone,
+		in.AddressLine1, in.AddressLine2, in.City, in.Region, in.Postcode, in.Country,
+		in.Latitude, in.Longitude, in.ClearCoordinates,
+		strSlice(in.Disciplines), strSlice(in.Distances), strSlice(in.Facilities),
+		in.MembershipInfo, in.VisitorPolicy, in.EstablishedYear,
+	); err != nil {
 		return nil, fmt.Errorf("admin update club: %w", err)
+	}
+
+	club, err := r.GetByID(ctx, id, "")
+	if err != nil {
+		return nil, err
 	}
 
 	// Renaming re-derives the slug; the previous one stays in
@@ -645,7 +629,63 @@ func (r *ClubRepository) AdminUpdate(ctx context.Context, id string, in *model.U
 	if club.Slug, err = syncShareSlug(ctx, r.db, SlugEntityClub, club.ID, club.Name, club.Slug); err != nil {
 		return nil, err
 	}
-	return &club, nil
+	return club, nil
+}
+
+// ListOpeningHours returns a club's published weekly session slots, ordered
+// Monday-first and earliest-first within a day.
+func (r *ClubRepository) ListOpeningHours(ctx context.Context, clubID string) ([]*model.ClubOpeningHours, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, club_id, day_of_week,
+		       to_char(opens_at, 'HH24:MI'), to_char(closes_at, 'HH24:MI'),
+		       is_closed, note
+		FROM club_opening_hours
+		WHERE club_id = $1
+		ORDER BY day_of_week ASC, opens_at ASC NULLS FIRST
+	`, clubID)
+	if err != nil {
+		return nil, fmt.Errorf("list club opening hours: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*model.ClubOpeningHours
+	for rows.Next() {
+		var h model.ClubOpeningHours
+		if err := rows.Scan(&h.ID, &h.ClubID, &h.DayOfWeek, &h.OpensAt, &h.ClosesAt, &h.IsClosed, &h.Note); err != nil {
+			return nil, fmt.Errorf("scan club opening hours: %w", err)
+		}
+		items = append(items, &h)
+	}
+	return items, rows.Err()
+}
+
+// ReplaceOpeningHours swaps a club's whole published week for the given slots
+// in one transaction — the editor always submits the complete week, so a
+// delete-then-insert keeps the stored week exactly what the admin saw.
+func (r *ClubRepository) ReplaceOpeningHours(ctx context.Context, clubID string, slots []model.ClubOpeningHoursInput) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM club_opening_hours WHERE club_id = $1`, clubID); err != nil {
+		return fmt.Errorf("clear club opening hours: %w", err)
+	}
+
+	for _, s := range slots {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO club_opening_hours (club_id, day_of_week, opens_at, closes_at, is_closed, note)
+			VALUES ($1, $2, $3::time, $4::time, $5, NULLIF($6::text, ''))
+		`, clubID, s.DayOfWeek, s.OpensAt, s.ClosesAt, s.IsClosed, s.Note); err != nil {
+			return fmt.Errorf("insert club opening hours: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
 }
 
 // RegenerateJoinCode replaces the club join code with a fresh random value and returns it.

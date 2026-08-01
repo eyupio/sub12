@@ -19,10 +19,67 @@ export interface Club {
   created_at: string
   updated_at: string
   member_count: number
-  league_count?: number
+  league_count: number
   is_admin?: boolean
   is_member?: boolean
+
+  // Real-world profile — all optional.
+  website_url?: string
+  contact_email?: string
+  contact_phone?: string
+  address_line1?: string
+  address_line2?: string
+  city?: string
+  region?: string
+  postcode?: string
+  country?: string
+  latitude?: number
+  longitude?: number
+  disciplines: string[]
+  distances: string[]
+  facilities: string[]
+  membership_info?: string
+  visitor_policy?: string
+  established_year?: number
+
+  /** Only present when the directory was queried with a viewer location. */
+  distance_km?: number
 }
+
+export interface ClubSummary {
+  id: string
+  name: string
+  description?: string
+  image_url?: string
+  type: string
+  join_policy: string
+  member_count: number
+  city?: string
+  region?: string
+  country?: string
+  disciplines: string[]
+}
+
+/** One published session slot. day_of_week is 0 = Monday through 6 = Sunday. */
+export interface ClubOpeningHours {
+  id: string
+  club_id: string
+  day_of_week: number
+  opens_at?: string
+  closes_at?: string
+  is_closed: boolean
+  note?: string
+}
+
+export interface ClubOpeningHoursInput {
+  day_of_week: number
+  opens_at: string | null
+  closes_at: string | null
+  is_closed: boolean
+  note: string | null
+}
+
+export const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 
 export interface ClubMember {
   user_id: string
@@ -61,6 +118,11 @@ export interface CreateClubInput {
   join_policy?: 'open' | 'invite_code' | 'approval'
 }
 
+/**
+ * Text fields follow the API's "omit to keep, empty string to clear"
+ * convention; arrays clear by sending an empty array. Coordinates only clear
+ * via `clear_coordinates`.
+ */
 export interface UpdateClubInput {
   name?: string
   description?: string
@@ -70,14 +132,58 @@ export interface UpdateClubInput {
   date_format?: string
   time_format?: string
   timezone?: string
+  website_url?: string
+  contact_email?: string
+  contact_phone?: string
+  address_line1?: string
+  address_line2?: string
+  city?: string
+  region?: string
+  postcode?: string
+  country?: string
+  latitude?: number
+  longitude?: number
+  clear_coordinates?: boolean
+  disciplines?: string[]
+  distances?: string[]
+  facilities?: string[]
+  membership_info?: string
+  visitor_policy?: string
+  established_year?: number
+}
+
+export interface ClubDirectoryParams {
+  code?: string
+  q?: string
+  discipline?: string
+  lat?: number
+  lng?: number
+  radiusKm?: number
 }
 
 export const clubsApi = {
-  list: (params?: { code?: string }) => {
+  list: (params?: ClubDirectoryParams) => {
+    const qs = new URLSearchParams()
+    // A join code resolves a single club and overrides the other filters, so
+    // send it alone.
     const code = params?.code?.trim()
-    const qs = code ? `?code=${encodeURIComponent(code)}` : ''
-    return api.get<{ items: Club[] }>(`/clubs${qs}`)
+    if (code) {
+      qs.set('code', code)
+    } else if (params) {
+      if (params.q?.trim()) qs.set('q', params.q.trim())
+      if (params.discipline) qs.set('discipline', params.discipline)
+      if (params.lat != null && params.lng != null) {
+        qs.set('lat', String(params.lat))
+        qs.set('lng', String(params.lng))
+        if (params.radiusKm != null) qs.set('radius_km', String(params.radiusKm))
+      }
+    }
+    const query = qs.toString()
+    return api.get<{ items: Club[] }>(`/clubs${query ? `?${query}` : ''}`)
   },
+
+  listDisciplines: () =>
+    api.get<{ items: string[] }>('/clubs/disciplines'),
 
   listMine: () =>
     api.get<{ items: Club[] }>('/users/me/clubs'),
@@ -86,7 +192,16 @@ export const clubsApi = {
     api.get<Club>(`/clubs/${id}`),
 
   summary: (id: string) =>
-    api.get<{ id: string; name: string; description?: string; image_url?: string; type: string; join_policy: string; member_count: number }>(`/clubs/${id}/summary`),
+    api.get<ClubSummary>(`/clubs/${id}/summary`),
+
+  getOpeningHours: (id: string) =>
+    api.get<{ items: ClubOpeningHours[] }>(`/clubs/${id}/opening-hours`),
+
+  replaceOpeningHours: (id: string, items: ClubOpeningHoursInput[]) =>
+    api.put<{ items: ClubOpeningHours[] }>(`/clubs/${id}/opening-hours`, { items }),
+
+  remove: (id: string) =>
+    api.del<void>(`/clubs/${id}`),
 
   create: (input: CreateClubInput) =>
     api.post<Club>('/clubs', input),
