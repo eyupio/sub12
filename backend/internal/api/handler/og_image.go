@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"image/color"
 	"net/http"
 	"strings"
 	"sync"
@@ -263,80 +264,69 @@ func (h *OGImage) User() http.HandlerFunc {
 // ── shared rendering ────────────────────────────────────────────────────────
 
 const (
-	ogWidth         = 1200
-	ogHeight        = 630
-	bgColor         = "#EFE6D2"
-	brassColor      = "#B8741F"
-	textColor       = "#2A1F12"
-	mutedColor      = "#5A4632"
-	targetColor     = "#3F2D1E"
-	borderColor     = "#D9C9AA"
-	maxMetaRunes    = 68
-	wordmarkSUB     = "SUB"
-	wordmark12      = "12"
-	wordmarkScale   = 118
-	wordmark12Scale = 72
-	taglineText     = "Precision shooting, properly tracked."
-	siteText        = "sub12.io"
+	ogWidth  = 1200
+	ogHeight = 630
+
+	// Horizontal centre of the canvas. The whole composition is built around
+	// it — see ogSafeHalfWidth for why.
+	ogCentreX = ogWidth / 2.0
+
+	brassColor    = "#B8741F"
+	brassInkColor = "#FBF6E9"
+	textColor     = "#2A1F12"
+	mutedColor    = "#5A4632"
+	ruleColor     = "#C9B48C"
+
+	maxMetaRunes = 68
+
+	wordmarkSUB = "SUB"
+	wordmark12  = "12"
+	taglineText = "PRECISION SHOOTING, PROPERLY TRACKED."
+	siteText    = "SUB12.IO"
+
+	// Not every surface honours the 1.91:1 aspect an OG image declares.
+	// WhatsApp, Slack, Discord, iMessage and the Facebook mobile composer
+	// centre-crop towards a square, which on a 1200×630 canvas keeps only
+	// x ∈ [285, 915]. Anything the preview must still read — wordmark,
+	// tagline, eyebrow, footer URL — is kept inside this half-width of the
+	// centre so those crops stay legible instead of slicing "SUB12" to "B12".
+	ogSafeHalfWidth = 300.0
+
+	// Headline column. Deliberately a little wider than the square-safe zone:
+	// long league and club names would otherwise shrink to an unreadable size
+	// in the common 1.91:1 case to protect a crop most shares never hit. The
+	// brand furniture around it stays inside ogSafeHalfWidth regardless, so a
+	// square crop still lands on a recognisably SUB12 card.
+	ogPrimaryMaxWidth = 720.0
+	ogMetaMaxWidth    = 880.0
+
+	// Vertical band the entity block is centred within. Vertical position is
+	// unaffected by centre-cropping, so this needs no safe-zone allowance.
+	ogBlockTop    = 198.0
+	ogBlockBottom = 524.0
+)
+
+var (
+	bgCentreRGBA = color.RGBA{R: 0xF6, G: 0xEF, B: 0xDC, A: 0xFF}
+	bgEdgeRGBA   = color.RGBA{R: 0xE4, G: 0xD7, B: 0xBA, A: 0xFF}
 )
 
 // render paints the shared OG layout and returns the PNG bytes.
 //
-// Layout: brand lockup and target grid at the top, then dynamic entity
-// type, primary value/name, optional sub-primary, and meta lines.
+// The composition is a single centred column: brand lockup and tagline at the
+// top, the entity block (eyebrow, headline, optional sub-primary pill, meta
+// lines) centred in the middle band, and the site URL in the footer. Brass
+// rules run the full width at top and bottom so the card is identifiably
+// SUB12 even when a platform crops the sides away.
 func (h *OGImage) render(typeLabel, primary, subprimary string, meta []string) ([]byte, error) {
 	dc := gg.NewContext(ogWidth, ogHeight)
-	dc.SetHexColor(bgColor)
-	dc.Clear()
 
-	// Cream-paper frame matching the public SUB12 brand lockup.
-	dc.SetHexColor(borderColor)
-	dc.DrawRectangle(18, 18, ogWidth-36, ogHeight-36)
-	dc.SetLineWidth(2)
-	dc.Stroke()
-
-	if err := h.drawBrandLockup(dc, 76, 132); err != nil {
-		return nil, err
-	}
-	h.drawTargetGrid(dc, 870, 104, 44)
-
-	contentX := 76.0
-	typeLabelY := 315.0
-
-	dc.SetHexColor(brassColor)
-	if err := h.drawText(dc, typeLabel, contentX, typeLabelY, 24, true); err != nil {
-		return nil, err
-	}
-
-	primarySize := primaryFontSize(primary)
-	if primarySize > 170 {
-		primarySize = 170
-	}
-	primaryY := 505.0
-	primarySize = h.drawTextFitted(dc, primary, contentX, primaryY, primarySize, 820, true, textColor)
-
-	if subprimary != "" {
-		dc.SetHexColor(brassColor)
-		subX := contentX + textWidth(dc, h.face(primarySize, true), primary) + 34
-		if err := h.drawText(dc, subprimary, subX, primaryY-6, 46, true); err != nil {
-			return nil, err
-		}
-	}
-
-	metaY := 555.0
-	lineHeight := 34.0
-	dc.SetHexColor(mutedColor)
-	for i, line := range meta {
-		if i >= 2 {
-			break
-		}
-		if line == "" {
-			continue
-		}
-		if err := h.drawTextCentred(dc, truncateRunes(line, maxMetaRunes), ogWidth/2, metaY+float64(i)*lineHeight, 22, false); err != nil {
-			return nil, err
-		}
-	}
+	h.drawBackground(dc)
+	h.drawFlankTargets(dc, 118, 315)
+	h.drawFlankTargets(dc, ogWidth-118, 315)
+	h.drawBrandHeader(dc)
+	h.drawEntityBlock(dc, typeLabel, primary, subprimary, meta)
+	h.drawFooter(dc)
 
 	var buf bytes.Buffer
 	if err := dc.EncodePNG(&buf); err != nil {
@@ -345,86 +335,271 @@ func (h *OGImage) render(typeLabel, primary, subprimary string, meta []string) (
 	return buf.Bytes(), nil
 }
 
-func (h *OGImage) drawBrandLockup(dc *gg.Context, x, baseline float64) error {
-	// Draw "SUB" in dark ink
-	dc.SetHexColor(textColor)
-	if err := h.drawText(dc, wordmarkSUB, x, baseline, wordmarkScale, true); err != nil {
-		return err
-	}
-	// Measure "SUB" width then draw "12" in brass immediately after, baseline-aligned
-	subWidth := textWidth(dc, h.face(wordmarkScale, true), wordmarkSUB)
-	dc.SetHexColor(brassColor)
-	if err := h.drawText(dc, wordmark12, x+subWidth+2, baseline, wordmark12Scale, true); err != nil {
-		return err
-	}
-	dc.SetHexColor(mutedColor)
-	if err := h.drawText(dc, taglineText, x+4, baseline+52, 25, false); err != nil {
-		return err
-	}
-	dc.SetHexColor(brassColor)
-	dc.DrawRectangle(x+4, baseline+88, 74, 4)
+// drawBackground lays the cream paper plus the full-bleed brass rules. The
+// radial wash keeps the centre — where the content sits — a shade lighter
+// than the edges so the card has some depth in a busy feed.
+func (h *OGImage) drawBackground(dc *gg.Context) {
+	wash := gg.NewRadialGradient(ogCentreX, 300, 0, ogCentreX, 300, 780)
+	wash.AddColorStop(0, bgCentreRGBA)
+	wash.AddColorStop(1, bgEdgeRGBA)
+	dc.SetFillStyle(wash)
+	dc.DrawRectangle(0, 0, ogWidth, ogHeight)
 	dc.Fill()
-	return h.drawText(dc, siteText, x+4, baseline+134, 19, true)
+
+	dc.SetHexColor(brassColor)
+	dc.DrawRectangle(0, 0, ogWidth, 10)
+	dc.Fill()
+	dc.DrawRectangle(0, ogHeight-10, ogWidth, 10)
+	dc.Fill()
 }
 
-func (h *OGImage) drawTargetGrid(dc *gg.Context, x, y, gap float64) {
-	hits := map[int]bool{3: true, 11: true, 18: true}
+// drawFlankTargets paints the 5×5 target motif in the outer margins. Purely
+// decorative brand texture: it sits outside the headline column and is the
+// first thing a centre crop discards, by design.
+func (h *OGImage) drawFlankTargets(dc *gg.Context, cx, cy float64) {
+	const gap, radius = 34.0, 11.0
+	hits := map[int]bool{6: true, 12: true, 18: true}
+	offset := -2.0 * gap
 	for row := 0; row < 5; row++ {
 		for col := 0; col < 5; col++ {
-			i := row*5 + col
-			cx := x + float64(col)*gap
-			cy := y + float64(row)*gap
-			if hits[i] {
-				dc.SetHexColor(brassColor)
-				dc.SetLineWidth(2.4)
-				dc.DrawCircle(cx, cy, 14)
+			x := cx + offset + float64(col)*gap
+			y := cy + offset + float64(row)*gap
+			if hits[row*5+col] {
+				dc.SetRGBA(184.0/255.0, 116.0/255.0, 31.0/255.0, 0.55)
+				dc.SetLineWidth(2.2)
+				dc.DrawCircle(x, y, radius)
 				dc.Stroke()
-				dc.DrawCircle(cx, cy, 4.5)
+				dc.DrawCircle(x, y, 3.4)
 				dc.Fill()
 				continue
 			}
-			dc.SetHexColor(targetColor)
-			dc.SetLineWidth(1.1)
-			dc.DrawCircle(cx, cy, 14)
+			dc.SetRGBA(63.0/255.0, 45.0/255.0, 30.0/255.0, 0.22)
+			dc.SetLineWidth(1.3)
+			dc.DrawCircle(x, y, radius)
 			dc.Stroke()
-			dc.SetRGBA(63.0/255.0, 45.0/255.0, 30.0/255.0, 0.5)
-			dc.DrawCircle(cx, cy, 2.7)
+			dc.DrawCircle(x, y, 2.2)
 			dc.Fill()
 		}
 	}
 }
 
-func (h *OGImage) drawText(dc *gg.Context, text string, x, y, size float64, bold bool) error {
-	face := h.face(size, bold)
-	dc.SetFontFace(face)
-	dc.DrawStringAnchored(text, x, y, 0, 0)
-	return nil
+func (h *OGImage) drawBrandHeader(dc *gg.Context) {
+	h.drawWordmark(dc, ogCentreX, 84, 66)
+	dc.SetHexColor(mutedColor)
+	h.drawTrackedCentred(dc, taglineText, ogCentreX, 140, 17, false, 3.4)
+	dc.SetHexColor(brassColor)
+	dc.DrawRectangle(ogCentreX-44, 170, 88, 3)
+	dc.Fill()
 }
 
-func (h *OGImage) drawTextCentred(dc *gg.Context, text string, x, y, size float64, bold bool) error {
-	face := h.face(size, bold)
-	dc.SetFontFace(face)
-	dc.DrawStringAnchored(text, x, y, 0.5, 0.5)
-	return nil
+func (h *OGImage) drawFooter(dc *gg.Context) {
+	dc.SetHexColor(ruleColor)
+	dc.SetLineWidth(1.5)
+	dc.DrawLine(ogCentreX-ogSafeHalfWidth, 556, ogCentreX+ogSafeHalfWidth, 556)
+	dc.Stroke()
+	dc.SetHexColor(brassColor)
+	h.drawTrackedCentred(dc, siteText, ogCentreX, 590, 21, true, 7)
 }
 
-func (h *OGImage) drawTextFitted(dc *gg.Context, text string, x, y, size, maxWidth float64, bold bool, color string) float64 {
-	for size > 34 {
-		face := h.face(size, bold)
-		if textWidth(dc, face, text) <= maxWidth {
+// drawWordmark paints "SUB12" as one baseline-aligned lockup centred on cx,
+// with the numerals set smaller and in brass to match the brand mark.
+func (h *OGImage) drawWordmark(dc *gg.Context, cx, cy, size float64) {
+	wordFace := h.face(size, true)
+	numFace := h.face(size*0.62, true)
+
+	dc.SetFontFace(wordFace)
+	wordWidth, _ := dc.MeasureString(wordmarkSUB)
+	dc.SetFontFace(numFace)
+	numWidth, _ := dc.MeasureString(wordmark12)
+
+	gap := size * 0.03
+	baseline := cy + capHeightOf(wordFace)/2
+	x := cx - (wordWidth+gap+numWidth)/2
+
+	dc.SetFontFace(wordFace)
+	dc.SetHexColor(textColor)
+	dc.DrawString(wordmarkSUB, x, baseline)
+	dc.SetFontFace(numFace)
+	dc.SetHexColor(brassColor)
+	dc.DrawString(wordmark12, x+wordWidth+gap, baseline)
+}
+
+// drawEntityBlock stacks the per-entity content — eyebrow, headline lines,
+// optional sub-primary pill, meta lines — and centres the whole stack in the
+// middle band. Measuring the stack before drawing is what keeps a two-line
+// league name from colliding with the meta lines below it, which the previous
+// fixed-baseline layout could not guarantee.
+func (h *OGImage) drawEntityBlock(dc *gg.Context, typeLabel, primary, subprimary string, meta []string) {
+	type item struct {
+		draw     func(cy float64)
+		height   float64
+		gapAbove float64
+	}
+	items := make([]item, 0, 6)
+
+	if typeLabel != "" {
+		label := typeLabel
+		items = append(items, item{
+			height: capHeightOf(h.face(23, true)),
+			draw: func(cy float64) {
+				dc.SetHexColor(brassColor)
+				h.drawTrackedCentred(dc, label, ogCentreX, cy, 23, true, 6.5)
+			},
+		})
+	}
+
+	lines, primarySize := h.layoutPrimary(dc, primary)
+	for i, line := range lines {
+		text := line
+		gap := 36.0
+		if i > 0 {
+			gap = primarySize * 0.28
+		}
+		items = append(items, item{
+			height:   capHeightOf(h.face(primarySize, true)),
+			gapAbove: gap,
+			draw: func(cy float64) {
+				dc.SetHexColor(textColor)
+				h.drawFittedCentred(dc, text, ogCentreX, cy, primarySize, ogPrimaryMaxWidth, true)
+			},
+		})
+	}
+
+	if subprimary != "" {
+		text := subprimary
+		items = append(items, item{
+			height:   52,
+			gapAbove: 28,
+			draw:     func(cy float64) { h.drawPill(dc, text, ogCentreX, cy) },
+		})
+	}
+
+	for i, line := range metaLines(meta) {
+		text := line
+		gap := 16.0
+		if i == 0 {
+			gap = 38.0
+		}
+		items = append(items, item{
+			height:   capHeightOf(h.face(23, false)),
+			gapAbove: gap,
+			draw: func(cy float64) {
+				dc.SetHexColor(mutedColor)
+				h.drawFittedCentred(dc, text, ogCentreX, cy, 23, ogMetaMaxWidth, false)
+			},
+		})
+	}
+
+	if len(items) == 0 {
+		return
+	}
+	items[0].gapAbove = 0
+
+	total := 0.0
+	for _, it := range items {
+		total += it.gapAbove + it.height
+	}
+
+	y := (ogBlockTop+ogBlockBottom)/2 - total/2
+	for _, it := range items {
+		y += it.gapAbove
+		it.draw(y + it.height/2)
+		y += it.height
+	}
+}
+
+// drawPill paints a filled brass lozenge — used for the X-count, which reads
+// as a badge under the score rather than a number floating beside it.
+func (h *OGImage) drawPill(dc *gg.Context, text string, cx, cy float64) {
+	const size, height = 30.0, 52.0
+	width := h.trackedWidth(dc, text, size, true, 2) + 56
+	dc.SetHexColor(brassColor)
+	dc.DrawRoundedRectangle(cx-width/2, cy-height/2, width, height, height/2)
+	dc.Fill()
+	dc.SetHexColor(brassInkColor)
+	h.drawTrackedCentred(dc, text, cx, cy, size, true, 2)
+}
+
+// metaLines trims, truncates and caps the supporting lines at two.
+func metaLines(meta []string) []string {
+	out := make([]string, 0, 2)
+	for _, line := range meta {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		out = append(out, truncateRunes(line, maxMetaRunes))
+		if len(out) == 2 {
 			break
 		}
-		size -= 4
 	}
-	dc.SetHexColor(color)
-	_ = h.drawText(dc, text, x, y, size, bold)
-	return size
+	return out
 }
 
-func textWidth(dc *gg.Context, face font.Face, text string) float64 {
+// ── text primitives ─────────────────────────────────────────────────────────
+//
+// Everything is drawn from a *visual centre* rather than a baseline. gg's
+// DrawStringAnchored centres on the font's full line height, which leaves
+// text sitting visibly low; centring on cap height is what the eye reads as
+// centred, and it makes the stack maths in drawEntityBlock exact.
+
+// capHeightOf measures a capital's ink height. font.Face.Metrics().CapHeight
+// is not populated by the truetype faces we build here, so the glyph bounds
+// are the reliable source.
+func capHeightOf(face font.Face) float64 {
+	bounds, _ := font.BoundString(face, "H")
+	return float64(-bounds.Min.Y) / 64
+}
+
+func (h *OGImage) drawCentred(dc *gg.Context, text string, cx, cy, size float64, bold bool) {
+	face := h.face(size, bold)
 	dc.SetFontFace(face)
 	width, _ := dc.MeasureString(text)
-	return width
+	dc.DrawString(text, cx-width/2, cy+capHeightOf(face)/2)
+}
+
+// drawFittedCentred shrinks the text a point at a time until it fits maxWidth.
+// The backstop for anything layoutPrimary could not wrap — a single
+// unbreakable word longer than the column, for instance.
+func (h *OGImage) drawFittedCentred(dc *gg.Context, text string, cx, cy, size, maxWidth float64, bold bool) {
+	for size > 14 {
+		dc.SetFontFace(h.face(size, bold))
+		if width, _ := dc.MeasureString(text); width <= maxWidth {
+			break
+		}
+		size--
+	}
+	h.drawCentred(dc, text, cx, cy, size, bold)
+}
+
+// drawTrackedCentred draws letter-spaced text. Used for the uppercase eyebrow,
+// tagline and footer URL, where tracking is what separates a set wordmark from
+// a run of capitals. Drawing rune by rune drops kerning, which is what you
+// want for tracked capitals anyway.
+func (h *OGImage) drawTrackedCentred(dc *gg.Context, text string, cx, cy, size float64, bold bool, tracking float64) {
+	face := h.face(size, bold)
+	x := cx - h.trackedWidth(dc, text, size, bold, tracking)/2
+	dc.SetFontFace(face)
+	baseline := cy + capHeightOf(face)/2
+	for _, r := range text {
+		s := string(r)
+		dc.DrawString(s, x, baseline)
+		width, _ := dc.MeasureString(s)
+		x += width + tracking
+	}
+}
+
+func (h *OGImage) trackedWidth(dc *gg.Context, text string, size float64, bold bool, tracking float64) float64 {
+	dc.SetFontFace(h.face(size, bold))
+	runes := []rune(text)
+	total := 0.0
+	for i, r := range runes {
+		width, _ := dc.MeasureString(string(r))
+		total += width
+		if i < len(runes)-1 {
+			total += tracking
+		}
+	}
+	return total
 }
 
 func (h *OGImage) face(size float64, bold bool) font.Face {
@@ -435,23 +610,82 @@ func (h *OGImage) face(size float64, bold bool) font.Face {
 	return truetype.NewFace(f, &truetype.Options{Size: size})
 }
 
-// primaryFontSize scales the headline down for longer strings so wide names
-// (club/league/user) don't overflow the 1200px canvas.
-func primaryFontSize(primary string) float64 {
-	runes := len([]rune(primary))
-	switch {
+// layoutPrimary picks a headline size and line break-up. It prefers one large
+// line, falls back to two lines rather than shrinking indefinitely — two lines
+// at 90pt read far better in a feed than one line at 46pt, which is where the
+// old shrink-only ladder ended up for long league and club names.
+func (h *OGImage) layoutPrimary(dc *gg.Context, primary string) ([]string, float64) {
+	primary = strings.Join(strings.Fields(primary), " ")
+	if primary == "" {
+		return nil, 0
+	}
+
+	start := primaryStartSize(primary)
+	for size := start; size >= 64; size -= 3 {
+		dc.SetFontFace(h.face(size, true))
+		if width, _ := dc.MeasureString(primary); width <= ogPrimaryMaxWidth {
+			return []string{primary}, size
+		}
+	}
+	for size := start; size >= 44; size -= 3 {
+		if lines, ok := h.wrapLines(dc, primary, size, ogPrimaryMaxWidth, 2); ok {
+			return lines, size
+		}
+	}
+	// Nothing fits two lines even at the floor size. Clip and let
+	// drawFittedCentred shrink whatever is left the rest of the way.
+	clipped := truncateRunes(primary, 56)
+	if lines, ok := h.wrapLines(dc, clipped, 44, ogPrimaryMaxWidth, 2); ok {
+		return lines, 44
+	}
+	return []string{clipped}, 44
+}
+
+// wrapLines greedily breaks text on word boundaries, reporting false when the
+// result needs more than maxLines or when a single word still overflows.
+func (h *OGImage) wrapLines(dc *gg.Context, text string, size, maxWidth float64, maxLines int) ([]string, bool) {
+	dc.SetFontFace(h.face(size, true))
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil, false
+	}
+
+	lines := make([]string, 0, maxLines+1)
+	current := words[0]
+	for _, word := range words[1:] {
+		candidate := current + " " + word
+		if width, _ := dc.MeasureString(candidate); width <= maxWidth {
+			current = candidate
+			continue
+		}
+		lines = append(lines, current)
+		current = word
+	}
+	lines = append(lines, current)
+
+	if len(lines) > maxLines {
+		return nil, false
+	}
+	for _, line := range lines {
+		if width, _ := dc.MeasureString(line); width > maxWidth {
+			return nil, false
+		}
+	}
+	return lines, true
+}
+
+// primaryStartSize caps the headline by length so a short score stays huge
+// without a long name starting from a size it can never reach.
+func primaryStartSize(primary string) float64 {
+	switch runes := len([]rune(primary)); {
 	case runes <= 4:
-		return 220
+		return 184
 	case runes <= 8:
-		return 160
+		return 148
 	case runes <= 14:
-		return 110
-	case runes <= 22:
-		return 78
-	case runes <= 34:
-		return 58
+		return 112
 	default:
-		return 46
+		return 92
 	}
 }
 

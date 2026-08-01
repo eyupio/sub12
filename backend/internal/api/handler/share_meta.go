@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -213,6 +214,10 @@ func (s *ShareMeta) User() http.HandlerFunc {
 				og.Image = s.absolute("/og/users/" + id + ".png")
 				og.ImageAlt = userImageAlt(profile)
 				og.Type = "profile"
+				// profile:username is the property Open Graph defines for
+				// og:type=profile; without it a shared profile is just an
+				// untyped page to anything consuming the graph.
+				og.AuthorName = profile.DisplayName
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -275,6 +280,7 @@ func (s *ShareMeta) defaultOG(r *http.Request) openGraph {
 		Title:       "SUB12 — Precision Shooting Platform",
 		Description: "Track scores, manage gear, and compete in leagues. The platform for precision airgun shooters.",
 		Image:       s.absolute("/og-image.png"),
+		ImageAlt:    "SUB12 — precision shooting platform for FT, HFT and benchrest",
 		URL:         s.absoluteFromRequest(r),
 		Type:        "website",
 	}
@@ -420,23 +426,30 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 // Regexes scoped to tag attributes; all anchored to the beginning of an
 // opening <meta ...> so we don't replace tags we didn't mean to.
 var (
-	reOGTitle       = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
-	reOGDesc        = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
-	reOGImage       = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
-	reOGType        = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
-	reOGURL         = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
-	reOGSiteName    = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
-	reOGImageAlt    = regexp.MustCompile(`(?i)<meta\s+property="og:image:alt"[^>]*>`)
-	reOGImageWH     = regexp.MustCompile(`(?i)<meta\s+property="og:image:(width|height)"[^>]*>`)
-	reOGProfileUser = regexp.MustCompile(`(?i)<meta\s+property="og:profile:username"[^>]*>`)
-	reArticleAuthor = regexp.MustCompile(`(?i)<meta\s+property="article:author"[^>]*>`)
-	reTwitterTitle  = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
-	reTwitterDesc   = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
-	reTwitterImage  = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reOGTitle        = regexp.MustCompile(`(?i)<meta\s+property="og:title"[^>]*>`)
+	reOGDesc         = regexp.MustCompile(`(?i)<meta\s+property="og:description"[^>]*>`)
+	reOGImage        = regexp.MustCompile(`(?i)<meta\s+property="og:image"[^>]*>`)
+	reOGType         = regexp.MustCompile(`(?i)<meta\s+property="og:type"[^>]*>`)
+	reOGURL          = regexp.MustCompile(`(?i)<meta\s+property="og:url"[^>]*>`)
+	reOGSiteName     = regexp.MustCompile(`(?i)<meta\s+property="og:site_name"[^>]*>`)
+	reOGImageAlt     = regexp.MustCompile(`(?i)<meta\s+property="og:image:alt"[^>]*>`)
+	reOGImageWidth   = regexp.MustCompile(`(?i)<meta\s+property="og:image:width"[^>]*>`)
+	reOGImageHeight  = regexp.MustCompile(`(?i)<meta\s+property="og:image:height"[^>]*>`)
+	reOGImageType    = regexp.MustCompile(`(?i)<meta\s+property="og:image:type"[^>]*>`)
+	reOGImageSecure  = regexp.MustCompile(`(?i)<meta\s+property="og:image:secure_url"[^>]*>`)
+	reOGLocale       = regexp.MustCompile(`(?i)<meta\s+property="og:locale"[^>]*>`)
+	reProfileUser    = regexp.MustCompile(`(?i)<meta\s+property="(og:)?profile:username"[^>]*>`)
+	reArticleAuthor  = regexp.MustCompile(`(?i)<meta\s+property="article:author"[^>]*>`)
+	reTwitterCard    = regexp.MustCompile(`(?i)<meta\s+name="twitter:card"[^>]*>`)
+	reTwitterTitle   = regexp.MustCompile(`(?i)<meta\s+name="twitter:title"[^>]*>`)
+	reTwitterDesc    = regexp.MustCompile(`(?i)<meta\s+name="twitter:description"[^>]*>`)
+	reTwitterImage   = regexp.MustCompile(`(?i)<meta\s+name="twitter:image"[^>]*>`)
+	reTwitterImgAlt  = regexp.MustCompile(`(?i)<meta\s+name="twitter:image:alt"[^>]*>`)
 	reTwitterCreator = regexp.MustCompile(`(?i)<meta\s+name="twitter:creator"[^>]*>`)
-	reDescription   = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
-	rePageTitle     = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
-	reHeadOpen      = regexp.MustCompile(`(?i)<head[^>]*>`)
+	reDescription    = regexp.MustCompile(`(?i)<meta\s+name="description"[^>]*>`)
+	reCanonical      = regexp.MustCompile(`(?i)<link\s+rel="canonical"[^>]*>`)
+	rePageTitle      = regexp.MustCompile(`(?i)<title>[^<]*</title>`)
+	reHeadOpen       = regexp.MustCompile(`(?i)<head[^>]*>`)
 )
 
 func metaProp(prop, content string) string {
@@ -445,6 +458,10 @@ func metaProp(prop, content string) string {
 
 func metaName(name, content string) string {
 	return fmt.Sprintf(`<meta name=%q content=%q />`, name, content)
+}
+
+func linkRel(rel, href string) string {
+	return fmt.Sprintf(`<link rel=%q href=%q />`, rel, href)
 }
 
 // injectOG rewrites the OG/Twitter tags in the template. It replaces
@@ -464,10 +481,12 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 	authorURL := html.EscapeString(og.AuthorURL)
 	authorName := html.EscapeString(og.AuthorName)
 
-	replacements := []struct {
+	type replacement struct {
 		re  *regexp.Regexp
 		tag string
-	}{
+	}
+
+	replacements := []replacement{
 		{rePageTitle, "<title>" + title + "</title>"},
 		{reDescription, metaName("description", desc)},
 		{reOGTitle, metaProp("og:title", title)},
@@ -476,49 +495,61 @@ func injectOG(tmpl []byte, og openGraph, siteName string) []byte {
 		{reOGType, metaProp("og:type", ogType)},
 		{reOGURL, metaProp("og:url", ogURL)},
 		{reOGSiteName, metaProp("og:site_name", site)},
+		{reOGLocale, metaProp("og:locale", "en_GB")},
 		{reTwitterTitle, metaName("twitter:title", title)},
 		{reTwitterDesc, metaName("twitter:description", desc)},
 		{reTwitterImage, metaName("twitter:image", img)},
+		// Pinned rather than inherited from the template: a missing or
+		// downgraded twitter:card turns a full-bleed preview into a small
+		// square thumbnail, which is the difference between a share that
+		// advertises sub-12 and one that doesn't.
+		{reTwitterCard, metaName("twitter:card", "summary_large_image")},
+		// Every image we point og:image at — the per-entity renders and the
+		// static site default alike — is a 1200×630 PNG. Declaring that is
+		// what lets Facebook and LinkedIn lay the card out at the intended
+		// 1.91:1 on first scrape instead of guessing an aspect ratio and
+		// centre-cropping the artwork.
+		{reOGImageWidth, metaProp("og:image:width", strconv.Itoa(ogWidth))},
+		{reOGImageHeight, metaProp("og:image:height", strconv.Itoa(ogHeight))},
+		{reOGImageType, metaProp("og:image:type", "image/png")},
+		// Canonical: the SPA shell hard-codes the site root, which would have
+		// every share page declaring itself a duplicate of the homepage and
+		// getting folded away in search results.
+		{reCanonical, linkRel("canonical", ogURL)},
 	}
 
-	// og:image:width/height are stripped because our dynamic image dimensions
-	// are unknown; omitting is better than misleading.
-	out = reOGImageWH.ReplaceAllString(out, "")
+	if strings.HasPrefix(og.Image, "https://") {
+		replacements = append(replacements, replacement{reOGImageSecure, metaProp("og:image:secure_url", img)})
+	} else {
+		out = reOGImageSecure.ReplaceAllString(out, "")
+	}
 
 	// og:image:alt: inject when we have alt text, drop any stale tag
 	// otherwise so we don't surface copy from a previous entity render.
 	if imgAlt != "" {
-		replacements = append(replacements, struct {
-			re  *regexp.Regexp
-			tag string
-		}{reOGImageAlt, metaProp("og:image:alt", imgAlt)})
+		replacements = append(replacements,
+			replacement{reOGImageAlt, metaProp("og:image:alt", imgAlt)},
+			replacement{reTwitterImgAlt, metaName("twitter:image:alt", imgAlt)},
+		)
 	} else {
 		out = reOGImageAlt.ReplaceAllString(out, "")
+		out = reTwitterImgAlt.ReplaceAllString(out, "")
 	}
 
-	// Author attribution for article-type OG (og:profile:username +
+	// Author attribution for article-type OG (profile:username +
 	// article:author + twitter:creator). Only emitted when we resolved an
 	// owner so anonymous / private shares don't leak a misleading byline.
 	if authorName != "" {
 		replacements = append(replacements,
-			struct {
-				re  *regexp.Regexp
-				tag string
-			}{reOGProfileUser, metaProp("og:profile:username", authorName)},
-			struct {
-				re  *regexp.Regexp
-				tag string
-			}{reTwitterCreator, metaName("twitter:creator", authorName)},
+			replacement{reProfileUser, metaProp("profile:username", authorName)},
+			replacement{reTwitterCreator, metaName("twitter:creator", authorName)},
 		)
 	} else {
-		out = reOGProfileUser.ReplaceAllString(out, "")
+		out = reProfileUser.ReplaceAllString(out, "")
 		out = reTwitterCreator.ReplaceAllString(out, "")
 	}
 	if authorURL != "" {
-		replacements = append(replacements, struct {
-			re  *regexp.Regexp
-			tag string
-		}{reArticleAuthor, metaProp("article:author", authorURL)})
+		replacements = append(replacements, replacement{reArticleAuthor, metaProp("article:author", authorURL)})
 	} else {
 		out = reArticleAuthor.ReplaceAllString(out, "")
 	}
