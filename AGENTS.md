@@ -301,6 +301,11 @@ these over ad-hoc Tailwind so surfaces stay consistent.
 - **Interaction utilities** — `.u-lift` (cards that link somewhere), `.u-press`
   (buttons and icon controls), `.u-nudge` (nav and list rows), `.u-sheen`
   (primary CTAs), `.u-hairline`, `.u-tnum`, `.u-text-gold-gradient`.
+- **Touch targets** — on `pointer: coarse` every button gets `min-height: 40px`.
+  A control whose drawn size *is* the design (a pill switch, a round icon badge
+  over an image) must carry `.tap-target`, or that floor stretches the circle
+  into an ellipse; the class keeps the box and moves the 40px touch area onto a
+  centred pseudo-element. `.no-min-target` opts out with no replacement area.
 - **Component classes** — `.btn` + `.btn-primary/secondary/ghost/danger` +
   `.btn-sm/lg`, `.field`, `.surface-card`, `.skeleton`, `.spinner`,
   `.skip-link`, `.app-tab` (mobile bottom-nav dot/pill markers).

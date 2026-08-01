@@ -178,7 +178,7 @@ export function PhotosStep({
                   <button
                     type="button"
                     onClick={() => startEditExisting(img)}
-                    className="p-1 rounded-full bg-page/80 backdrop-blur text-muted hover:text-primary transition-colors"
+                    className="tap-target p-1 rounded-full bg-page/80 backdrop-blur text-muted hover:text-primary transition-colors"
                     aria-label="Edit photo"
                   >
                     <Pencil size={12} />
@@ -187,7 +187,7 @@ export function PhotosStep({
                     type="button"
                     onClick={() => deleteMutation.mutate(img.id)}
                     disabled={deleteMutation.isPending}
-                    className="p-1 rounded-full bg-page/80 backdrop-blur text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
+                    className="tap-target p-1 rounded-full bg-page/80 backdrop-blur text-muted hover:text-[var(--error-text)] transition-colors disabled:opacity-50"
                     aria-label="Remove photo"
                   >
                     <X size={12} />

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearch, useNavigate, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Trophy, Settings, Copy, Check, PenLine, CheckCircle, AlertCircle,
   Lock, LogOut, Share2, Flame, Trophy as TrophyIcon, Activity,
-  ListChecks, Inbox,
+  ListChecks, Inbox, ChevronLeft,
 } from 'lucide-react'
 import { leagueApi, type LeagueScore } from '../api/leagues'
 import { ApiError } from '../api/client'
@@ -60,6 +60,144 @@ function statusBadge(verification: string) {
   if (verification === 'verified') return <Badge variant="green">Verified</Badge>
   if (verification === 'rejected') return <Badge variant="red">Rejected</Badge>
   return <Badge variant="gold">Pending</Badge>
+}
+
+/** One shooter's position, as the hero needs it. */
+type HeroStanding = { rank: number; name: string; score: number | null; x: number | null }
+
+function formatScore(value: number | null): string {
+  if (value == null) return '—'
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+/**
+ * League landing header. The old one was a single flex row, so on a phone the
+ * title, description and controls fought over ~180px and the thumbnail floated
+ * beside three lines of wrapped text. This splits controls, identity and
+ * figures into bands, and promotes the four numbers a shooter actually opens
+ * the page for — who's in it, how much has been shot, who leads, and where you
+ * sit against them — so none of it depends on scrolling to the table.
+ */
+export function LeagueHero({
+  onBack,
+  thumb,
+  title,
+  badges,
+  actions,
+  description,
+  chips,
+  memberCount,
+  faces,
+  cardCount,
+  pendingCount,
+  leader,
+  me,
+  rankedCount,
+  scoreLabel,
+}: {
+  onBack?: () => void
+  thumb: ReactNode
+  title: string
+  badges?: ReactNode
+  actions?: ReactNode
+  description?: string | null
+  chips?: ReactNode
+  memberCount: number
+  faces: { id: string; name: string; avatarUrl?: string | null }[]
+  cardCount: number
+  pendingCount: number
+  leader: HeroStanding | null
+  me: HeroStanding | null
+  rankedCount: number
+  scoreLabel: string
+}) {
+  // ESC to go back — carried over from the header this replaces.
+  useEffect(() => {
+    if (!onBack) return
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onBack() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [onBack])
+
+  const shown = faces.slice(0, 4)
+  const overflow = Math.max(0, memberCount - shown.length)
+  const gap = me && leader && me.rank > 1 && me.score != null && leader.score != null
+    ? leader.score - me.score
+    : null
+
+  let meSub = 'Not on the board yet'
+  if (me?.rank === 1) meSub = 'Leading the league'
+  else if (gap != null) meSub = `${formatScore(gap)} off the lead`
+  else if (me) meSub = `of ${rankedCount} ranked`
+
+  return (
+    <header className="lc-hero">
+      <div className="lc-hero-bar">
+        {onBack ? (
+          <button className="lc-icon-btn" onClick={onBack} aria-label="Back"><ChevronLeft size={16} /></button>
+        ) : <span />}
+        {actions && <div className="lc-hero-actions">{actions}</div>}
+      </div>
+
+      <div className="lc-hero-id">
+        {thumb}
+        <div className="lc-hero-titlebar">
+          <h1 className="t-page-title lc-hero-title">
+            {title}
+            {badges}
+          </h1>
+          {description && <p className="lc-hero-desc">{description}</p>}
+          {chips && <div className="lc-hero-chips">{chips}</div>}
+        </div>
+      </div>
+
+      <div className="lc-hero-stats">
+        <div className="lc-hero-stat">
+          <div className="lc-hero-stat-key"><Users size={11} /> Shooters</div>
+          <div className="lc-hero-stat-val">{memberCount}</div>
+          {shown.length > 0 ? (
+            <div className="lc-hero-faces">
+              {shown.map(f => <Avatar key={f.id} name={f.name} size="sm" src={f.avatarUrl} />)}
+              {overflow > 0 && <span className="lc-hero-faces-more">+{overflow}</span>}
+            </div>
+          ) : (
+            <div className="lc-hero-stat-sub">Nobody has shot yet</div>
+          )}
+        </div>
+
+        <div className="lc-hero-stat">
+          <div className="lc-hero-stat-key"><ListChecks size={11} /> Cards</div>
+          <div className="lc-hero-stat-val">{cardCount}</div>
+          <div className="lc-hero-stat-sub">
+            {pendingCount > 0
+              ? `${pendingCount} awaiting review`
+              : cardCount > 0 ? 'All reviewed' : 'None submitted'}
+          </div>
+        </div>
+
+        <div className="lc-hero-stat">
+          <div className="lc-hero-stat-key"><Flame size={11} /> Leader</div>
+          <div className="lc-hero-stat-val">
+            <span className="lc-hero-stat-name">{leader ? leader.name : '—'}</span>
+          </div>
+          <div className="lc-hero-stat-sub">
+            {leader
+              ? `${scoreLabel} ${formatScore(leader.score)}${leader.x ? ` · ${leader.x}X` : ''}`
+              : 'Top spot unclaimed'}
+          </div>
+        </div>
+
+        <div className={`lc-hero-stat ${me ? 'is-me' : ''}`}>
+          <div className="lc-hero-stat-key"><TrophyIcon size={11} /> You</div>
+          <div className="lc-hero-stat-val">
+            {me ? `#${me.rank}` : '—'}
+            {me?.score != null && <span className="lc-hero-stat-x">{formatScore(me.score)}</span>}
+          </div>
+          <div className="lc-hero-stat-sub">{meSub}</div>
+        </div>
+      </div>
+    </header>
+  )
 }
 
 function formatDate(iso: string): string {
@@ -226,6 +364,17 @@ export default function LeagueDetail() {
   }, [standings, recentScoresData, currentUser, scoringRule])
 
   const podium = standingsRows.slice(0, 3)
+  // Under the "average" rule the ranking figure lands in `avg`, not `best`.
+  const toHeroStanding = (r: StandingRow): HeroStanding => ({
+    rank: r.rank,
+    name: r.name,
+    score: r.best ?? r.avg ?? null,
+    x: r.bestX ?? null,
+  })
+  const leaderRow = standingsRows.find(r => r.rank === 1) ?? standingsRows[0]
+  const heroLeader = leaderRow ? toHeroStanding(leaderRow) : null
+  const meRow = standingsRows.find(r => r.isMe)
+  const heroMe = meRow ? toHeroStanding(meRow) : null
 
   const visibility: 'public' | 'private' = league?.type === 'private' ? 'private' : 'public'
   // A club league's code is inert — joining is gated on club membership — so
@@ -327,35 +476,37 @@ export default function LeagueDetail() {
 
   return (
     <PageGrid>
-      <EntityDetailHeader
+      <LeagueHero
         onBack={smartBack}
         thumb={
           league?.image_url ? (
-            <img src={league.image_url} alt={league.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />
+            <img src={league.image_url} alt={league.name} className="lc-detail-thumb" style={{ objectFit: 'cover' }} />
           ) : (
             <DisciplineThumb size={48} icon={<Trophy size={20} />} />
           )
         }
         title={leagueLoading ? '…' : (league?.name ?? 'League')}
-        tag={
-          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-            {visibility === 'private' && <Badge variant="neutral"><Lock size={10} /> Private</Badge>}
-            <HelpIcon content={pageHelp.leagueDetail} />
-          </span>
-        }
-        sub={
+        badges={visibility === 'private' ? <Badge variant="neutral"><Lock size={10} /> Private</Badge> : null}
+        description={league?.description}
+        chips={
           <>
-            {league?.description && <span>{league.description}</span>}
-            {league?.description && <span className="lc-detail-sub-sep">·</span>}
-            <span><Users size={11} style={{ display: 'inline', verticalAlign: 'middle' }} /> {league?.member_count ?? 0} shooters</span>
-            {code && (<>
-              <span className="lc-detail-sub-sep">·</span>
-              <span className="font-mono"><Lock size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /> {code}</span>
-            </>)}
+            <span className="lc-hero-chip">
+              <span className={`lc-vdot ${visibility === 'private' ? 'lc-vdot-private' : 'lc-vdot-public'}`} />
+              {visibility}
+            </span>
+            <span className="lc-hero-chip">{scoringRule === 'average' ? 'Average score' : 'Best score'}</span>
+            {/* Members only: for an invite-code league the code is the gate. */}
+            {isMember && code && (
+              <button type="button" onClick={copyCode} className="lc-hero-chip" title="Copy invite code">
+                {copied ? <Check size={11} style={{ color: 'var(--green)' }} /> : <Copy size={11} />}
+                {copied ? 'Copied' : <>Code <span className="lc-hero-chip-val">{code}</span></>}
+              </button>
+            )}
           </>
         }
-        rightActions={
+        actions={
           <>
+            <HelpIcon content={pageHelp.leagueDetail} />
             <button className="lc-icon-btn" onClick={() => setShowShare(true)} aria-label="Share"><Share2 size={14} /></button>
             {canLeave && (
               <button className="lc-icon-btn" onClick={() => setConfirmLeave(true)} aria-label="Leave"><LogOut size={14} /></button>
@@ -367,6 +518,14 @@ export default function LeagueDetail() {
             )}
           </>
         }
+        memberCount={league?.member_count ?? 0}
+        faces={standingsRows.map(r => ({ id: r.id, name: r.name, avatarUrl: r.avatarUrl }))}
+        cardCount={totalCards}
+        pendingCount={scoreCounts?.pending ?? 0}
+        leader={heroLeader}
+        me={heroMe}
+        rankedCount={standingsRows.length}
+        scoreLabel={scoringRule === 'average' ? 'Avg' : 'Best'}
       />
 
       {showShare && league && leagueId && (
@@ -445,17 +604,6 @@ export default function LeagueDetail() {
           <div className="lc-status-row warn"><Users size={14} /> Your request is pending admin approval</div>
         )}
         {joinError && <p style={{ color: 'var(--red)', fontSize: 12 }}>{joinError}</p>}
-
-        {/* Code copy */}
-        {isMember && code && (
-          <button
-            onClick={copyCode}
-            style={{ background: 'transparent', border: 0, color: 'var(--muted)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: 0 }}
-          >
-            {copied ? <Check size={12} style={{ color: 'var(--green)' }} /> : <Copy size={12} />}
-            {copied ? 'Copied!' : `Code: ${code}`}
-          </button>
-        )}
 
         {/* Status row — admins only; jumps straight to the pending queue */}
         {isAdmin && scoreCounts && scoreCounts.pending === 0 && (

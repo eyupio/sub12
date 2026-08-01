@@ -1477,7 +1477,7 @@ export default function ScoreCardDetail() {
                 <img src={imagePreview} alt="New score card photo" className="rounded border border-subtle max-h-48 w-full object-contain bg-surface" />
                 <button
                   onClick={clearImage}
-                  className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
+                  className="tap-target absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-1 text-muted hover:text-primary transition-colors"
                   aria-label="Remove new photo"
                 >
                   <XIcon size={16} />
@@ -1920,7 +1920,7 @@ export default function ScoreCardDetail() {
           <div className="relative w-[min(64rem,100vw-2rem)] max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
             <button
               onClick={() => setShowLightbox(false)}
-              className="absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-2 text-muted hover:text-primary transition-colors z-10"
+              className="tap-target absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-2 text-muted hover:text-primary transition-colors z-10"
               aria-label="Close"
             >
               <XIcon size={20} />

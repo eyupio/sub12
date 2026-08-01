@@ -267,11 +267,14 @@
   ::-webkit-scrollbar-corner { background: transparent; }
 
   /* Touch targets: pointer-coarse devices get a comfortable minimum so the
-     dense desktop-first controls stay tappable on phones. */
+     dense desktop-first controls stay tappable on phones. Controls whose
+     drawn size *is* the design — pill switches, round icon badges — opt out
+     with `.tap-target` and take the touch area from a pseudo-element instead,
+     because growing them stretches a circle into an ellipse. */
   @media (pointer: coarse) {
-    button:not(.no-min-target),
-    [role='button']:not(.no-min-target),
-    a[class*='rounded']:not(.no-min-target) {
+    button:not(.no-min-target):not(.tap-target),
+    [role='button']:not(.no-min-target):not(.tap-target),
+    a[class*='rounded']:not(.no-min-target):not(.tap-target) {
       min-height: 40px;
     }
   }
@@ -518,6 +521,24 @@
   /* Buttons and icon controls: a small, quick physical response. */
   .u-press { transition: transform var(--dur-instant) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
   .u-press:active { transform: scale(0.96); }
+
+  /* Fixed-geometry control: keeps the box it draws and grows only its touch
+     area, so a 22px round badge or a 44×24 switch stays that shape on phones.
+     Zero-specificity positioning so any `absolute`/`fixed` utility still wins. */
+  :where(.tap-target) { position: relative; }
+  @media (pointer: coarse) {
+    .tap-target::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      min-width: 40px;
+      min-height: 40px;
+      transform: translate(-50%, -50%);
+    }
+  }
 
   /* Nav/list rows: nudge toward the reading direction on hover. */
   .u-nudge { transition: transform var(--dur-base) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }

@@ -399,6 +399,7 @@
   margin-bottom: 20px;
 }
 .lc-icon-btn {
+  position: relative;
   width: 32px; height: 32px;
   border-radius: var(--radius);
   background: var(--lc-surface);
@@ -408,6 +409,20 @@
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
+}
+/* Square by design: the global coarse-pointer floor would stretch it into a
+   vertical pill, so it keeps its box and hangs the touch area off ::after —
+   the same trick as `.tap-target`. The selector has to out-specify the global
+   rule in index.css (`button:not(.no-min-target):not(.tap-target)`). */
+@media (pointer: coarse) {
+  button.lc-icon-btn:not(.tap-target):not(.no-min-target) { min-height: 0; }
+  .lc-icon-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 40px; height: 40px;
+    transform: translate(-50%, -50%);
+  }
 }
 .lc-icon-btn:hover { border-color: var(--line-2); color: var(--ink); background: var(--surface-2); }
 .lc-icon-btn:active { transform: scale(0.94); }
@@ -434,6 +449,154 @@
   flex-wrap: wrap;
 }
 .lc-detail-sub-sep { color: var(--muted-2); }
+
+/* Detail hero — identity, the people in it, and the figures that answer
+   "how is this going" before any table has loaded. Four tiles is the ceiling:
+   past that the header competes with the standings instead of introducing it. */
+.lc-hero {
+  position: relative;
+  background: var(--lc-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+  animation: fade-in-up var(--dur-slow) var(--ease-out) both;
+}
+/* Brass wash from the top-left corner. Radial rather than a fixed-height
+   linear band so it fades out on its own instead of cutting a hard line
+   across the card; the opaque stat tiles paint over whatever reaches them. */
+.lc-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 130% at 0% 0%, var(--gold-tint) 0%, transparent 62%);
+  pointer-events: none;
+}
+.lc-hero-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+.lc-hero-actions { display: flex; align-items: center; gap: 8px; }
+.lc-hero-id {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 16px 16px;
+}
+.lc-hero-titlebar { flex: 1; min-width: 0; }
+.lc-hero-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lc-hero-desc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.lc-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.lc-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+button.lc-hero-chip { cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+button.lc-hero-chip:hover { color: var(--ink-2); border-color: var(--line-2); }
+.lc-hero-chip .lc-hero-chip-val { font-family: var(--mono); letter-spacing: 0.08em; color: var(--ink-2); }
+
+/* 1px grid gaps stand in for per-tile borders so the dividers stay clean at
+   both the 2-up and 4-up breakpoints. */
+.lc-hero-stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 720px) {
+  .lc-hero-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.lc-hero-stat {
+  background: var(--lc-surface);
+  padding: 12px 16px 13px;
+  min-width: 0;
+}
+.lc-hero-stat-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lc-hero-stat-val {
+  margin-top: 5px;
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.1;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.lc-hero-stat-val .lc-hero-stat-name {
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-hero-stat-x { font-family: var(--mono); font-size: 12px; color: var(--gold); }
+.lc-hero-stat-sub {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-hero-stat.is-me .lc-hero-stat-val { color: var(--gold); }
+.lc-hero-faces { display: flex; align-items: center; margin-top: 7px; }
+.lc-hero-faces img {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--lc-surface);
+  margin-left: -7px;
+  background: var(--bg-2);
+}
+.lc-hero-faces img:first-child { margin-left: 0; }
+.lc-hero-faces-more {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
 
 /* Big CTA */
 .lc-cta {

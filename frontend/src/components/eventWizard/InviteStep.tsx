@@ -135,7 +135,7 @@ export function InviteStep({ slug, hasClub }: Props) {
                 type="button"
                 aria-label={`Remove ${u.display_name}`}
                 onClick={() => togglePick(u)}
-                className="rounded-full hover:bg-gold/10 p-0.5"
+                className="tap-target rounded-full hover:bg-gold/10 p-0.5"
               >
                 <X size={11} />
               </button>
