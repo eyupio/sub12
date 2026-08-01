@@ -37,6 +37,7 @@ import {
   xColumn,
   type StandingRow,
 } from '../components/leagues'
+import { can, PERM } from '../utils/moderators'
 
 function PrivateClubSummary({ clubId }: { clubId: string }) {
   const queryClient = useQueryClient()
@@ -98,12 +99,13 @@ function PrivateClubSummary({ clubId }: { clubId: string }) {
   )
 }
 
-function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemoved }: {
+function MemberRow({ member, clubId, canManageModerators, canManageMembers, currentUserId, moderatorCount, onRemoved }: {
   member: ClubMember
   clubId: string
-  isAdmin: boolean
+  canManageModerators: boolean
+  canManageMembers: boolean
   currentUserId: string
-  adminCount: number
+  moderatorCount: number
   onRemoved: () => void
 }) {
   const queryClient = useQueryClient()
@@ -120,11 +122,11 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
   })
 
   const roleMutation = useMutation({
-    mutationFn: () => clubsApi.updateMember(clubId, member.user_id, { is_admin: !member.is_admin }),
+    mutationFn: () => clubsApi.updateMember(clubId, member.user_id, { is_moderator: !member.is_moderator }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
-      toast(member.is_admin ? 'Demoted from admin' : 'Promoted to admin', 'success')
+      toast(member.is_moderator ? 'Demoted to member' : 'Promoted to moderator', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update role', 'error'),
   })
@@ -137,19 +139,20 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
         <div className="lc-member-name">{member.display_name}</div>
         <div className="lc-member-joined">Joined {member.joined_at.slice(0, 10)}</div>
       </div>
-      {member.is_admin && <Badge variant="gold">Admin</Badge>}
-      {isAdmin && !isSelf && (
+      {member.is_owner && <Badge variant="gold">Owner</Badge>}
+      {member.is_moderator && !member.is_owner && <Badge variant="gold">Moderator</Badge>}
+      {canManageModerators && !isSelf && !member.is_owner && (
         <button
           onClick={() => setConfirmRole(true)}
-          disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
+          disabled={roleMutation.isPending || (member.is_moderator && moderatorCount <= 1)}
           className="lc-icon-btn"
           style={{ width: 28, height: 28 }}
-          title={member.is_admin ? 'Demote' : 'Promote'}
+          title={member.is_moderator ? 'Demote to member' : 'Promote to moderator'}
         >
-          {member.is_admin ? <ShieldOff size={12} /> : <Shield size={12} />}
+          {member.is_moderator ? <ShieldOff size={12} /> : <Shield size={12} />}
         </button>
       )}
-      {isAdmin && !member.is_admin && !isSelf && (
+      {canManageMembers && !member.is_moderator && !isSelf && (
         <button
           onClick={() => setConfirmRemove(true)}
           disabled={removeMutation.isPending}
@@ -170,9 +173,11 @@ function MemberRow({ member, clubId, isAdmin, currentUserId, adminCount, onRemov
       />
       <ConfirmDialog
         open={confirmRole}
-        title={member.is_admin ? `Demote ${member.display_name}?` : `Promote ${member.display_name}?`}
-        message={member.is_admin ? 'This member will no longer manage settings.' : 'This member will be able to manage settings.'}
-        confirmLabel={member.is_admin ? 'Demote' : 'Promote'}
+        title={member.is_moderator ? `Demote ${member.display_name}?` : `Promote ${member.display_name}?`}
+        message={member.is_moderator
+          ? 'They will no longer help run the club, and their permissions will be cleared.'
+          : 'They will start with the day-to-day permissions. Choose exactly what they can do in club settings.'}
+        confirmLabel={member.is_moderator ? 'Demote' : 'Promote'}
         onConfirm={() => { setConfirmRole(false); roleMutation.mutate() }}
         onCancel={() => setConfirmRole(false)}
       />
@@ -223,7 +228,7 @@ export default function ClubDetail() {
   const { data: pendingRequests } = useQuery({
     queryKey: ['club', id, 'join-requests', 'pending'],
     queryFn: () => clubsApi.listJoinRequests(id, 'pending'),
-    enabled: !!club?.is_admin && club?.join_policy === 'approval',
+    enabled: can(club, PERM.manageMembers) && club?.join_policy === 'approval',
   })
 
   const [showCreateLeague, setShowCreateLeague] = useState(false)
@@ -312,7 +317,7 @@ export default function ClubDetail() {
 
   const needsJoinCode = !club.is_member && club.join_policy === 'invite_code'
   const joinLabel = club.join_policy === 'approval' ? 'Request' : 'Join'
-  const adminCount = (membersData?.items ?? []).filter(m => m.is_admin).length
+  const moderatorCount = (membersData?.items ?? []).filter(m => m.is_moderator).length
   const placeLabel = [club.city, club.region].filter(Boolean).join(', ')
   const pendingCount = pendingRequests?.items?.length ?? 0
 
@@ -327,7 +332,7 @@ export default function ClubDetail() {
             ) : (
               <DisciplineThumb size={48} icon={<Users size={20} />} />
             )}
-            {club.is_admin && (
+            {can(club, PERM.manageSettings) && (
               <>
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -362,13 +367,13 @@ export default function ClubDetail() {
         rightActions={
           <>
             <button className="lc-icon-btn" onClick={() => setShowShare(true)} aria-label="Share"><Share2 size={14} /></button>
-            {club.is_admin && (
+            {can(club, PERM.moderateContent) && (
               <Link to="/clubs/$id/reports" params={{ id }} className="lc-icon-btn" aria-label="Reports"><Flag size={14} /></Link>
             )}
-            {club.is_admin && (
+            {club.is_moderator && (
               <Link to="/clubs/$id/settings" params={{ id }} className="lc-icon-btn" aria-label="Settings"><Settings size={14} /></Link>
             )}
-            {club.is_member && !club.is_admin && (
+            {club.is_member && !club.is_moderator && (
               <button className="lc-icon-btn" onClick={() => setConfirmLeave(true)} aria-label="Leave"><LogOut size={14} /></button>
             )}
           </>
@@ -382,7 +387,7 @@ export default function ClubDetail() {
             <div style={{ flex: 1, color: 'var(--muted)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
               {club.join_policy === 'open' && 'Open club'}
               {club.join_policy === 'invite_code' && 'Invite code required'}
-              {club.join_policy === 'approval' && 'Admins approve requests'}
+              {club.join_policy === 'approval' && 'Moderators approve requests'}
             </div>
             {needsJoinCode && (
               <input
@@ -465,7 +470,7 @@ export default function ClubDetail() {
           <Section
             title={`Members ${club.member_count}`}
             icon={<Users size={12} />}
-            actions={club.is_admin ? <button className="lc-action-ghost" onClick={copyJoinCode}><UserPlus size={12} /> Invite</button> : null}
+            actions={club.is_moderator ? <button className="lc-action-ghost" onClick={copyJoinCode}><UserPlus size={12} /> Invite</button> : null}
           >
             {!club.is_member && (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
@@ -479,9 +484,10 @@ export default function ClubDetail() {
                     key={m.user_id}
                     member={m}
                     clubId={id}
-                    isAdmin={!!club.is_admin}
+                    canManageModerators={can(club, PERM.manageModerators)}
+                    canManageMembers={can(club, PERM.manageMembers)}
                     currentUserId={user?.id ?? ''}
-                    adminCount={adminCount}
+                    moderatorCount={moderatorCount}
                     onRemoved={() => {}}
                   />
                 ))}
@@ -498,7 +504,7 @@ export default function ClubDetail() {
           <Section
             title="Leagues"
             icon={<Trophy size={12} />}
-            actions={club.is_admin ? (
+            actions={can(club, PERM.manageLeagues) ? (
               <button className="lc-action-ghost" onClick={() => setShowCreateLeague((v) => !v)}>
                 <Plus size={12} /> New League
               </button>
@@ -534,8 +540,8 @@ export default function ClubDetail() {
               <EmptyState
                 icon={<Trophy size={36} />}
                 title="No leagues yet"
-                body={club.is_admin ? 'Create one to get started.' : 'Check back later.'}
-                cta={club.is_admin ? <button className="lc-action-ghost" onClick={() => setShowCreateLeague(true)}><Plus size={12} /> New League</button> : null}
+                body={can(club, PERM.manageLeagues) ? 'Create one to get started.' : 'Check back later.'}
+                cta={can(club, PERM.manageLeagues) ? <button className="lc-action-ghost" onClick={() => setShowCreateLeague(true)}><Plus size={12} /> New League</button> : null}
               />
             )}
 
@@ -562,7 +568,7 @@ export default function ClubDetail() {
         )}
 
         {/* Events (members only) */}
-        {club.is_member && <ClubEvents clubId={id} isAdmin={!!club.is_admin} />}
+        {club.is_member && <ClubEvents clubId={id} canManageEvents={can(club, PERM.manageEvents)} />}
 
         {/* Feed */}
         {club.is_member && <ClubFeed clubId={id} postVisibility={club.post_visibility} />}
@@ -677,7 +683,7 @@ function ClubAbout({ club }: { club: Club }) {
     !!club.membership_info || !!club.visitor_policy || club.established_year != null
 
   if (!hasProfile) {
-    if (!club.is_admin) return null
+    if (!can(club, PERM.manageSettings)) return null
     return (
       <Section title="About" icon={<Info size={12} />}>
         <EmptyState
@@ -767,7 +773,7 @@ function eventStateBadge(state: EventState) {
   }
 }
 
-function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
+function ClubEvents({ clubId, canManageEvents }: { clubId: string; canManageEvents: boolean }) {
   const navigate = useNavigate()
   const { data, isLoading, error } = useQuery({
     queryKey: ['club', clubId, 'events'],
@@ -780,7 +786,7 @@ function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
       title="Events"
       icon={<CalendarClock size={12} />}
       actions={
-        isAdmin ? (
+        canManageEvents ? (
           <button
             className="lc-action-ghost"
             onClick={() => navigate({ to: '/events/new', search: { clubId } })}
@@ -811,9 +817,9 @@ function ClubEvents({ clubId, isAdmin }: { clubId: string; isAdmin: boolean }) {
         <EmptyState
           icon={<CalendarClock size={36} />}
           title="No events yet"
-          body={isAdmin ? 'Run your first event for the club.' : 'Check back later.'}
+          body={canManageEvents ? 'Run your first event for the club.' : 'Check back later.'}
           cta={
-            isAdmin ? (
+            canManageEvents ? (
               <button
                 className="lc-action-ghost"
                 onClick={() => navigate({ to: '/events/new', search: { clubId } })}

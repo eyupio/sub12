@@ -79,7 +79,7 @@ export function ReportDialog({ open, targetType, targetId, onClose, contextLeagu
     onSuccess: () => {
       toast(
         communityName
-          ? `Report sent to ${communityName} admins`
+          ? `Report sent to ${communityName} moderators`
           : 'Report submitted — thanks',
         'success',
       )

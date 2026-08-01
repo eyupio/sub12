@@ -275,20 +275,20 @@ func (s *CommentService) CanModerateComment(ctx context.Context, userID, role, c
 		return ModerationScope{}, err
 	}
 	if leagueID != nil && *leagueID != "" {
-		isAdmin, err := s.leagues.IsAdmin(ctx, *leagueID, userID)
+		role, err := s.leagues.GetMemberRole(ctx, *leagueID, userID)
 		if err != nil {
 			return ModerationScope{}, err
 		}
-		if isAdmin {
+		if role.Can(model.PermModerateContent) {
 			return ModerationScope{Scope: "league", ScopeID: *leagueID}, nil
 		}
 	}
 	if clubID != nil && *clubID != "" {
-		isAdmin, err := s.clubs.IsAdmin(ctx, *clubID, userID)
+		role, err := s.clubs.GetMemberRole(ctx, *clubID, userID)
 		if err != nil {
 			return ModerationScope{}, err
 		}
-		if isAdmin {
+		if role.Can(model.PermModerateContent) {
 			return ModerationScope{Scope: "club", ScopeID: *clubID}, nil
 		}
 	}

@@ -101,7 +101,7 @@ func (h *ReportHandler) ListForLeague(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListForLeague(r.Context(), leagueID, adminID, status, limit)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a league admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to list league reports")
@@ -144,7 +144,7 @@ func (h *ReportHandler) ListForClub(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.ListForClub(r.Context(), clubID, adminID, status, limit)
 	if err != nil {
 		if errors.Is(err, service.ErrNotAdmin) {
-			writeError(w, http.StatusForbidden, "not a club admin")
+			writeError(w, http.StatusForbidden, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to list club reports")

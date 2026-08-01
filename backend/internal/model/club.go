@@ -61,8 +61,15 @@ type Club struct {
 	UpdatedAt      string  `json:"updated_at"`
 	MemberCount    int     `json:"member_count"`
 	LeagueCount    int     `json:"league_count"`
-	IsAdmin        bool    `json:"is_admin,omitempty"`
-	IsMember       bool    `json:"is_member,omitempty"`
+	// IsAdmin is the pre-moderator spelling of IsModerator, still emitted so
+	// an app running an older bundle keeps unlocking its admin controls.
+	IsAdmin  bool `json:"is_admin,omitempty"`
+	IsMember bool `json:"is_member,omitempty"`
+	// Viewer standing. IsModerator covers owners too; Permissions is the
+	// viewer's effective grant (the whole catalogue for an owner).
+	IsModerator bool     `json:"is_moderator,omitempty"`
+	IsOwner     bool     `json:"is_owner,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
 
 	// Real-world profile. All optional — an online-only club leaves them unset.
 	WebsiteURL      *string  `json:"website_url,omitempty"`
@@ -128,8 +135,13 @@ type ClubMember struct {
 	UserID      string  `json:"user_id"`
 	DisplayName string  `json:"display_name"`
 	AvatarURL   *string `json:"avatar_url,omitempty"`
-	IsAdmin     bool    `json:"is_admin"`
-	JoinedAt    string  `json:"joined_at"`
+	// IsAdmin is the pre-moderator spelling of IsModerator, still emitted so
+	// an app running an older bundle keeps rendering the badge.
+	IsAdmin     bool     `json:"is_admin"`
+	IsModerator bool     `json:"is_moderator"`
+	IsOwner     bool     `json:"is_owner"`
+	Permissions []string `json:"permissions"`
+	JoinedAt    string   `json:"joined_at"`
 }
 
 type ClubStanding struct {
@@ -149,8 +161,21 @@ type CreateClubInput struct {
 	JoinPolicy  *string `json:"join_policy,omitempty"` // "open", "invite_code", or "approval" (defaults to "open")
 }
 
+// UpdateClubMemberInput carries a member role change: promote/demote via
+// IsModerator (IsAdmin is the accepted legacy spelling), and the delegated
+// capability grant via Permissions.
 type UpdateClubMemberInput struct {
-	IsAdmin *bool `json:"is_admin"`
+	IsAdmin     *bool     `json:"is_admin"`
+	IsModerator *bool     `json:"is_moderator"`
+	Permissions *[]string `json:"permissions"`
+}
+
+// Moderator resolves the promote/demote intent from either spelling.
+func (in *UpdateClubMemberInput) Moderator() *bool {
+	if in.IsModerator != nil {
+		return in.IsModerator
+	}
+	return in.IsAdmin
 }
 
 type ClubJoinRequest struct {

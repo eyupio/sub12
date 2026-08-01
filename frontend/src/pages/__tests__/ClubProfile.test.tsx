@@ -21,7 +21,26 @@ vi.mock('@tanstack/react-router', async () => {
   }
 })
 
+const CLUB_PERMISSIONS = [
+  { key: 'manage_members', label: 'Manage members', description: '', default: true },
+  { key: 'moderate_content', label: 'Moderate content', description: '', default: true },
+  { key: 'manage_events', label: 'Manage events', description: '', default: false },
+  { key: 'manage_leagues', label: 'Manage leagues', description: '', default: false },
+  { key: 'manage_settings', label: 'Manage settings', description: '', default: false },
+  { key: 'manage_support', label: 'Handle support', description: '', default: false },
+  { key: 'manage_moderators', label: 'Manage moderators', description: '', default: false },
+]
+
 function makeClub(partial: Partial<Club> = {}): Club {
+  // The API derives the viewer's standing server-side; mirror that here so a
+  // fixture only has to say whether the viewer runs the club.
+  const isModerator = partial.is_moderator ?? partial.is_admin ?? false
+  const viewerRole = {
+    is_admin: isModerator,
+    is_moderator: isModerator,
+    is_owner: isModerator,
+    permissions: isModerator ? CLUB_PERMISSIONS.map(p => p.key) : [],
+  }
   return {
     id: 'club-1',
     name: 'Riverside Rifle Club',
@@ -38,11 +57,14 @@ function makeClub(partial: Partial<Club> = {}): Club {
     member_count: 12,
     league_count: 2,
     is_member: true,
-    is_admin: false,
     disciplines: [],
     distances: [],
     facilities: [],
+    ...viewerRole,
     ...partial,
+    is_moderator: viewerRole.is_moderator,
+    is_owner: viewerRole.is_owner,
+    permissions: viewerRole.permissions,
   }
 }
 
@@ -73,6 +95,15 @@ beforeEach(() => {
   // Every club API the pages call must be stubbed: an unmocked call reaches the
   // real client, 401s, and clears the auth store mid-test.
   vi.spyOn(clubsApi, 'listDisciplines').mockResolvedValue({ items: ['air rifle', 'benchrest'] })
+  vi.spyOn(clubsApi, 'getModeratorPermissions').mockResolvedValue({
+    catalogue: CLUB_PERMISSIONS,
+    role: {
+      is_member: true,
+      is_moderator: true,
+      is_owner: true,
+      permissions: CLUB_PERMISSIONS.map(p => p.key),
+    },
+  })
 })
 
 afterEach(() => {
@@ -135,7 +166,7 @@ describe('ClubDetail about panel', () => {
     expect(screen.queryByText('About')).not.toBeInTheDocument()
   })
 
-  it('prompts an admin to fill in a blank profile', async () => {
+  it('prompts a moderator to fill in a blank profile', async () => {
     vi.spyOn(clubsApi, 'get').mockResolvedValue(makeClub({ is_admin: true }))
 
     renderWithQuery(<ClubDetail />)
@@ -143,7 +174,7 @@ describe('ClubDetail about panel', () => {
     await waitFor(() => expect(screen.getByText('No club details yet')).toBeInTheDocument())
   })
 
-  it('surfaces pending join requests to admins of approval-gated clubs', async () => {
+  it('surfaces pending join requests to moderators of approval-gated clubs', async () => {
     vi.spyOn(clubsApi, 'get').mockResolvedValue(makeClub({ is_admin: true, join_policy: 'approval' }))
     vi.spyOn(clubsApi, 'listJoinRequests').mockResolvedValue({
       items: [
@@ -189,7 +220,7 @@ describe('ClubSettings profile editing', () => {
     expect(update.mock.calls[0][1]).toMatchObject({ city: 'Huddersfield', latitude: 53.6, longitude: -1.8 })
   })
 
-  it('clears the pin explicitly when the admin removes it', async () => {
+  it('clears the pin explicitly when a moderator removes it', async () => {
     vi.spyOn(clubsApi, 'get').mockResolvedValue(makeClub({ is_admin: true, latitude: 53.6, longitude: -1.8 }))
     const update = vi.spyOn(clubsApi, 'update').mockResolvedValue(makeClub({ is_admin: true }))
 

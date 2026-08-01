@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { ModeratorPermissionsResponse } from '../utils/moderators'
 
 export interface League {
   id: string
@@ -110,7 +111,12 @@ export interface JoinRequest {
 export interface LeagueMember {
   user_id: string
   display_name: string
+  /** Legacy spelling of is_moderator, still sent by the API. */
   is_admin: boolean
+  is_moderator: boolean
+  is_owner: boolean
+  /** Omitted for viewers who do not help run the league. */
+  permissions?: string[]
   joined_at: string
 }
 
@@ -272,8 +278,15 @@ export const leagueApi = {
   removeMember: (leagueId: string, userId: string) =>
     api.del<void>(`/leagues/${leagueId}/members/${userId}`),
 
-  updateMember: (leagueId: string, userId: string, input: { is_admin: boolean }) =>
-    api.patch<{ updated: boolean }>(`/leagues/${leagueId}/members/${userId}`, input),
+  updateMember: (
+    leagueId: string,
+    userId: string,
+    input: { is_moderator?: boolean; permissions?: string[] },
+  ) => api.patch<{ updated: boolean }>(`/leagues/${leagueId}/members/${userId}`, input),
+
+  /** The capabilities a league owner can delegate, plus the caller's own role. */
+  getModeratorPermissions: (leagueId: string) =>
+    api.get<ModeratorPermissionsResponse>(`/leagues/${leagueId}/moderator-permissions`),
 
   leave: (id: string) =>
     api.del<void>(`/leagues/${id}/members/me`),
@@ -294,7 +307,7 @@ export const leagueApi = {
   rejectScore: (scoreCardId: string, reason: string) =>
     api.post(`/score-cards/${scoreCardId}/reject`, { reason }),
 
-  // Returns a rejected card to the pending queue (league admins only).
+  // Returns a rejected card to the pending queue (league moderators only).
   reopenScore: (scoreCardId: string, reason?: string) =>
     api.post<{ reopened: boolean }>(`/score-cards/${scoreCardId}/reopen`, { reason }),
 

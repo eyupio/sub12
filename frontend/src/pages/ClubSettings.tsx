@@ -18,6 +18,8 @@ import { ImageEditor } from '../components/ImageEditor'
 import { UserAvatar } from '../components/UserAvatar'
 import { requestPosition } from '../utils/geolocation'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
+import { can, PERM } from '../utils/moderators'
+import { ModeratorPermissionEditor, PermissionSummary, RoleBadge } from '../components/ModeratorPermissions'
 
 const TIMEZONES: string[] = (() => {
   const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
@@ -742,7 +744,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
         <p className="text-[10px] text-muted">
           {club.join_policy === 'open' && 'Anyone can join instantly.'}
           {club.join_policy === 'invite_code' && 'Members need the join code to join.'}
-          {club.join_policy === 'approval' && 'Admins review and approve each join request.'}
+          {club.join_policy === 'approval' && 'Moderators review and approve each join request.'}
         </p>
       </div>
 
@@ -974,10 +976,16 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
   const queryClient = useQueryClient()
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const [confirmRole, setConfirmRole] = useState<{ userId: string; displayName: string; promote: boolean } | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const { data } = useQuery({
     queryKey: ['club', clubId, 'members'],
     queryFn: () => clubsApi.listMembers(clubId),
+  })
+
+  const { data: permissionData } = useQuery({
+    queryKey: ['club', clubId, 'moderator-permissions'],
+    queryFn: () => clubsApi.getModeratorPermissions(clubId),
   })
 
   const removeMutation = useMutation({
@@ -991,8 +999,8 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
   })
 
   const roleMutation = useMutation({
-    mutationFn: ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) =>
-      clubsApi.updateMember(clubId, userId, { is_admin: isAdmin }),
+    mutationFn: ({ userId, isModerator }: { userId: string; isModerator: boolean }) =>
+      clubsApi.updateMember(clubId, userId, { is_moderator: isModerator }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
       toast('Role updated', 'success')
@@ -1003,8 +1011,32 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
     },
   })
 
+  const permissionMutation = useMutation({
+    mutationFn: ({ userId, permissions }: { userId: string; permissions: string[] }) =>
+      clubsApi.updateMember(clubId, userId, { permissions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
+      toast('Permissions updated', 'success')
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to update permissions', 'error')
+      queryClient.invalidateQueries({ queryKey: ['club', clubId, 'members'] })
+    },
+  })
+
   const members = data?.items ?? []
-  const adminCount = members.filter(m => m.is_admin).length
+  const moderatorCount = members.filter(m => m.is_moderator).length
+  const catalogue = permissionData?.catalogue ?? []
+  const viewerRole = permissionData?.role ?? null
+  const canDelegate = can(viewerRole, PERM.manageModerators)
+  // Owners delegate anything; a moderator may only pass on what they hold.
+  const grantable = viewerRole?.is_owner ? null : (viewerRole?.permissions ?? [])
+
+  const togglePermission = (member: ClubMember, key: string, next: boolean) => {
+    const current = member.permissions ?? []
+    const permissions = next ? [...current, key] : current.filter(p => p !== key)
+    permissionMutation.mutate({ userId: member.user_id, permissions })
+  }
 
   return (
     <div className={sectionCls}>
@@ -1012,56 +1044,88 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
         <h2 className="t-section-title">Members</h2>
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
+      <p className="text-[10px] text-muted -mt-2">
+        Promote a moderator to help run the club, then choose exactly what they
+        can do. The owner always holds every capability.
+      </p>
 
-      {members.map((member: ClubMember) => (
-        <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
-          <div className="flex items-center gap-2">
-            <UserAvatar
-              user={{ id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url }}
-              size={24}
-              variant="brass"
-              linkToProfile
-            />
-            <span className="text-sm text-secondary">{member.display_name}</span>
-            {member.is_admin && (
-              <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-1.5 py-0.5 rounded">
-                <Shield size={10} /> Admin
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted font-mono">
-              {member.joined_at.slice(0, 10)}
-            </span>
-            {member.user_id !== currentUserId && (
-              <>
-                <button
-                  onClick={() => setConfirmRole({
-                    userId: member.user_id,
-                    displayName: member.display_name,
-                    promote: !member.is_admin,
-                  })}
-                  disabled={roleMutation.isPending || (member.is_admin && adminCount <= 1)}
-                  className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass)]/10 transition-colors disabled:opacity-30"
-                  title={member.is_admin ? 'Demote from admin' : 'Promote to admin'}
-                >
-                  {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
-                </button>
-                {!member.is_admin && (
-                  <button
-                    onClick={() => setConfirmRemove(member.user_id)}
-                    disabled={removeMutation.isPending}
-                    className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Remove member"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+      {members.map((member: ClubMember) => {
+        const lastModerator = member.is_moderator && moderatorCount <= 1
+        const showPermissions = member.is_moderator && !member.is_owner && expanded === member.user_id
+        return (
+          <div key={member.user_id} className="py-2 border-b border-subtle last:border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserAvatar
+                  user={{ id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url }}
+                  size={24}
+                  variant="brass"
+                  linkToProfile
+                />
+                <span className="text-sm text-secondary">{member.display_name}</span>
+                <RoleBadge member={member} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted font-mono">
+                  {member.joined_at.slice(0, 10)}
+                </span>
+                {member.user_id !== currentUserId && !member.is_owner && (
+                  <>
+                    {canDelegate && (
+                      <button
+                        onClick={() => setConfirmRole({
+                          userId: member.user_id,
+                          displayName: member.display_name,
+                          promote: !member.is_moderator,
+                        })}
+                        disabled={roleMutation.isPending || lastModerator}
+                        className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass)]/10 transition-colors disabled:opacity-30"
+                        title={lastModerator ? 'Cannot demote the last moderator' : member.is_moderator ? 'Demote to member' : 'Promote to moderator'}
+                      >
+                        {member.is_moderator ? <ShieldOff size={14} /> : <Shield size={14} />}
+                      </button>
+                    )}
+                    {!member.is_moderator && (
+                      <button
+                        onClick={() => setConfirmRemove(member.user_id)}
+                        disabled={removeMutation.isPending}
+                        className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Remove member"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
+            </div>
+
+            {member.is_owner && (
+              <p className="text-[10px] text-muted mt-1">Full access — the owner's role cannot be changed.</p>
+            )}
+
+            {member.is_moderator && !member.is_owner && (
+              <div className="mt-1">
+                <PermissionSummary
+                  permissions={member.permissions}
+                  catalogue={catalogue}
+                  open={showPermissions}
+                  onToggle={() => setExpanded(showPermissions ? null : member.user_id)}
+                />
+                {showPermissions && (
+                  <ModeratorPermissionEditor
+                    catalogue={catalogue}
+                    granted={member.permissions ?? []}
+                    grantable={grantable}
+                    disabled={!canDelegate || permissionMutation.isPending}
+                    onToggle={(key, next) => togglePermission(member, key, next)}
+                  />
+                )}
+              </div>
             )}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       <ConfirmDialog
         open={!!confirmRemove}
@@ -1077,13 +1141,13 @@ function MembersSection({ clubId, currentUserId }: { clubId: string; currentUser
 
       <ConfirmDialog
         open={!!confirmRole}
-        title={confirmRole?.promote ? 'Promote to admin?' : 'Demote from admin?'}
+        title={confirmRole?.promote ? 'Promote to moderator?' : 'Demote to member?'}
         message={confirmRole?.promote
-          ? `${confirmRole.displayName} will be able to manage club settings and members.`
-          : `${confirmRole?.displayName} will no longer be able to manage club settings and members.`}
+          ? `${confirmRole.displayName} will start with the day-to-day permissions. You can change exactly what they can do afterwards.`
+          : `${confirmRole?.displayName} will no longer help run the club, and their permissions will be cleared.`}
         confirmLabel={confirmRole?.promote ? 'Promote' : 'Demote'}
         onConfirm={() => {
-          if (confirmRole) roleMutation.mutate({ userId: confirmRole.userId, isAdmin: confirmRole.promote })
+          if (confirmRole) roleMutation.mutate({ userId: confirmRole.userId, isModerator: confirmRole.promote })
           setConfirmRole(null)
         }}
         onCancel={() => setConfirmRole(null)}
@@ -1103,8 +1167,10 @@ function LeaveSection({ clubId, club, members, currentUserId }: { clubId: string
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const currentMember = members.find(m => m.user_id === currentUserId)
-  const adminCount = members.filter(m => m.is_admin).length
-  const isLastAdmin = currentMember?.is_admin && adminCount <= 1
+  const moderatorCount = members.filter(m => m.is_moderator).length
+  const isLastModerator = currentMember?.is_moderator && moderatorCount <= 1
+  // Deleting the club is the one capability the owner never delegates.
+  const isOwner = !!currentMember?.is_owner
 
   const leaveMutation = useMutation({
     mutationFn: () => clubsApi.leave(clubId),
@@ -1135,13 +1201,13 @@ function LeaveSection({ clubId, club, members, currentUserId }: { clubId: string
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-secondary">Leave this club</p>
-          {isLastAdmin && (
-            <p className="text-[11px] text-muted">Promote another member to admin first.</p>
+          {isLastModerator && (
+            <p className="text-[11px] text-muted">Promote another member to moderator first.</p>
           )}
         </div>
         <button
           onClick={() => setConfirmLeave(true)}
-          disabled={!!isLastAdmin || leaveMutation.isPending}
+          disabled={!!isLastModerator || leaveMutation.isPending}
           className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] tracking-widest uppercase border border-red-500/30 text-red-400 rounded hover:bg-red-500/10 transition-colors disabled:opacity-30"
         >
           <LogOut size={12} />
@@ -1154,11 +1220,12 @@ function LeaveSection({ clubId, club, members, currentUserId }: { clubId: string
           <p className="text-sm text-secondary">Delete this club</p>
           <p className="text-[11px] text-muted">
             Removes the club, its members, posts and opening times. Leagues stay but are no longer club-hosted.
+            {!isOwner && ' Only the club owner can do this.'}
           </p>
         </div>
         <button
           onClick={() => setConfirmDelete(true)}
-          disabled={deleteMutation.isPending}
+          disabled={!isOwner || deleteMutation.isPending}
           className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] tracking-widest uppercase border border-red-500/30 text-red-400 rounded hover:bg-red-500/10 transition-colors disabled:opacity-30 shrink-0"
         >
           <Trash2 size={12} />
@@ -1207,13 +1274,13 @@ export default function ClubSettings() {
   })
 
   const isLoading = clubLoading || membersLoading
-  const isAdmin = club?.is_admin ?? false
+  const isModerator = club?.is_moderator ?? false
 
   useEffect(() => {
-    if (!isLoading && !isAdmin) {
+    if (!isLoading && !isModerator) {
       navigate({ to: '/clubs/$id', params: { id } })
     }
-  }, [isLoading, isAdmin, navigate, id])
+  }, [isLoading, isModerator, navigate, id])
 
   if (isLoading) {
     return (
@@ -1238,7 +1305,7 @@ export default function ClubSettings() {
   // currentUser can briefly be null while the persisted auth store settles, and
   // is null outright once a session expires — render nothing rather than
   // dereferencing it.
-  if (!isAdmin || !currentUser) return null
+  if (!isModerator || !currentUser) return null
 
   const members = membersData?.items ?? []
 

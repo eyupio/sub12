@@ -15,6 +15,7 @@ import { commentApi } from '../api/scoreCards'
 import { formatDate, formatDateTime, formatRelativeTime, useRegionalPrefs } from '../utils/date'
 import { applyPostDeleteToCaches, applyPostEditToCaches } from '../utils/postCache'
 import { UserAvatar } from './UserAvatar'
+import { can, PERM } from '../utils/moderators'
 
 function AttachmentPreview({ attachment, authorName }: { attachment: PostAttachment; authorName: string }) {
   switch (attachment.type) {
@@ -119,20 +120,21 @@ export const PostCard = memo(function PostCard({ post, onCommentClick }: { post:
     queryFn: () => leagueApi.listMembers(post.league_id!),
     enabled: !!post.league_id && !!currentUser,
   })
-  // Resolve club-admin status for the post's club (cached by clubId).
+  // Resolve the viewer's club standing for the post's club (cached by clubId).
   const { data: club } = useQuery({
     queryKey: ['clubs', post.club_id],
     queryFn: () => clubsApi.get(post.club_id!),
     enabled: !!post.club_id && !!currentUser,
   })
 
-  const isLeagueAdmin = !!leagueMembers?.items?.find(
-    (m) => m.user_id === currentUser?.id && m.is_admin,
+  const isLeagueModerator = can(
+    leagueMembers?.items?.find((m) => m.user_id === currentUser?.id),
+    PERM.moderateContent,
   )
-  const isClubAdmin = !!club?.is_admin
+  const isClubModerator = can(club, PERM.moderateContent)
   const isGlobalAdmin = currentUser?.role === 'admin'
   const isOwnPost = currentUser?.id === post.user_id
-  const canModerate = !isOwnPost && (isGlobalAdmin || isLeagueAdmin || isClubAdmin)
+  const canModerate = !isOwnPost && (isGlobalAdmin || isLeagueModerator || isClubModerator)
 
   const flagMutation = useMutation({
     mutationFn: (reason: string) => postApi.flag(post.id, reason),

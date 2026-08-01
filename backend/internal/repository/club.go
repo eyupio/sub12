@@ -114,10 +114,11 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 	}
 
 	_, err = tx.Exec(ctx, `
-		INSERT INTO club_members (club_id, user_id, is_admin) VALUES ($1, $2, true)
-	`, club.ID, userID)
+		INSERT INTO club_members (club_id, user_id, is_admin, moderator_permissions)
+		VALUES ($1, $2, true, $3)
+	`, club.ID, userID, model.AllModeratorPermissions(model.ClubModeratorPermissions))
 	if err != nil {
-		return nil, fmt.Errorf("insert club admin member: %w", err)
+		return nil, fmt.Errorf("insert club owner member: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -125,8 +126,8 @@ func (r *ClubRepository) Create(ctx context.Context, userID string, input *model
 	}
 
 	club.MemberCount = 1
-	club.IsAdmin = true
 	club.IsMember = true
+	applyViewerRole(&club, userID, nil)
 	return &club, nil
 }
 
@@ -146,6 +147,7 @@ func (r *ClubRepository) getOne(ctx context.Context, whereClause, key, viewerID 
 	var club model.Club
 	var err error
 
+	var permissions []string
 	if viewerID == "" {
 		query := fmt.Sprintf(`SELECT %s FROM clubs c WHERE %s LIMIT 1`, clubColumns, whereClause)
 		err = scanClub(r.db.QueryRow(ctx, query, key), &club)
@@ -153,12 +155,13 @@ func (r *ClubRepository) getOne(ctx context.Context, whereClause, key, viewerID 
 		query := fmt.Sprintf(`
 			SELECT %s,
 				COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), false),
-				EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid)
+				EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = $2::uuid),
+				COALESCE((SELECT moderator_permissions FROM club_members WHERE club_id = c.id AND user_id = $2::uuid), '{}'::text[])
 			FROM clubs c
 			WHERE %s
 			LIMIT 1
 		`, clubColumns, whereClause)
-		err = scanClub(r.db.QueryRow(ctx, query, key, viewerID), &club, &club.IsAdmin, &club.IsMember)
+		err = scanClub(r.db.QueryRow(ctx, query, key, viewerID), &club, &club.IsAdmin, &club.IsMember, &permissions)
 	}
 
 	if err != nil {
@@ -167,7 +170,27 @@ func (r *ClubRepository) getOne(ctx context.Context, whereClause, key, viewerID 
 		}
 		return nil, fmt.Errorf("get club: %w", err)
 	}
+	applyViewerRole(&club, viewerID, permissions)
 	return &club, nil
+}
+
+// applyViewerRole derives the viewer's standing from the club's owner and the
+// grant on their membership row. The owner runs the club whether or not a
+// membership row says so, and holds every delegable capability.
+func applyViewerRole(club *model.Club, viewerID string, permissions []string) {
+	if viewerID == "" {
+		return
+	}
+	club.IsOwner = club.CreatedBy == viewerID
+	if club.IsOwner {
+		club.IsAdmin = true
+		permissions = model.AllModeratorPermissions(model.ClubModeratorPermissions)
+	}
+	club.IsModerator = club.IsAdmin
+	club.Permissions = permissions
+	if club.Permissions == nil {
+		club.Permissions = []string{}
+	}
 }
 
 // GetByJoinCode returns a single club matched by join_code (case-insensitive),
@@ -192,6 +215,8 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string, q model.Club
 
 	selects := clubColumns
 	extras := func(club *model.Club) []any { return nil }
+	// Non-empty only when the query carries the viewer's membership columns.
+	viewerRole := ""
 
 	visibility := "c.type = 'public'"
 	if q.IncludePrivate {
@@ -207,6 +232,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string, q model.Club
 			COALESCE((SELECT is_admin FROM club_members WHERE club_id = c.id AND user_id = %s::uuid), false),
 			EXISTS(SELECT 1 FROM club_members WHERE club_id = c.id AND user_id = %s::uuid)`, viewer, viewer)
 		extras = func(club *model.Club) []any { return []any{&club.IsAdmin, &club.IsMember} }
+		viewerRole = viewerID
 	}
 	where := []string{visibility}
 
@@ -253,6 +279,9 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string, q model.Club
 		if err := scanClub(rows, &club, extras(&club)...); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
 		}
+		// The directory reports standing but not the grant itself — nothing on
+		// a listing card acts on a single capability.
+		applyViewerRole(&club, viewerRole, nil)
 		clubs = append(clubs, &club)
 	}
 	return clubs, rows.Err()
@@ -260,7 +289,7 @@ func (r *ClubRepository) List(ctx context.Context, viewerID string, q model.Club
 
 func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*model.Club, error) {
 	rows, err := r.db.Query(ctx, fmt.Sprintf(`
-		SELECT %s, cm.is_admin
+		SELECT %s, cm.is_admin, COALESCE(cm.moderator_permissions, '{}'::text[])
 		FROM clubs c
 		JOIN club_members cm ON cm.club_id = c.id AND cm.user_id = $1
 		ORDER BY cm.joined_at DESC
@@ -273,10 +302,12 @@ func (r *ClubRepository) ListByUser(ctx context.Context, userID string) ([]*mode
 	var clubs []*model.Club
 	for rows.Next() {
 		var club model.Club
-		if err := scanClub(rows, &club, &club.IsAdmin); err != nil {
+		var permissions []string
+		if err := scanClub(rows, &club, &club.IsAdmin, &permissions); err != nil {
 			return nil, fmt.Errorf("scan club: %w", err)
 		}
 		club.IsMember = true
+		applyViewerRole(&club, userID, permissions)
 		clubs = append(clubs, &club)
 	}
 	return clubs, rows.Err()
@@ -306,12 +337,85 @@ func (r *ClubRepository) Join(ctx context.Context, clubID, userID string) error 
 	return nil
 }
 
-func (r *ClubRepository) IsAdmin(ctx context.Context, clubID, userID string) (bool, error) {
-	var isAdmin bool
-	err := r.db.QueryRow(ctx, `
-		SELECT COALESCE((SELECT is_admin FROM club_members WHERE club_id = $1 AND user_id = $2), false)
-	`, clubID, userID).Scan(&isAdmin)
-	return isAdmin, err
+// GetMemberRole resolves a user's standing in a club: membership, whether they
+// were promoted to moderator, whether they own the club, and the capabilities
+// the owner delegated to them. A missing club or a stranger yields the zero
+// role rather than an error.
+func (r *ClubRepository) GetMemberRole(ctx context.Context, clubID, userID string) (*model.MemberRole, error) {
+	role := &model.MemberRole{Permissions: []string{}}
+	if clubID == "" || userID == "" {
+		return role, nil
+	}
+	clubID, err := resolveEntityRef(ctx, r.db, SlugEntityClub, clubID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return role, nil
+		}
+		return nil, err
+	}
+	var permissions []string
+	err = r.db.QueryRow(ctx, `
+		SELECT c.created_by = $2,
+		       cm.user_id IS NOT NULL,
+		       COALESCE(cm.is_admin, FALSE),
+		       COALESCE(cm.moderator_permissions, '{}'::text[])
+		FROM clubs c
+		LEFT JOIN club_members cm ON cm.club_id = c.id AND cm.user_id = $2
+		WHERE c.id = $1
+	`, clubID, userID).Scan(&role.IsOwner, &role.IsMember, &role.IsModerator, &permissions)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return role, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get club member role: %w", err)
+	}
+	// The owner runs the club whether or not they hold a membership row, and
+	// holds every capability without anything being granted to them.
+	if role.IsOwner {
+		role.IsModerator = true
+		permissions = model.AllModeratorPermissions(model.ClubModeratorPermissions)
+	}
+	if permissions != nil {
+		role.Permissions = permissions
+	}
+	return role, nil
+}
+
+// IsModerator reports whether the user runs the club — its owner, or a member
+// promoted to moderator. It says nothing about which capabilities they were
+// delegated; use GetMemberRole for that.
+func (r *ClubRepository) IsModerator(ctx context.Context, clubID, userID string) (bool, error) {
+	role, err := r.GetMemberRole(ctx, clubID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.IsModerator, nil
+}
+
+// Can reports whether the user holds one delegated capability in the club.
+// Owners always can.
+func (r *ClubRepository) Can(ctx context.Context, clubID, userID, permission string) (bool, error) {
+	role, err := r.GetMemberRole(ctx, clubID, userID)
+	if err != nil {
+		return false, err
+	}
+	return role.Can(permission), nil
+}
+
+// SetModeratorPermissions replaces a moderator's delegated capability grant.
+// Returns ErrNotFound when the target is not a promoted member.
+func (r *ClubRepository) SetModeratorPermissions(ctx context.Context, clubID, userID string, permissions []string) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE club_members SET moderator_permissions = $3
+		WHERE club_id = $1 AND user_id = $2 AND is_admin = TRUE
+	`, clubID, userID, permissions)
+	if err != nil {
+		return fmt.Errorf("set club moderator permissions: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *ClubRepository) IsMember(ctx context.Context, clubID, userID string) (bool, error) {
@@ -357,11 +461,14 @@ func (r *ClubRepository) CountMembershipsByUser(ctx context.Context, userID stri
 
 func (r *ClubRepository) ListMembers(ctx context.Context, clubID string) ([]*model.ClubMember, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT u.id, u.display_name, u.avatar_url, cm.is_admin, cm.joined_at::text
+		SELECT u.id, u.display_name, u.avatar_url, cm.is_admin, cm.joined_at::text,
+		       COALESCE(cm.moderator_permissions, '{}'::text[]),
+		       cm.user_id = c.created_by
 		FROM club_members cm
 		JOIN users u ON u.id = cm.user_id
+		JOIN clubs c ON c.id = cm.club_id
 		WHERE cm.club_id = $1
-		ORDER BY cm.is_admin DESC, cm.joined_at ASC
+		ORDER BY cm.user_id = c.created_by DESC, cm.is_admin DESC, cm.joined_at ASC
 	`, clubID)
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
@@ -371,9 +478,20 @@ func (r *ClubRepository) ListMembers(ctx context.Context, clubID string) ([]*mod
 	var members []*model.ClubMember
 	for rows.Next() {
 		var m model.ClubMember
-		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.AvatarURL, &m.IsAdmin, &m.JoinedAt); err != nil {
+		var permissions []string
+		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.AvatarURL, &m.IsAdmin, &m.JoinedAt, &permissions, &m.IsOwner); err != nil {
 			return nil, fmt.Errorf("scan member: %w", err)
 		}
+		m.Permissions = permissions
+		if m.Permissions == nil {
+			m.Permissions = []string{}
+		}
+		// The owner runs the club by construction, and holds everything.
+		if m.IsOwner {
+			m.IsAdmin = true
+			m.Permissions = model.AllModeratorPermissions(model.ClubModeratorPermissions)
+		}
+		m.IsModerator = m.IsAdmin
 		members = append(members, &m)
 	}
 	return members, rows.Err()
@@ -434,16 +552,19 @@ func (r *ClubRepository) CountAdmins(ctx context.Context, clubID string) (int, e
 	return count, err
 }
 
-// UpdateMemberRole sets is_admin for a specific club member.
-func (r *ClubRepository) UpdateMemberRole(ctx context.Context, clubID, userID string, isAdmin bool) error {
+// PromoteMember makes an existing club member a moderator, granting the
+// supplied capabilities. Re-promoting an existing moderator re-grants, which
+// is how the owner edits a moderator's delegated capabilities.
+func (r *ClubRepository) PromoteMember(ctx context.Context, clubID, userID string, permissions []string) error {
 	ct, err := r.db.Exec(ctx, `
-		UPDATE club_members SET is_admin = $3 WHERE club_id = $1 AND user_id = $2
-	`, clubID, userID, isAdmin)
+		UPDATE club_members SET is_admin = TRUE, moderator_permissions = $3
+		WHERE club_id = $1 AND user_id = $2
+	`, clubID, userID, permissions)
 	if err != nil {
-		return fmt.Errorf("update member role: %w", err)
+		return fmt.Errorf("promote club member: %w", err)
 	}
 	if ct.RowsAffected() == 0 {
-		return fmt.Errorf("member not found")
+		return ErrClubMemberNotFound
 	}
 	return nil
 }
@@ -498,7 +619,8 @@ func (r *ClubRepository) DemoteMemberGuarded(ctx context.Context, clubID, userID
 	}
 
 	if _, err := tx.Exec(ctx, `
-		UPDATE club_members SET is_admin = FALSE WHERE club_id = $1 AND user_id = $2
+		UPDATE club_members SET is_admin = FALSE, moderator_permissions = '{}'
+		WHERE club_id = $1 AND user_id = $2
 	`, clubID, userID); err != nil {
 		return fmt.Errorf("demote member: %w", err)
 	}

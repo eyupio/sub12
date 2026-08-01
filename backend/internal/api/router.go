@@ -402,6 +402,7 @@ func NewRouter(
 			r.Delete("/leagues/{id}/members/me", lh.Leave)
 			r.Delete("/leagues/{id}/members/{userId}", lh.RemoveMember)
 			r.Patch("/leagues/{id}/members/{userId}", lh.UpdateMember)
+			r.Get("/leagues/{id}/moderator-permissions", lh.ModeratorPermissions)
 
 			// Seasons & rounds
 			r.Post("/leagues/{id}/seasons", lh.CreateSeason)
@@ -442,6 +443,7 @@ func NewRouter(
 			r.Delete("/clubs/{id}/members/me", clh.Leave)
 			r.Delete("/clubs/{id}/members/{userId}", clh.RemoveMember)
 			r.Patch("/clubs/{id}/members/{userId}", clh.UpdateMember)
+			r.Get("/clubs/{id}/moderator-permissions", clh.ModeratorPermissions)
 			r.Post("/clubs/{id}/image", clh.UploadImage)
 			r.Post("/clubs/{id}/leagues", clh.CreateLeague)
 			r.Get("/clubs/{id}/leagues", clh.ListLeagues)

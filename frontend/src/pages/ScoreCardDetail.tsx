@@ -28,6 +28,7 @@ import { formatDate, useRegionalPrefs } from '../utils/date'
 import { captureImageOrClick } from '../utils/imagePicker'
 import { UserAvatar } from '../components/UserAvatar'
 import { LocationMapThumbnail } from '../components/LocationMapThumbnail'
+import { can, PERM } from '../utils/moderators'
 
 function RotatedImage({
   src,
@@ -235,7 +236,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
   const isOwnScore = currentUser?.id === cardOwnerID
   const currentMember = members?.items?.find(m => m.user_id === currentUser?.id)
   const isMember = !!currentMember
-  const isAdmin = currentMember?.is_admin ?? false
+  const canVerify = can(currentMember, PERM.verifyScores)
 
   const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 
@@ -271,7 +272,7 @@ function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
 
       {actions.length > 0 && (
         <div className="space-y-1.5">
-          <p className="t-section-title">Admin Actions</p>
+          <p className="t-section-title">Moderator Actions</p>
           {actions.map((action: ScoreCardAction) => (
             <div key={action.id} className="bg-surface rounded p-2.5 space-y-1">
               <div className="flex items-center gap-2">
@@ -326,9 +327,9 @@ function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
         </div>
       )}
 
-      {/* A rejection used to be permanent — admins can return the card to the
+      {/* A rejection used to be permanent — moderators can return the card to the
           review queue, e.g. once the shooter supplies the missing photo. */}
-      {isAdmin && verification === 'rejected' && (
+      {canVerify && verification === 'rejected' && (
         <button
           onClick={() => reopenMutation.mutate()}
           disabled={reopenMutation.isPending}
@@ -338,8 +339,8 @@ function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
         </button>
       )}
 
-      {/* Amend/Reject buttons — visible only to league admins */}
-      {isAdmin && (
+      {/* Amend/Reject buttons — visible only to moderators who verify scores */}
+      {canVerify && (
         <>
           <div className="flex gap-2">
             <Tooltip content={tips.scoreAmend}>
@@ -1123,12 +1124,13 @@ export default function ScoreCardDetail() {
     queryFn: () => clubsApi.get(card!.club_id!),
     enabled: !!card?.club_id && !!currentUser,
   })
-  const isCardLeagueAdmin = !!cardLeagueMembers?.items?.find(
-    (m) => m.user_id === currentUser?.id && m.is_admin,
+  const isCardLeagueModerator = can(
+    cardLeagueMembers?.items?.find((m) => m.user_id === currentUser?.id),
+    PERM.moderateContent,
   )
-  const isCardClubAdmin = !!cardClub?.is_admin
+  const isCardClubModerator = can(cardClub, PERM.moderateContent)
   const isGlobalAdmin = currentUser?.role === 'admin'
-  const canModerateComments = isGlobalAdmin || isCardLeagueAdmin || isCardClubAdmin
+  const canModerateComments = isGlobalAdmin || isCardLeagueModerator || isCardClubModerator
 
   // Always fetch (with all=true so inactive gear still resolves) when viewing
   // an own card with rifle/pellet IDs, so the EQUIPMENT sidebar can render
@@ -1183,7 +1185,7 @@ export default function ScoreCardDetail() {
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 403) {
-        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+        toast('This card is locked — the league has disabled edits after verification.', 'error')
       }
     },
   })
@@ -1203,7 +1205,7 @@ export default function ScoreCardDetail() {
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 403) {
-        toast('This card is locked — the league admin has disabled edits after verification.', 'error')
+        toast('This card is locked — the league has disabled edits after verification.', 'error')
       } else {
         toast('Failed to delete score card', 'error')
       }

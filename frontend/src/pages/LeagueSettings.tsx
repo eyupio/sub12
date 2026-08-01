@@ -7,6 +7,8 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
+import { can, PERM } from '../utils/moderators'
+import { ModeratorPermissionEditor, PermissionSummary, RoleBadge } from '../components/ModeratorPermissions'
 
 const TIMEZONES: string[] = (() => {
   const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
@@ -873,10 +875,16 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
   const prefs = useRegionalPrefs()
   const [pendingRemove, setPendingRemove] = useState<LeagueMember | null>(null)
   const [pendingRole, setPendingRole] = useState<LeagueMember | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
     queryFn: () => leagueApi.listMembers(leagueId),
+  })
+
+  const { data: permissionData } = useQuery({
+    queryKey: ['leagues', leagueId, 'moderator-permissions'],
+    queryFn: () => leagueApi.getModeratorPermissions(leagueId),
   })
 
   const removeMutation = useMutation({
@@ -895,10 +903,10 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
 
   const roleMutation = useMutation({
     mutationFn: (member: LeagueMember) =>
-      leagueApi.updateMember(leagueId, member.user_id, { is_admin: !member.is_admin }),
+      leagueApi.updateMember(leagueId, member.user_id, { is_moderator: !member.is_moderator }),
     onSuccess: (_data, member) => {
       queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
-      toast(member.is_admin ? 'Demoted from admin' : 'Promoted to admin', 'success')
+      toast(member.is_moderator ? 'Demoted to member' : 'Promoted to moderator', 'success')
       setPendingRole(null)
     },
     onError: (err) => {
@@ -907,8 +915,32 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
     },
   })
 
+  const permissionMutation = useMutation({
+    mutationFn: ({ userId, permissions }: { userId: string; permissions: string[] }) =>
+      leagueApi.updateMember(leagueId, userId, { permissions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      toast('Permissions updated', 'success')
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to update permissions', 'error')
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+    },
+  })
+
   const members = data?.items ?? []
-  const adminCount = members.filter(m => m.is_admin).length
+  const moderatorCount = members.filter(m => m.is_moderator).length
+  const catalogue = permissionData?.catalogue ?? []
+  const viewerRole = permissionData?.role ?? null
+  const canDelegate = can(viewerRole, PERM.manageModerators)
+  // Owners delegate anything; a moderator may only pass on what they hold.
+  const grantable = viewerRole?.is_owner ? null : (viewerRole?.permissions ?? [])
+
+  const togglePermission = (member: LeagueMember, key: string, next: boolean) => {
+    const current = member.permissions ?? []
+    const permissions = next ? [...current, key] : current.filter(p => p !== key)
+    permissionMutation.mutate({ userId: member.user_id, permissions })
+  }
 
   return (
     <div className={sectionCls}>
@@ -917,50 +949,75 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
       <p className="text-[10px] text-muted -mt-2">
-        Promote a co-admin so league admin never rests on one account — the last
-        admin cannot leave or be demoted.
+        Promote a moderator to help run the league, then choose exactly what they
+        can do. The owner always holds every capability, and the last moderator
+        cannot leave or be demoted.
       </p>
 
       {members.map(member => {
         const isSelf = member.user_id === currentUserId
-        const lastAdmin = member.is_admin && adminCount <= 1
+        const lastModerator = member.is_moderator && moderatorCount <= 1
+        const roleLocked = member.is_owner || lastModerator || !canDelegate
+        const showPermissions = member.is_moderator && !member.is_owner && expanded === member.user_id
         return (
-          <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-secondary">{member.display_name}</span>
-              {member.is_admin && (
-                <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass-dim)] px-1.5 py-0.5 rounded">
-                  <Shield size={10} /> Admin
+          <div key={member.user_id} className="py-2 border-b border-subtle last:border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-secondary">{member.display_name}</span>
+                <RoleBadge member={member} />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted font-mono">
+                  {formatDate(member.joined_at, prefs)}
                 </span>
-              )}
+                {!isSelf && !member.is_owner && canDelegate && (
+                  <button
+                    onClick={() => setPendingRole(member)}
+                    disabled={roleMutation.isPending || roleLocked}
+                    className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass-dim)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={lastModerator ? 'Cannot demote the last moderator' : member.is_moderator ? 'Demote to member' : 'Promote to moderator'}
+                    aria-label={member.is_moderator ? `Demote ${member.display_name} to member` : `Promote ${member.display_name} to moderator`}
+                  >
+                    {member.is_moderator ? <ShieldOff size={14} /> : <Shield size={14} />}
+                  </button>
+                )}
+                {!member.is_moderator && !isSelf && (
+                  <button
+                    onClick={() => setPendingRemove(member)}
+                    disabled={removeMutation.isPending}
+                    className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Remove member"
+                    aria-label={`Remove ${member.display_name} from league`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-muted font-mono">
-                {formatDate(member.joined_at, prefs)}
-              </span>
-              {!isSelf && (
-                <button
-                  onClick={() => setPendingRole(member)}
-                  disabled={roleMutation.isPending || lastAdmin}
-                  className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass-dim)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={lastAdmin ? 'Cannot demote the last admin' : member.is_admin ? 'Demote to member' : 'Promote to admin'}
-                  aria-label={member.is_admin ? `Demote ${member.display_name} to member` : `Promote ${member.display_name} to admin`}
-                >
-                  {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
-                </button>
-              )}
-              {!member.is_admin && !isSelf && (
-                <button
-                  onClick={() => setPendingRemove(member)}
-                  disabled={removeMutation.isPending}
-                  className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Remove member"
-                  aria-label={`Remove ${member.display_name} from league`}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
+
+            {member.is_owner && (
+              <p className="text-[10px] text-muted mt-1">Full access — the owner's role cannot be changed.</p>
+            )}
+
+            {member.is_moderator && !member.is_owner && (
+              <div className="mt-1">
+                <PermissionSummary
+                  permissions={member.permissions}
+                  catalogue={catalogue}
+                  open={showPermissions}
+                  onToggle={() => setExpanded(showPermissions ? null : member.user_id)}
+                />
+                {showPermissions && (
+                  <ModeratorPermissionEditor
+                    catalogue={catalogue}
+                    granted={member.permissions ?? []}
+                    grantable={grantable}
+                    disabled={!canDelegate || permissionMutation.isPending}
+                    onToggle={(key, next) => togglePermission(member, key, next)}
+                  />
+                )}
+              </div>
+            )}
           </div>
         )
       })}
@@ -982,15 +1039,15 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
 
       <ConfirmDialog
         open={pendingRole !== null}
-        title={pendingRole?.is_admin ? 'Demote to member?' : 'Promote to admin?'}
+        title={pendingRole?.is_moderator ? 'Demote to member?' : 'Promote to moderator?'}
         message={
           pendingRole
-            ? pendingRole.is_admin
-              ? `${pendingRole.display_name} will no longer manage this league's settings, members or score reviews.`
-              : `${pendingRole.display_name} will be able to manage this league's settings, members and score reviews.`
+            ? pendingRole.is_moderator
+              ? `${pendingRole.display_name} will no longer help run this league, and their permissions will be cleared.`
+              : `${pendingRole.display_name} will start with the day-to-day permissions. You can change exactly what they can do afterwards.`
             : ''
         }
-        confirmLabel={pendingRole?.is_admin ? 'Demote' : 'Promote'}
+        confirmLabel={pendingRole?.is_moderator ? 'Demote' : 'Promote'}
         onConfirm={() => {
           if (pendingRole) roleMutation.mutate(pendingRole)
         }}
@@ -1025,17 +1082,17 @@ export default function LeagueSettings() {
   })
 
   const isLoading = leagueLoading || configLoading || membersLoading
-  const isAdmin = !isLoading && members && currentUser
-    ? members.items.some(m => m.user_id === currentUser.id && m.is_admin)
+  const isModerator = !isLoading && members && currentUser
+    ? members.items.some(m => m.user_id === currentUser.id && m.is_moderator)
     : null
 
   useEffect(() => {
-    if (isAdmin === false) {
+    if (isModerator === false) {
       navigate({ to: '/leagues/$id', params: { id } })
     }
-  }, [isAdmin, navigate, id])
+  }, [isModerator, navigate, id])
 
-  if (isLoading || isAdmin === null) {
+  if (isLoading || isModerator === null) {
     return (
       <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-3xl mx-auto">
         <div className="h-6 w-40 skeleton rounded" />
@@ -1055,7 +1112,7 @@ export default function LeagueSettings() {
     )
   }
 
-  if (isAdmin === false) return null
+  if (isModerator === false) return null
 
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-3xl mx-auto pb-24">

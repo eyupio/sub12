@@ -93,12 +93,12 @@ func (s *EventService) Create(ctx context.Context, ownerID string, in *model.Cre
 		return nil, err
 	}
 	if in.ClubID != nil && *in.ClubID != "" {
-		isAdmin, err := s.clubs.IsAdmin(ctx, *in.ClubID, ownerID)
+		role, err := s.clubs.GetMemberRole(ctx, *in.ClubID, ownerID)
 		if err != nil {
 			return nil, err
 		}
-		if !isAdmin {
-			return nil, fmt.Errorf("%w: must be a club admin to host an event in this club", ErrNotAdmin)
+		if !role.Can(model.PermManageEvents) {
+			return nil, fmt.Errorf("%w: you cannot host events in this club", ErrNotAdmin)
 		}
 	}
 	if len(in.CategoryIDs) > 0 {

@@ -380,12 +380,12 @@ func (s *SupportTicketService) canAccessTicketAsRole(ctx context.Context, ticket
 		if ticket.ScopeID == nil {
 			return false, nil
 		}
-		return s.leagues.IsAdmin(ctx, *ticket.ScopeID, userID)
+		return s.leagues.Can(ctx, *ticket.ScopeID, userID, model.PermManageSupport)
 	case model.SupportScopeClub:
 		if ticket.ScopeID == nil {
 			return false, nil
 		}
-		return s.clubs.IsAdmin(ctx, *ticket.ScopeID, userID)
+		return s.clubs.Can(ctx, *ticket.ScopeID, userID, model.PermManageSupport)
 	default:
 		return false, nil
 	}
@@ -404,12 +404,12 @@ func (s *SupportTicketService) isAdminForTicket(ctx context.Context, ticket *mod
 		if ticket.ScopeID == nil {
 			return false, nil
 		}
-		return s.leagues.IsAdmin(ctx, *ticket.ScopeID, userID)
+		return s.leagues.Can(ctx, *ticket.ScopeID, userID, model.PermManageSupport)
 	case model.SupportScopeClub:
 		if ticket.ScopeID == nil {
 			return false, nil
 		}
-		return s.clubs.IsAdmin(ctx, *ticket.ScopeID, userID)
+		return s.clubs.Can(ctx, *ticket.ScopeID, userID, model.PermManageSupport)
 	default:
 		return false, nil
 	}

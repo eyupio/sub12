@@ -19,7 +19,7 @@ const ROWS: PrefRow[] = [
   { inAppKey: 'comment_on_my_card', emailKey: 'comment_on_my_card_email', label: 'Comments on my score cards', description: '' },
   { inAppKey: 'reply_to_my_comment', emailKey: 'reply_to_my_comment_email', label: 'Replies to my comments', description: '' },
   { inAppKey: 'like_on_my_content', emailKey: 'like_on_my_content_email', label: 'Likes on my content', description: '' },
-  { inAppKey: 'score_verified', emailKey: 'score_verified_email', label: 'Score verified', description: 'A league admin confirmed your score.' },
+  { inAppKey: 'score_verified', emailKey: 'score_verified_email', label: 'Score verified', description: 'A league moderator confirmed your score.' },
   { inAppKey: 'score_rejected', emailKey: 'score_rejected_email', label: 'Score rejected', description: '' },
   { inAppKey: 'score_amended', emailKey: 'score_amended_email', label: 'Score amended', description: '' },
   { inAppKey: 'league_join_approved', emailKey: 'league_join_approved_email', label: 'League join approved', description: '' },
@@ -121,7 +121,7 @@ export default function NotificationSettings() {
               <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-secondary font-medium">Reports filed</p>
-                  <p className="text-xs text-muted">League/club admin only. Email delivery is controlled by the digest email setting below.</p>
+                  <p className="text-xs text-muted">League/club moderators only. Email delivery is controlled by the digest email setting below.</p>
                 </div>
                 <label className="shrink-0 cursor-pointer">
                   <input
@@ -142,7 +142,7 @@ export default function NotificationSettings() {
               <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-secondary font-medium">Digest email</p>
-                  <p className="text-xs text-muted">Weekly summary by email; also gates report-filed emails for admins.</p>
+                  <p className="text-xs text-muted">Weekly summary by email; also gates report-filed emails for moderators.</p>
                 </div>
                 <label className="shrink-0 cursor-pointer">
                   <input

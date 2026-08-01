@@ -188,15 +188,32 @@ type VerifyScoreInput struct {
 }
 
 type LeagueMember struct {
-	UserID      string    `json:"user_id"`
-	DisplayName string    `json:"display_name"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	// IsAdmin is the pre-moderator spelling of IsModerator, still emitted so
+	// an app running an older bundle keeps rendering the badge.
 	IsAdmin     bool      `json:"is_admin"`
+	IsModerator bool      `json:"is_moderator"`
+	IsOwner     bool      `json:"is_owner"`
+	Permissions []string  `json:"permissions"`
 	JoinedAt    time.Time `json:"joined_at"`
 }
 
-// UpdateLeagueMemberInput carries a member role change (promote/demote).
+// UpdateLeagueMemberInput carries a member role change: promote/demote via
+// IsModerator (IsAdmin is the accepted legacy spelling), and the delegated
+// capability grant via Permissions.
 type UpdateLeagueMemberInput struct {
-	IsAdmin *bool `json:"is_admin"`
+	IsAdmin     *bool     `json:"is_admin"`
+	IsModerator *bool     `json:"is_moderator"`
+	Permissions *[]string `json:"permissions"`
+}
+
+// Moderator resolves the promote/demote intent from either spelling.
+func (in *UpdateLeagueMemberInput) Moderator() *bool {
+	if in.IsModerator != nil {
+		return in.IsModerator
+	}
+	return in.IsAdmin
 }
 
 // LeagueScoreCounts is the per-status tally of submitted cards in a league.
