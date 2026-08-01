@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 15 (API 35) forces edge-to-edge on apps that target SDK 35: the
+         activity window is laid out behind the status and navigation bars. The
+         Android WebView does not report system-bar insets to CSS, so
+         env(safe-area-inset-top) stays 0 and the `html` padding in index.css has
+         nothing to pad with — the sticky top bar drew over the clock and battery
+         icons and the fixed bottom nav ran under the gesture bar.
+
+         Opting out restores the pre-15 layout, where the window is inset for the
+         system bars, and re-enables Window#setStatusBarColor so
+         utils/statusBar.ts can keep the bar matched to the active theme. These
+         styles override the values/ definitions for API 35+ only, so they must
+         repeat every item from the base style. -->
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+</resources>
