@@ -392,6 +392,7 @@ func NewRouter(
 			r.Patch("/leagues/{id}/config", lh.UpdateConfig)
 			r.Delete("/leagues/{id}/members/me", lh.Leave)
 			r.Delete("/leagues/{id}/members/{userId}", lh.RemoveMember)
+			r.Patch("/leagues/{id}/members/{userId}", lh.UpdateMember)
 
 			// Seasons & rounds
 			r.Post("/leagues/{id}/seasons", lh.CreateSeason)
@@ -626,6 +627,7 @@ func NewRouter(
 			r.Get("/leagues/{id}/summary", publicLH.Summary)
 			r.Get("/leagues/{id}/standings", publicLH.Standings)
 			r.Get("/leagues/{id}/scores", publicLH.ListScores)
+			r.Get("/leagues/{id}/score-counts", publicLH.ScoreCounts)
 			r.Get("/leagues/{id}/members", publicLH.ListMembers)
 
 			// Public Live Event reads. Visibility is enforced server-side.

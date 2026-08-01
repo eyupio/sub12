@@ -16,6 +16,10 @@ import (
 
 var ErrAlreadyMember = errors.New("already a member")
 
+// ErrLeagueLastAdmin is returned when demoting a member would leave the league
+// with no admins at all.
+var ErrLeagueLastAdmin = errors.New("cannot demote the last league admin")
+
 type LeagueRepository struct {
 	db *pgxpool.Pool
 }
@@ -453,12 +457,22 @@ func (r *LeagueRepository) Standings(ctx context.Context, leagueID string, scori
 // in a single query. Missing entries mean the user is not in that league's
 // standings (or the league has no members). Ranks use competition ranking and
 // respect each league's scoring_rule (highest/average), matching Standings.
+// Only cards submitted to that league's own rounds count towards its rank.
 func (r *LeagueRepository) GetUserRanksForLeagues(ctx context.Context, userID string, leagueIDs []string) (map[string]int, error) {
 	if len(leagueIDs) == 0 {
 		return map[string]int{}, nil
 	}
 	rows, err := r.db.Query(ctx, `
-		WITH per_user_scores AS (
+		WITH league_cards AS (
+			SELECT sn.league_id, sc.user_id, sc.total_score
+			FROM score_cards sc
+			JOIN rounds rd  ON rd.id = sc.league_round_id
+			JOIN seasons sn ON sn.id = rd.season_id
+			WHERE sn.league_id = ANY($1)
+			  AND sc.verification = 'verified'
+			  AND sc.is_draft = FALSE
+		),
+		per_user_scores AS (
 			SELECT
 				lm.league_id,
 				lm.user_id,
@@ -468,8 +482,8 @@ func (r *LeagueRepository) GetUserRanksForLeagues(ctx context.Context, userID st
 				END AS score
 			FROM league_members lm
 			LEFT JOIN league_configs lc ON lc.league_id = lm.league_id
-			LEFT JOIN score_cards sc ON sc.user_id = lm.user_id
-				AND sc.verification = 'verified' AND sc.is_draft = FALSE
+			LEFT JOIN league_cards sc ON sc.user_id = lm.user_id
+				AND sc.league_id = lm.league_id
 			WHERE lm.league_id = ANY($1)
 			GROUP BY lm.league_id, lm.user_id, lc.scoring_rule
 		),
@@ -783,19 +797,53 @@ func (r *LeagueRepository) ListScores(ctx context.Context, leagueID string, limi
 	return scores, rows.Err()
 }
 
+// CountScores returns the number of submitted (non-draft) cards in a league
+// broken down by verification status. One round trip replaces the four capped
+// list queries the detail page used to run just to render its tab counters.
+func (r *LeagueRepository) CountScores(ctx context.Context, leagueID string) (*model.LeagueScoreCounts, error) {
+	var c model.LeagueScoreCounts
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*)::int,
+			COUNT(*) FILTER (WHERE sc.verification = 'pending')::int,
+			COUNT(*) FILTER (WHERE sc.verification = 'verified')::int,
+			COUNT(*) FILTER (WHERE sc.verification = 'rejected')::int
+		FROM score_cards sc
+		JOIN rounds rd  ON rd.id = sc.league_round_id
+		JOIN seasons sn ON sn.id = rd.season_id
+		WHERE sn.league_id = $1 AND sc.is_draft = FALSE
+	`, leagueID).Scan(&c.All, &c.Pending, &c.Verified, &c.Rejected)
+	if err != nil {
+		return nil, fmt.Errorf("count league scores: %w", err)
+	}
+	return &c, nil
+}
+
 // ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------
 
+// CreateJoinRequest opens a pending join request. The (league_id, user_id)
+// uniqueness constraint means a user only ever has one row, so a previously
+// decided request is reopened rather than rejected — otherwise anyone who was
+// turned down once, or who was approved and later removed, could never apply
+// again. Returns ErrConflict when a request is already awaiting a decision.
 func (r *LeagueRepository) CreateJoinRequest(ctx context.Context, leagueID, userID string) (*model.JoinRequest, error) {
 	var jr model.JoinRequest
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO league_join_requests (league_id, user_id)
 		VALUES ($1, $2)
+		ON CONFLICT (league_id, user_id) DO UPDATE
+		SET status = 'pending', decided_by = NULL, decided_at = NULL, created_at = NOW()
+		WHERE league_join_requests.status <> 'pending'
 		RETURNING id, league_id, user_id, status, decided_by, decided_at, created_at
 	`, leagueID, userID).Scan(
 		&jr.ID, &jr.LeagueID, &jr.UserID, &jr.Status, &jr.DecidedBy, &jr.DecidedAt, &jr.CreatedAt,
 	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The conflicting row is still pending, so DO UPDATE was skipped.
+		return nil, ErrConflict
+	}
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -865,10 +913,16 @@ func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requ
 	return tx.Commit(ctx)
 }
 
+// JoinWithCode adds a user to a league after verifying the invite code.
+// The comparison is case-insensitive and ignores surrounding whitespace so a
+// code typed (or auto-uppercased) by a user matches the stored lowercase hex.
 func (r *LeagueRepository) JoinWithCode(ctx context.Context, leagueID, userID, code string) error {
 	var match bool
 	err := r.db.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM leagues WHERE id = $1 AND join_code = $2)`,
+		`SELECT EXISTS(
+			SELECT 1 FROM leagues
+			WHERE id = $1 AND join_code IS NOT NULL AND UPPER(join_code) = UPPER(BTRIM($2))
+		)`,
 		leagueID, code,
 	).Scan(&match)
 	if err != nil {
@@ -1110,6 +1164,66 @@ func (r *LeagueRepository) RemoveMember(ctx context.Context, leagueID, memberID 
 		return ErrNotFound
 	}
 	return nil
+}
+
+// PromoteMember grants admin rights to an existing league member.
+// Returns ErrNotFound when the target is not a member.
+func (r *LeagueRepository) PromoteMember(ctx context.Context, leagueID, userID string) error {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE league_members SET is_admin = TRUE WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("promote league member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DemoteMemberGuarded clears admin rights for the target member, checking the
+// last-admin invariant inside the same transaction so two concurrent demotions
+// cannot leave the league without an admin.
+func (r *LeagueRepository) DemoteMemberGuarded(ctx context.Context, leagueID, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var adminCount int
+	err = tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM league_members WHERE league_id = $1 AND is_admin = TRUE FOR UPDATE`,
+		leagueID,
+	).Scan(&adminCount)
+	if err != nil {
+		return fmt.Errorf("count league admins: %w", err)
+	}
+
+	var isAdmin bool
+	err = tx.QueryRow(ctx,
+		`SELECT is_admin FROM league_members WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	).Scan(&isAdmin)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read league member: %w", err)
+	}
+	if isAdmin && adminCount <= 1 {
+		return ErrLeagueLastAdmin
+	}
+
+	_, err = tx.Exec(ctx,
+		`UPDATE league_members SET is_admin = FALSE WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("demote league member: %w", err)
+	}
+	return tx.Commit(ctx)
 }
 
 // LeaveLeague removes the caller's own membership row regardless of admin

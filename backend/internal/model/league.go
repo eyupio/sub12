@@ -172,6 +172,19 @@ type LeagueMember struct {
 	JoinedAt    time.Time `json:"joined_at"`
 }
 
+// UpdateLeagueMemberInput carries a member role change (promote/demote).
+type UpdateLeagueMemberInput struct {
+	IsAdmin *bool `json:"is_admin"`
+}
+
+// LeagueScoreCounts is the per-status tally of submitted cards in a league.
+type LeagueScoreCounts struct {
+	All      int `json:"all"`
+	Pending  int `json:"pending"`
+	Verified int `json:"verified"`
+	Rejected int `json:"rejected"`
+}
+
 // ScoreCardLeague is a lightweight league reference resolved from a score card.
 type ScoreCardLeague struct {
 	ID        string  `json:"id"`

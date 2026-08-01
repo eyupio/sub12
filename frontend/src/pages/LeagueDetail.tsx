@@ -132,27 +132,17 @@ export default function LeagueDetail() {
     enabled: !!leagueId,
   })
 
-  const { data: allScoresData } = useQuery({
-    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'all-tally'],
-    queryFn: () => leagueApi.listScores(leagueId!, 200, 0),
+  // Recent cards drive the per-shooter sparkline in the "Form" tab. The tab
+  // counters come from the counts endpoint below, so this stays a single page.
+  const { data: recentScoresData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'recent'],
+    queryFn: () => leagueApi.listScores(leagueId!, 100, 0),
     enabled: !!leagueId,
   })
 
-  const { data: pendingData } = useQuery({
-    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'pending'],
-    queryFn: () => leagueApi.listScores(leagueId!, 100, 0, 'pending'),
-    enabled: !!leagueId && !!members?.items?.find(m => m.user_id === currentUser?.id)?.is_admin,
-  })
-
-  const { data: verifiedData } = useQuery({
-    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'verified-tally'],
-    queryFn: () => leagueApi.listScores(leagueId!, 200, 0, 'verified'),
-    enabled: !!leagueId,
-  })
-
-  const { data: rejectedData } = useQuery({
-    queryKey: ['leagues', leagueId ?? 'invalid', 'scores', 'rejected-tally'],
-    queryFn: () => leagueApi.listScores(leagueId!, 200, 0, 'rejected'),
+  const { data: scoreCounts } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'score-counts'],
+    queryFn: () => leagueApi.scoreCounts(leagueId!),
     enabled: !!leagueId,
   })
 
@@ -206,30 +196,33 @@ export default function LeagueDetail() {
   const joinPolicy = config?.join_policy ?? 'open'
   const scoringRule = config?.scoring_rule ?? 'highest'
 
-  // Build standings rows (with optional sparkline data computed from scores)
+  // Build standings rows. best_score from the API is the *ranking* score, so
+  // under the "average" rule it is the shooter's mean — not their best card.
+  // It is surfaced under whichever header matches the league's rule rather
+  // than being shown twice under two different labels.
   const standingsRows: StandingRow[] = useMemo(() => {
     const items = standings?.items ?? []
     const scoreMap = new Map<string, number[]>()
-    if (allScoresData?.items) {
-      for (const s of allScoresData.items) {
-        if (!scoreMap.has(s.user_id)) scoreMap.set(s.user_id, [])
-        scoreMap.get(s.user_id)!.push(s.total_score)
-      }
+    for (const s of recentScoresData?.items ?? []) {
+      if (s.verification !== 'verified') continue
+      if (!scoreMap.has(s.user_id)) scoreMap.set(s.user_id, [])
+      scoreMap.get(s.user_id)!.push(s.total_score)
     }
+    const isAverage = scoringRule === 'average'
     return items.map((s) => ({
       id: s.user_id,
       rank: s.rank,
       name: s.display_name,
       avatarUrl: s.avatar_url,
       cards: s.card_count,
-      best: s.best_score ?? null,
+      best: isAverage ? null : (s.best_score ?? null),
       bestX: s.best_x ?? null,
-      avg: typeof s.best_score === 'number' ? s.best_score : null,
+      avg: isAverage ? (s.best_score ?? null) : null,
       recent: (scoreMap.get(s.user_id) ?? []).slice(0, 6).reverse(),
       trend: null,
       isMe: s.user_id === currentUser?.id,
     }))
-  }, [standings, allScoresData, currentUser])
+  }, [standings, recentScoresData, currentUser, scoringRule])
 
   const podium = standingsRows.slice(0, 3)
 
@@ -306,17 +299,13 @@ export default function LeagueDetail() {
     )
   }
 
-  const allCount = scoresData ? scoresData.items.length : 0
-  const pendingCount = pendingData?.items.length ?? null
-  const verifiedCount = verifiedData?.items.length ?? null
-  const rejectedCount = rejectedData?.items.length ?? null
-  const totalCards = allScoresData?.items.length ?? 0
+  const totalCards = scoreCounts?.all ?? 0
 
   const scoreTabs: TabSpec<ScoreTab>[] = [
-    { value: '', label: 'All', count: allCount },
-    { value: 'pending', label: 'Pending', count: pendingCount },
-    { value: 'verified', label: 'Verified', count: verifiedCount },
-    { value: 'rejected', label: 'Rejected', count: rejectedCount },
+    { value: '', label: 'All', count: scoreCounts?.all ?? null },
+    { value: 'pending', label: 'Pending', count: scoreCounts?.pending ?? null },
+    { value: 'verified', label: 'Verified', count: scoreCounts?.verified ?? null },
+    { value: 'rejected', label: 'Rejected', count: scoreCounts?.rejected ?? null },
   ]
 
   const standingsTabs: TabSpec<StandingsTab>[] = [
@@ -450,12 +439,19 @@ export default function LeagueDetail() {
           </button>
         )}
 
-        {/* Status row */}
-        {isAdmin && pendingData && pendingData.items.length === 0 && (
+        {/* Status row — admins only; jumps straight to the pending queue */}
+        {isAdmin && scoreCounts && scoreCounts.pending === 0 && (
           <div className="lc-status-row"><CheckCircle size={14} /> All scores reviewed</div>
         )}
-        {isAdmin && pendingData && pendingData.items.length > 0 && (
-          <div className="lc-status-row warn"><AlertCircle size={14} /> {pendingData.items.length} score{pendingData.items.length !== 1 ? 's' : ''} pending review</div>
+        {isAdmin && scoreCounts && scoreCounts.pending > 0 && (
+          <button
+            type="button"
+            onClick={() => setScoreFilter('pending')}
+            className="lc-status-row warn"
+            style={{ width: '100%', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+          >
+            <AlertCircle size={14} /> {scoreCounts.pending} score{scoreCounts.pending !== 1 ? 's' : ''} pending review — review now
+          </button>
         )}
 
         {/* Standings — full width */}
@@ -484,8 +480,7 @@ export default function LeagueDetail() {
                 rankColumn(),
                 shooterColumn(),
                 cardsColumn(),
-                bestColumn(),
-                ...(scoringRule === 'average' ? [avgColumn<StandingRow>()] : []),
+                ...(scoringRule === 'average' ? [avgColumn<StandingRow>()] : [bestColumn<StandingRow>()]),
                 ...(standingsTab === 'form' ? [recentColumn<StandingRow>()] : []),
                 trendColumn(),
               ]}

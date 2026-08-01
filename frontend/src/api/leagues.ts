@@ -146,6 +146,13 @@ export interface LeagueScore {
   created_at: string
 }
 
+export interface LeagueScoreCounts {
+  all: number
+  pending: number
+  verified: number
+  rejected: number
+}
+
 export interface MyLeagueSummary {
   id: string
   name: string
@@ -256,6 +263,9 @@ export const leagueApi = {
   removeMember: (leagueId: string, userId: string) =>
     api.del<void>(`/leagues/${leagueId}/members/${userId}`),
 
+  updateMember: (leagueId: string, userId: string, input: { is_admin: boolean }) =>
+    api.patch<{ updated: boolean }>(`/leagues/${leagueId}/members/${userId}`, input),
+
   leave: (id: string) =>
     api.del<void>(`/leagues/${id}/members/me`),
 
@@ -281,6 +291,11 @@ export const leagueApi = {
     if (verification) url += `&verification=${verification}`
     return api.get<{ items: LeagueScore[] }>(url)
   },
+
+  // Per-status tally of submitted cards — one call instead of paging the
+  // score list once per verification status just to render tab counters.
+  scoreCounts: (id: string) =>
+    api.get<LeagueScoreCounts>(`/leagues/${id}/score-counts`),
 
   ensureDefaultRound: (id: string) =>
     api.post<{ round_id: string }>(`/leagues/${id}/ensure-round`, {}),

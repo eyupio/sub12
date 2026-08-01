@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, Check, X, Shield, Camera, Trash2, Flag } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Check, X, Shield, ShieldOff, Camera, Trash2, Flag } from 'lucide-react'
 import { leagueApi, LeagueConfig, League, LeagueMember } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
@@ -532,7 +532,12 @@ function JoinPolicySection({ leagueId, config, joinCode }: { leagueId: string; c
         {saveMutation.isPending ? 'Saving…' : 'Save Join Policy'}
       </button>
 
-      {joinPolicy === 'approval' && <JoinRequestsList leagueId={leagueId} />}
+      {/* Keyed off the saved policy as well as the local selection: requests
+          raised under a previous "approval" policy still need deciding even
+          after an admin clicks a different radio. */}
+      {(joinPolicy === 'approval' || config.join_policy === 'approval') && (
+        <JoinRequestsList leagueId={leagueId} />
+      )}
     </div>
   )
 }
@@ -606,6 +611,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
   const queryClient = useQueryClient()
   const prefs = useRegionalPrefs()
   const [pendingRemove, setPendingRemove] = useState<LeagueMember | null>(null)
+  const [pendingRole, setPendingRole] = useState<LeagueMember | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'members'],
@@ -626,7 +632,22 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
     },
   })
 
+  const roleMutation = useMutation({
+    mutationFn: (member: LeagueMember) =>
+      leagueApi.updateMember(leagueId, member.user_id, { is_admin: !member.is_admin }),
+    onSuccess: (_data, member) => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'members'] })
+      toast(member.is_admin ? 'Demoted from admin' : 'Promoted to admin', 'success')
+      setPendingRole(null)
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to update role', 'error')
+      setPendingRole(null)
+    },
+  })
+
   const members = data?.items ?? []
+  const adminCount = members.filter(m => m.is_admin).length
 
   return (
     <div className={sectionCls}>
@@ -634,35 +655,54 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
         <h2 className="t-section-title">Members</h2>
         <span className="text-[11px] text-muted font-mono">{members.length}</span>
       </div>
+      <p className="text-[10px] text-muted -mt-2">
+        Promote a co-admin so league admin never rests on one account — the last
+        admin cannot leave or be demoted.
+      </p>
 
-      {members.map(member => (
-        <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-secondary">{member.display_name}</span>
-            {member.is_admin && (
-              <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass-dim)] px-1.5 py-0.5 rounded">
-                <Shield size={10} /> Admin
+      {members.map(member => {
+        const isSelf = member.user_id === currentUserId
+        const lastAdmin = member.is_admin && adminCount <= 1
+        return (
+          <div key={member.user_id} className="flex items-center justify-between py-2 border-b border-subtle last:border-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-secondary">{member.display_name}</span>
+              {member.is_admin && (
+                <span className="inline-flex items-center gap-1 text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass-dim)] px-1.5 py-0.5 rounded">
+                  <Shield size={10} /> Admin
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-muted font-mono">
+                {formatDate(member.joined_at, prefs)}
               </span>
-            )}
+              {!isSelf && (
+                <button
+                  onClick={() => setPendingRole(member)}
+                  disabled={roleMutation.isPending || lastAdmin}
+                  className="p-1 rounded text-muted hover:text-[var(--brass)] hover:bg-[var(--brass-dim)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={lastAdmin ? 'Cannot demote the last admin' : member.is_admin ? 'Demote to member' : 'Promote to admin'}
+                  aria-label={member.is_admin ? `Demote ${member.display_name} to member` : `Promote ${member.display_name} to admin`}
+                >
+                  {member.is_admin ? <ShieldOff size={14} /> : <Shield size={14} />}
+                </button>
+              )}
+              {!member.is_admin && !isSelf && (
+                <button
+                  onClick={() => setPendingRemove(member)}
+                  disabled={removeMutation.isPending}
+                  className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Remove member"
+                  aria-label={`Remove ${member.display_name} from league`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-muted font-mono">
-              {formatDate(member.joined_at, prefs)}
-            </span>
-            {!member.is_admin && member.user_id !== currentUserId && (
-              <button
-                onClick={() => setPendingRemove(member)}
-                disabled={removeMutation.isPending}
-                className="p-1 rounded text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove member"
-                aria-label={`Remove ${member.display_name} from league`}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+        )
+      })}
 
       <ConfirmDialog
         open={pendingRemove !== null}
@@ -677,6 +717,23 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
           if (pendingRemove) removeMutation.mutate(pendingRemove.user_id)
         }}
         onCancel={() => setPendingRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingRole !== null}
+        title={pendingRole?.is_admin ? 'Demote to member?' : 'Promote to admin?'}
+        message={
+          pendingRole
+            ? pendingRole.is_admin
+              ? `${pendingRole.display_name} will no longer manage this league's settings, members or score reviews.`
+              : `${pendingRole.display_name} will be able to manage this league's settings, members and score reviews.`
+            : ''
+        }
+        confirmLabel={pendingRole?.is_admin ? 'Demote' : 'Promote'}
+        onConfirm={() => {
+          if (pendingRole) roleMutation.mutate(pendingRole)
+        }}
+        onCancel={() => setPendingRole(null)}
       />
     </div>
   )

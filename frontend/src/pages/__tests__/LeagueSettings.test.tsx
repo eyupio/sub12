@@ -112,3 +112,74 @@ describe('LeagueSettings rules save flow', () => {
     })
   })
 })
+
+describe('LeagueSettings member roles', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-1', email: 'admin@example.com', display_name: 'Admin User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig())
+    vi.spyOn(leagueApi, 'updateMember').mockResolvedValue({ updated: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  function renderSettings() {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+  }
+
+  it('promotes another member to admin', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: false })],
+    })
+
+    renderSettings()
+
+    fireEvent.click(await screen.findByRole('button', { name: /promote second shooter to admin/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^promote$/i }))
+
+    await waitFor(() =>
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: true }),
+    )
+  })
+
+  it('demotes a co-admin back to member', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
+    })
+
+    renderSettings()
+
+    fireEvent.click(await screen.findByRole('button', { name: /demote second shooter to member/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /^demote$/i }))
+
+    await waitFor(() =>
+      expect(leagueApi.updateMember).toHaveBeenCalledWith('league-1', 'user-2', { is_admin: false }),
+    )
+  })
+
+  // Removing a member is destructive and must stay behind its own confirm
+  // step — never share the role dialog's confirm button.
+  it('does not offer a remove control for co-admins', async () => {
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-2', display_name: 'Second Shooter', is_admin: true })],
+    })
+
+    renderSettings()
+
+    await screen.findByRole('button', { name: /demote second shooter to member/i })
+    expect(screen.queryByRole('button', { name: /remove second shooter from league/i })).toBeNull()
+  })
+})
