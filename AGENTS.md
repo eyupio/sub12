@@ -49,7 +49,7 @@ landing/              Static landing page (index.html + favicon.svg)
 - **Frontend:** React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts, Lucide React icons
 - **Mobile:** Capacitor 6 (PWA-first, via vite-plugin-pwa)
 - **Testing:** Go test + testify (backend), Vitest + Testing Library (frontend)
-- **CI/CD:** GitHub Actions (ci.yml + release.yml) → GHCR container images
+- **CI/CD:** GitHub Actions (ci.yml + release.yml) → GHCR container images; android.yml + ios.yml build the Capacitor apps
 - **Migrations:** golang-migrate with embedded SQL files (pgx5 driver)
 
 ## Build & Run Commands
@@ -83,9 +83,11 @@ cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
 ```
 
-The `android/` project is committed; the `ios/` project must be generated on a Mac
-(`npx cap add ios`) and committed. The web assets `cap sync` copies into the native
-projects are git-ignored (regenerated from `dist/`).
+Both the `android/` and `ios/` projects are committed (`ios/` was generated with
+`npx cap add ios` on a Mac — it can't be created on Linux). The web assets
+`cap sync` copies into the native projects are git-ignored (regenerated from
+`dist/`). CI builds both: `android.yml` on a Linux runner, `ios.yml` on a
+Blacksmith macOS runner.
 
 ### Production
 
@@ -253,7 +255,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
 ## CI Pipeline
 
-Three GitHub Actions workflows:
+Four GitHub Actions workflows:
 
 ### ci.yml (push/PR to `main`)
 
@@ -278,6 +280,52 @@ Builds the Capacitor Android app and publishes the APK for download.
   APK
 - `versionCode` / `versionName` come from `ANDROID_VERSION_CODE` /
   `ANDROID_VERSION_NAME`, read in `android/app/build.gradle`
+
+### ios.yml (PR / push to `main` / tag `v*` / manual)
+
+Builds the Capacitor iOS app on a Blacksmith **macOS** runner
+(`blacksmith-6vcpu-macos-15` — Apple Silicon M4, $0.08/min). macOS 15 rather
+than `macos-latest`, because Blacksmith mirrors the GitHub-hosted images and the
+15 image ships the Xcode 16 line Capacitor 6 and the iOS 13.0 pod deployment
+target are tested against.
+
+`npm ci` → `npm run build` → `npx cap sync ios` → `pod install` → `xcodebuild
+archive` → export.
+
+Unlike Android, an unsigned build is **not installable** — Apple requires a paid
+Developer Program membership, so the workflow has two modes:
+
+- **Without signing secrets** (the default): archives unsigned and packages the
+  `.app` into a `Payload/` zip. This is a compile check — it proves the Xcode
+  project, pods and web bundle still build — and it is uploaded as a workflow
+  artifact only. Nothing is published to a release, because an unsigned `.ipa`
+  behind a download link cannot install.
+- **With `IOS_CERTIFICATE_BASE64` / `IOS_CERTIFICATE_PASSWORD` /
+  `IOS_PROVISIONING_PROFILE_BASE64`**: imports the identity into a temporary
+  keychain, installs the profile, and re-signs via `xcodebuild -exportArchive`.
+  Pushes to `main` then refresh the rolling `ios-latest` pre-release
+  (`.../releases/download/ios-latest/sub12.ipa`) and tags `v*` attach the `.ipa`
+  to that version's Release.
+
+The archive step is deliberately unsigned in both modes: applying manual signing
+there would push the app's provisioning profile onto every CocoaPods framework
+target, which then fails to match. `exportArchive` re-signs the app and its
+embedded frameworks from `ExportOptions.plist`.
+
+Other configuration:
+
+- `IOS_EXPORT_METHOD` repository variable selects the export method
+  (`app-store` by default; `ad-hoc` or `development` for direct device installs).
+- `APPSTORE_KEY_ID` / `APPSTORE_ISSUER_ID` / `APPSTORE_PRIVATE_KEY` (App Store
+  Connect API key) enable a TestFlight upload via `xcrun altool` on pushes when
+  the export method is `app-store`.
+- `MARKETING_VERSION` comes from the tag (or `0.0.<run_number>`) and
+  `CURRENT_PROJECT_VERSION` from the run number, passed as `xcodebuild`
+  overrides. `CFBundleShortVersionString` must be a plain dotted number, so the
+  Android trick of appending a short SHA isn't available.
+- `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` is committed —
+  `xcodebuild -scheme App` needs a *shared* scheme, and Xcode only writes a
+  per-user one by default.
 
 ### release.yml (push to `main`)
 
