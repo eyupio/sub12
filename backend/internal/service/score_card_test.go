@@ -22,6 +22,7 @@ type mockScoreCardRepo struct {
 	deleteCalled         bool
 	lastTotal            int16
 	lastXCount           int16
+	lastUpdateInput      *model.UpdateScoreCardInput
 	lastRotation         int16
 	submitToLeagueCalled bool
 	// card is returned from GetByID; if nil, a placeholder is returned.
@@ -74,8 +75,9 @@ func (m *mockScoreCardRepo) UpdateImageRotation(_ context.Context, _, _ string, 
 	m.lastRotation = rotation
 	return &model.ScoreCard{ID: "test-id", CardImageRotation: int(rotation)}, nil
 }
-func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, _ *model.UpdateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
+func (m *mockScoreCardRepo) Update(_ context.Context, _, _ string, input *model.UpdateScoreCardInput, total, xCount int16) (*model.ScoreCard, error) {
 	m.updateCalled = true
+	m.lastUpdateInput = input
 	m.lastTotal = total
 	m.lastXCount = xCount
 	return &model.ScoreCard{ID: "test-id", TotalScore: total, XCount: xCount, Verification: "pending"}, nil
@@ -221,6 +223,63 @@ func TestUpdate_ValidInput(t *testing.T) {
 	assert.True(t, repo.updateCalled)
 	assert.Equal(t, int16(250), card.TotalScore)
 	assert.Equal(t, int16(25), card.XCount)
+}
+
+// A shooter whose round is full can still keep the card by dropping its league
+// link. The empty string is the "make this personal" signal; it has to reach
+// the repository, which is the only thing that can clear the column.
+func TestUpdate_DetachFromLeagueRound(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", IsDraft: true, LeagueRoundID: &roundID}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{cfg: &model.LeagueConfig{MaxSubmissionsPerRound: 1}}}
+
+	detach := ""
+	_, err := svc.Update(context.Background(), "card1", "user1", &model.UpdateScoreCardInput{
+		ShotAt:        "2025-01-01",
+		ShotScores:    make([]int16, 25),
+		ShotXs:        make([]bool, 25),
+		LeagueRoundID: &detach,
+	})
+	require.NoError(t, err)
+	assert.True(t, repo.updateCalled)
+	require.NotNil(t, repo.lastUpdateInput.LeagueRoundID)
+	assert.Equal(t, "", *repo.lastUpdateInput.LeagueRoundID)
+}
+
+// The refine form echoes the card's own round back on every save. That must
+// read as "leave it alone", not as a re-submission.
+func TestUpdate_SameLeagueRoundIsNoChange(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", IsDraft: true, LeagueRoundID: &roundID}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{}}
+
+	same := roundID
+	_, err := svc.Update(context.Background(), "card1", "user1", &model.UpdateScoreCardInput{
+		ShotAt:        "2025-01-01",
+		ShotScores:    make([]int16, 25),
+		ShotXs:        make([]bool, 25),
+		LeagueRoundID: &same,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, repo.lastUpdateInput.LeagueRoundID)
+}
+
+// Moving a card between rounds would bypass the membership, cap and
+// image-required checks that SubmitToLeague runs, so PATCH refuses it.
+func TestUpdate_MoveToDifferentRoundRejected(t *testing.T) {
+	roundID := "round-1"
+	repo := &mockScoreCardRepo{card: &model.ScoreCard{ID: "card1", LeagueRoundID: &roundID}}
+	svc := &ScoreCardService{cards: repo, leagueRepo: &mockLeagueRepo{}}
+
+	other := "round-2"
+	_, err := svc.Update(context.Background(), "card1", "user1", &model.UpdateScoreCardInput{
+		ShotAt:        "2025-01-01",
+		ShotScores:    make([]int16, 25),
+		ShotXs:        make([]bool, 25),
+		LeagueRoundID: &other,
+	})
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestUpdate_InvalidShotCount(t *testing.T) {

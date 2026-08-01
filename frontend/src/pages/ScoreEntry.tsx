@@ -3,6 +3,7 @@ import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, Upload, X, Trophy, HelpCircle, Trash2, ChevronLeft } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
+import { ApiError } from '../api/client'
 import { toast } from '../store/toast'
 import { useAuthStore } from '../store/auth'
 import { gearApi } from '../api/gear'
@@ -49,6 +50,10 @@ export default function ScoreEntry() {
     try { return !localStorage.getItem('sub12-score-help-seen') } catch { /* localStorage unavailable */ return true }
   })
   const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false)
+  // Whether this card goes to the league round it was captured against, or is
+  // kept as a personal card. A full round is the usual reason to switch.
+  const [submitToLeague, setSubmitToLeague] = useState(true)
+  const [roundRefusedCard, setRoundRefusedCard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -105,15 +110,36 @@ export default function ScoreEntry() {
     enabled: !!leagueId,
   })
 
-  // League config for require_image_upload enforcement
+  // League config for require_image_upload and max_submissions_per_round
   const { data: leagueConfig } = useQuery({
     queryKey: ['leagues', leagueId, 'config'],
     queryFn: () => leagueApi.getConfig(leagueId!),
     enabled: !!leagueId,
   })
-  const requireImage = leagueId && leagueConfig?.require_image_upload
 
-  const leagueRoundId = roundIdParam ?? ensuredRound?.round_id
+  // A draft carries its own round, so a league draft opened without the search
+  // params still knows where it was meant to go.
+  const leagueRoundId = roundIdParam ?? draft?.league_round_id ?? ensuredRound?.round_id
+  const hasLeagueContext = !!leagueId || !!draft?.league_round_id
+  const asLeague = hasLeagueContext && submitToLeague
+  const requireImage = asLeague && leagueConfig?.require_image_upload
+  // An image already on the draft satisfies require_image_upload — the refine
+  // flow would otherwise demand the photo be picked again to submit.
+  const hasImage = !!imageFile || !!draft?.card_image_url
+
+  // How many cards this round has already taken from the user. The cap is
+  // enforced server-side at graduation; counting here is what lets the form
+  // say so before the user fills in 25 shots and gets refused.
+  const { data: leagueCards } = useQuery({
+    queryKey: ['score-cards', 'league', leagueId],
+    queryFn: () => scoreCardApi.list(100, 0, 'league', leagueId!),
+    enabled: !!leagueId && !!leagueRoundId,
+  })
+  const maxSubmissions = leagueConfig?.max_submissions_per_round ?? 0
+  const usedSubmissions = (leagueCards?.items ?? []).filter(
+    (c) => c.league_round_id === leagueRoundId && c.id !== draftId,
+  ).length
+  const roundFull = roundRefusedCard || (maxSubmissions > 0 && usedSubmissions >= maxSubmissions)
 
   const shotScores = shots.map(s => s.score)
   const shotXs = shots.map(s => s.x)
@@ -258,24 +284,36 @@ export default function ScoreEntry() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // On a draft, an empty league_round_id detaches the card from its round —
+  // the way out when the round is full or the user simply wants it personal.
+  // On a new card, no round means it was never a league submission.
+  function leagueRoundField(forDraft: boolean) {
+    if (asLeague) return leagueRoundId
+    return forDraft && hasLeagueContext ? '' : undefined
+  }
+
+  function buildPayload(forDraft: boolean) {
+    return {
+      shot_at: shotAt,
+      shot_scores: shotScores,
+      shot_xs: shotXs,
+      location: location.label || undefined,
+      location_lat: location.lat,
+      location_lng: location.lng,
+      wind_mph: windMph ? Number(windMph) : undefined,
+      temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
+      notes: notes || undefined,
+      rifle_id: rifleId || undefined,
+      pellet_id: pelletId || undefined,
+      league_round_id: leagueRoundField(forDraft),
+      visibility,
+      location_id: locationId ?? undefined,
+    }
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload = {
-        shot_at: shotAt,
-        shot_scores: shotScores,
-        shot_xs: shotXs,
-        location: location.label || undefined,
-        location_lat: location.lat,
-        location_lng: location.lng,
-        wind_mph: windMph ? Number(windMph) : undefined,
-        temp_celsius: tempCelsius ? Number(tempCelsius) : undefined,
-        notes: notes || undefined,
-        rifle_id: rifleId || undefined,
-        pellet_id: pelletId || undefined,
-        league_round_id: leagueId ? leagueRoundId : undefined,
-        visibility,
-        location_id: locationId ?? undefined,
-      }
+      const payload = buildPayload(!!draftId)
 
       let card
       let imageFailedReason: string | null = null
@@ -317,7 +355,12 @@ export default function ScoreEntry() {
       if (imageFailedReason) {
         toast(`Score card saved, but image upload failed: ${imageFailedReason}. Try again from the card.`, 'error')
       } else {
-        toast(wasDraft ? 'Draft refined and submitted' : 'Score card saved', 'success')
+        toast(
+          wasDraft
+            ? (asLeague ? 'Draft refined and submitted' : 'Draft refined and saved')
+            : 'Score card saved',
+          'success',
+        )
       }
       if (eventSlug) {
         navigate({ to: '/events/$slug', params: { slug: eventSlug } })
@@ -326,8 +369,44 @@ export default function ScoreEntry() {
       }
     },
     onError: (err: unknown) => {
+      // 409 is the league's submission cap. On the refine flow the PATCH has
+      // already landed, so the work isn't lost — the card stays a draft and
+      // the user picks between a later round and a personal card.
+      if (err instanceof ApiError && err.status === 409) {
+        setRoundRefusedCard(true)
+        setSubmitToLeague(false)
+        toast(
+          draftId
+            ? 'This round is full — your card is still saved as a draft. Save it as a personal card, or submit it to another round later.'
+            : 'This round is full — save this card as a personal card instead, or submit it to another round later.',
+          'error',
+        )
+        return
+      }
       const msg = err instanceof Error ? err.message : 'Failed to save score card'
       toast(msg, 'error')
+    },
+  })
+
+  // Refining without graduating: the shot grid and metadata are saved, the
+  // card stays in Drafts. The way to keep working on a card that has nowhere
+  // to go yet — a full round, or a round that hasn't opened.
+  const saveDraftMutation = useMutation({
+    mutationFn: async () => {
+      await scoreCardApi.update(draftId!, buildPayload(true))
+      if (imageFile) {
+        await scoreCardApi.uploadImage(draftId!, imageFile)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['score-drafts'] })
+      qc.invalidateQueries({ queryKey: ['score-drafts-count'] })
+      qc.invalidateQueries({ queryKey: ['score-card', draftId] })
+      toast('Draft saved', 'success')
+      navigate({ to: '/drafts' })
+    },
+    onError: (err) => {
+      toast(err instanceof Error ? err.message : 'Failed to save draft', 'error')
     },
   })
 
@@ -391,22 +470,61 @@ export default function ScoreEntry() {
       </div>
 
       {/* League context banner */}
-      {league && (
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5">
-          <Trophy size={14} className="text-[var(--brass)]" />
-          <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
-          <span className="t-section-title">·</span>
-          <span className="text-xs text-secondary">{league.name}</span>
-          {/* Which round this lands in is not obvious once a league runs a
-              schedule, and it decides which submission cap applies. */}
-          {!roundIdParam && ensuredRound && (
-            <span className="ml-auto text-[10px] tracking-widest uppercase text-muted truncate">
-              {ensuredRound.season_name} · {ensuredRound.round_name}
-            </span>
+      {hasLeagueContext && (
+        <div className="rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <Trophy size={14} className="text-[var(--brass)]" />
+            <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
+            {league && (
+              <>
+                <span className="t-section-title">·</span>
+                <span className="text-xs text-secondary">{league.name}</span>
+              </>
+            )}
+            {/* Which round this lands in is not obvious once a league runs a
+                schedule, and it decides which submission cap applies. */}
+            {!roundIdParam && ensuredRound && (
+              <span className="ml-auto text-[10px] tracking-widest uppercase text-muted truncate">
+                {ensuredRound.season_name} · {ensuredRound.round_name}
+              </span>
+            )}
+          </div>
+          {/* A card captured against a league doesn't have to end up in it. A
+              full round, or a change of mind, keeps the card as a personal one
+              rather than stranding it. */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] tracking-widest uppercase text-muted">Save as</span>
+            {([true, false] as const).map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => setSubmitToLeague(v)}
+                aria-pressed={submitToLeague === v}
+                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+                  submitToLeague === v
+                    ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
+                    : 'border-subtle text-muted hover:text-secondary'
+                }`}
+              >
+                {v ? 'League entry' : 'Personal card'}
+              </button>
+            ))}
+          </div>
+          {roundFull && (
+            <p className="text-xs text-secondary">
+              {maxSubmissions > 0 && !roundRefusedCard
+                ? `This round is full — it takes ${maxSubmissions} card${maxSubmissions === 1 ? '' : 's'} per shooter and you've submitted ${usedSubmissions}. `
+                : 'This round is full. '}
+              {submitToLeague
+                ? draftId
+                  ? 'Save it as a personal card, or keep working on it as a draft and submit it to another round later.'
+                  : 'Save it as a personal card, or submit it to another round later.'
+                : 'This card will be saved as a personal card.'}
+            </p>
           )}
         </div>
       )}
-      {requireImage && !imageFile && (
+      {requireImage && !hasImage && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
           <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400 font-medium">Photo required</span>
           <span className="t-section-title">·</span>
@@ -426,9 +544,9 @@ export default function ScoreEntry() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-surface-hover text-muted">
-                {leagueId ? 'League' : 'Personal'}
+                {asLeague ? 'League' : 'Personal'}
               </span>
-              {league && (
+              {league && asLeague && (
                 <span className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded">
                   {league.name}
                 </span>
@@ -741,13 +859,26 @@ export default function ScoreEntry() {
       <div className="space-y-2">
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || deleteDraftMutation.isPending || !shotAt || (!!requireImage && !imageFile)}
+          disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt || (!!requireImage && !hasImage)}
           className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
         >
           {mutation.isPending
-            ? (leagueId ? 'Submitting…' : 'Saving…')
-            : (leagueId ? 'Submit Score' : 'Save Card')}
+            ? (asLeague ? 'Submitting…' : 'Saving…')
+            : (asLeague ? 'Submit Score' : 'Save Card')}
         </button>
+        {/* Refining doesn't have to finish the card: a draft can be saved and
+            picked up again, which is the only option left when its round is
+            full and the shooter wants to wait for the next one. */}
+        {draftId && (
+          <button
+            type="button"
+            onClick={() => saveDraftMutation.mutate()}
+            disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt}
+            className="w-full py-2.5 rounded border border-subtle text-secondary font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:border-[var(--brass)]/40 hover:text-primary"
+          >
+            {saveDraftMutation.isPending ? 'Saving…' : 'Keep as draft'}
+          </button>
+        )}
         <p className="text-center text-xs text-muted tracking-wide">
           {selectedShot === null
             ? 'Tap a shot cell to select it, then use the buttons to set the score'

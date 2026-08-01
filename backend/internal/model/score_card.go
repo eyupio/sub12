@@ -136,6 +136,11 @@ type UpdateScoreCardInput struct {
 	LocationID        *string  `json:"location_id"`
 	CardImageRotation *int     `json:"card_image_rotation"`
 	Visibility        *string  `json:"visibility"`
+	// LeagueRoundID detaches the card from its league round when set to the
+	// empty string, turning it into a personal card. Omit to keep the current
+	// round. A non-empty value must match the round the card already sits in —
+	// attaching a card to a league is POST /score-cards/{id}/submit-to-league.
+	LeagueRoundID *string `json:"league_round_id"`
 }
 
 // Comment is a user comment on any content type (score_card, post, etc.).
