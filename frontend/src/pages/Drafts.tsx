@@ -120,6 +120,13 @@ function toPelletRow(s: PelletTestSessionSummary): DraftRow {
 function toScoreRow(s: ScoreCardSummary): DraftRow {
   const meta: MetaItem[] = []
   if (s.location) meta.push({ icon: MapPin, text: s.location })
+  // Carry the draft's league through to the refine page. ScoreEntry reads its
+  // league context from the search params only, so without these a league
+  // draft refines as "Personal" — wrong badge, no league banner, and the
+  // league's require_image_upload rule never gets applied.
+  const params = new URLSearchParams({ draftId: s.id })
+  if (s.league_id) params.set('leagueId', s.league_id)
+  if (s.league_round_id) params.set('roundId', s.league_round_id)
   return {
     id: s.id,
     kind: 'score',
@@ -130,7 +137,7 @@ function toScoreRow(s: ScoreCardSummary): DraftRow {
     when: s.created_at,
     thumbnail: s.card_image_url ?? undefined,
     status: scoreStatus(s),
-    href: `/scores/new?draftId=${s.id}`,
+    href: `/scores/new?${params.toString()}`,
   }
 }
 

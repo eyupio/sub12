@@ -77,10 +77,13 @@ func (r *ScoreCardRepository) Create(ctx context.Context, userID string, input *
 	if gated {
 		// Acquire a transaction-scoped advisory lock keyed on (round, user) before
 		// counting existing submissions, so a concurrent request for the same
-		// round/user can't read the same pre-insert count.
+		// round/user can't read the same pre-insert count. hashtext takes text, so
+		// the round and user placeholders go through ::uuid first — casting them
+		// straight to text pins those parameters to text for the whole statement,
+		// which breaks the uuid comparisons and the uuid target columns below.
 		query = `
 			WITH lock AS (
-				SELECT pg_advisory_xact_lock(hashtext($18::text), hashtext($1::text))
+				SELECT pg_advisory_xact_lock(hashtext($18::uuid::text), hashtext($1::uuid::text))
 			),
 			cnt AS (
 				SELECT count(*) AS n FROM score_cards, lock
@@ -211,7 +214,7 @@ func (r *ScoreCardRepository) Graduate(ctx context.Context, id, userID string, l
 		// Excludes this card itself; only peer submissions count toward the cap.
 		query = `
 			WITH lock AS (
-				SELECT pg_advisory_xact_lock(hashtext($3::text), hashtext($2::text))
+				SELECT pg_advisory_xact_lock(hashtext($3::uuid::text), hashtext($2::uuid::text))
 			),
 			cnt AS (
 				SELECT count(*) AS n FROM score_cards, lock
