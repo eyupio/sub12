@@ -190,8 +190,11 @@ export default function Help() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        {/* Categories: a horizontal chip rail on mobile, a sidebar on desktop. */}
-        <aside className="h-fit lg:rounded-lg lg:border lg:border-subtle lg:bg-surface lg:p-3">
+        {/* Categories: a horizontal chip rail on mobile, a sidebar on desktop.
+            `min-w-0`: the rail's scroll container is a descendant, not this grid
+            item, so without it the item's automatic minimum size is the rail's
+            full max-content width and the whole page overflows sideways. */}
+        <aside className="h-fit min-w-0 lg:rounded-lg lg:border lg:border-subtle lg:bg-surface lg:p-3">
           <h2 className="t-section-title pb-2 lg:px-2">Categories</h2>
           <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-x-visible lg:px-0 lg:pb-0">
             <button
