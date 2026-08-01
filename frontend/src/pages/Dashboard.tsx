@@ -555,6 +555,8 @@ export default function Dashboard() {
                 bestScore={hasData ? rs.best_score : null}
                 bestXCount={hasData ? rs.best_x_count : null}
                 hasData={hasData}
+                to="/gear/rifles/$id"
+                params={{ id: rifle.id }}
               />
             ))}
             {rifleCards.length === 1 && (
