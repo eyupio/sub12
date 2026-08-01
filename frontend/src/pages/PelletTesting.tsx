@@ -217,7 +217,7 @@ function OverviewTab({
         </div>
         <div className="bg-surface border border-line rounded-lg p-4 lg:p-6 shadow-card">
           {loading && timeline.length === 0 ? (
-            <div className="h-64 rounded bg-surface-2 animate-pulse" />
+            <div className="h-64 rounded skeleton" />
           ) : timeline.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-sm text-muted">
               No timeline data yet.

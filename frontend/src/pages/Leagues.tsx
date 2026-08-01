@@ -148,7 +148,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="w-full bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-opacity"
+            className="w-full btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase py-3 rounded transition-all"
           >
             {mutation.isPending ? 'Creating…' : 'Create League'}
           </button>

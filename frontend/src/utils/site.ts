@@ -10,6 +10,17 @@ import { Capacitor } from '@capacitor/core'
 // builds (mirrors VITE_API_URL in api/client.ts).
 const CANONICAL_SITE_URL = 'https://sub12.io'
 
+// Direct download for the Android build. The Android APK workflow keeps the
+// `android-latest` pre-release pointed at the newest `main` build under a fixed
+// asset name, so this URL never has to change. VITE_ANDROID_APK_URL retargets it
+// for forks and staging builds.
+const CANONICAL_ANDROID_APK_URL =
+  'https://github.com/eyupio/sub12/releases/download/android-latest/sub12.apk'
+
+export function androidApkUrl(): string {
+  return import.meta.env.VITE_ANDROID_APK_URL || CANONICAL_ANDROID_APK_URL
+}
+
 export function siteOrigin(): string {
   const override = import.meta.env.VITE_SITE_URL
   if (override) return override.replace(/\/+$/, '')

@@ -52,4 +52,8 @@
     <!-- Geolocation: tag score cards & pellet tests with the shooter's position -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Haptics: tactile feedback on nav taps, primary actions and toasts.
+         Normal-level permission, granted at install with no runtime prompt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

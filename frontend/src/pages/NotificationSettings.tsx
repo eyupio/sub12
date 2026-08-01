@@ -67,7 +67,7 @@ export default function NotificationSettings() {
 
       {isLoading && (
         <div className="space-y-2">
-          {ROWS.map((_, i) => <div key={i} className="h-14 rounded border border-subtle bg-surface animate-pulse" />)}
+          {ROWS.map((_, i) => <div key={i} className="h-14 rounded border border-subtle skeleton" />)}
         </div>
       )}
 

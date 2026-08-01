@@ -106,7 +106,7 @@ export default function ComboAnalytics() {
       {isLoading && (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-10 rounded border border-subtle bg-surface animate-pulse" />
+            <div key={i} className="h-10 rounded border border-subtle skeleton" />
           ))}
         </div>
       )}

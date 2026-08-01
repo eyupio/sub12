@@ -19,7 +19,7 @@ const TIMEZONES: string[] = (() => {
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 
 // ---------------------------------------------------------------------------
 // Club Image Section
@@ -677,9 +677,9 @@ export default function ClubSettings() {
   if (isLoading) {
     return (
       <div className="p-4 lg:p-8 space-y-4 max-w-lg lg:max-w-3xl mx-auto">
-        <div className="h-6 w-40 bg-surface rounded animate-pulse" />
+        <div className="h-6 w-40 skeleton rounded" />
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 bg-surface rounded animate-pulse" />
+          <div key={i} className="h-32 skeleton rounded" />
         ))}
       </div>
     )

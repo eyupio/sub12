@@ -95,7 +95,7 @@ export function UserHoverCard({
         {isLoading && (
           <div className="grid grid-cols-6 gap-1.5">
             {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="h-7 rounded bg-surface-hover animate-pulse" />
+              <div key={i} className="h-7 rounded skeleton" />
             ))}
           </div>
         )}

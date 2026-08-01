@@ -12,22 +12,40 @@ export default defineConfig({
         name: 'SUB12',
         short_name: 'SUB12',
         description: 'Track scores, manage gear, and compete in leagues. The platform for precision airgun shooters.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        // Brand darks — these drive the install splash and the OS task-switcher
+        // chrome, so they have to match --gunmetal rather than a stock slate.
+        theme_color: '#0C0C0C',
+        background_color: '#0C0C0C',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
+        categories: ['sports', 'utilities', 'productivity'],
         icons: [
           {
             src: '/icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: '/icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any',
           },
+          {
+            src: '/icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+        // Long-press the installed icon to jump straight into the actions
+        // people open the app for.
+        shortcuts: [
+          { name: 'Quick capture', short_name: 'Capture', url: '/quick-capture' },
+          { name: 'Log a score card', short_name: 'New card', url: '/scores/new' },
+          { name: 'Leagues', short_name: 'Leagues', url: '/leagues' },
         ],
       },
       workbox: {

@@ -20,10 +20,30 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true,
     },
     SplashScreen: {
+      // main.tsx calls SplashScreen.hide() as soon as the web layer boots, so
+      // the launch image is dismissed on the app's schedule rather than a
+      // fixed timer. The fade keeps that handover from reading as a flash.
       launchShowDuration: 0,
+      launchAutoHide: false,
       backgroundColor: '#0C0C0C',
       showSpinner: false,
+      fadeOutDuration: 200,
+      androidScaleType: 'CENTER_CROP',
+      splashImmersive: false,
     },
+    Haptics: {},
+  },
+  android: {
+    // The WebView background shows through during navigation and overscroll;
+    // matching it to --gunmetal stops a white flash between screens.
+    backgroundColor: '#0C0C0C',
+    // Chrome-on-Android caches aggressively during development; on release
+    // builds the assets are bundled so this only affects local iteration.
+    allowMixedContent: false,
+  },
+  ios: {
+    backgroundColor: '#0C0C0C',
+    contentInset: 'never',
   },
   server: {
     // Use local dev server during development

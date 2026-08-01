@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { haptics } from '../utils/haptics'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -55,17 +56,17 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', c
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
       <div
         ref={dialogRef}
-        className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-sm p-5 space-y-4"
+        className="relative bg-surface border border-subtle rounded-[var(--radius-lg)] shadow-overlay w-full max-w-sm p-5 space-y-4 animate-scale-in"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-msg"
       >
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-[var(--error-bg)] flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-full bg-[var(--error-bg)] ring-4 ring-[var(--error-bg)]/50 flex items-center justify-center shrink-0">
             <AlertTriangle size={18} className="text-[var(--error-text)]" />
           </div>
           <div>
@@ -77,14 +78,14 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', c
           <button
             ref={cancelRef}
             onClick={onCancel}
-            className="px-4 py-2 rounded border border-subtle text-sm text-muted hover:text-secondary transition-colors"
+            className="px-4 py-2 rounded border border-subtle text-sm text-muted hover:text-secondary hover:border-strong u-press transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => { haptics.tapHeavy(); onConfirm() }}
             disabled={confirmDisabled}
-            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            className="px-4 py-2 rounded bg-[var(--error-text)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed u-press transition-opacity"
           >
             {confirmLabel}
           </button>

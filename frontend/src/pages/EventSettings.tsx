@@ -5,7 +5,7 @@ import { ChevronLeft } from 'lucide-react'
 import { eventsApi, type EventVisibility } from '../api/events'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
-import { PageGrid, PageHeader, Section } from '../components/leagues'
+import { PageGrid, PageHeader, Section, LoadingRows } from '../components/leagues'
 import { toast } from '../store/toast'
 
 const inputCls =
@@ -48,7 +48,7 @@ export default function EventSettings() {
   if (ev.isLoading) {
     return (
       <PageGrid>
-        <p style={{ padding: 24, fontSize: 13, color: 'var(--muted)' }}>Loading…</p>
+        <Section title="Event Settings"><LoadingRows rows={5} /></Section>
       </PageGrid>
     )
   }
@@ -133,7 +133,7 @@ export default function EventSettings() {
               <button
                 type="submit"
                 disabled={addScorer.isPending || !scorerUserId.trim()}
-                className="bg-[var(--gold)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-5 py-3 rounded transition-opacity"
+                className="btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-5 py-3 rounded transition-all"
               >
                 Add
               </button>

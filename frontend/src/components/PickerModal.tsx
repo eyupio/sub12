@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { Skeleton } from './Skeleton'
 
 export interface PickerItem {
   id: string
@@ -52,7 +53,7 @@ export function PickerModal({ open, title, items, loading, emptyMessage, onSelec
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {loading && <p className="text-center text-sm text-muted p-6">Loading…</p>}
+          {loading && <div className="p-4 space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} height={36} />)}</div>}
           {!loading && items.length === 0 && (
             <p className="text-center text-sm text-muted p-6">{emptyMessage ?? 'Nothing to show.'}</p>
           )}

@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminEmailApi } from '../api/adminEmail'
 import { TemplateFormState, validateTemplateForm } from './adminEmailValidation'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { SkeletonText } from '../components/Skeleton'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const textareaCls = `${inputCls} min-h-[130px] font-mono`
 const labelCls = 't-section-title'
-const btnPrimary = 'bg-[var(--brass)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-opacity'
+const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 const btnSecondary = 'border border-subtle hover:border-strong text-secondary hover:text-primary text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-colors'
 
 const templateLabels: Record<string, string> = {
@@ -189,7 +190,7 @@ export default function AdminEmailTemplates() {
         </aside>
 
         <section className="bg-surface border border-subtle rounded-lg p-4 space-y-4">
-          {templateQuery.isLoading && <p className="text-sm text-muted">Loading template…</p>}
+          {templateQuery.isLoading && <SkeletonText lines={6} />}
 
           {templateQuery.data && (
             <form onSubmit={handleSubmit} className="space-y-4">

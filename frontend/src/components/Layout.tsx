@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect, useMemo, useState } from 'react'
+import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -16,6 +16,7 @@ import { Sub12BrandLockup } from './Sub12BrandLockup'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
 import { clearClientSession } from '../utils/clearSession'
+import { haptics } from '../utils/haptics'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -78,6 +79,10 @@ export default function Layout({ children }: PropsWithChildren) {
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [moreOpen, setMoreOpen] = useState(false)
+  // Drives the sticky mobile header's elevation: flat at the top of the page,
+  // shadowed once content has scrolled underneath it.
+  const [scrolled, setScrolled] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
   const isAdmin = user?.role === 'admin'
   // ⚡ Bolt: memoize navItems — the array spread allocates a new 24-item array on
   // every render. Layout re-renders on every draft-count poll (60 s), route
@@ -116,6 +121,26 @@ export default function Layout({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // The page content scrolls inside <main>, not the window, so the elevation
+  // listener has to sit on that element rather than on window scroll.
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const onScroll = () => setScrolled(el.scrollTop > 4)
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Close the More sheet when the viewport grows past the mobile breakpoint —
+  // otherwise it stays mounted invisibly and traps the next Escape press.
+  useEffect(() => {
+    if (!moreOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen])
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
 
@@ -146,13 +171,24 @@ export default function Layout({ children }: PropsWithChildren) {
     navigate({ to: '/' })
   }
 
-  const navLinkBase = 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-hover transition-colors text-sm tracking-wide'
-  const navLinkActive = 'flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[var(--brass)]/10 text-[var(--brass)] text-sm tracking-wide'
+  // Sidebar links carry a brass rail on the left edge. It's scaled to 0 by
+  // default and to full height when active, so switching routes animates the
+  // marker rather than repainting it.
+  const navLinkBase = 'group relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-hover u-nudge text-sm tracking-wide before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-[var(--brass)] before:scale-y-0 before:origin-center before:transition-transform before:duration-200'
+  const navLinkActive = 'group relative flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[var(--brass)]/10 text-[var(--brass)] text-sm tracking-wide before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-[var(--brass)] before:scale-y-100 before:origin-center before:transition-transform before:duration-200'
+
+  // `app-tab` carries the dot/pill treatment (see index.css); `is-active`
+  // switches it on. TanStack's activeProps replaces className wholesale, so the
+  // active variant has to repeat the base classes.
+  const mobileNavBase = 'app-tab relative h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-muted hover:text-[var(--brass)] u-press transition-colors no-min-target'
+  const mobileNavActive = `${mobileNavBase} is-active text-[var(--brass)]`
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
       <NavTracker />
       <ToastContainer />
+      {/* Keyboard users can jump straight past the 24-item sidebar. */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Corner crosshair decorations */}
       <CornerMark className="top-5 left-5 text-muted" />
       <CornerMark className="top-5 right-5 text-muted" />
@@ -179,10 +215,10 @@ export default function Layout({ children }: PropsWithChildren) {
                 className={navLinkBase}
                 activeProps={{ className: navLinkActive, 'aria-current': 'page' }}
               >
-                <Icon size={20} />
+                <Icon size={20} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
                 <span className="flex-1">{label}</span>
                 {showBadge && (
-                  <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                  <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 u-tnum">
                     {draftCount}
                   </span>
                 )}
@@ -216,7 +252,10 @@ export default function Layout({ children }: PropsWithChildren) {
       {/* ── Main content column ────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile top bar */}
-        <header className={`app-mobile-header lg:hidden sticky top-0 z-50 bg-nav backdrop-blur border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}>
+        <header
+          data-scrolled={scrolled}
+          className={`app-mobile-header lg:hidden sticky top-0 z-50 bg-nav backdrop-blur-xl border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}
+        >
           <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
             <Sub12BrandLockup variant="compact" />
           </Link>
@@ -238,18 +277,22 @@ export default function Layout({ children }: PropsWithChildren) {
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="bg-amber-600/15 border-b border-amber-600/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 text-xs tracking-wide" role="status">
-            <WifiOff size={14} />
+          <div className="bg-amber-600/15 border-b border-amber-600/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 text-xs tracking-wide animate-slide-in" role="status">
+            <WifiOff size={14} className="animate-pulse" />
             <span>You're offline — some features may be limited</span>
           </div>
         )}
 
         {/* Page content */}
-        <main className={`flex-1 flex flex-col overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}>
+        <main
+          id="main-content"
+          ref={mainRef}
+          className={`flex-1 flex flex-col overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}
+        >
           <div className="flex-1">
             {children ?? <Outlet />}
           </div>
-          <footer className="shrink-0 border-t border-subtle mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide">
+          <footer className="shrink-0 mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-[linear-gradient(90deg,transparent,var(--line-2),transparent)]">
             <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
             <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
@@ -268,27 +311,36 @@ export default function Layout({ children }: PropsWithChildren) {
         <QuickCaptureFabWhenAppropriate />
 
         {/* Mobile bottom nav — 5 items max */}
-        <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
+        <nav aria-label="Primary mobile" className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nav backdrop-blur-xl border-t border-subtle overflow-x-hidden ${isMobileKeyboardOpen ? 'hidden' : 'block'}`}>
           <div className="grid grid-cols-5 w-full min-h-[var(--mobile-nav-offset)]">
             {mobileNavItems.map(({ to, icon: Icon, label }) => (
               <Link
                 key={to}
                 to={to}
-                className="h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-muted hover:text-[var(--brass)] transition-colors"
-                activeProps={{ className: 'h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 text-[var(--brass)]', 'aria-current': 'page' }}
+                onClick={() => haptics.tapLight()}
+                className={mobileNavBase}
+                activeProps={{ className: mobileNavActive, 'aria-current': 'page' }}
               >
-                <Icon size={22} />
-                <span className="max-w-full truncate text-[11px] tracking-wide">{label}</span>
+                {/* Active tab gets a brass dot above the glyph and a tinted
+                    pill behind it — legible at a glance on a small screen. */}
+                <span className="nav-dot" aria-hidden="true" />
+                <span className="nav-pill" aria-hidden="true" />
+                <Icon size={22} className="relative transition-transform duration-200" />
+                <span className="relative max-w-full truncate text-[11px] tracking-wide">{label}</span>
               </Link>
             ))}
             <button
-              onClick={() => setMoreOpen(prev => !prev)}
+              onClick={() => { haptics.tapLight(); setMoreOpen(prev => !prev) }}
               aria-label="More navigation options"
               aria-expanded={moreOpen}
-              className={`h-[var(--mobile-nav-offset)] min-w-0 flex flex-col items-center justify-center gap-1 px-1 transition-colors ${moreOpen ? 'text-[var(--brass)]' : 'text-muted hover:text-[var(--brass)]'}`}
+              className={`${mobileNavBase} ${moreOpen ? 'text-[var(--brass)]' : ''}`}
             >
-              <MoreHorizontal size={22} />
-              <span className="max-w-full truncate text-[11px] tracking-wide">More</span>
+              <span className="nav-pill" aria-hidden="true" />
+              <MoreHorizontal
+                size={22}
+                className={`relative transition-transform duration-300 ${moreOpen ? 'rotate-90' : ''}`}
+              />
+              <span className="relative max-w-full truncate text-[11px] tracking-wide">More</span>
             </button>
           </div>
         </nav>
@@ -296,28 +348,39 @@ export default function Layout({ children }: PropsWithChildren) {
         {/* More menu overlay */}
         {moreOpen && (
           <div className="lg:hidden fixed inset-0 z-50" onClick={() => setMoreOpen(false)}>
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-            <div className="absolute bottom-[var(--mobile-nav-offset)] left-0 right-0 bg-surface border-t border-subtle rounded-t-xl flex flex-col max-h-[calc(100dvh-var(--mobile-nav-offset)-1rem)]" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-                <span className="text-xs tracking-widest uppercase text-muted">More</span>
-                <button onClick={() => setMoreOpen(false)} className="text-muted hover:text-secondary transition-colors" aria-label="Close menu">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="More navigation options"
+              className="absolute bottom-[var(--mobile-nav-offset)] left-0 right-0 bg-surface border-t border-subtle rounded-t-[var(--radius-xl)] shadow-overlay flex flex-col max-h-[calc(100dvh-var(--mobile-nav-offset)-1rem)] animate-sheet-up"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Grab handle — the standard affordance for a dismissible sheet. */}
+              <div className="pt-2.5 pb-1 flex justify-center shrink-0" aria-hidden="true">
+                <span className="h-1 w-9 rounded-full bg-[var(--line-2)]" />
+              </div>
+              <div className="flex items-center justify-between px-4 pt-2 pb-2 shrink-0">
+                <span className="t-label-caps">More</span>
+                <button onClick={() => setMoreOpen(false)} className="text-muted hover:text-secondary u-press transition-colors no-min-target" aria-label="Close menu">
                   <X size={18} />
                 </button>
               </div>
-              <div className="overflow-y-auto px-4 pb-4 space-y-1">
+              <div className="overflow-y-auto px-4 pb-4 space-y-1 u-stagger">
                 {moreMenuItems.map(({ to, icon: Icon, label }) => {
                   const showBadge = to === '/drafts' && draftCount > 0
                   return (
                     <Link
                       key={to}
                       to={to}
-                      onClick={() => setMoreOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                      onClick={() => { haptics.tapLight(); setMoreOpen(false) }}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover hover:text-[var(--brass)] u-nudge text-sm"
+                      activeProps={{ className: 'flex items-center gap-3 px-3 py-2.5 rounded-lg bg-[var(--brass)]/10 text-[var(--brass)] text-sm', 'aria-current': 'page' }}
                     >
-                      <Icon size={18} className="text-muted" />
+                      <Icon size={18} className="text-muted shrink-0" />
                       <span className="flex-1">{label}</span>
                       {showBadge && (
-                        <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                        <span className="text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 u-tnum">
                           {draftCount}
                         </span>
                       )}
@@ -326,16 +389,16 @@ export default function Layout({ children }: PropsWithChildren) {
                 })}
                 {isAdmin && (
                   <>
-                    <div className="border-t border-subtle my-2" />
-                    <span className="block text-[10px] tracking-widest uppercase text-muted px-3 py-1">Admin</span>
+                    <hr className="u-hairline my-2" />
+                    <span className="block t-label-caps px-3 py-1">Admin</span>
                     {adminNavItems.map(({ to, icon: Icon, label }) => (
                       <Link
                         key={to}
                         to={to}
-                        onClick={() => setMoreOpen(false)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover transition-colors text-sm"
+                        onClick={() => { haptics.tapLight(); setMoreOpen(false) }}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-secondary hover:bg-surface-hover hover:text-[var(--brass)] u-nudge text-sm"
                       >
-                        <Icon size={18} className="text-muted" />
+                        <Icon size={18} className="text-muted shrink-0" />
                         <span>{label}</span>
                       </Link>
                     ))}

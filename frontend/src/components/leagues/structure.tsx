@@ -1,5 +1,6 @@
 import { ReactNode, useEffect } from 'react'
 import { Search, ChevronLeft } from 'lucide-react'
+import { haptics } from '../../utils/haptics'
 import { disciplineCover, type Discipline } from './tokens'
 import './styles.css'
 
@@ -68,7 +69,7 @@ export function FilterRow<T extends string>({
               key={c.value}
               type="button"
               className={`lc-chip ${activeChip === c.value ? 'is-active' : ''}`}
-              onClick={() => onChip?.(c.value)}
+              onClick={() => { haptics.tapLight(); onChip?.(c.value) }}
             >
               {c.label}
             </button>
@@ -133,11 +134,30 @@ export function Tabs<T extends string>({
           role="tab"
           aria-selected={active === t.value}
           className={`lc-tab ${active === t.value ? 'is-active' : ''}`}
-          onClick={() => onChange(t.value)}
+          onClick={() => { haptics.tapLight(); onChange(t.value) }}
         >
           {t.label}
           {t.count != null && <span className="lc-tab-pill">{t.count}</span>}
         </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Row placeholders sized for the tables and member lists that live inside
+ * <Section>. Standing in for the real rows keeps the panel at roughly its
+ * final height, so the page doesn't reflow when the query resolves.
+ */
+export function LoadingRows({ rows = 5, className }: { rows?: number; className?: string }) {
+  return (
+    <div className={`lc-loading-rows ${className ?? ''}`} role="status" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="lc-loading-row">
+          <span className="skeleton lc-loading-avatar" />
+          <span className="skeleton lc-loading-name" />
+          <span className="skeleton lc-loading-value" />
+        </div>
       ))}
     </div>
   )

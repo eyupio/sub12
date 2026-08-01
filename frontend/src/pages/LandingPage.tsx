@@ -9,21 +9,26 @@ import {
   ChevronRight,
   Clock3,
   Crosshair,
+  Download,
   Gauge,
   LineChart,
   Medal,
   NotebookPen,
   Radar,
   ScanLine,
+  Share2,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   TableProperties,
   Target,
   Users2,
+  WifiOff,
 } from 'lucide-react'
 import { CornerMark } from '../components/CornerMark'
 import { Sub12BrandLockup } from '../components/Sub12BrandLockup'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { androidApkUrl } from '../utils/site'
 
 type SectionHeaderProps = {
   eyebrow: string
@@ -469,6 +474,9 @@ export default function LandingPage() {
             </a>
             <a href="#analytics" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Trends & analytics
+            </a>
+            <a href="#get-the-app" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
+              Get the app
             </a>
             <a href="#clubs-leagues" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Clubs and leagues
@@ -1055,6 +1063,75 @@ export default function LandingPage() {
                   <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.18em] text-muted">{role}</p>
                 </SurfaceCard>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="get-the-app" className="border-y border-subtle bg-surface px-4 py-20 lg:py-24">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeader
+              eyebrow="On The Range"
+              title="Take it to the firing line"
+              description="Score cards get logged where they're shot, not typed up later at a desk. SUB12 installs to the home screen on any phone, and Android shooters can grab the native build directly."
+              align="center"
+            />
+
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <Smartphone size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Android app</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  The native build — camera capture, offline score entry, and push notifications for league results.
+                </p>
+                <a
+                  href={androidApkUrl()}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold uppercase tracking-[0.16em] text-inverse shadow-gold u-press u-sheen transition-shadow hover:shadow-float"
+                  style={{ background: 'linear-gradient(135deg, var(--gold-2), var(--gold))' }}
+                >
+                  <Download size={16} />
+                  Download APK
+                </a>
+                <p className="mt-3 text-[11px] leading-5 text-muted">
+                  Android asks you to allow installs from your browser the first time — this is a direct download, not a Play Store listing.
+                </p>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <Share2 size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">iPhone &amp; iPad</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  Open SUB12 in Safari, tap Share, then <span className="text-primary">Add to Home Screen</span>. It runs full-screen with its own icon, no App Store required.
+                </p>
+                <Link
+                  to="/register"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-subtle px-5 py-3 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]"
+                >
+                  Create an account
+                  <ArrowRight size={16} />
+                </Link>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <WifiOff size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Works without signal</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  Ranges rarely have coverage. Capture targets and enter scores offline; everything syncs the moment you're back on a connection.
+                </p>
+                <ul className="mt-6 space-y-2 text-sm text-secondary">
+                  {['Quick capture from the camera', 'Draft score cards held on device', 'Automatic sync and conflict-free upload'].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <Check size={15} className="mt-0.5 shrink-0 text-[var(--brass)]" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </SurfaceCard>
             </div>
           </div>
         </section>

@@ -1291,10 +1291,10 @@ export default function ScoreCardDetail() {
   if (isLoading) {
     return (
       <div className="p-4 lg:p-8 space-y-3 max-w-lg lg:max-w-3xl mx-auto">
-        <div className="h-6 w-32 bg-surface rounded animate-pulse" />
+        <div className="h-6 w-32 skeleton rounded" />
         <div className="grid grid-cols-5 gap-2">
           {Array.from({ length: 25 }).map((_, i) => (
-            <div key={i} className="aspect-square bg-surface rounded animate-pulse" />
+            <div key={i} className="aspect-square skeleton rounded" />
           ))}
         </div>
       </div>

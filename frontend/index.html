@@ -3,7 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Kept as a single tag: store/theme.ts rewrites its content when the
+         user switches theme, and querySelector would only ever see the first. -->
     <meta name="theme-color" content="#0C0C0C" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Home-screen install on iOS: run without Safari chrome and let the
+         status bar sit over the app's own background. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SUB12" />
+    <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- Primary SEO -->
     <title>SUB12 — Score Cards, Pellet Testing, Leagues &amp; Events for FT / HFT</title>

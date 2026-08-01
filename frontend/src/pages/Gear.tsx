@@ -258,7 +258,7 @@ function RiflesTab() {
         </button>
       )}
       {adding && <AddRifleForm onDone={() => setAdding(false)} />}
-      {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
+      {isLoading && <div className="h-12 rounded skeleton" />}
       {isError && <p className="text-[var(--error-text)] text-sm">Failed to load rifles. Please try again.</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {rifles.map(r => <RifleRow key={r.id} rifle={r} stats={rifleStatsMap.get(r.id)} />)}
@@ -513,7 +513,7 @@ function PelletsTab() {
         </button>
       )}
       {adding && <AddPelletForm onDone={() => setAdding(false)} />}
-      {isLoading && <div className="h-12 rounded bg-surface animate-pulse" />}
+      {isLoading && <div className="h-12 rounded skeleton" />}
       {isError && <p className="text-[var(--error-text)] text-sm">Failed to load pellets. Please try again.</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {pellets.map(p => <PelletRow key={p.id} pellet={p} />)}

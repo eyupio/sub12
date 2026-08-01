@@ -19,7 +19,7 @@ export default function GroupSizeTimeline() {
   const points = data?.items ?? []
 
   if (isLoading) {
-    return <div className="h-64 rounded bg-surface animate-pulse" />
+    return <div className="h-64 rounded skeleton" />
   }
 
   if (points.length === 0) {

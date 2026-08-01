@@ -191,9 +191,9 @@ export default function UserProfile() {
 
       {isLoading && (
         <div className="space-y-4">
-          <div className="h-24 w-24 rounded-full bg-surface-hover animate-pulse" />
-          <div className="h-5 w-40 rounded bg-surface-hover animate-pulse" />
-          <div className="h-4 w-64 rounded bg-surface-hover animate-pulse" />
+          <div className="h-24 w-24 rounded-full skeleton" />
+          <div className="h-5 w-40 rounded skeleton" />
+          <div className="h-4 w-64 rounded skeleton" />
         </div>
       )}
 

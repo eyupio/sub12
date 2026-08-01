@@ -247,9 +247,55 @@ What the native shell adds on top of the PWA:
 - **Native chrome** — status-bar styling, splash-screen dismissal, safe-area
   insets, and Android hardware back-button → SPA history mapping (`src/main.tsx`).
   The Workbox service worker is skipped on native to avoid serving a stale shell
-  after an app update.
+  after an app update. The WebView also drops document behaviours that read
+  wrong in an app — long-press callouts, chrome text selection, and rubber-band
+  overscroll (`.native-app` rules in `src/index.css`).
+- **Haptics** — `src/utils/haptics.ts` wraps `@capacitor/haptics` and no-ops on
+  web. Wired into bottom-nav taps, tabs and filter chips, the quick-capture FAB,
+  the like button, wizard step jumps, destructive confirmations, and every toast
+  (success / error notification patterns fire from `src/store/toast.ts`).
 - **Branded icons & splash** — generated from `frontend/assets/` via
   `npm run cap:assets`.
+
+### Android APK builds
+
+`.github/workflows/android.yml` builds the Android app in CI and publishes the
+APK as a downloadable release asset.
+
+| Trigger | Variant | Where the APK lands |
+|---------|---------|---------------------|
+| Pull request | debug | Workflow artifact only |
+| Push to `main` | release | Rolling `android-latest` pre-release **and** an artifact |
+| Tag `v*` | release | Attached to that version's GitHub Release |
+| Manual dispatch | release | Workflow artifact |
+
+The rolling pre-release keeps a fixed asset name, so the in-app and landing-page
+download links never change:
+
+```
+https://github.com/<owner>/<repo>/releases/download/android-latest/sub12.apk
+```
+
+`VITE_ANDROID_APK_URL` overrides that URL at build time (see `src/utils/site.ts`)
+for forks and staging builds.
+
+**Signing.** Set these repository secrets to sign with a stable release key —
+required for users to upgrade an installed APK in place:
+
+| Secret | Description |
+|--------|-------------|
+| `ANDROID_KEYSTORE_BASE64` | Release keystore, base64-encoded (`base64 -w0 release.keystore`) |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias inside the keystore |
+| `ANDROID_KEY_PASSWORD` | Key password |
+
+Without them the workflow generates a throwaway key per run so the build still
+produces an installable APK — fine for testing, but each build must be
+uninstalled before the next one can be installed.
+
+The workflow stamps `versionCode` from the run number and `versionName` from the
+tag (or `0.0.<run>-<sha>` off a tag) via the `ANDROID_VERSION_CODE` /
+`ANDROID_VERSION_NAME` environment variables read in `android/app/build.gradle`.
 
 See [frontend/README.md](frontend/README.md) for prerequisites, one-time iOS
 setup, and the full asset workflow.
