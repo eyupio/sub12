@@ -1,6 +1,6 @@
-import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react'
+import { PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -15,6 +15,7 @@ import { Tooltip } from './Tooltip'
 import { Sub12BrandLockup } from './Sub12BrandLockup'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { clearClientSession } from '../utils/clearSession'
 import { haptics } from '../utils/haptics'
 
@@ -110,6 +111,19 @@ export default function Layout({ children }: PropsWithChildren) {
   })
   const draftCount = (scoreDraftCount?.count ?? 0) + (pelletDraftCount?.count ?? 0)
 
+  // The one "reload" affordance the app has: the native shell has no browser
+  // chrome, and a WebView reload would drop the router back to the start. Every
+  // query the current screen is actually using is refetched instead.
+  const refreshData = useCallback(() => queryClient.refetchQueries({ type: 'active' }), [queryClient])
+
+  // Pull-to-refresh on the page scroller. Suppressed while the More sheet or the
+  // keyboard is up, when a downward drag belongs to that surface instead.
+  const { indicatorRef, refreshing } = usePullToRefresh(
+    mainRef,
+    refreshData,
+    !moreOpen && !isMobileKeyboardOpen,
+  )
+
   useEffect(() => {
     const goOnline = () => setIsOnline(true)
     const goOffline = () => setIsOnline(false)
@@ -199,7 +213,12 @@ export default function Layout({ children }: PropsWithChildren) {
       <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-r border-subtle bg-nav backdrop-blur z-40">
         <div className="px-5 py-4 border-b border-subtle">
           <Tooltip content={tips.homeLogo} placement="right">
-            <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
+            <Link
+              to="/"
+              aria-label="Go to dashboard and refresh"
+              onClick={() => { void refreshData() }}
+              className="inline-block hover:opacity-80 transition-opacity"
+            >
               <Sub12BrandLockup variant="compact" />
             </Link>
           </Tooltip>
@@ -256,7 +275,12 @@ export default function Layout({ children }: PropsWithChildren) {
           data-scrolled={scrolled}
           className={`app-mobile-header lg:hidden sticky top-0 z-50 bg-nav backdrop-blur-xl border-b border-subtle px-4 py-2 items-center justify-between ${isMobileKeyboardOpen ? 'hidden' : 'flex'}`}
         >
-          <Link to="/" aria-label="Go to dashboard" className="inline-block hover:opacity-80 transition-opacity">
+          <Link
+            to="/"
+            aria-label="Go to dashboard and refresh"
+            onClick={() => { haptics.tapLight(); void refreshData() }}
+            className="inline-block hover:opacity-80 transition-opacity"
+          >
             <Sub12BrandLockup variant="compact" />
           </Link>
           <div className="flex items-center gap-3">
@@ -275,6 +299,18 @@ export default function Layout({ children }: PropsWithChildren) {
           </div>
         </header>
 
+        {/* Pull-to-refresh indicator. usePullToRefresh writes its transform and
+            opacity directly, so it deliberately carries no inline style here. */}
+        <div
+          ref={indicatorRef}
+          role="status"
+          aria-live="polite"
+          className="lg:hidden pointer-events-none fixed left-1/2 top-0 z-[60] h-10 w-10 flex items-center justify-center rounded-full bg-surface border border-subtle shadow-float text-[var(--brass)] opacity-0"
+        >
+          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
+          <span className="sr-only">{refreshing ? 'Refreshing' : ''}</span>
+        </div>
+
         {/* Offline banner */}
         {!isOnline && (
           <div className="bg-amber-600/15 border-b border-amber-600/30 px-4 py-2 flex items-center justify-center gap-2 text-amber-700 dark:text-amber-400 text-xs tracking-wide animate-slide-in" role="status">
@@ -287,7 +323,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <main
           id="main-content"
           ref={mainRef}
-          className={`flex-1 flex flex-col overflow-auto lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}
+          className={`flex-1 flex flex-col overflow-auto overscroll-y-contain lg:pb-0 ${isMobileKeyboardOpen ? 'pb-0' : 'pb-[var(--mobile-nav-offset)]'}`}
         >
           <div className="flex-1">
             {children ?? <Outlet />}

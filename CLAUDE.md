@@ -334,6 +334,13 @@ these over ad-hoc Tailwind so surfaces stay consistent.
 - **Native-only rules** — `.native-app` selectors in the base layer disable
   long-press callouts, chrome text selection, and overscroll bounce inside the
   Capacitor WebView. Add `.selectable` to opt real content back in.
+- **Refreshing** — `Layout` owns the app's only reload affordances: pull down on
+  the page scroller (`usePullToRefresh`, touch only) or tap the SUB12 lockup.
+  Both refetch active TanStack queries rather than reloading the WebView, which
+  would reset the router. Android targets SDK 35, so `android/app/src/main/
+  res/values-v35/styles.xml` opts out of Android 15's forced edge-to-edge — the
+  WebView never reports system-bar insets to `env(safe-area-inset-*)`, so the
+  app shell would otherwise draw under the status and gesture bars.
 
 ## Container Images
 
