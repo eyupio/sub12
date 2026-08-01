@@ -49,6 +49,12 @@ type LeagueConfigRepo interface {
 	RecordOwnerReopen(ctx context.Context, scoreCardID, userID string) error
 }
 
+// ClubMembershipRepo answers whether a user belongs to a club, so a card can
+// only be re-homed to a club its owner is actually in.
+type ClubMembershipRepo interface {
+	IsMember(ctx context.Context, clubID, userID string) (bool, error)
+}
+
 // UserProfileReader returns the profile-visibility flag needed when deciding
 // whether to expose a public item to anonymous viewers.
 type UserProfileReader interface {
@@ -58,6 +64,7 @@ type UserProfileReader interface {
 type ScoreCardService struct {
 	cards       ScoreCardRepo
 	leagueRepo  LeagueConfigRepo    // optional; nil skips league rule enforcement
+	clubs       ClubMembershipRepo  // optional; nil skips club membership checks
 	users       UserProfileReader   // optional; nil skips owner-privacy checks
 	events      *EventService       // optional; nil disables event-bound submissions
 	activity    *ActivityService    // optional; nil disables feed ingestion
@@ -67,6 +74,12 @@ type ScoreCardService struct {
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
 	return &ScoreCardService{cards: cards, leagueRepo: leagueRepo, activity: activity, achievement: achievement}
+}
+
+// SetClubRepo wires the club membership lookup used when a card is re-homed
+// to a club. Left unset, club changes are accepted without a membership check.
+func (s *ScoreCardService) SetClubRepo(clubs ClubMembershipRepo) {
+	s.clubs = clubs
 }
 
 // SetEventService wires the EventService dependency. Required for event-bound
@@ -583,6 +596,9 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	if err := s.resolveLeagueDetach(card, input); err != nil {
 		return nil, err
 	}
+	if err := s.resolveClubChange(ctx, userID, card, input); err != nil {
+		return nil, err
+	}
 	// Editing a rejected league card is the shooter's recourse, but it must
 	// leave a trace: the silent rejected → pending flip the update performs is
 	// recorded as an owner reopen in the audit trail. A card on its way out of
@@ -651,6 +667,36 @@ func (s *ScoreCardService) resolveLeagueDetach(card *model.ScoreCard, input *mod
 	}
 	if *input.LeagueRoundID != "" {
 		return fmt.Errorf("%w: use submit-to-league to move a card to a different round", ErrInvalidCard)
+	}
+	return nil
+}
+
+// resolveClubChange validates input.ClubID against the card's current club and
+// normalises it for the repository. An empty string takes the card out of its
+// club; a club the user belongs to re-homes it; repeating the current club (or
+// omitting the field) leaves the link alone. A club the user is not a member of
+// is refused rather than silently accepted.
+func (s *ScoreCardService) resolveClubChange(ctx context.Context, userID string, card *model.ScoreCard, input *model.UpdateScoreCardInput) error {
+	if input.ClubID == nil {
+		return nil
+	}
+	current := ""
+	if card.ClubID != nil {
+		current = *card.ClubID
+	}
+	if *input.ClubID == current {
+		input.ClubID = nil
+		return nil
+	}
+	if *input.ClubID == "" || s.clubs == nil {
+		return nil
+	}
+	isMember, err := s.clubs.IsMember(ctx, *input.ClubID, userID)
+	if err != nil {
+		return fmt.Errorf("check club membership: %w", err)
+	}
+	if !isMember {
+		return ErrNotClubMember
 	}
 	return nil
 }
@@ -757,11 +803,24 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 	if err != nil {
 		return nil, err
 	}
-	if card.IsDraft {
-		return nil, fmt.Errorf("%w: card must be graduated before submitting to a league", ErrInvalidCard)
+	// An event card belongs to its event; a league round is not somewhere it
+	// can be moved to.
+	if card.EventParticipantID != nil && *card.EventParticipantID != "" {
+		return nil, fmt.Errorf("%w: an event card cannot be submitted to a league", ErrInvalidCard)
 	}
-	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" {
-		return nil, fmt.Errorf("%w: card is already submitted to a league round", ErrInvalidCard)
+	current := ""
+	if card.LeagueRoundID != nil {
+		current = *card.LeagueRoundID
+	}
+	if current == roundID {
+		return card, nil
+	}
+	// Moving a card out of a round it has already been ruled on is an edit
+	// like any other, so the league's lock policy applies.
+	if current != "" {
+		if err := s.ensureNotLockedCard(ctx, card); err != nil {
+			return nil, err
+		}
 	}
 
 	if s.leagueRepo != nil {
@@ -781,7 +840,10 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 		if cfgErr != nil && !errors.Is(cfgErr, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", cfgErr)
 		}
-		if cfg != nil {
+		// A draft is checked at graduation, not here: the cap counts only
+		// graduated cards, and refusing to park a draft in a full round is
+		// exactly the dead end the refine flow exists to avoid.
+		if cfg != nil && !card.IsDraft {
 			if _, err := s.checkMaxSubmissionsPerRound(ctx, userID, roundID, cfg, false); err != nil {
 				return nil, err
 			}

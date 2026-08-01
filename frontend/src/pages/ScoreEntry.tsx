@@ -12,6 +12,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageEditor } from '../components/ImageEditor'
 import { type LocationValue } from '../components/LocationField'
 import { PlaceSelector } from '../components/PlaceSelector'
+import { CardContextPicker } from '../components/CardContextPicker'
+import { contextChangePlan, type CardContext } from '../utils/cardContext'
 import { useSmartBack } from '../hooks/useSmartBack'
 import { captureImageOrClick } from '../utils/imagePicker'
 
@@ -50,9 +52,15 @@ export default function ScoreEntry() {
     try { return !localStorage.getItem('sub12-score-help-seen') } catch { /* localStorage unavailable */ return true }
   })
   const [confirmDeleteDraft, setConfirmDeleteDraft] = useState(false)
-  // Whether this card goes to the league round it was captured against, or is
-  // kept as a personal card. A full round is the usual reason to switch.
-  const [submitToLeague, setSubmitToLeague] = useState(true)
+  // The card's context. Seeded from the search params (or the draft being
+  // refined) and changeable from here — a card captured against the wrong
+  // league, or one whose round filled up, must be movable without re-shooting.
+  const [cardContext, setCardContext] = useState<CardContext>(search.leagueId ? 'league' : 'personal')
+  const [ctxLeagueId, setCtxLeagueId] = useState<string | null>(search.leagueId ?? null)
+  const [ctxClubId, setCtxClubId] = useState<string | null>(null)
+  // Once the user picks a context themselves, a late-arriving draft fetch must
+  // not overwrite it.
+  const [contextTouched, setContextTouched] = useState(false)
   const [roundRefusedCard, setRoundRefusedCard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -92,37 +100,71 @@ export default function ScoreEntry() {
     if (draft.card_image_url && !imagePreview) {
       setImagePreview(draft.card_image_url)
     }
+    if (!contextTouched) {
+      if (draft.league_round_id) {
+        setCardContext('league')
+      } else if (draft.club_id) {
+        setCardContext('club')
+        setCtxClubId(draft.club_id)
+      }
+    }
     // Shot grid stays empty on a quick-capture draft — the user fills it
     // here during refinement, which is the whole point.
-  }, [draft, imagePreview])
+  }, [draft, imagePreview, contextTouched])
+
+  // A draft opened from Drafts carries its league in the search params, but a
+  // draft reached any other way only carries the round — resolve the league so
+  // the picker can show which one it is.
+  const { data: draftLeague } = useQuery({
+    queryKey: ['score-cards', draftId, 'league'],
+    queryFn: () => leagueApi.getLeagueForScoreCard(draftId!),
+    enabled: !!draftId && !!draft?.league_round_id && !leagueId,
+  })
+  useEffect(() => {
+    if (draftLeague?.id && !ctxLeagueId) setCtxLeagueId(draftLeague.id)
+  }, [draftLeague, ctxLeagueId])
 
   // League context
   const { data: league } = useQuery({
-    queryKey: ['leagues', leagueId],
-    queryFn: () => leagueApi.get(leagueId!),
-    enabled: !!leagueId,
+    queryKey: ['leagues', ctxLeagueId],
+    queryFn: () => leagueApi.get(ctxLeagueId!),
+    enabled: !!ctxLeagueId,
   })
 
   // Ensure a default round exists for score submission
   const { data: ensuredRound } = useQuery({
-    queryKey: ['leagues', leagueId, 'ensure-round'],
-    queryFn: () => leagueApi.ensureDefaultRound(leagueId!),
-    enabled: !!leagueId,
+    queryKey: ['leagues', ctxLeagueId, 'ensure-round'],
+    queryFn: () => leagueApi.ensureDefaultRound(ctxLeagueId!),
+    enabled: !!ctxLeagueId && cardContext === 'league',
   })
 
   // League config for require_image_upload and max_submissions_per_round
   const { data: leagueConfig } = useQuery({
-    queryKey: ['leagues', leagueId, 'config'],
-    queryFn: () => leagueApi.getConfig(leagueId!),
-    enabled: !!leagueId,
+    queryKey: ['leagues', ctxLeagueId, 'config'],
+    queryFn: () => leagueApi.getConfig(ctxLeagueId!),
+    enabled: !!ctxLeagueId,
   })
 
-  // A draft carries its own round, so a league draft opened without the search
-  // params still knows where it was meant to go.
-  const leagueRoundId = roundIdParam ?? draft?.league_round_id ?? ensuredRound?.round_id
-  const hasLeagueContext = !!leagueId || !!draft?.league_round_id
-  const asLeague = hasLeagueContext && submitToLeague
+  // The round the current selection lands in. While the card's original league
+  // is still the chosen one it keeps its own round; picking a different league
+  // means the round that league resolves to instead.
+  const originalLeagueId = leagueId ?? draftLeague?.id ?? null
+  const keepsOriginalRound = !!ctxLeagueId && ctxLeagueId === originalLeagueId
+  const leagueRoundId = cardContext === 'league'
+    ? (keepsOriginalRound
+      ? (roundIdParam ?? draft?.league_round_id ?? ensuredRound?.round_id)
+      : ensuredRound?.round_id)
+    : undefined
+  const asLeague = cardContext === 'league' && !!leagueRoundId
   const requireImage = asLeague && leagueConfig?.require_image_upload
+  // Picking League or Club without naming one would quietly save a personal
+  // card, so the save waits for the answer.
+  const contextIncomplete =
+    (cardContext === 'league' && !ctxLeagueId) || (cardContext === 'club' && !ctxClubId)
+  // Until the draft has landed we don't know what context it is in, so a save
+  // would compare against nothing and could re-submit a card to the round it
+  // is already in.
+  const draftLoading = !!draftId && !draft
   // An image already on the draft satisfies require_image_upload — the refine
   // flow would otherwise demand the photo be picked again to submit.
   const hasImage = !!imageFile || !!draft?.card_image_url
@@ -131,9 +173,9 @@ export default function ScoreEntry() {
   // enforced server-side at graduation; counting here is what lets the form
   // say so before the user fills in 25 shots and gets refused.
   const { data: leagueCards } = useQuery({
-    queryKey: ['score-cards', 'league', leagueId],
-    queryFn: () => scoreCardApi.list(100, 0, 'league', leagueId!),
-    enabled: !!leagueId && !!leagueRoundId,
+    queryKey: ['score-cards', 'league', ctxLeagueId],
+    queryFn: () => scoreCardApi.list(100, 0, 'league', ctxLeagueId!),
+    enabled: !!ctxLeagueId && !!leagueRoundId,
   })
   const maxSubmissions = leagueConfig?.max_submissions_per_round ?? 0
   const usedSubmissions = (leagueCards?.items ?? []).filter(
@@ -284,16 +326,19 @@ export default function ScoreEntry() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // On a draft, an empty league_round_id detaches the card from its round —
-  // the way out when the round is full or the user simply wants it personal.
-  // On a new card, no round means it was never a league submission.
-  function leagueRoundField(forDraft: boolean) {
-    if (asLeague) return leagueRoundId
-    return forDraft && hasLeagueContext ? '' : undefined
-  }
+  // How the card gets from where it is to the context the user has picked:
+  // leaving a league is a PATCH detach, joining or changing one is a
+  // submit-to-league call, and the club link rides along on the PATCH.
+  const changePlan = contextChangePlan({
+    target: cardContext,
+    targetRoundId: leagueRoundId,
+    targetClubId: ctxClubId,
+    currentRoundId: draft?.league_round_id,
+    currentClubId: draft?.club_id,
+  })
 
   function buildPayload(forDraft: boolean) {
-    return {
+    const base = {
       shot_at: shotAt,
       shot_scores: shotScores,
       shot_xs: shotXs,
@@ -305,9 +350,18 @@ export default function ScoreEntry() {
       notes: notes || undefined,
       rifle_id: rifleId || undefined,
       pellet_id: pelletId || undefined,
-      league_round_id: leagueRoundField(forDraft),
       visibility,
       location_id: locationId ?? undefined,
+    }
+    if (forDraft) {
+      // PATCH semantics: omit to keep, empty string to clear.
+      return { ...base, ...changePlan.patch }
+    }
+    // A brand-new card carries its context on the INSERT instead.
+    return {
+      ...base,
+      league_round_id: asLeague ? leagueRoundId : undefined,
+      club_id: cardContext === 'club' ? ctxClubId ?? undefined : undefined,
     }
   }
 
@@ -323,6 +377,9 @@ export default function ScoreEntry() {
         // upload any newly picked photo, then graduate. Graduate re-runs
         // verification logic and league limit enforcement.
         await scoreCardApi.update(draftId, payload)
+        if (changePlan.submitRoundId) {
+          await scoreCardApi.submitToLeague(draftId, changePlan.submitRoundId)
+        }
         if (imageFile) {
           try {
             await scoreCardApi.uploadImage(draftId, imageFile)
@@ -374,7 +431,8 @@ export default function ScoreEntry() {
       // the user picks between a later round and a personal card.
       if (err instanceof ApiError && err.status === 409) {
         setRoundRefusedCard(true)
-        setSubmitToLeague(false)
+        setCardContext('personal')
+        setContextTouched(true)
         toast(
           draftId
             ? 'This round is full — your card is still saved as a draft. Save it as a personal card, or submit it to another round later.'
@@ -394,6 +452,9 @@ export default function ScoreEntry() {
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
       await scoreCardApi.update(draftId!, buildPayload(true))
+      if (changePlan.submitRoundId) {
+        await scoreCardApi.submitToLeague(draftId!, changePlan.submitRoundId)
+      }
       if (imageFile) {
         await scoreCardApi.uploadImage(draftId!, imageFile)
       }
@@ -469,61 +530,58 @@ export default function ScoreEntry() {
         </div>
       </div>
 
-      {/* League context banner */}
-      {hasLeagueContext && (
-        <div className="rounded-lg border border-[var(--brass)]/40 bg-[var(--brass)]/10 px-4 py-2.5 space-y-2.5">
-          <div className="flex items-center gap-2">
-            <Trophy size={14} className="text-[var(--brass)]" />
-            <span className="text-[11px] tracking-widest uppercase text-[var(--brass)] font-medium">League</span>
-            {league && (
-              <>
-                <span className="t-section-title">·</span>
-                <span className="text-xs text-secondary">{league.name}</span>
-              </>
-            )}
-            {/* Which round this lands in is not obvious once a league runs a
-                schedule, and it decides which submission cap applies. */}
-            {!roundIdParam && ensuredRound && (
-              <span className="ml-auto text-[10px] tracking-widest uppercase text-muted truncate">
-                {ensuredRound.season_name} · {ensuredRound.round_name}
-              </span>
-            )}
-          </div>
-          {/* A card captured against a league doesn't have to end up in it. A
-              full round, or a change of mind, keeps the card as a personal one
-              rather than stranding it. */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] tracking-widest uppercase text-muted">Save as</span>
-            {([true, false] as const).map((v) => (
-              <button
-                key={String(v)}
-                type="button"
-                onClick={() => setSubmitToLeague(v)}
-                aria-pressed={submitToLeague === v}
-                className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
-                  submitToLeague === v
-                    ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
-                    : 'border-subtle text-muted hover:text-secondary'
-                }`}
-              >
-                {v ? 'League entry' : 'Personal card'}
-              </button>
-            ))}
-          </div>
-          {roundFull && (
-            <p className="text-xs text-secondary">
-              {maxSubmissions > 0 && !roundRefusedCard
-                ? `This round is full — it takes ${maxSubmissions} card${maxSubmissions === 1 ? '' : 's'} per shooter and you've submitted ${usedSubmissions}. `
-                : 'This round is full. '}
-              {submitToLeague
-                ? draftId
-                  ? 'Save it as a personal card, or keep working on it as a draft and submit it to another round later.'
-                  : 'Save it as a personal card, or submit it to another round later.'
-                : 'This card will be saved as a personal card.'}
-            </p>
+      {/* Context — personal, league or club, changeable right up to saving */}
+      <div className="rounded-lg border border-subtle bg-surface px-4 py-3 space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Trophy size={14} className="text-[var(--brass)]" />
+          <span className="text-[11px] tracking-widest uppercase text-muted font-medium">Context</span>
+          {asLeague && league && (
+            <>
+              <span className="t-section-title">·</span>
+              <span className="text-xs text-secondary">{league.name}</span>
+            </>
+          )}
+          {/* Which round this lands in is not obvious once a league runs a
+              schedule, and it decides which submission cap applies. */}
+          {asLeague && ensuredRound && (
+            <span className="ml-auto text-[10px] tracking-widest uppercase text-muted truncate">
+              {ensuredRound.season_name} · {ensuredRound.round_name}
+            </span>
           )}
         </div>
-      )}
+        <CardContextPicker
+          context={cardContext}
+          onContextChange={(c) => {
+            setContextTouched(true)
+            setCardContext(c)
+            setRoundRefusedCard(false)
+          }}
+          leagueId={ctxLeagueId}
+          onLeagueChange={(id) => {
+            setContextTouched(true)
+            setCtxLeagueId(id)
+            setRoundRefusedCard(false)
+          }}
+          clubId={ctxClubId}
+          onClubChange={(id) => {
+            setContextTouched(true)
+            setCtxClubId(id)
+          }}
+          selectClassName={inputCls}
+        />
+        {roundFull && (
+          <p className="text-xs text-secondary">
+            {maxSubmissions > 0 && !roundRefusedCard
+              ? `This round is full — it takes ${maxSubmissions} card${maxSubmissions === 1 ? '' : 's'} per shooter and you've submitted ${usedSubmissions}. `
+              : 'This round is full. '}
+            {cardContext === 'league'
+              ? draftId
+                ? 'Switch it to Personal, or keep working on it as a draft and submit it to another round later.'
+                : 'Switch it to Personal, or submit it to another round later.'
+              : 'This card will be saved as a personal card.'}
+          </p>
+        )}
+      </div>
       {requireImage && !hasImage && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
           <span className="text-[11px] tracking-widest uppercase text-amber-600 dark:text-amber-400 font-medium">Photo required</span>
@@ -544,7 +602,7 @@ export default function ScoreEntry() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-surface-hover text-muted">
-                {asLeague ? 'League' : 'Personal'}
+                {asLeague ? 'League' : cardContext === 'club' ? 'Club' : 'Personal'}
               </span>
               {league && asLeague && (
                 <span className="text-[10px] tracking-widest uppercase text-[var(--brass)] bg-[var(--brass)]/10 px-2 py-0.5 rounded">
@@ -859,7 +917,7 @@ export default function ScoreEntry() {
       <div className="space-y-2">
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt || (!!requireImage && !hasImage)}
+          disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt || draftLoading || contextIncomplete || (!!requireImage && !hasImage)}
           className="w-full py-3 rounded font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--brass)] text-inverse hover:opacity-90"
         >
           {mutation.isPending
@@ -873,16 +931,18 @@ export default function ScoreEntry() {
           <button
             type="button"
             onClick={() => saveDraftMutation.mutate()}
-            disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt}
+            disabled={mutation.isPending || saveDraftMutation.isPending || deleteDraftMutation.isPending || !shotAt || draftLoading || contextIncomplete}
             className="w-full py-2.5 rounded border border-subtle text-secondary font-medium tracking-widest uppercase text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:border-[var(--brass)]/40 hover:text-primary"
           >
             {saveDraftMutation.isPending ? 'Saving…' : 'Keep as draft'}
           </button>
         )}
         <p className="text-center text-xs text-muted tracking-wide">
-          {selectedShot === null
-            ? 'Tap a shot cell to select it, then use the buttons to set the score'
-            : 'Use number buttons below, or arrow keys to navigate between shots'}
+          {contextIncomplete
+            ? `Pick a ${cardContext} to continue, or switch back to Personal.`
+            : selectedShot === null
+              ? 'Tap a shot cell to select it, then use the buttons to set the score'
+              : 'Use number buttons below, or arrow keys to navigate between shots'}
         </p>
       </div>
 

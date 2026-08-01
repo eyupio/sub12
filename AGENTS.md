@@ -202,7 +202,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 
 ### Protected (requires `Authorization: Bearer <jwt>`)
 
-- **Score cards:** CRUD + image upload + comments (write). `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in — moving a card between rounds stays with `submit-to-league`.
+- **Score cards:** CRUD + image upload + comments (write). `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in, and `club_id` follows the same convention — joining or moving between rounds stays with `submit-to-league` (see "A card's context is never final").
 - **Rifles:** CRUD + image upload + showcase (`GET /rifles/{id}/showcase`)
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
@@ -226,6 +226,33 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List (private clubs included), get, update, delete, members management
+
+### A card's context is never final
+
+A score card is a personal card, a league entry or a club card, and the answer
+given at quick capture must stay changeable — a card captured against the wrong
+league, or one whose round filled up, is moved rather than re-shot. The same
+`CardContextPicker` therefore appears in quick capture, the refine form
+(`ScoreEntry`) and the card's own edit mode (`ScoreCardDetail`).
+
+- **Leaving** a league is a `PATCH` with `league_round_id: ""`; leaving a club
+  is `club_id: ""`. Both follow the "omit to keep, empty string to clear"
+  convention.
+- **Joining or moving** is always `POST /score-cards/{id}/submit-to-league`,
+  which is where league membership, the per-round submission cap and the
+  league's image rule are enforced. `PATCH` refuses a round the card is not
+  already in so those checks can't be bypassed. Submitting to the round the
+  card already sits in is a no-op, not an error.
+- A **draft** can be pointed at a round: that is how the refine flow moves a
+  quick-capture card into a league. The cap and image rules are graduation's
+  job, so a full round never refuses a draft — it just can't graduate there.
+- A card that **moves between rounds** arrives with no history: the previous
+  league's confirmations, community-review request and `score_card_actions`
+  audit trail are cleared in the same transaction, and verification restarts.
+- **Locked** cards (verified or rejected under `lock_edits_after_verification`)
+  refuse both the detach and the move, the same as any other edit.
+- `frontend/src/utils/cardContext.ts` (`contextChangePlan`) is the single place
+  that decides what to send; both call sites just render its plan.
 
 ### Naming a picked location
 

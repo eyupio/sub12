@@ -541,15 +541,24 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 
 	// $21 carries the request's intent (NULL = keep, '' = detach) and $22 the
 	// round to move to, kept in a separate parameter so the uuid cast is never
-	// applied to the empty string.
+	// applied to the empty string. $23/$24 do the same for the club.
 	const newRoundExpr = `CASE
 			WHEN $21::text IS NULL THEN score_cards.league_round_id
 			WHEN $21::text = ''    THEN NULL
 			ELSE $22::uuid
 		END`
+	const newClubExpr = `CASE
+			WHEN $23::text IS NULL THEN score_cards.club_id
+			WHEN $23::text = ''    THEN NULL
+			ELSE $24::uuid
+		END`
 	var newRound *string
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" {
 		newRound = input.LeagueRoundID
+	}
+	var newClub *string
+	if input.ClubID != nil && *input.ClubID != "" {
+		newClub = input.ClubID
 	}
 
 	err = tx.QueryRow(ctx, `
@@ -573,6 +582,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			location_id  = $19,
 			card_image_rotation = COALESCE($20, card_image_rotation),
 			league_round_id = `+newRoundExpr+`,
+			club_id = `+newClubExpr+`,
 			verification = CASE
 				WHEN `+newRoundExpr+` IS NOT NULL OR event_participant_id IS NOT NULL
 					THEN 'pending'::verification_status
@@ -594,7 +604,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount, input.Visibility, input.LocationID, input.CardImageRotation,
-		input.LeagueRoundID, newRound,
+		input.LeagueRoundID, newRound, input.ClubID, newClub,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
@@ -772,7 +782,7 @@ func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID
 			league_round_id = $3,
 			verification    = 'pending'::verification_status,
 			updated_at      = NOW()
-		WHERE id = $1 AND user_id = $2 AND is_draft = FALSE AND league_round_id IS NULL AND event_participant_id IS NULL
+		WHERE id = $1 AND user_id = $2 AND event_participant_id IS NULL
 		RETURNING
 			id, user_id, rifle_id, pellet_id,
 			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
@@ -802,6 +812,12 @@ func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM community_review_requests WHERE score_card_id = $1`, cardID); err != nil {
 		return nil, fmt.Errorf("clear community review request on league submit: %w", err)
+	}
+	// A card that moves to another round arrives with no history there: the
+	// old league's verify/amend/reject trail describes a submission that no
+	// longer exists, and its moderators are no longer the ones ruling on it.
+	if _, err := tx.Exec(ctx, `DELETE FROM score_card_actions WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear audit trail on league submit: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

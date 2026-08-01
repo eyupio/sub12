@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ban, Camera, CheckCircle2, ChevronLeft, Crosshair, Loader2, Plus, Target, Upload, X } from 'lucide-react'
 import { gearApi, type CreatePelletPayload, type CreateRiflePayload } from '../api/gear'
 import { leagueApi } from '../api/leagues'
-import { clubsApi } from '../api/clubs'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
 import { CatalogSearch } from '../components/CatalogSearch'
@@ -12,6 +11,8 @@ import { ChipSelector } from '../components/ChipSelector'
 import { ImageEditor } from '../components/ImageEditor'
 import { type LocationValue } from '../components/LocationField'
 import { PlaceSelector } from '../components/PlaceSelector'
+import { CardContextPicker } from '../components/CardContextPicker'
+import { type CardContext } from '../utils/cardContext'
 import { RIFLE_CATALOG, type RifleCatalogEntry } from '../catalog/rifleCatalog'
 import { PELLET_CATALOG, type PelletCatalogEntry } from '../catalog/pelletCatalog'
 import { rifleImage, pelletImage, UNKNOWN_BRAND_IMAGE } from '../catalog/brandImages'
@@ -20,7 +21,7 @@ import { useSmartBack } from '../hooks/useSmartBack'
 import { captureImageOrClick } from '../utils/imagePicker'
 
 type CaptureType = 'score' | 'pellet'
-type Context = 'personal' | 'league' | 'club'
+type Context = CardContext
 
 const WIND_CHIPS = [
   { value: 0, label: 'Calm', hint: '0 mph' },
@@ -248,17 +249,6 @@ export default function QuickCapture() {
 
   const { data: rifleData } = useQuery({ queryKey: ['rifles'], queryFn: () => gearApi.listRifles() })
   const { data: pelletData } = useQuery({ queryKey: ['pellets'], queryFn: () => gearApi.listPellets() })
-  const { data: myLeagues } = useQuery({
-    queryKey: ['my-leagues'],
-    queryFn: () => leagueApi.listMine(),
-    enabled: type === 'score' && context === 'league',
-  })
-  const { data: myClubs } = useQuery({
-    queryKey: ['my-clubs'],
-    queryFn: () => clubsApi.listMine(),
-    enabled: type === 'score' && context === 'club',
-  })
-
   const rifles = rifleData?.items ?? []
   const pellets = pelletData?.items ?? []
 
@@ -611,56 +601,20 @@ export default function QuickCapture() {
             />
           </div>
 
-          {/* Context (score only) */}
+          {/* Context (score only) — the same picker the refine form and the
+              card's own edit mode use, so the answer given here is never final */}
           {type === 'score' && (
             <div className="rounded-lg border border-subtle bg-surface p-4 space-y-2.5">
               <p className={`${sidebarLabelCls} border-b border-subtle pb-2`}>Context</p>
-              <ChipSelector<Context>
-                ariaLabel="Context"
-                value={context}
-                allowClear={false}
-                onChange={(v) => {
-                  if (!v) return
-                  setContext(v)
-                  if (v === 'personal') {
-                    setLeagueId(null)
-                    setClubId(null)
-                  }
-                }}
-                options={[
-                  { value: 'personal', label: 'Personal' },
-                  { value: 'league', label: 'League' },
-                  { value: 'club', label: 'Club' },
-                ]}
+              <CardContextPicker
+                context={context}
+                onContextChange={setContext}
+                leagueId={leagueId}
+                onLeagueChange={setLeagueId}
+                clubId={clubId}
+                onClubChange={setClubId}
+                selectClassName={inputCls}
               />
-              {context === 'league' && myLeagues && (
-                <div className="pt-1">
-                  <select
-                    value={leagueId ?? ''}
-                    onChange={e => setLeagueId(e.target.value || null)}
-                    className={inputCls}
-                  >
-                    <option value="">Select league…</option>
-                    {myLeagues.items.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {context === 'club' && myClubs && (
-                <div className="pt-1">
-                  <select
-                    value={clubId ?? ''}
-                    onChange={e => setClubId(e.target.value || null)}
-                    className={inputCls}
-                  >
-                    <option value="">Select club…</option>
-                    {myClubs.items.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
           )}
 

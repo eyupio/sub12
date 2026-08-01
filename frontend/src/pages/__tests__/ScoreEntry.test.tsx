@@ -117,6 +117,7 @@ describe('ScoreEntry refining a draft on a full league round', () => {
     vi.spyOn(scoreCardApi, 'get').mockResolvedValue(draftCard())
     vi.spyOn(scoreCardApi, 'update').mockResolvedValue(draftCard())
     vi.spyOn(scoreCardApi, 'graduate').mockResolvedValue(makeCard({ id: 'draft-1' }))
+    vi.spyOn(scoreCardApi, 'submitToLeague').mockResolvedValue(draftCard())
     vi.spyOn(leagueApi, 'get').mockResolvedValue({
       id: 'league-1', name: 'Test League', type: 'public', post_visibility: 'members',
       created_by: 'user-1', member_count: 2, date_format: 'DD/MM/YYYY', time_format: '24h',
@@ -146,8 +147,10 @@ describe('ScoreEntry refining a draft on a full league round', () => {
 
     expect(await screen.findByText(/this round is full/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /personal card/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /save card/i }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Personal' }))
+    const save = await screen.findByRole('button', { name: /save card/i })
+    await waitFor(() => expect(save).toBeEnabled())
+    fireEvent.click(save)
 
     await waitFor(() => expect(scoreCardApi.update).toHaveBeenCalled())
     // The empty round detaches the draft, so graduating it no longer runs
@@ -159,7 +162,9 @@ describe('ScoreEntry refining a draft on a full league round', () => {
   it('keeps the card as a draft without graduating it', async () => {
     renderRefine()
 
-    fireEvent.click(await screen.findByRole('button', { name: /keep as draft/i }))
+    const keep = await screen.findByRole('button', { name: /keep as draft/i })
+    await waitFor(() => expect(keep).toBeEnabled())
+    fireEvent.click(keep)
 
     await waitFor(() => expect(scoreCardApi.update).toHaveBeenCalled())
     expect(scoreCardApi.graduate).not.toHaveBeenCalled()
@@ -174,7 +179,9 @@ describe('ScoreEntry refining a draft on a full league round', () => {
     )
     renderRefine()
 
-    fireEvent.click(await screen.findByRole('button', { name: /submit score/i }))
+    const submit = await screen.findByRole('button', { name: /submit score/i })
+    await waitFor(() => expect(submit).toBeEnabled())
+    fireEvent.click(submit)
 
     await waitFor(() => expect(scoreCardApi.graduate).toHaveBeenCalled())
     // The refinement is already persisted, so the user stays put with the
@@ -182,5 +189,82 @@ describe('ScoreEntry refining a draft on a full league round', () => {
     expect(navigateMock).not.toHaveBeenCalled()
     expect(await screen.findByText(/this round is full/i)).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /save card/i })).toBeInTheDocument()
+  })
+})
+
+// The context picked at quick capture is not final: a personal draft can be
+// moved into a league while refining it, and a league draft can be moved out.
+describe('ScoreEntry changing a draft\'s context', () => {
+  const personalDraft = () => makeCard({ id: 'draft-1', is_draft: true, verification: 'pending' })
+
+  beforeEach(() => {
+    searchParams.current = { draftId: 'draft-1' }
+    navigateMock.mockReset()
+    vi.spyOn(gearApi, 'listRifles').mockResolvedValue({ items: [] })
+    vi.spyOn(gearApi, 'listPellets').mockResolvedValue({ items: [] })
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [] })
+    vi.spyOn(scoreCardApi, 'get').mockResolvedValue(personalDraft())
+    vi.spyOn(scoreCardApi, 'update').mockResolvedValue(personalDraft())
+    vi.spyOn(scoreCardApi, 'graduate').mockResolvedValue(makeCard({ id: 'draft-1' }))
+    vi.spyOn(scoreCardApi, 'submitToLeague').mockResolvedValue(personalDraft())
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'listMine').mockResolvedValue({
+      items: [{ id: 'league-1', name: 'Test League', type: 'public', member_count: 2, role: 'member' }],
+    } as Awaited<ReturnType<typeof leagueApi.listMine>>)
+    vi.spyOn(leagueApi, 'get').mockResolvedValue({
+      id: 'league-1', name: 'Test League', type: 'public', post_visibility: 'members',
+      created_by: 'user-1', member_count: 2, date_format: 'DD/MM/YYYY', time_format: '24h',
+      timezone: 'Europe/London', created_at: '2026-01-01T00:00:00Z',
+    })
+    vi.spyOn(leagueApi, 'ensureDefaultRound').mockResolvedValue({
+      round_id: 'round-9', round_name: 'R1', season_name: 'S1',
+    })
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue({
+      league_id: 'league-1', max_submissions_per_round: 0, scoring_rule: 'highest',
+      join_policy: 'open', require_score_verification: false, required_confirmations: 0,
+      require_image_upload: false, lock_edits_after_verification: false,
+      updated_at: '2026-01-01T00:00:00Z',
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('submits a personal draft to the league picked while refining', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ScoreEntry />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'League' }))
+    // The league list loads only once League is picked, so the option has to
+    // exist before the select can take its value.
+    await screen.findByRole('option', { name: 'Test League' })
+    fireEvent.change(screen.getByLabelText('League'), { target: { value: 'league-1' } })
+
+    const submit = await screen.findByRole('button', { name: /submit score/i })
+    await waitFor(() => expect(submit).toBeEnabled())
+    fireEvent.click(submit)
+
+    await waitFor(() => expect(scoreCardApi.submitToLeague).toHaveBeenCalledWith('draft-1', 'round-9'))
+    // Attaching is submit-to-league's job — the PATCH must not try to do it.
+    expect(vi.mocked(scoreCardApi.update).mock.calls[0][1].league_round_id).toBeUndefined()
+    await waitFor(() => expect(scoreCardApi.graduate).toHaveBeenCalledWith('draft-1'))
+  })
+
+  it('blocks the save until the picked context names a league', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ScoreEntry />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'League' }))
+
+    const save = await screen.findByRole('button', { name: /save card/i })
+    await waitFor(() => expect(save).toBeDisabled())
+    expect(screen.getByText(/pick a league to continue/i)).toBeInTheDocument()
   })
 })
