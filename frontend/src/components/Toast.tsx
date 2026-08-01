@@ -34,8 +34,14 @@ export function ToastContainer() {
   if (toasts.length === 0) return null
 
   return (
+    // Toasts are the app's only channel for the outcome of an action, and
+    // plenty of those actions are started from inside a dialog (submitting a
+    // card to a league, flagging a post). At a layer below the dialogs they
+    // landed behind the backdrop, blurred and unreadable, so the failure looked
+    // like nothing happening. This has to stay above every overlay in the app —
+    // see the layer stack in CLAUDE.md; Toast.test.tsx pins it.
     <div
-      className="fixed top-4 right-4 left-4 sm:left-auto sm:w-[22rem] z-[100] space-y-2 pointer-events-none"
+      className="fixed top-4 right-4 left-4 sm:left-auto sm:w-[22rem] z-[150] space-y-2 pointer-events-none"
       aria-live="polite"
     >
       {toasts.map((t) => {
