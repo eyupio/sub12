@@ -1158,7 +1158,7 @@ function ReviewRequestPost({ post }: { post: FeedPost }) {
     },
   })
 
-  return (
+  const preview = (
     <div className="score-grid">
       {post.cardImageUrl ? (
         <img
@@ -1176,24 +1176,40 @@ function ReviewRequestPost({ post }: { post: FeedPost }) {
           {post.x != null && <span className="x">{post.x}<small>X</small></span>}
         </div>
         <div className="score-meta">
-          <span><Sparkles size={11} />Asked for community review · needs {required} confirmations</span>
+          <span className="review-status">
+            <Sparkles size={11} />Asked for community review · needs {required} confirmations
+          </span>
         </div>
-        {!isOwner && targetId && (
-          <button
-            onClick={() => confirmMutation.mutate()}
-            disabled={confirmMutation.isPending}
-            style={{ marginTop: 8, alignSelf: 'flex-start', padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-hover)', cursor: 'pointer' }}
-          >
-            {confirmMutation.isPending ? 'Confirming…' : 'Confirm this card'}
-          </button>
-        )}
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {targetId ? (
+        <Link to="/scores/$id/review" params={{ id: targetId }} className="review-link">
+          {preview}
+        </Link>
+      ) : (
+        preview
+      )}
+      {!isOwner && targetId && (
+        <button
+          type="button"
+          className="review-cta"
+          onClick={() => confirmMutation.mutate()}
+          disabled={confirmMutation.isPending}
+        >
+          {confirmMutation.isPending ? 'Confirming…' : 'Confirm this card'}
+        </button>
+      )}
+    </>
   )
 }
 
 function ReviewVerifiedPost({ post }: { post: FeedPost }) {
-  return (
+  const targetId = post.activity.target_id
+  const preview = (
     <div className="score-grid">
       {post.cardImageUrl ? (
         <img
@@ -1211,10 +1227,17 @@ function ReviewVerifiedPost({ post }: { post: FeedPost }) {
           {post.x != null && <span className="x">{post.x}<small>X</small></span>}
         </div>
         <div className="score-meta">
-          <span><Award size={11} />Verified by the community</span>
+          <span className="review-status"><Award size={11} />Verified by the community</span>
         </div>
       </div>
     </div>
+  )
+
+  if (!targetId) return preview
+  return (
+    <Link to="/scores/$id/review" params={{ id: targetId }} className="review-link">
+      {preview}
+    </Link>
   )
 }
 

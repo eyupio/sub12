@@ -746,6 +746,39 @@
   color: var(--gold);
 }
 
+/* Review posts open the card's community review page — the whole preview is
+   the target, so the confirm button sits outside the link. */
+.review-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.review-link:hover .review-status {
+  color: var(--gold);
+}
+
+.review-cta {
+  margin-top: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.review-cta:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.review-cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .standings-block {
   display: flex;
   align-items: center;

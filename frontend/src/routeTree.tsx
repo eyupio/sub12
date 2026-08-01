@@ -21,6 +21,7 @@ const LazyScoreEntry = lazy(() => import('./pages/ScoreEntry'))
 const LazyScoreHistory = lazy(() => import('./pages/ScoreHistory'))
 const LazyScoreCompare = lazy(() => import('./pages/ScoreCompare'))
 const LazyScoreCardDetail = lazy(() => import('./pages/ScoreCardDetail'))
+const LazyCommunityReview = lazy(() => import('./pages/CommunityReview'))
 const LazyScoreTrends = lazy(() => import('./pages/ScoreTrends'))
 const LazyGear = lazy(() => import('./pages/Gear'))
 const LazyRifleShowcase = lazy(() => import('./pages/GearShowcase').then(m => ({ default: m.RifleShowcase })))
@@ -197,6 +198,12 @@ const scoreCardDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/$id',
   component: lz(LazyScoreCardDetail),
+})
+
+const communityReviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/scores/$id/review',
+  component: lz(LazyCommunityReview),
 })
 
 const gearRoute = createRoute({
@@ -694,6 +701,7 @@ export const routeTree = rootRoute.addChildren([
     quickCaptureRoute,
     draftsRoute,
     scoreCardDetailRoute,
+    communityReviewRoute,
     scoreTrendsRoute,
     pelletTestingRoute,
     newPelletTestRoute,
