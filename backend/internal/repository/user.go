@@ -15,6 +15,11 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrConflict = errors.New("already exists")
 
+// ErrCardRejected and ErrCardDraft signal score-card verification state
+// preconditions (an admin action attempted on a rejected or draft card).
+var ErrCardRejected = errors.New("score card is rejected")
+var ErrCardDraft = errors.New("score card is a draft")
+
 type UserRepository struct {
 	db *pgxpool.Pool
 }

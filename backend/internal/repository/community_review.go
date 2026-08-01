@@ -62,24 +62,32 @@ func (r *CommunityReviewRepository) GetByScoreCard(ctx context.Context, scoreCar
 	return &req, nil
 }
 
-// MarkVerified flips the request status to 'verified'. Idempotent.
-func (r *CommunityReviewRepository) MarkVerified(ctx context.Context, scoreCardID string) error {
-	_, err := r.db.Exec(ctx, `
+// MarkVerified flips the request status to 'verified'. Reports whether this
+// call performed the transition, so exactly one of two racing confirmations
+// emits the verified activity and notification.
+func (r *CommunityReviewRepository) MarkVerified(ctx context.Context, scoreCardID string) (bool, error) {
+	tag, err := r.db.Exec(ctx, `
 		UPDATE community_review_requests
 		SET status = 'verified', resolved_at = NOW()
 		WHERE score_card_id = $1 AND status = 'open'
 	`, scoreCardID)
 	if err != nil {
-		return fmt.Errorf("mark community review verified: %w", err)
+		return false, fmt.Errorf("mark community review verified: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
-// Cancel removes the request row. Confirmations on score_confirmations are kept
-// (they're harmless without an open request) but the row goes away so the owner
-// can reopen later if desired.
+// Cancel removes the request row together with the confirmations gathered
+// under it — otherwise a cancel-and-re-request would inherit the old count and
+// reach the threshold early.
 func (r *CommunityReviewRepository) Cancel(ctx context.Context, scoreCardID string) error {
-	tag, err := r.db.Exec(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
 		DELETE FROM community_review_requests
 		WHERE score_card_id = $1 AND status = 'open'
 	`, scoreCardID)
@@ -89,7 +97,12 @@ func (r *CommunityReviewRepository) Cancel(ctx context.Context, scoreCardID stri
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
 	}
-	return nil
+
+	if _, err := tx.Exec(ctx, `DELETE FROM score_confirmations WHERE score_card_id = $1`, scoreCardID); err != nil {
+		return fmt.Errorf("clear confirmations on cancel: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 // CountConfirmationsByUser counts confirmations a user has given on score

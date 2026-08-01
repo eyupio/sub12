@@ -36,16 +36,52 @@ var (
 	ErrVerificationDisabled = errors.New("this league does not use peer verification")
 	ErrScoreRejected        = errors.New("this score has been rejected by an admin")
 	ErrScoreNotRejected     = errors.New("only a rejected score can be reopened")
+	ErrScoreNotPending      = errors.New("only a pending score can be verified")
+	ErrScoreIsDraft         = errors.New("draft cards cannot be actioned")
+	ErrInvalidScoreFilter   = errors.New("verification filter must be pending, verified, or rejected")
 )
 
 type LeagueService struct {
-	leagues  *repository.LeagueRepository
-	clubs    *repository.ClubRepository
-	activity *ActivityService // nil disables feed ingestion
+	leagues       *repository.LeagueRepository
+	clubs         *repository.ClubRepository
+	activity      *ActivityService     // nil disables feed ingestion
+	notifications *NotificationService // nil disables notification fan-out
 }
 
 func NewLeagueService(leagues *repository.LeagueRepository, clubs *repository.ClubRepository, activity *ActivityService) *LeagueService {
 	return &LeagueService{leagues: leagues, clubs: clubs, activity: activity}
+}
+
+// SetNotifications wires notification fan-out for verification outcomes.
+// Optional — nil disables it.
+func (s *LeagueService) SetNotifications(n *NotificationService) {
+	s.notifications = n
+}
+
+// notifyScoreOutcome tells the card owner about a verification outcome
+// (verified / rejected / amended). Best-effort; Fanout never returns errors.
+func (s *LeagueService) notifyScoreOutcome(ctx context.Context, scoreCardID, actorID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	ownerID, _, err := s.leagues.GetScoreCardOwner(ctx, scoreCardID)
+	if err != nil {
+		return
+	}
+	var leagueID *string
+	if league, err := s.leagues.GetLeagueByScoreCardID(ctx, scoreCardID); err == nil {
+		leagueID = &league.ID
+	}
+	tid, tt := scoreCardID, "score_card"
+	s.notifications.Fanout(ctx, NotifEvent{
+		RecipientID: ownerID,
+		ActorID:     actorID,
+		Type:        notifType,
+		TargetID:    &tid,
+		TargetType:  &tt,
+		LeagueID:    leagueID,
+		Metadata:    metadata,
+	})
 }
 
 func (s *LeagueService) requireAdmin(ctx context.Context, leagueID, userID string) error {
@@ -397,7 +433,22 @@ func (s *LeagueService) UpdateConfig(ctx context.Context, leagueID, userID strin
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
 	}
-	return cfg, err
+	if err != nil {
+		return nil, err
+	}
+
+	// A league running without verification must not strand cards in
+	// 'pending' — nothing else could ever flip them, and the standings only
+	// count verified cards. Release any backlog whenever the config lands in
+	// (or stays in) the verification-off state.
+	if !cfg.RequireScoreVerification {
+		if n, relErr := s.leagues.VerifyPendingForLeague(ctx, leagueID); relErr != nil {
+			log.Warn().Err(relErr).Str("league_id", leagueID).Msg("league: release pending cards after config change failed")
+		} else if n > 0 {
+			log.Info().Int64("cards", n).Str("league_id", leagueID).Msg("league: auto-verified pending cards after verification disabled")
+		}
+	}
+	return cfg, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -461,6 +512,16 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 			return nil, fmt.Errorf("%w: closes_at must be on or after opens_at", ErrInvalidRound)
 		}
 	}
+	// The admin check above is scoped to the path league; make sure the season
+	// actually belongs to it, or an admin of any league could attach rounds to
+	// another league's season.
+	belongs, err := s.leagues.SeasonBelongsToLeague(ctx, seasonID, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	if !belongs {
+		return nil, fmt.Errorf("%w: season does not belong to this league", ErrInvalidSeason)
+	}
 	round, err := s.leagues.CreateRound(ctx, seasonID, input)
 	if err != nil {
 		return nil, err
@@ -510,19 +571,38 @@ func (s *LeagueService) EnsureDefaultRound(ctx context.Context, leagueID, userID
 
 // ListScores returns score cards submitted to a league, newest first.
 // When verification is non-empty, results are filtered by that status.
-func (s *LeagueService) ListScores(ctx context.Context, leagueID string, limit, offset int, verification string) ([]*model.LeagueScore, error) {
+// Non-members only see verified cards — the moderation queue (pending and
+// rejected submissions) is league business, not a public surface.
+func (s *LeagueService) ListScores(ctx context.Context, leagueID, viewerID string, limit, offset int, verification string) ([]*model.LeagueScore, error) {
+	switch verification {
+	case "", "pending", "verified", "rejected":
+	default:
+		return nil, ErrInvalidScoreFilter
+	}
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	member := false
+	if viewerID != "" {
+		member, err = s.leagues.IsMember(ctx, leagueID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !member {
+		verification = "verified"
 	}
 	return s.leagues.ListScores(ctx, leagueID, limit, offset, verification)
 }
 
 // CountScores returns the per-verification-status tally of submitted cards.
-func (s *LeagueService) CountScores(ctx context.Context, leagueID string) (*model.LeagueScoreCounts, error) {
+// Non-members only learn the verified count; pending/rejected tallies are
+// zeroed for them.
+func (s *LeagueService) CountScores(ctx context.Context, leagueID, viewerID string) (*model.LeagueScoreCounts, error) {
 	_, err := s.leagues.GetByID(ctx, leagueID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrLeagueNotFound
@@ -530,7 +610,23 @@ func (s *LeagueService) CountScores(ctx context.Context, leagueID string) (*mode
 	if err != nil {
 		return nil, err
 	}
-	return s.leagues.CountScores(ctx, leagueID)
+	counts, err := s.leagues.CountScores(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	member := false
+	if viewerID != "" {
+		member, err = s.leagues.IsMember(ctx, leagueID, viewerID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !member {
+		counts.All = counts.Verified
+		counts.Pending = 0
+		counts.Rejected = 0
+	}
+	return counts, nil
 }
 
 // GetLeagueForScoreCard resolves the league that a score card belongs to.
@@ -693,20 +789,57 @@ func (s *LeagueService) ConfirmScore(ctx context.Context, scoreCardID, userID st
 	// Check if confirmation threshold is met. The confirmation row is already
 	// persisted; surface lookup failures so the caller knows auto-verification
 	// did not run (a retry is safe — the unique constraint dedupes).
-	if cfg.RequiredConfirmations > 0 {
-		count, err := s.leagues.GetConfirmationCount(ctx, scoreCardID)
+	// A configured threshold of 0 counts as 1: verification is enabled, so a
+	// single confirmation must be able to verify — otherwise confirmations
+	// accumulate forever with no path to the standings.
+	required := int(cfg.RequiredConfirmations)
+	if required < 1 {
+		required = 1
+	}
+	count, err := s.leagues.GetConfirmationCount(ctx, scoreCardID)
+	if err != nil {
+		return err
+	}
+	if count >= required {
+		// Guarded so a rejection landing between the read above and this
+		// write is not overwritten.
+		verified, err := s.leagues.VerifyIfPending(ctx, scoreCardID)
 		if err != nil {
 			return err
 		}
-		if count >= int(cfg.RequiredConfirmations) {
-			// Guarded so a rejection landing between the read above and this
-			// write is not overwritten.
-			if _, err := s.leagues.VerifyIfPending(ctx, scoreCardID); err != nil {
-				return err
-			}
+		if verified {
+			s.notifyScoreOutcome(ctx, scoreCardID, userID, model.NotificationTypeScoreVerified, nil)
 		}
 	}
 
+	return nil
+}
+
+// VerifyScore lets a league admin explicitly verify a pending card without
+// having to route through an amend. Records a 'verify' audit action.
+func (s *LeagueService) VerifyScore(ctx context.Context, scoreCardID, adminID string, input *model.VerifyScoreInput) error {
+	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrLeagueNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return ErrNotAdmin
+	}
+	var reason *string
+	if input != nil {
+		reason = input.Reason
+	}
+	err = s.leagues.VerifyScore(ctx, scoreCardID, adminID, reason)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrScoreNotPending
+	}
+	if err != nil {
+		return err
+	}
+	s.notifyScoreOutcome(ctx, scoreCardID, adminID, model.NotificationTypeScoreVerified, nil)
 	return nil
 }
 
@@ -737,7 +870,7 @@ func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID str
 		return fmt.Errorf("%w: new_x_count must be 0-25", ErrInvalidAmend)
 	}
 
-	isAdmin, leagueID, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
+	isAdmin, _, err := s.leagues.IsAdminForScoreCard(ctx, scoreCardID, adminID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrLeagueNotFound
 	}
@@ -747,8 +880,21 @@ func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID str
 	if !isAdmin {
 		return ErrNotAdmin
 	}
-	_ = leagueID // league resolved internally
-	return s.leagues.AmendScore(ctx, scoreCardID, adminID, input)
+	err = s.leagues.AmendScore(ctx, scoreCardID, adminID, input)
+	if errors.Is(err, repository.ErrCardRejected) {
+		return ErrScoreRejected
+	}
+	if errors.Is(err, repository.ErrCardDraft) {
+		return ErrScoreIsDraft
+	}
+	if err != nil {
+		return err
+	}
+	s.notifyScoreOutcome(ctx, scoreCardID, adminID, model.NotificationTypeScoreAmended, map[string]any{
+		"new_total_score": input.NewTotalScore,
+		"new_x_count":     input.NewXCount,
+	})
+	return nil
 }
 
 func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID string, input *model.RejectScoreInput) error {
@@ -762,10 +908,24 @@ func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID st
 	if !isAdmin {
 		return ErrNotAdmin
 	}
+	input.Reason = strings.TrimSpace(input.Reason)
 	if input.Reason == "" {
 		return ErrReasonRequired
 	}
-	return s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
+	err = s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
+	if errors.Is(err, repository.ErrCardRejected) {
+		return ErrScoreRejected
+	}
+	if errors.Is(err, repository.ErrCardDraft) {
+		return ErrScoreIsDraft
+	}
+	if err != nil {
+		return err
+	}
+	s.notifyScoreOutcome(ctx, scoreCardID, adminID, model.NotificationTypeScoreRejected, map[string]any{
+		"reason": input.Reason,
+	})
+	return nil
 }
 
 func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID, userID string) ([]*model.ScoreConfirmation, []*model.ScoreCardAction, error) {
@@ -781,7 +941,12 @@ func (s *LeagueService) GetScoreAuditTrail(ctx context.Context, scoreCardID, use
 		return nil, nil, err
 	}
 	if !isMember {
-		return nil, nil, ErrNotMember
+		// The card's owner can always read why their own card was actioned,
+		// even after leaving (or being removed from) the league.
+		ownerID, _, ownerErr := s.leagues.GetScoreCardOwner(ctx, scoreCardID)
+		if ownerErr != nil || ownerID != userID {
+			return nil, nil, ErrNotMember
+		}
 	}
 
 	confs, err := s.leagues.ListConfirmations(ctx, scoreCardID)

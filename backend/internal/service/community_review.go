@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
@@ -13,17 +15,20 @@ const defaultRequiredConfirmations int16 = 3
 
 var (
 	ErrCardIsLeague          = errors.New("league cards use league verification")
+	ErrCardIsDraft           = errors.New("draft cards cannot be reviewed")
+	ErrCardIsPrivate         = errors.New("private cards cannot be reviewed")
 	ErrCardAlreadyVerified   = errors.New("card already verified")
 	ErrReviewRequestExists   = errors.New("review request already open")
 	ErrReviewRequestNotFound = errors.New("review request not found")
 	ErrNotCardOwner          = errors.New("not the card owner")
+	ErrCardNotVisible        = errors.New("score card not visible")
 )
 
 // CommunityReviewRepo is the persistence interface for community review request rows.
 type CommunityReviewRepo interface {
 	Create(ctx context.Context, scoreCardID, requestedBy string, requiredConfirmations int16) (*model.CommunityReviewRequest, error)
 	GetByScoreCard(ctx context.Context, scoreCardID string) (*model.CommunityReviewRequest, error)
-	MarkVerified(ctx context.Context, scoreCardID string) error
+	MarkVerified(ctx context.Context, scoreCardID string) (bool, error)
 	Cancel(ctx context.Context, scoreCardID string) error
 }
 
@@ -41,14 +46,17 @@ type ScoreConfirmationRepo interface {
 // review flow needs to enforce its rules and populate feed metadata.
 type ScoreCardLookupRepo interface {
 	GetByID(ctx context.Context, id, userID string) (*model.ScoreCard, error)
+	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
 }
 
 type CommunityReviewService struct {
-	requests    CommunityReviewRepo
-	cards       ScoreCardLookupRepo
-	confirms    ScoreConfirmationRepo
-	activity    *ActivityService
-	achievement *AchievementService
+	requests      CommunityReviewRepo
+	cards         ScoreCardLookupRepo
+	confirms      ScoreConfirmationRepo
+	activity      *ActivityService
+	achievement   *AchievementService
+	notifications *NotificationService // nil disables notification fan-out
+	log           zerolog.Logger
 }
 
 func NewCommunityReviewService(
@@ -67,7 +75,32 @@ func NewCommunityReviewService(
 	}
 }
 
-// RequestReview opens a community review on a personal practice card.
+// SetNotifications wires notification fan-out. Optional — nil disables it.
+func (s *CommunityReviewService) SetNotifications(n *NotificationService) {
+	s.notifications = n
+}
+
+// SetLogger wires the logger used by background goroutines for panic recovery.
+func (s *CommunityReviewService) SetLogger(log zerolog.Logger) {
+	s.log = log
+}
+
+// safeGo runs fn in a goroutine, recovering panics so a failure in async
+// activity/achievement ingestion cannot crash the API process.
+func (s *CommunityReviewService) safeGo(name string, fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Error().Interface("panic", r).Str("task", name).Msg("community_review: background task panicked")
+			}
+		}()
+		fn()
+	}()
+}
+
+// RequestReview opens a community review on a personal practice card. Drafts
+// and private cards are refused: the request is broadcast to the feed, so the
+// card must be something other users are allowed to see.
 func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID, ownerID string) (*model.CommunityReviewRequest, error) {
 	card, err := s.cards.GetByID(ctx, scoreCardID, ownerID)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -78,6 +111,12 @@ func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID,
 	}
 	if card.LeagueRoundID != nil {
 		return nil, ErrCardIsLeague
+	}
+	if card.IsDraft {
+		return nil, ErrCardIsDraft
+	}
+	if card.Visibility == "private" {
+		return nil, ErrCardIsPrivate
 	}
 
 	req, err := s.requests.Create(ctx, scoreCardID, ownerID, defaultRequiredConfirmations)
@@ -96,12 +135,17 @@ func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID,
 			RequiredConfirmations: req.RequiredConfirmations,
 			CardImageURL:          card.CardImageURL,
 		}
-		go s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewRequested, &scoreCardID, &tt, meta, nil, nil, "public")
+		visibility := card.Visibility
+		s.safeGo("activity.Ingest(review_requested)", func() {
+			s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewRequested, &scoreCardID, &tt, meta, nil, nil, visibility)
+		})
 	}
 	return req, nil
 }
 
-// CancelReview removes an open community review request. Owner-only.
+// CancelReview removes an open community review request. Owner-only. The
+// confirmations gathered under the request and the feed post advertising it
+// are removed with it.
 func (s *CommunityReviewService) CancelReview(ctx context.Context, scoreCardID, ownerID string) error {
 	req, err := s.requests.GetByScoreCard(ctx, scoreCardID)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -119,13 +163,19 @@ func (s *CommunityReviewService) CancelReview(ctx context.Context, scoreCardID, 
 	if err := s.requests.Cancel(ctx, scoreCardID); err != nil {
 		return err
 	}
+	if s.activity != nil {
+		s.safeGo("activity.RemoveReviewRequest(cancel)", func() {
+			s.activity.RemoveReviewRequestFromFeed(context.Background(), scoreCardID)
+		})
+	}
 	return nil
 }
 
 // ConfirmCard records a confirmation from a non-owner reviewer. If the
-// configured threshold is reached, the card auto-flips to verified and an
-// `community_review_verified` activity is emitted. Reviewer achievements are
-// evaluated regardless of whether the threshold was hit.
+// configured threshold is reached, the card auto-flips to verified, a
+// `community_review_verified` activity is emitted, and the owner is notified.
+// Reviewer achievements are evaluated regardless of whether the threshold was
+// hit.
 func (s *CommunityReviewService) ConfirmCard(ctx context.Context, scoreCardID, reviewerID string) error {
 	req, err := s.requests.GetByScoreCard(ctx, scoreCardID)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -161,32 +211,79 @@ func (s *CommunityReviewService) ConfirmCard(ctx context.Context, scoreCardID, r
 		return err
 	}
 
-	thresholdReached := count >= int(req.RequiredConfirmations)
-	if thresholdReached {
-		if err := s.confirms.UpdateScoreVerification(ctx, scoreCardID, "verified"); err != nil {
+	if count >= int(req.RequiredConfirmations) {
+		// MarkVerified is the arbiter: the request row flips open → verified
+		// exactly once, so a confirmation racing this one (or a re-request
+		// racing a cancel) cannot double-emit the verified activity.
+		verified, err := s.requests.MarkVerified(ctx, scoreCardID)
+		if err != nil {
 			return err
 		}
-		if err := s.requests.MarkVerified(ctx, scoreCardID); err != nil {
-			return err
-		}
-		if s.activity != nil {
-			tt := "score_card"
-			meta := model.CommunityReviewMeta{
-				RequiredConfirmations: req.RequiredConfirmations,
+		if verified {
+			if err := s.confirms.UpdateScoreVerification(ctx, scoreCardID, "verified"); err != nil {
+				return err
 			}
-			go s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewVerified, &scoreCardID, &tt, meta, nil, nil, "public")
+			if s.activity != nil {
+				tt := "score_card"
+				meta := model.CommunityReviewMeta{
+					RequiredConfirmations: req.RequiredConfirmations,
+				}
+				// Populate the card preview so the verified feed post doesn't
+				// render a zero score with a blank target.
+				if card, cardErr := s.cards.GetByID(ctx, scoreCardID, ownerID); cardErr == nil {
+					meta.TotalScore = card.TotalScore
+					meta.XCount = card.XCount
+					meta.CardImageURL = card.CardImageURL
+					visibility := card.Visibility
+					s.safeGo("activity.Ingest(review_verified)", func() {
+						s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewVerified, &scoreCardID, &tt, meta, nil, nil, visibility)
+					})
+				} else {
+					s.safeGo("activity.Ingest(review_verified)", func() {
+						s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewVerified, &scoreCardID, &tt, meta, nil, nil, "public")
+					})
+				}
+			}
+			if s.notifications != nil {
+				tid, tt := scoreCardID, "score_card"
+				s.notifications.Fanout(ctx, NotifEvent{
+					RecipientID: ownerID,
+					ActorID:     reviewerID,
+					Type:        model.NotificationTypeScoreVerified,
+					TargetID:    &tid,
+					TargetType:  &tt,
+				})
+			}
 		}
 	}
 
 	if s.achievement != nil {
-		go s.achievement.EvaluateForCommunityReview(context.Background(), reviewerID, req.CreatedAt)
+		createdAt := req.CreatedAt
+		s.safeGo("achievement.EvaluateForCommunityReview", func() {
+			s.achievement.EvaluateForCommunityReview(context.Background(), reviewerID, createdAt)
+		})
 	}
 	return nil
 }
 
 // GetForCard returns the request status, confirmations, and viewer-specific
-// flags for the score card detail page.
+// flags for the score card detail page. Visibility follows the card: the owner
+// always sees it; other viewers only when the card itself is shareable
+// (non-draft, non-private, not a league card).
 func (s *CommunityReviewService) GetForCard(ctx context.Context, scoreCardID, viewerID string) (*model.CommunityReviewStatusResponse, error) {
+	card, err := s.cards.GetPublicByID(ctx, scoreCardID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrCardNotVisible
+	}
+	if err != nil {
+		return nil, err
+	}
+	if viewerID == "" || viewerID != card.UserID {
+		if card.IsDraft || card.Visibility == "private" || card.LeagueRoundID != nil {
+			return nil, ErrCardNotVisible
+		}
+	}
+
 	resp := &model.CommunityReviewStatusResponse{
 		Confirmations: []*model.ScoreConfirmation{},
 	}

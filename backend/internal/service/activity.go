@@ -72,6 +72,17 @@ func (s *ActivityService) RemovePostFromFeed(ctx context.Context, postID string)
 	}
 }
 
+// RemoveReviewRequestFromFeed removes community_review_requested activities
+// tied to a cancelled review request.
+func (s *ActivityService) RemoveReviewRequestFromFeed(ctx context.Context, scoreCardID string) {
+	if scoreCardID == "" {
+		return
+	}
+	if err := s.repo.DeleteReviewRequestActivities(ctx, scoreCardID); err != nil {
+		s.log.Warn().Err(err).Str("score_card_id", scoreCardID).Msg("activity: failed to delete review request activity")
+	}
+}
+
 // Ingest writes an activity event. It is intended to be called as a goroutine
 // (fire-and-forget). Always use context.Background() as the context when calling
 // from a goroutine to avoid cancellation when the HTTP handler returns. An
