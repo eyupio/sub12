@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { usersApi } from '../api/users'
 import { privacyApi } from '../api/privacy'
+import { gearApi } from '../api/gear'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { UserAvatar } from '../components/UserAvatar'
@@ -53,6 +54,24 @@ export default function PrivacyCenter() {
       toast('Privacy settings saved', 'success')
     },
     onError: () => toast('Failed to save settings', 'error'),
+  })
+
+  // Gear comparison is stored per gear item, not on the user, so the master
+  // switch here writes through to every rifle and pellet the account owns.
+  const gearComparisonMutation = useMutation({
+    mutationFn: (optIn: boolean) => gearApi.setComparisonOptInAll(optIn),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['rifles'] })
+      queryClient.invalidateQueries({ queryKey: ['pellets'] })
+      const changed = res.rifles_updated + res.pellets_updated
+      toast(
+        changed === 0
+          ? 'All gear was already set that way'
+          : `${changed} item${changed === 1 ? '' : 's'} ${res.opt_in ? 'added to' : 'removed from'} public comparison`,
+        'success',
+      )
+    },
+    onError: () => toast('Failed to update gear comparison', 'error'),
   })
 
   const { data: blocks } = useQuery({
@@ -188,6 +207,31 @@ export default function PrivacyCenter() {
             <span className="text-xs text-muted block">Your followers still see your activity in their personalised feed.</span>
           </span>
         </label>
+      </section>
+
+      <section className="space-y-3 p-4 rounded border border-subtle bg-surface">
+        <h2 className="t-section-title">Gear comparison</h2>
+        <p className="text-sm text-secondary">
+          Each rifle and pellet can be pooled anonymously with other owners of the same model, which is what powers the
+          comparison on its showcase page. Opting out stops your results feeding others' figures and hides theirs from
+          you. You can also set this per item from any gear showcase.
+        </p>
+        <div className="flex gap-1.5 flex-wrap">
+          <button
+            onClick={() => gearComparisonMutation.mutate(true)}
+            disabled={gearComparisonMutation.isPending}
+            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-[var(--brass)] hover:border-[var(--brass)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Opt all gear in
+          </button>
+          <button
+            onClick={() => gearComparisonMutation.mutate(false)}
+            disabled={gearComparisonMutation.isPending}
+            className="px-3 py-1.5 rounded border border-subtle text-[11px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] hover:border-[var(--error-text)]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Opt all gear out
+          </button>
+        </div>
       </section>
 
       <div className="flex justify-end">

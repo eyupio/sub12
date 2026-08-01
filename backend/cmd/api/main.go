@@ -280,9 +280,13 @@ func main() {
 	// leaderboard so simulated content can be excluded when the admin disables it.
 	activitySvc.SetSimulatedContentFilter(simulationSvc)
 	pelletTestSvc.SetSimulatedContentFilter(simulationSvc)
+
+	gearShowcaseSvc := service.NewGearShowcaseService(
+		repository.NewGearShowcaseRepository(pool), rifleRepo, pelletRepo, simulationSvc)
+	adminGearSvc := service.NewAdminGearService(repository.NewAdminGearRepository(pool))
 	go service.NewSimulationRunner(simulationSvc, log.Logger).Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

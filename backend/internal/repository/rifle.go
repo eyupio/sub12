@@ -23,7 +23,7 @@ func scanRifle(row pgx.Row) (*model.Rifle, error) {
 	var r model.Rifle
 	err := row.Scan(
 		&r.ID, &r.UserID, &r.Make, &r.Model, &r.Calibre,
-		&r.PowerFtLb, &r.TuneNotes, &r.ImageURL, &r.IsActive,
+		&r.PowerFtLb, &r.TuneNotes, &r.ImageURL, &r.IsActive, &r.ComparisonOptIn,
 		&r.CreatedAt, &r.UpdatedAt,
 	)
 	if err != nil {
@@ -40,7 +40,7 @@ func (r *RifleRepository) Create(ctx context.Context, userID string, in *model.C
 	rifle, err := scanRifle(r.db.QueryRow(ctx, `
 		INSERT INTO rifles (user_id, make, model, calibre, power_ftlb, tune_notes, image_url)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
+		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, comparison_opt_in, created_at, updated_at
 	`, userID, in.Make, in.Model, calibre, in.PowerFtLb, in.TuneNotes, in.ImageURL))
 	if err != nil {
 		return nil, fmt.Errorf("create rifle: %w", err)
@@ -50,7 +50,7 @@ func (r *RifleRepository) Create(ctx context.Context, userID string, in *model.C
 
 func (r *RifleRepository) ListByUser(ctx context.Context, userID string, activeOnly bool) ([]*model.Rifle, error) {
 	query := `
-		SELECT id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
+		SELECT id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, comparison_opt_in, created_at, updated_at
 		FROM rifles WHERE user_id = $1`
 	if activeOnly {
 		query += ` AND is_active = TRUE`
@@ -76,7 +76,7 @@ func (r *RifleRepository) ListByUser(ctx context.Context, userID string, activeO
 
 func (r *RifleRepository) GetByID(ctx context.Context, id, userID string) (*model.Rifle, error) {
 	rifle, err := scanRifle(r.db.QueryRow(ctx, `
-		SELECT id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
+		SELECT id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, comparison_opt_in, created_at, updated_at
 		FROM rifles WHERE id = $1 AND user_id = $2
 	`, id, userID))
 	if err != nil {
@@ -98,10 +98,11 @@ func (r *RifleRepository) Update(ctx context.Context, id, userID string, in *mod
 			tune_notes = COALESCE($7, tune_notes),
 			image_url  = COALESCE($8, image_url),
 			is_active  = COALESCE($9, is_active),
+			comparison_opt_in = COALESCE($10, comparison_opt_in),
 			updated_at = NOW()
 		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
-	`, id, userID, in.Make, in.Model, in.Calibre, in.PowerFtLb, in.TuneNotes, in.ImageURL, in.IsActive))
+		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, comparison_opt_in, created_at, updated_at
+	`, id, userID, in.Make, in.Model, in.Calibre, in.PowerFtLb, in.TuneNotes, in.ImageURL, in.IsActive, in.ComparisonOptIn))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -115,7 +116,7 @@ func (r *RifleRepository) UpdateImageURL(ctx context.Context, id, userID, imageU
 	rifle, err := scanRifle(r.db.QueryRow(ctx, `
 		UPDATE rifles SET image_url = $3, updated_at = NOW()
 		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, created_at, updated_at
+		RETURNING id, user_id, make, model, calibre, power_ftlb, tune_notes, image_url, is_active, comparison_opt_in, created_at, updated_at
 	`, id, userID, imageURL))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -135,4 +136,17 @@ func (r *RifleRepository) Delete(ctx context.Context, id, userID string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SetComparisonOptInAll flips the comparison opt-in on every rifle the user
+// owns. Backs the one-switch control in the privacy centre.
+func (r *RifleRepository) SetComparisonOptInAll(ctx context.Context, userID string, optIn bool) (int, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE rifles SET comparison_opt_in = $2, updated_at = NOW()
+		WHERE user_id = $1 AND comparison_opt_in <> $2
+	`, userID, optIn)
+	if err != nil {
+		return 0, fmt.Errorf("set rifle comparison opt-in: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }

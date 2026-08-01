@@ -57,6 +57,8 @@ func NewRouter(
 	events *service.EventService,
 	eventInvitations *service.EventInvitationService,
 	simulation *service.SimulationService,
+	gearShowcase *service.GearShowcaseService,
+	adminGear *service.AdminGearService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -171,6 +173,11 @@ func NewRouter(
 			r.Delete("/rifles/{id}", rh.Delete)
 			r.Post("/rifles/{id}/image", rh.UploadImage)
 
+			// Gear showcase: per-item detail pages with cross-user comparison.
+			gsh := handler.NewGearShowcase(gearShowcase)
+			r.Get("/rifles/{id}/showcase", gsh.Rifle)
+			r.Patch("/users/me/gear-comparison", gsh.SetOptInAll)
+
 			// Pellets
 			ph := handler.NewPellet(pellets, images)
 			r.Post("/pellets", ph.Create)
@@ -178,6 +185,7 @@ func NewRouter(
 			r.Patch("/pellets/{id}", ph.Update)
 			r.Delete("/pellets/{id}", ph.Delete)
 			r.Post("/pellets/{id}/image", ph.UploadImage)
+			r.Get("/pellets/{id}/showcase", gsh.Pellet)
 
 			// Locations
 			locH := handler.NewLocation(locations, images)
@@ -562,22 +570,28 @@ func NewRouter(
 				r.Get("/admin/events", adminEH.List)
 				r.Delete("/admin/events/{id}", adminEH.Delete)
 
-			// Activity simulation engine.
-			asimh := handler.NewAdminSimulation(simulation, images)
-			r.Get("/admin/simulation/settings", asimh.GetSettings)
-			r.Patch("/admin/simulation/settings", asimh.PatchSettings)
-			r.Get("/admin/simulation/status", asimh.GetStatus)
-			r.Post("/admin/simulation/run-now", asimh.RunNow)
-			r.Get("/admin/simulation/personas", asimh.ListPersonas)
-			r.Patch("/admin/simulation/personas/{id}", asimh.PatchPersona)
-			r.Post("/admin/simulation/personas/{id}/avatar", asimh.UploadPersonaAvatar)
-			r.Delete("/admin/simulation/personas/{id}/avatar", asimh.DeletePersonaAvatar)
-			r.Post("/admin/simulation/personas/{id}/join-league", asimh.JoinPersonaToLeague)
-			r.Post("/admin/simulation/personas/{id}/join-club", asimh.JoinPersonaToClub)
-			r.Delete("/admin/simulation/personas", asimh.PurgeAll)
-			r.Delete("/admin/simulation/personas/{id}", asimh.DeletePersona)
-			r.Post("/admin/simulation/cleanup", asimh.Cleanup)
-			r.Get("/admin/simulation/audit", asimh.ListAudit)
+				// Site-wide gear analytics.
+				agh := handler.NewAdminGear(adminGear)
+				r.Get("/admin/gear/stats", agh.Stats)
+				r.Get("/admin/gear/models", agh.ListModels)
+				r.Get("/admin/gear/model", agh.ModelDetail)
+
+				// Activity simulation engine.
+				asimh := handler.NewAdminSimulation(simulation, images)
+				r.Get("/admin/simulation/settings", asimh.GetSettings)
+				r.Patch("/admin/simulation/settings", asimh.PatchSettings)
+				r.Get("/admin/simulation/status", asimh.GetStatus)
+				r.Post("/admin/simulation/run-now", asimh.RunNow)
+				r.Get("/admin/simulation/personas", asimh.ListPersonas)
+				r.Patch("/admin/simulation/personas/{id}", asimh.PatchPersona)
+				r.Post("/admin/simulation/personas/{id}/avatar", asimh.UploadPersonaAvatar)
+				r.Delete("/admin/simulation/personas/{id}/avatar", asimh.DeletePersonaAvatar)
+				r.Post("/admin/simulation/personas/{id}/join-league", asimh.JoinPersonaToLeague)
+				r.Post("/admin/simulation/personas/{id}/join-club", asimh.JoinPersonaToClub)
+				r.Delete("/admin/simulation/personas", asimh.PurgeAll)
+				r.Delete("/admin/simulation/personas/{id}", asimh.DeletePersona)
+				r.Post("/admin/simulation/cleanup", asimh.Cleanup)
+				r.Get("/admin/simulation/audit", asimh.ListAudit)
 			})
 		})
 

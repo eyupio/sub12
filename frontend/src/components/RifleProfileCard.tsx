@@ -157,9 +157,15 @@ export function RifleProfileCard({
     return <Link to="/scores">{cardContent}</Link>
   }
 
+  // In the gear list the whole card opens the rifle showcase; the action icons
+  // inside stop propagation so they still work.
+  const wrapped = mode === 'gear'
+    ? <Link to="/gear/rifles/$id" params={{ id: rifle.id }} className="block">{cardContent}</Link>
+    : cardContent
+
   return (
     <>
-      {cardContent}
+      {wrapped}
       {editingFile && (
         <ImageEditor
           file={editingFile}
