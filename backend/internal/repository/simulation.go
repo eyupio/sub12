@@ -5,12 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 )
+
+// simRecentWindow is how far back "fresh" content reaches for the purposes of
+// picking something to like, comment on or share. Real users engage with what
+// is on the feed in front of them, so the random pickers prefer this window and
+// only widen to all-time when it turns up empty.
+const simRecentWindow = "21 days"
 
 type SimulationRepository struct {
 	db *pgxpool.Pool
@@ -40,6 +47,12 @@ func scanSimulationSettings(row pgx.Row) (*model.SimulationSettings, error) {
 		&s.MaxCardsPerPersona,
 		&hourlyRaw,
 		&s.IncludeInPublicStats,
+		&s.BackdateDays,
+		&s.WeekendBias,
+		&s.AwayDayChance,
+		&s.ReplyChance,
+		&s.SessionActions,
+		&s.PersonaHistoryDays,
 		&s.LastRunAt,
 		&s.LastAction,
 		&s.LastTickAt,
@@ -73,6 +86,8 @@ const simulationSettingsColumns = `
 	unfollow_weight, share_weight,
 	active_start_hour, active_end_hour, interact_with_real_users,
 	max_cards_per_persona, hourly_multipliers, include_in_public_stats,
+	backdate_days, weekend_bias, away_day_chance, reply_chance,
+	session_actions, persona_history_days,
 	last_run_at, last_action, last_tick_at, updated_by::text, updated_at,
 	total_actions, post_count, like_count, comment_count, follow_count,
 	unfollow_count, share_count,
@@ -107,9 +122,12 @@ func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.
 			unfollow_weight, share_weight,
 			active_start_hour, active_end_hour, interact_with_real_users,
 			max_cards_per_persona, hourly_multipliers, include_in_public_stats,
+			backdate_days, weekend_bias, away_day_chance, reply_chance,
+			session_actions, persona_history_days,
 			updated_by, updated_at
 		)
-		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16::uuid, NOW())
+		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15,
+		        $16, $17, $18, $19, $20, $21, $22::uuid, NOW())
 		ON CONFLICT (id) DO UPDATE
 		SET
 			enabled = EXCLUDED.enabled,
@@ -127,6 +145,12 @@ func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.
 			max_cards_per_persona = EXCLUDED.max_cards_per_persona,
 			hourly_multipliers = EXCLUDED.hourly_multipliers,
 			include_in_public_stats = EXCLUDED.include_in_public_stats,
+			backdate_days = EXCLUDED.backdate_days,
+			weekend_bias = EXCLUDED.weekend_bias,
+			away_day_chance = EXCLUDED.away_day_chance,
+			reply_chance = EXCLUDED.reply_chance,
+			session_actions = EXCLUDED.session_actions,
+			persona_history_days = EXCLUDED.persona_history_days,
 			updated_by = EXCLUDED.updated_by,
 			updated_at = NOW()
 		RETURNING `+simulationSettingsColumns+`
@@ -134,7 +158,9 @@ func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.
 		input.PostWeight, input.LikeWeight, input.CommentWeight, input.FollowWeight,
 		input.UnfollowWeight, input.ShareWeight,
 		input.ActiveStartHour, input.ActiveEndHour, input.InteractWithRealUsers,
-		input.MaxCardsPerPersona, multsJSON, input.IncludeInPublicStats, updatedBy))
+		input.MaxCardsPerPersona, multsJSON, input.IncludeInPublicStats,
+		input.BackdateDays, input.WeekendBias, input.AwayDayChance, input.ReplyChance,
+		input.SessionActions, input.PersonaHistoryDays, updatedBy))
 	if err != nil {
 		return nil, fmt.Errorf("upsert simulation settings: %w", err)
 	}
@@ -222,15 +248,61 @@ func (r *SimulationRepository) TouchTick(ctx context.Context) error {
 	return nil
 }
 
-// CreateSimulatedUser inserts a flagged simulated account. Returns the new id,
-// or ErrConflict if the generated email collides with an existing row.
-func (r *SimulationRepository) CreateSimulatedUser(ctx context.Context, email, displayName string, bio, location *string, passwordHash string) (string, error) {
+// randomRow picks one random row matching where, first trying the narrower
+// preferWhere and widening to where only when the preferred set is empty. That
+// two-tier shape is what makes simulated engagement look considered rather than
+// uniform: callers prefer recently posted content, or the follow nobody
+// reciprocated, and still degrade to the full set instead of doing nothing.
+// Pass an empty preferWhere to skip the preference.
+//
+// Selection is count-then-random-offset rather than ORDER BY random(), so the
+// cost stays at two cheap queries as the content tables grow. from, cols and
+// the where clauses are trusted constants built in this file; every
+// caller-supplied value is passed as a query parameter.
+func (r *SimulationRepository) randomRow(ctx context.Context, from, cols, where, preferWhere string, args []any, dest ...any) error {
+	clauses := make([]string, 0, 2)
+	if preferWhere != "" {
+		clauses = append(clauses, preferWhere)
+	}
+	clauses = append(clauses, where)
+
+	offsetParam := fmt.Sprintf("$%d", len(args)+1)
+	for _, clause := range clauses {
+		var n int
+		if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM `+from+` WHERE `+clause, args...).Scan(&n); err != nil {
+			return fmt.Errorf("count random row: %w", err)
+		}
+		if n == 0 {
+			continue
+		}
+		selectArgs := append(append(make([]any, 0, len(args)+1), args...), n)
+		err := r.db.QueryRow(ctx,
+			`SELECT `+cols+` FROM `+from+` WHERE `+clause+`
+			 OFFSET floor(random() * `+offsetParam+`) LIMIT 1`,
+			selectArgs...,
+		).Scan(dest...)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			return fmt.Errorf("select random row: %w", err)
+		}
+		return nil
+	}
+	return ErrNotFound
+}
+
+// CreateSimulatedUser inserts a flagged simulated account with an explicit
+// join date, so a freshly provisioned roster reads as a community that grew
+// over time rather than one that appeared in a single afternoon. Returns the
+// new id, or ErrConflict if the generated email collides with an existing row.
+func (r *SimulationRepository) CreateSimulatedUser(ctx context.Context, email, displayName, passwordHash string, createdAt time.Time) (string, error) {
 	var id string
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO users (email, display_name, password_hash, bio, location, is_simulated)
-		VALUES ($1, $2, $3, $4, $5, TRUE)
+		INSERT INTO users (email, display_name, password_hash, is_simulated, created_at, updated_at)
+		VALUES ($1, $2, $3, TRUE, $4, $4)
 		RETURNING id
-	`, email, displayName, passwordHash, bio, location).Scan(&id)
+	`, email, displayName, passwordHash, createdAt).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return "", ErrConflict
@@ -274,24 +346,54 @@ func (r *SimulationRepository) CountSimulatedCards(ctx context.Context) (int, er
 	return n, nil
 }
 
-// ListSimulatedUserIDs returns up to limit simulated account ids, oldest first.
-func (r *SimulationRepository) ListSimulatedUserIDs(ctx context.Context, limit int) ([]string, error) {
+// PersonaSeed is the stored identity of a simulated account that the engine
+// needs in order to stay consistent with what a visitor sees on the profile —
+// currently just the join date, which bounds how far back the persona's score
+// cards can be dated.
+type PersonaSeed struct {
+	ID       string
+	JoinedAt time.Time
+}
+
+// ListSimulatedPersonaSeeds returns up to limit simulated accounts, oldest
+// first.
+func (r *SimulationRepository) ListSimulatedPersonaSeeds(ctx context.Context, limit int) ([]PersonaSeed, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id::text FROM users WHERE is_simulated ORDER BY created_at LIMIT $1
+		SELECT id::text, created_at FROM users WHERE is_simulated ORDER BY created_at LIMIT $1
 	`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list simulated users: %w", err)
 	}
 	defer rows.Close()
-	var ids []string
+	var seeds []PersonaSeed
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("scan simulated user id: %w", err)
+		var s PersonaSeed
+		if err := rows.Scan(&s.ID, &s.JoinedAt); err != nil {
+			return nil, fmt.Errorf("scan simulated user seed: %w", err)
 		}
-		ids = append(ids, id)
+		seeds = append(seeds, s)
 	}
-	return ids, rows.Err()
+	return seeds, rows.Err()
+}
+
+// ListDisplayNames returns every display name already in use, so newly
+// provisioned personas can avoid handing the community two members with the
+// same name.
+func (r *SimulationRepository) ListDisplayNames(ctx context.Context) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT display_name FROM users`)
+	if err != nil {
+		return nil, fmt.Errorf("list display names: %w", err)
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, fmt.Errorf("scan display name: %w", err)
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
 }
 
 // ListSimulatedPersonas returns a paginated list of simulated accounts with
@@ -393,39 +495,35 @@ func eligibleCardWhere(simulatedOnly bool) string {
 	return q
 }
 
-// RandomPublicCard picks a random public, non-draft score card not owned by
-// excludeUserID. When simulatedOnly is true, only cards owned by simulated
-// accounts are eligible (keeps simulated interaction off real users' content).
-// Returns (cardID, ownerID). ErrNotFound when no eligible card exists.
-//
-// Selection uses count-then-random-offset so cost is O(2) queries rather than
-// O(n) ORDER BY random() as the cards table grows.
-func (r *SimulationRepository) RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, string, error) {
-	var n int
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM score_cards sc JOIN users u ON u.id = sc.user_id
-		WHERE `+eligibleCardWhere(simulatedOnly)+`
-	`, excludeUserID).Scan(&n); err != nil {
-		return "", "", fmt.Errorf("count random public card: %w", err)
-	}
-	if n == 0 {
-		return "", "", ErrNotFound
-	}
+// SimCard is a random score card chosen as an interaction target, carrying
+// enough of the card for the engine to react to what it is actually looking at
+// rather than praising every card identically.
+type SimCard struct {
+	ID         string
+	OwnerID    string
+	TotalScore int16
+	XCount     int16
+}
 
-	var cardID, ownerID string
-	err := r.db.QueryRow(ctx, `
-		SELECT sc.id::text, sc.user_id::text
-		FROM score_cards sc JOIN users u ON u.id = sc.user_id
-		WHERE `+eligibleCardWhere(simulatedOnly)+`
-		OFFSET floor(random() * $2) LIMIT 1
-	`, excludeUserID, n).Scan(&cardID, &ownerID)
+// RandomPublicCard picks a random public, non-draft score card not owned by
+// excludeUserID, preferring recently posted ones. When simulatedOnly is true,
+// only cards owned by simulated accounts are eligible (keeps simulated
+// interaction off real users' content). ErrNotFound when none is eligible.
+func (r *SimulationRepository) RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly bool) (*SimCard, error) {
+	where := eligibleCardWhere(simulatedOnly)
+	var c SimCard
+	err := r.randomRow(ctx,
+		`score_cards sc JOIN users u ON u.id = sc.user_id`,
+		`sc.id::text, sc.user_id::text, sc.total_score, sc.x_count`,
+		where,
+		where+` AND sc.created_at > NOW() - INTERVAL '`+simRecentWindow+`'`,
+		[]any{excludeUserID},
+		&c.ID, &c.OwnerID, &c.TotalScore, &c.XCount,
+	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", "", ErrNotFound
-		}
-		return "", "", fmt.Errorf("random public card: %w", err)
+		return nil, err
 	}
-	return cardID, ownerID, nil
+	return &c, nil
 }
 
 // eligibleFollowWhere returns the WHERE clause for RandomFollowTarget.
@@ -444,29 +542,40 @@ func eligibleFollowWhere(simulatedOnly bool) string {
 // excludeUserID is not already following. When simulatedOnly is true, only
 // simulated accounts are eligible. ErrNotFound when no eligible user exists.
 func (r *SimulationRepository) RandomFollowTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
-	var n int
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM users u WHERE `+eligibleFollowWhere(simulatedOnly)+`
-	`, excludeUserID).Scan(&n); err != nil {
-		return "", fmt.Errorf("count random follow target: %w", err)
-	}
-	if n == 0 {
-		return "", ErrNotFound
-	}
-
 	var id string
-	err := r.db.QueryRow(ctx, `
-		SELECT u.id::text FROM users u
-		WHERE `+eligibleFollowWhere(simulatedOnly)+`
-		OFFSET floor(random() * $2) LIMIT 1
-	`, excludeUserID, n).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("random follow target: %w", err)
-	}
-	return id, nil
+	err := r.randomRow(ctx, `users u`, `u.id::text`,
+		eligibleFollowWhere(simulatedOnly), "", []any{excludeUserID}, &id)
+	return id, err
+}
+
+// RandomFollowBackTarget picks a random user who already follows
+// excludeUserID but is not followed back. Real follow graphs are strongly
+// reciprocal, so the engine reaches for this before following a stranger.
+// ErrNotFound when every follower is already followed back.
+func (r *SimulationRepository) RandomFollowBackTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
+	where := eligibleFollowWhere(simulatedOnly) + ` AND EXISTS (
+		SELECT 1 FROM user_follows inbound
+		WHERE inbound.follower_id = u.id AND inbound.following_id = $1
+	)`
+	var id string
+	err := r.randomRow(ctx, `users u`, `u.id::text`, where, "", []any{excludeUserID}, &id)
+	return id, err
+}
+
+// RandomMutualFollowTarget picks a random user followed by someone
+// excludeUserID already follows. Following friends-of-friends grows the follow
+// graph into overlapping clusters — the shape a real community has — instead of
+// the uniform mesh that picking strangers produces. ErrNotFound when no such
+// user exists.
+func (r *SimulationRepository) RandomMutualFollowTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
+	where := eligibleFollowWhere(simulatedOnly) + ` AND EXISTS (
+		SELECT 1 FROM user_follows mine
+		JOIN user_follows theirs ON theirs.follower_id = mine.following_id
+		WHERE mine.follower_id = $1 AND theirs.following_id = u.id
+	)`
+	var id string
+	err := r.randomRow(ctx, `users u`, `u.id::text`, where, "", []any{excludeUserID}, &id)
+	return id, err
 }
 
 // RecordAudit appends an admin-operation entry to the simulation audit log.
@@ -603,32 +712,20 @@ func eligiblePostWhere(simulatedOnly bool) string {
 }
 
 // RandomPublicPost picks a random public, non-hidden post not owned by
-// excludeUserID. When simulatedOnly is true, only posts by simulated accounts
-// are eligible. ErrNotFound when no eligible post exists.
+// excludeUserID, preferring recent ones. When simulatedOnly is true, only posts
+// by simulated accounts are eligible. ErrNotFound when no eligible post exists.
 func (r *SimulationRepository) RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
-	var n int
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM posts p JOIN users u ON u.id = p.user_id
-		WHERE `+eligiblePostWhere(simulatedOnly)+`
-	`, excludeUserID).Scan(&n); err != nil {
-		return "", fmt.Errorf("count random public post: %w", err)
-	}
-	if n == 0 {
-		return "", ErrNotFound
-	}
+	where := eligiblePostWhere(simulatedOnly)
 	var id string
-	err := r.db.QueryRow(ctx, `
-		SELECT p.id::text FROM posts p JOIN users u ON u.id = p.user_id
-		WHERE `+eligiblePostWhere(simulatedOnly)+`
-		OFFSET floor(random() * $2) LIMIT 1
-	`, excludeUserID, n).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("random public post: %w", err)
-	}
-	return id, nil
+	err := r.randomRow(ctx,
+		`posts p JOIN users u ON u.id = p.user_id`,
+		`p.id::text`,
+		where,
+		where+` AND p.created_at > NOW() - INTERVAL '`+simRecentWindow+`'`,
+		[]any{excludeUserID},
+		&id,
+	)
+	return id, err
 }
 
 // eligibleActivityWhere returns the WHERE clause for RandomActivity.
@@ -641,62 +738,84 @@ func eligibleActivityWhere(simulatedOnly bool) string {
 }
 
 // RandomActivity picks a random public, non-hidden activity not owned by
-// excludeUserID. When simulatedOnly is true, only activities by simulated
-// accounts are eligible. ErrNotFound when none exists.
+// excludeUserID, preferring recent ones. When simulatedOnly is true, only
+// activities by simulated accounts are eligible. ErrNotFound when none exists.
 func (r *SimulationRepository) RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
-	var n int
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM activities a JOIN users u ON u.id = a.user_id
-		WHERE `+eligibleActivityWhere(simulatedOnly)+`
-	`, excludeUserID).Scan(&n); err != nil {
-		return "", fmt.Errorf("count random activity: %w", err)
-	}
-	if n == 0 {
-		return "", ErrNotFound
-	}
+	where := eligibleActivityWhere(simulatedOnly)
 	var id string
-	err := r.db.QueryRow(ctx, `
-		SELECT a.id::text FROM activities a JOIN users u ON u.id = a.user_id
-		WHERE `+eligibleActivityWhere(simulatedOnly)+`
-		OFFSET floor(random() * $2) LIMIT 1
-	`, excludeUserID, n).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("random activity: %w", err)
-	}
-	return id, nil
+	err := r.randomRow(ctx,
+		`activities a JOIN users u ON u.id = a.user_id`,
+		`a.id::text`,
+		where,
+		where+` AND a.created_at > NOW() - INTERVAL '`+simRecentWindow+`'`,
+		[]any{excludeUserID},
+		&id,
+	)
+	return id, err
 }
 
-// RandomFollowedUser picks a random user that followerID currently follows.
-// When simulatedOnly is true, only simulated followees are eligible.
-// ErrNotFound when the actor follows no one eligible.
+// RandomTopLevelComment picks a random top-level comment on the given target
+// that excludeUserID did not write, so a persona can reply into an existing
+// thread instead of only ever adding another top-level remark. Returns the
+// comment id and its author's display name. ErrNotFound when the target has no
+// comment worth replying to.
+func (r *SimulationRepository) RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string) (string, string, error) {
+	var id, author string
+	err := r.randomRow(ctx,
+		`comments c JOIN users u ON u.id = c.user_id`,
+		`c.id::text, u.display_name`,
+		`c.target_id = $1 AND c.target_type = $2 AND c.parent_id IS NULL AND c.user_id <> $3`,
+		"",
+		[]any{targetID, targetType, excludeUserID},
+		&id, &author,
+	)
+	if err != nil {
+		return "", "", err
+	}
+	return id, author, nil
+}
+
+// RandomLikeableComment picks a random recent comment not written by
+// excludeUserID. When simulatedOnly is true, only comments by simulated
+// accounts are eligible. ErrNotFound when none exists.
+func (r *SimulationRepository) RandomLikeableComment(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
+	where := `c.user_id <> $1`
+	if simulatedOnly {
+		where += ` AND u.is_simulated`
+	}
+	var id string
+	err := r.randomRow(ctx,
+		`comments c JOIN users u ON u.id = c.user_id`,
+		`c.id::text`,
+		where,
+		where+` AND c.created_at > NOW() - INTERVAL '`+simRecentWindow+`'`,
+		[]any{excludeUserID},
+		&id,
+	)
+	return id, err
+}
+
+// RandomFollowedUser picks a random user that followerID currently follows,
+// preferring one who never followed back — the follow a real person is most
+// likely to drop. When simulatedOnly is true, only simulated followees are
+// eligible. ErrNotFound when the actor follows no one eligible.
 func (r *SimulationRepository) RandomFollowedUser(ctx context.Context, followerID string, simulatedOnly bool) (string, error) {
 	where := `f.follower_id = $1 AND u.id <> $1 AND u.profile_visibility = 'public'`
 	if simulatedOnly {
 		where += ` AND u.is_simulated`
 	}
-	var n int
-	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM user_follows f JOIN users u ON u.id = f.following_id
-		WHERE `+where, followerID).Scan(&n); err != nil {
-		return "", fmt.Errorf("count random followed user: %w", err)
-	}
-	if n == 0 {
-		return "", ErrNotFound
-	}
+	unreciprocated := where + ` AND NOT EXISTS (
+		SELECT 1 FROM user_follows back
+		WHERE back.follower_id = u.id AND back.following_id = $1
+	)`
 	var id string
-	err := r.db.QueryRow(ctx, `
-		SELECT u.id::text FROM user_follows f JOIN users u ON u.id = f.following_id
-		WHERE `+where+`
-		OFFSET floor(random() * $2) LIMIT 1
-	`, followerID, n).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("random followed user: %w", err)
-	}
-	return id, nil
+	err := r.randomRow(ctx,
+		`user_follows f JOIN users u ON u.id = f.following_id`,
+		`u.id::text`,
+		where,
+		unreciprocated,
+		[]any{followerID},
+		&id,
+	)
+	return id, err
 }

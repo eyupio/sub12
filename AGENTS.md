@@ -116,7 +116,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **111** (000001–000111). Latest: `000111_faqs_new_user_onboarding`.
+Current migration count: **112** (000001–000112). Latest: `000112_simulation_realism_settings`.
 
 ## Critical Migration Rules
 

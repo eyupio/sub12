@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **111** (000001–000111). Latest: `000111_faqs_new_user_onboarding`.
+Current migration count: **112** (000001–000112). Latest: `000112_simulation_realism_settings`.
 
 ## Critical Migration Rules
 
@@ -244,7 +244,57 @@ stable name and keep their UUID.
 - **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List (private clubs included), get, update, delete, members management
-- **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Each persona gets a rifle + pellet and a stable personality that biases action selection. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.
+- **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.
+
+  Personas are built to read as people rather than as a bot roster (see "Simulation realism" below for how, and which parts are admin-tunable).
+
+## Simulation Realism
+
+Everything that makes the simulated community look inhabited lives in
+`service/simulation.go`. The guiding rule: **anything a visitor could use to
+tell one persona from another must be stable and self-consistent**. Traits are
+derived from an FNV hash of the persona's id (`personaTraitsFor`), so the same
+account shoots to the same standard, writes in the same voice, and shoots the
+same ground forever — across restarts, with nothing extra stored.
+
+- **Character** — `personaTraits` fixes skill, consistency, talkativeness,
+  sociability, competitiveness, activity level, writing voice, home ground,
+  discipline, usual distance, indoor/outdoor, and rifle/pellet choice. The bio
+  written at provisioning is composed from those same values, so the profile,
+  the gear list and the cards all agree.
+- **Uneven activity** — actor selection is weighted by a *cubed* activity trait,
+  so a keen minority generates most of the traffic and there is a quiet tail.
+  A persona also holds the floor for a short run of consecutive actions (a
+  browse session) rather than the engine drawing a fresh actor every time.
+- **Time** — cards are back-dated with a decaying offset, pulled toward the
+  weekend just gone, and never dated before the persona joined. New personas'
+  join dates are staggered back through `persona_history_days`, so a roster
+  looks grown rather than provisioned in one afternoon.
+- **Sessions** — every card shot on the same day shares one form value
+  (`sessionForm`) and one set of weather conditions (`dayConditions`, keyed on
+  ground + date, with a UK seasonal temperature curve). Two personas who shot
+  the same county on the same Sunday report the same wind. Scores respond to
+  form, wind and accumulated experience; notes are chosen to match the
+  conditions and the result, so a calm day never reports a gale.
+- **Conversation** — comments react to the tier of the card they are on (a 190
+  gets encouragement, a 245 gets praise and sometimes the score quoted), in the
+  persona's own voice, avoiding the lines that persona used most recently.
+  Comments also reply into existing threads, addressed to the author by name.
+- **Engagement** — target selection prefers recently posted content
+  (`simRecentWindow`) and spreads likes across cards, posts, comments and
+  activities. Follows prefer whoever just followed the persona, then
+  friends-of-friends, then a stranger; unfollows prefer the follows nobody
+  reciprocated. That produces a clustered, reciprocal graph rather than a
+  uniform mesh.
+
+Six of these are admin-tunable from the simulation page (`backdate_days`,
+`weekend_bias`, `away_day_chance`, `reply_chance`, `session_actions`,
+`persona_history_days`); each accepts 0 to switch that behaviour off. The rest
+are intentionally not settings — they are what "human" means here, not knobs.
+
+When adding a new behaviour, prefer deriving it from the persona's traits over
+adding another random roll: randomness per action is exactly what makes a feed
+read as generated.
 
 ## Environment Variables
 

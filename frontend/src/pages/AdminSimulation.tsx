@@ -43,6 +43,12 @@ interface FormState {
   max_cards_per_persona: string
   include_in_public_stats: boolean
   hourly_multipliers: string[] // 24 entries
+  backdate_days: string
+  weekend_bias: string
+  away_day_chance: string
+  reply_chance: string
+  session_actions: string
+  persona_history_days: string
 }
 
 function validate(values: FormState): string[] {
@@ -89,6 +95,28 @@ function validate(values: FormState): string[] {
   const maxCards = num(values.max_cards_per_persona)
   if (!isInt(values.max_cards_per_persona) || maxCards < 0) {
     errors.push('Max cards per persona must be 0 or more.')
+  }
+  const backdate = num(values.backdate_days)
+  if (!isInt(values.backdate_days) || backdate < 0 || backdate > 365) {
+    errors.push('Session back-dating must be a whole number of days between 0 and 365.')
+  }
+  const history = num(values.persona_history_days)
+  if (!isInt(values.persona_history_days) || history < 0 || history > 3650) {
+    errors.push('Join-date spread must be a whole number of days between 0 and 3650.')
+  }
+  const session = num(values.session_actions)
+  if (!isInt(values.session_actions) || session < 1 || session > 20) {
+    errors.push('Actions per visit must be a whole number between 1 and 20.')
+  }
+  for (const [label, key] of [
+    ['Weekend bias', 'weekend_bias'],
+    ['Away-day chance', 'away_day_chance'],
+    ['Reply chance', 'reply_chance'],
+  ] as const) {
+    const pct = num(values[key])
+    if (!isInt(values[key]) || pct < 0 || pct > 100) {
+      errors.push(`${label} must be a whole percentage between 0 and 100.`)
+    }
   }
   for (let i = 0; i < values.hourly_multipliers.length; i++) {
     const m = Number(values.hourly_multipliers[i])
@@ -156,6 +184,12 @@ export default function AdminSimulation() {
     max_cards_per_persona: '30',
     include_in_public_stats: true,
     hourly_multipliers: defaultMultipliers(),
+    backdate_days: '45',
+    weekend_bias: '45',
+    away_day_chance: '15',
+    reply_chance: '20',
+    session_actions: '3',
+    persona_history_days: '240',
   })
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [serverError, setServerError] = useState<string | null>(null)
@@ -233,6 +267,12 @@ export default function AdminSimulation() {
         ? data.hourly_multipliers
         : Array.from({ length: 24 }, () => 1)
       ).map(String),
+      backdate_days: String(data.backdate_days),
+      weekend_bias: String(data.weekend_bias),
+      away_day_chance: String(data.away_day_chance),
+      reply_chance: String(data.reply_chance),
+      session_actions: String(data.session_actions),
+      persona_history_days: String(data.persona_history_days),
     }
     setForm(next)
     setSavedSnapshot(JSON.stringify(next))
@@ -280,6 +320,12 @@ export default function AdminSimulation() {
           ? updated.hourly_multipliers
           : Array.from({ length: 24 }, () => 1)
         ).map(String),
+        backdate_days: String(updated.backdate_days),
+        weekend_bias: String(updated.weekend_bias),
+        away_day_chance: String(updated.away_day_chance),
+        reply_chance: String(updated.reply_chance),
+        session_actions: String(updated.session_actions),
+        persona_history_days: String(updated.persona_history_days),
       }
       setForm(next)
       setSavedSnapshot(JSON.stringify(next))
@@ -455,6 +501,12 @@ export default function AdminSimulation() {
       max_cards_per_persona: Number(form.max_cards_per_persona),
       include_in_public_stats: form.include_in_public_stats,
       hourly_multipliers: form.hourly_multipliers.map(Number),
+      backdate_days: Number(form.backdate_days),
+      weekend_bias: Number(form.weekend_bias),
+      away_day_chance: Number(form.away_day_chance),
+      reply_chance: Number(form.reply_chance),
+      session_actions: Number(form.session_actions),
+      persona_history_days: Number(form.persona_history_days),
     })
   }
 
@@ -680,6 +732,67 @@ export default function AdminSimulation() {
           <label className={labelCls} htmlFor="max-cards">Max Cards Per Persona</label>
           <input id="max-cards" value={form.max_cards_per_persona} onChange={(e) => updateField('max_cards_per_persona', e.target.value)} className={inputCls} inputMode="numeric" />
           <p className="text-xs text-muted">Caps how many score cards each simulated account posts (0 = unlimited).</p>
+        </div>
+
+        {/* Behaviour: how human the simulated community reads, as opposed to
+            how much of it there is. */}
+        <div className="space-y-3 pt-2 border-t border-subtle">
+          <div>
+            <div className={labelCls}>Behaviour &amp; Realism</div>
+            <p className="text-xs text-muted">
+              Shapes how lifelike the simulated community looks. Set a control to 0 to switch that behaviour off.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="backdate-days">Session Back-dating (days)</label>
+              <input id="backdate-days" value={form.backdate_days} onChange={(e) => updateField('backdate_days', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                How far back a logged card's shoot date can fall. Most land within a few days; 0 dates every card today.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="weekend-bias">Weekend Bias (%)</label>
+              <input id="weekend-bias" value={form.weekend_bias} onChange={(e) => updateField('weekend_bias', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                How often a weekday session is pulled onto the weekend just gone, the way club grounds actually fill up.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="away-day">Away-day Chance (%)</label>
+              <input id="away-day" value={form.away_day_chance} onChange={(e) => updateField('away_day_chance', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                How often a persona shoots away from its home ground, at a different discipline and distance.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="reply-chance">Reply Chance (%)</label>
+              <input id="reply-chance" value={form.reply_chance} onChange={(e) => updateField('reply_chance', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                Base chance a comment joins an existing thread instead of starting a new one. Talkative personas reply more.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="session-actions">Actions Per Visit</label>
+              <input id="session-actions" value={form.session_actions} onChange={(e) => updateField('session_actions', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                Most a persona does in one sitting before another takes over. 1 spreads activity evenly; higher values read as real visits.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelCls} htmlFor="history-days">Join-date Spread (days)</label>
+              <input id="history-days" value={form.persona_history_days} onChange={(e) => updateField('persona_history_days', e.target.value)} className={inputCls} inputMode="numeric" />
+              <p className="text-xs text-muted">
+                How far back new personas' join dates are staggered, so the roster looks grown rather than provisioned at once. Applies to accounts created from now on.
+              </p>
+            </div>
+          </div>
         </div>
 
         <label className="text-sm text-secondary inline-flex items-center gap-2">
