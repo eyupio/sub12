@@ -192,6 +192,10 @@
     -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
     position: relative;
+    /* Keeps the browser's own pull-to-refresh out of the way of the app's
+       (usePullToRefresh) without putting a scroll container in the shell —
+       body's value propagates to the viewport, which is the actual scroller. */
+    overscroll-behavior-y: contain;
   }
 
   /* Subtle scope-grid background */
