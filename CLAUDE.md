@@ -242,6 +242,40 @@ reach stops at the one league or club they were promoted in.
   working. Member listings redact `permissions` for viewers who don't help run
   the group.
 
+### Indexable surface (sitemap, robots.txt, canonicals)
+
+Only two kinds of URL are fit to submit to a search engine: a page an
+anonymous visitor can load, and one robots.txt allows. Getting this wrong is
+silent — nothing fails, the pages just never appear in search — so treat these
+as invariants and lean on the tests that pin them.
+
+- **What may go in the sitemap.** `service/sitemap.go` lists fixed pages that
+  are children of `rootRoute`/`authRoute` in `frontend/src/routeTree.tsx`, plus
+  entity URLs at their public `/share/…` form. Never list an `appRoute` child:
+  `beforeLoad: requireAuth` redirects a crawler to `/login`, which Search
+  Console reports as a soft 404. That rules out `/leagues`, `/clubs`,
+  `/events`, `/help`, `/support` and `/feature-requests`, and the in-app
+  `/users/{id}`, `/leagues/{id}`, `/clubs/{id}` routes — the last of which is
+  also disallowed in robots.txt and produced a "Blocked by robots.txt" report.
+- **Keep the two files in step.** `frontend/public/robots.txt` and the sitemap
+  are edited independently, so `service/sitemap_test.go` parses the shipped
+  robots.txt and asserts every generated URL is crawlable — and that the
+  authed routes stay blocked. `landing/robots.txt` is a byte-identical copy.
+- **Canonicals.** The SPA shell hard-codes one `<title>`, description and
+  `rel=canonical` pointing at the site root, so any page served straight from
+  nginx declares itself a duplicate of the homepage. Fixed public pages are
+  therefore routed through `ShareMeta.StaticPage` (`handler.StaticPages`) to
+  get their own metadata. Adding one means adding it to *both* that table and
+  the matching `location ~ ^/(…)$` block in `frontend/nginx.conf` — a test
+  cross-checks the two, because missing the nginx half fails silently. `/` is
+  deliberately excluded: nginx serves it from the bundle, whose baked-in tags
+  are already the homepage's own.
+- **Who is eligible.** Simulated personas (`is_simulated`) and private
+  profiles are excluded. The `Count*` queries must mirror the `List*` ones or
+  the admin Sitemap & SEO page reports a sitemap that was never served.
+- `lastmod` tracks `updated_at`, not `created_at` — reporting a creation date
+  on a league whose standings move weekly tells crawlers to stop coming back.
+
 ### Public (no auth)
 
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`

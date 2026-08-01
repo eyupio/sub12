@@ -305,6 +305,75 @@ func (s *ShareMeta) defaultOG(r *http.Request) openGraph {
 	}
 }
 
+// StaticPageMeta is the search metadata for one fixed public page.
+type StaticPageMeta struct {
+	Path        string
+	Title       string
+	Description string
+}
+
+// StaticPages are the anonymous-reachable pages that carry their own search
+// metadata. The SPA shell ships a single hard-coded <title>, description and
+// rel=canonical pointing at the site root, so without this every one of these
+// URLs told Google it was a duplicate of the homepage — which is why they were
+// submitted in the sitemap and then dropped from the index.
+//
+// The site root is deliberately absent: nginx serves "/" straight from the
+// static bundle, whose baked-in tags are already correct for the homepage, and
+// routing it through the backend would put the landing page behind the API's
+// availability for no gain.
+var StaticPages = []StaticPageMeta{
+	{
+		Path:        "/pellet-leaderboard",
+		Title:       "Pellet Leaderboard — Tested Accuracy Rankings | SUB12",
+		Description: "Community pellet test results ranked by measured group size. Compare .177 and .22 pellets by rifle, distance and conditions before you buy a tin.",
+	},
+	{
+		Path:        "/register",
+		Title:       "Create Your Free SUB12 Account",
+		Description: "Sign up free to log 25-shot score cards, test pellets with image-based group measurement, track your gear and compete in FT, HFT and benchrest leagues.",
+	},
+	{
+		Path:        "/login",
+		Title:       "Sign In to SUB12",
+		Description: "Sign in to your SUB12 account to log score cards, review pellet tests and check your league standings.",
+	},
+	{
+		Path:        "/privacy",
+		Title:       "Privacy Policy | SUB12",
+		Description: "How SUB12 collects, uses and protects your personal data, and the rights you have over it.",
+	},
+	{
+		Path:        "/terms",
+		Title:       "Terms of Use | SUB12",
+		Description: "The terms governing your use of the SUB12 platform, including acceptable use and account responsibilities.",
+	},
+	{
+		Path:        "/cookies",
+		Title:       "Cookie Policy | SUB12",
+		Description: "The cookies and local storage SUB12 uses, what each is for, and how to control them.",
+	},
+}
+
+// StaticPage returns a handler that serves the SPA shell with the supplied
+// page's own title, description and self-referencing canonical injected. It
+// touches no services and issues no queries, so these pages keep serving even
+// when the database is unreachable.
+func (s *ShareMeta) StaticPage(meta StaticPageMeta) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		og := s.defaultOG(r)
+		og.Title = meta.Title
+		og.Description = meta.Description
+		// defaultOG already set URL from the request path, which is this
+		// page's path (the routes are exact matches) and drops any query
+		// string — so /login?next=... canonicalises to /login rather than
+		// splintering into a URL per redirect target. Using it also keeps
+		// og:url absolute when SITE_URL is unset, which s.absolute cannot.
+		og.Type = "website"
+		s.writeHTML(w, r, og)
+	}
+}
+
 // shareRef prefers an entity's human-readable slug for public URLs, falling
 // back to its UUID. The fallback covers the window between a row being
 // inserted and its slug being claimed, and any row a backfill missed.

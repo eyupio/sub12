@@ -1,30 +1,53 @@
 User-agent: *
 Allow: /
 
-# Authenticated-only paths
-Disallow: /scores/
-Disallow: /pellet-testing/
-Disallow: /gear/
-Disallow: /locations/
+# Public, crawlable content. Every entity URL in sitemap.xml lives under
+# /share/ (or /score-cards/{id} and /pellet-tests/{id}); the backend renders
+# these with per-entity title, description and a self-referencing canonical.
+# The in-app routes for the same entities are disallowed below — they sit
+# behind requireAuth and would only ever serve a redirect to /login.
+Allow: /share/
+
+# The API is not content. Keep crawlers out of it so they spend their budget
+# on pages instead of JSON.
+Disallow: /api/
+
+# Authenticated-only paths (children of `appRoute` in the frontend route
+# tree — `beforeLoad: requireAuth` bounces anonymous visitors to /login).
+# Rules are prefixes, so "/users" also covers "/users/{id}".
+Disallow: /scores
+Disallow: /pellet-testing
+Disallow: /gear
+Disallow: /locations
 Disallow: /profile
-Disallow: /users/
-Disallow: /feed/
-Disallow: /notifications/
-Disallow: /drafts/
-Disallow: /quick-capture/
+Disallow: /users
+Disallow: /feed
+Disallow: /posts
+Disallow: /notifications
+Disallow: /drafts
+Disallow: /quick-capture
+Disallow: /help
+Disallow: /support
+Disallow: /feature-requests
+Disallow: /confirm-email
+
+# League, club and event pages are authenticated in-app views. Their public
+# counterparts are /share/leagues/{slug} and /share/clubs/{slug}, allowed above.
+Disallow: /leagues
+Disallow: /clubs
+Disallow: /events
 
 # Admin paths
-Disallow: /admin/
+Disallow: /admin
 
 # Settings paths
-Disallow: /settings/
+Disallow: /settings
 
-# Event management
-Disallow: /events/new
-Disallow: /events/*/settings
-
-# League/Club management
-Disallow: /leagues/*/settings
-Disallow: /clubs/*/settings
+# Token-bearing and post-login pages. These carry single-use secrets in the
+# URL or query string and must never be indexed. "/login/" keeps the trailing
+# slash so the sign-in page itself (/login) stays crawlable.
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /login/
 
 Sitemap: https://sub12.io/sitemap.xml
