@@ -11,6 +11,19 @@ const RESISTANCE = 0.5
 const HIDDEN_Y = -56
 const SPINNING_Y = 16
 
+/**
+ * How far the page is scrolled from its top.
+ *
+ * The app shell is document-height, so `main` only overflows — and only carries
+ * a non-zero `scrollTop` — when something above it constrains its height. On
+ * every normal screen the document is the scroller, and reading `main.scrollTop`
+ * reports 0 no matter how far down the user is.
+ */
+export function pageScrollTop(el: HTMLElement | null): number {
+  if (el && el.scrollHeight > el.clientHeight) return el.scrollTop
+  return window.scrollY || document.documentElement.scrollTop || 0
+}
+
 interface PullToRefresh {
   /** Attach to the floating indicator; the hook drives its transform directly. */
   indicatorRef: RefObject<HTMLDivElement>
@@ -63,7 +76,7 @@ export function usePullToRefresh(
     let travel = 0
 
     const start = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || el.scrollTop > 0) return
+      if (e.touches.length !== 1 || pageScrollTop(el) > 0) return
       startY = e.touches[0].clientY
       pulling = true
       armed = false
@@ -74,7 +87,7 @@ export function usePullToRefresh(
       if (!pulling) return
       const dy = e.touches[0].clientY - startY
       // Swiping up, or the container scrolled under us — hand the gesture back.
-      if (dy <= 0 || el.scrollTop > 0) {
+      if (dy <= 0 || pageScrollTop(el) > 0) {
         pulling = false
         travel = 0
         place(0, true)
