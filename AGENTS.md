@@ -369,6 +369,13 @@ these over ad-hoc Tailwind so surfaces stay consistent.
   `SkeletonStats`, `SkeletonPage`, `Spinner`) or `LoadingRows` from
   `src/components/leagues` inside a `<Section>`. Don't ship a bare "Loading…"
   string — it collapses the layout and reflows when data lands.
+- **Layer stack** — nav chrome `z-40`–`z-[60]`, dialogs and overlays `z-[110]`,
+  image viewers/editors `z-[120]`, toasts `z-[150]`, `.skip-link` `200`. Toasts
+  have to outrank every overlay: most of what they report is the outcome of an
+  action *started from inside a dialog*, and a toast under the backdrop is
+  blurred out — the user reads a failed submit as a dead button. New overlays
+  go at `z-[110]`/`z-[120]`; `Toast.test.tsx` scans the source and fails on
+  anything at or above the toast layer.
 - **Native-only rules** — `.native-app` selectors in the base layer disable
   long-press callouts, chrome text selection, and overscroll bounce inside the
   Capacitor WebView. Add `.selectable` to opt real content back in.
