@@ -386,6 +386,7 @@ export default function UserProfile() {
           {showShare && id && profile && (
             <ShareDialog
               targetId={id}
+              targetSlug={profile.slug}
               targetType="user"
               targetLabel={profile.display_name}
               shareTitle={profile.display_name}

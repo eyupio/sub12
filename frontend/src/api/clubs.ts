@@ -4,6 +4,8 @@ import type { League, CreateLeaguePayload } from './leagues'
 export interface Club {
   id: string
   name: string
+  /** Human-readable identifier used in public share URLs. */
+  slug?: string
   description?: string
   image_url?: string
   join_code: string

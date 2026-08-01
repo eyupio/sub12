@@ -174,8 +174,9 @@ func (h *OGImage) League() http.HandlerFunc {
 
 		// Leagues don't expose UpdatedAt on the public shape; fall back to a
 		// coarse hourly cache key instead of tying the rendered image to a
-		// mutable ETag-ish value.
-		key := ogCacheKey("league", id, time.Now().Truncate(time.Hour))
+		// mutable ETag-ish value. Keyed on the resolved ID so the slug and
+		// UUID spellings of the URL share one rendered PNG.
+		key := ogCacheKey("league", league.ID, time.Now().Truncate(time.Hour))
 		if png, ok := h.cache.Get(key); ok {
 			h.writePNG(w, png)
 			return
@@ -208,7 +209,7 @@ func (h *OGImage) Club() http.HandlerFunc {
 			return
 		}
 
-		key := ogCacheKey("club", id, time.Now().Truncate(time.Hour))
+		key := ogCacheKey("club", club.ID, time.Now().Truncate(time.Hour))
 		if png, ok := h.cache.Get(key); ok {
 			h.writePNG(w, png)
 			return
@@ -241,7 +242,7 @@ func (h *OGImage) User() http.HandlerFunc {
 			return
 		}
 
-		key := ogCacheKey("user", id, time.Now().Truncate(time.Hour))
+		key := ogCacheKey("user", profile.ID, time.Now().Truncate(time.Hour))
 		if png, ok := h.cache.Get(key); ok {
 			h.writePNG(w, png)
 			return

@@ -57,28 +57,69 @@ export const SharedLeagueView = () => <SharedView type="league" />
 export const SharedClubView = () => <SharedView type="club" />
 export const SharedUserView = () => <SharedView type="user" />
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Share URLs for users, leagues and clubs carry a readable slug; the backend
+// resolves either spelling. The in-app routes we hand signed-in users off to
+// are a different matter — their secondary fetches (standings, members,
+// rounds) take the route param straight through to endpoints that only speak
+// UUIDs, so a slug has to be resolved to an ID before we redirect.
+const resolveEntityId: Partial<Record<ShareTargetType, (ref: string) => Promise<string>>> = {
+  league: (ref) => leagueApi.get(ref).then((l) => l.id),
+  club: (ref) => clubsApi.get(ref).then((c) => c.id),
+  user: (ref) => usersApi.getProfile(ref).then((p) => p.id),
+}
+
 export default function SharedView({ type }: SharedViewProps) {
   const { id } = useParams({ strict: false }) as { id?: string }
   const isAuthed = useIsAuthed()
   const navigate = useNavigate()
 
+  const needsResolve = !!id && !UUID_RE.test(id) && !!resolveEntityId[type]
+
   // Authenticated users get the full in-app experience. We do this before any
-  // fetching to avoid a flash of the public view for signed-in users.
+  // fetching to avoid a flash of the public view for signed-in users — except
+  // when the URL carries a slug, where there is nothing to redirect to until
+  // it has been resolved.
   useEffect(() => {
-    if (isAuthed && id) {
+    if (isAuthed && id && !needsResolve) {
       navigate({ to: inAppPath[type](id), replace: true })
     }
-  }, [isAuthed, id, type, navigate])
-
-  if (isAuthed) {
-    return null
-  }
+  }, [isAuthed, id, type, needsResolve, navigate])
 
   if (!id) {
     return <NotFoundOrPrivate type={type} />
   }
 
+  if (isAuthed) {
+    return needsResolve ? <ResolveThenRedirect type={type} entityRef={id} /> : null
+  }
+
   return <PublicContent type={type} id={id} />
+}
+
+// ResolveThenRedirect turns a slug into the entity's ID and hands the signed-in
+// user on to the in-app page. A failure here is the same story as any other
+// missing entity, so it renders the standard not-found state rather than
+// bouncing to a broken in-app route.
+function ResolveThenRedirect({ type, entityRef }: { type: ShareTargetType; entityRef: string }) {
+  const navigate = useNavigate()
+  const resolve = resolveEntityId[type]
+  const { data, error } = useQuery({
+    queryKey: ['share-resolve', type, entityRef],
+    queryFn: () => resolve!(entityRef),
+    retry: false,
+    enabled: !!resolve,
+  })
+
+  useEffect(() => {
+    if (data) {
+      navigate({ to: inAppPath[type](data), replace: true })
+    }
+  }, [data, type, navigate])
+
+  if (error) return <NotFoundOrPrivate type={type} />
+  return <LoadingShell type={type} />
 }
 
 function PublicContent({ type, id }: { type: ShareTargetType; id: string }) {
@@ -556,6 +597,7 @@ function PublicLeague({ id }: { id: string }) {
       {showShare && (
         <ShareDialog
           targetId={id}
+          targetSlug={league.slug}
           targetType="league"
           targetLabel={league.name}
           shareTitle={league.name}
@@ -623,6 +665,7 @@ function PublicClub({ id }: { id: string }) {
       {showShare && (
         <ShareDialog
           targetId={id}
+          targetSlug={club.slug}
           targetType="club"
           targetLabel={club.name}
           shareTitle={club.name}
@@ -696,6 +739,7 @@ function PublicUser({ id }: { id: string }) {
       {showShare && (
         <ShareDialog
           targetId={id}
+          targetSlug={profile.slug}
           targetType="user"
           targetLabel={profile.display_name}
           shareTitle={profile.display_name}

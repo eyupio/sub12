@@ -386,3 +386,30 @@ func newShareMetaForTest(frontendOrigin string, ttl time.Duration) *ShareMeta {
 		ttl:            ttl,
 	}
 }
+
+func TestShareRef_PrefersSlugAndFallsBackToID(t *testing.T) {
+	assert.Equal(t, "paul-jennings", shareRef("paul-jennings", "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6"))
+	// A row inserted but not yet slugged, or one a backfill missed, still has
+	// to produce a working URL.
+	assert.Equal(t, "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6", shareRef("", "bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6"))
+}
+
+func TestInjectOG_CanonicalUsesTheSlugURLEvenWhenServedTheUUIDOne(t *testing.T) {
+	// The whole point of canonicalising: a visitor may arrive on either
+	// spelling, but search engines and social platforms must be told there is
+	// one page, at the readable URL.
+	tmpl := []byte(`<!doctype html><html><head><title>x</title></head></html>`)
+	og := openGraph{
+		Title:       "Paul Jennings on sub-12",
+		Description: "Yorkshire",
+		Image:       "https://sub12.io/og/users/paul-jennings.png",
+		URL:         "https://sub12.io/share/users/paul-jennings",
+		Type:        "profile",
+	}
+
+	out := string(injectOG(tmpl, og, "SUB12"))
+
+	assert.Contains(t, out, `<link rel="canonical" href="https://sub12.io/share/users/paul-jennings" />`)
+	assert.Contains(t, out, `property="og:url" content="https://sub12.io/share/users/paul-jennings"`)
+	assert.NotContains(t, out, "bb2c625d")
+}

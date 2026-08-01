@@ -3,6 +3,9 @@ import { api } from './client'
 export interface PublicProfile {
   id: string
   display_name: string
+  /** Human-readable identifier used in public share URLs. Empty for rows a
+   *  backfill hasn't reached; callers fall back to `id`. */
+  slug?: string
   bio?: string
   location?: string
   club?: string

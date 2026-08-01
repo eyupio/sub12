@@ -3,8 +3,10 @@ package model
 import "time"
 
 type League struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Slug is the human-readable identifier used in public share URLs.
+	Slug           string    `json:"slug"`
 	Description    *string   `json:"description,omitempty"`
 	Type           string    `json:"type"`
 	PostVisibility string    `json:"post_visibility"`

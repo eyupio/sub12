@@ -372,6 +372,7 @@ export default function LeagueDetail() {
       {showShare && league && leagueId && (
         <ShareDialog
           targetId={leagueId}
+          targetSlug={league.slug}
           targetType="league"
           targetLabel={league.name}
           shareTitle={league.name}

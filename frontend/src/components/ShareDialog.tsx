@@ -21,6 +21,13 @@ interface ShareDialogProps {
   targetLabel: string
   shareTitle?: string
   shareText?: string
+  /**
+   * Human-readable identifier for the shared entity, used in place of the UUID
+   * so a pasted link reads as /share/users/paul-jennings. Users, leagues and
+   * clubs have one; score cards and pellet tests don't and keep their UUID.
+   * Falls back to targetId when absent — the backend resolves either form.
+   */
+  targetSlug?: string
   onClose: () => void
 }
 
@@ -61,7 +68,7 @@ function XMarkIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, shareText: shareTextProp, onClose }: ShareDialogProps) {
+export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, shareText: shareTextProp, targetSlug, onClose }: ShareDialogProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [destination, setDestination] = useState<Destination>('personal')
@@ -77,7 +84,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
   // on native the latter is capacitor://localhost / https://localhost, which is
   // useless once the link leaves the app.
   const origin = siteOrigin()
-  const shareUrl = `${origin}${publicPathByType[targetType]}/${targetId}`
+  const shareUrl = `${origin}${publicPathByType[targetType]}/${targetSlug?.trim() || targetId}`
   const shareText = shareTextProp?.trim() || `${targetLabel} on sub-12`
   const effectiveTitle = shareTitle?.trim() || targetLabel
   const systemShare = hasSystemShare()

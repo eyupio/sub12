@@ -181,6 +181,42 @@ describe('ShareDialog', () => {
     expect(clubsSpy).not.toHaveBeenCalled()
   })
 
+  it('builds the share link from the slug when the entity has one', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+
+    renderDialog({
+      targetId: 'bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6',
+      targetSlug: 'paul-jennings',
+      targetType: 'user',
+      targetLabel: 'Paul Jennings',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^share externally$/i }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    // A raw UUID reads badly in a social post next to the preview card.
+    expect(share.mock.calls[0][0].url).toBe('https://app.test/share/users/paul-jennings')
+  })
+
+  it('falls back to the id when the entity has no slug yet', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+
+    renderDialog({
+      targetId: 'bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6',
+      targetType: 'user',
+      targetLabel: 'Paul Jennings',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^share externally$/i }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    expect(share.mock.calls[0][0].url).toBe(
+      'https://app.test/share/users/bb2c625d-6dc4-4f9e-9f1c-04fc13b46ce6',
+    )
+  })
+
   it('forwards a caller-supplied shareText to the Web Share API', async () => {
     const share = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'share', { configurable: true, value: share })

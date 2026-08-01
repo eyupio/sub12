@@ -547,6 +547,7 @@ export default function ClubDetail() {
       {showShare && (
         <ShareDialog
           targetId={id}
+          targetSlug={club.slug}
           targetType="club"
           targetLabel={club.name}
           shareTitle={club.name}

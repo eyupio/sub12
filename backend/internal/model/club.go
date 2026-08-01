@@ -16,8 +16,10 @@ type ClubSummary struct {
 }
 
 type Club struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Slug is the human-readable identifier used in public share URLs.
+	Slug           string  `json:"slug"`
 	Description    *string `json:"description,omitempty"`
 	ImageURL       *string `json:"image_url,omitempty"`
 	JoinCode       string  `json:"join_code"`

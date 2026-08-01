@@ -120,7 +120,8 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 		if id != "" {
 			card, err := s.scoreCards.GetForViewer(r.Context(), id, "")
 			if err == nil {
-				displayName := s.lookupDisplayName(r.Context(), card.UserID)
+				author := s.lookupAuthor(r.Context(), card.UserID)
+				displayName := authorDisplayName(author)
 				rifle := s.lookupRifle(r.Context(), card.RifleID, card.UserID)
 				pellet := s.lookupPellet(r.Context(), card.PelletID, card.UserID)
 				achievements := s.lookupUserAchievements(r.Context(), card.UserID)
@@ -129,9 +130,9 @@ func (s *ShareMeta) ScoreCard() http.HandlerFunc {
 				og.Image = s.absolute("/og/score-cards/" + id + ".png")
 				og.ImageAlt = scoreCardImageAlt(card, displayName)
 				og.Type = "article"
-				if displayName != "" {
+				if author != nil {
 					og.AuthorName = displayName
-					og.AuthorURL = s.absolute("/share/users/" + card.UserID)
+					og.AuthorURL = s.absolute("/share/users/" + shareRef(author.Slug, author.ID))
 				}
 			}
 		}
@@ -147,15 +148,16 @@ func (s *ShareMeta) PelletTest() http.HandlerFunc {
 		if id != "" {
 			sess, err := s.pelletTest.GetForViewer(r.Context(), id, "")
 			if err == nil {
-				displayName := s.lookupDisplayName(r.Context(), sess.UserID)
+				author := s.lookupAuthor(r.Context(), sess.UserID)
+				displayName := authorDisplayName(author)
 				og.Title = pelletTestTitle(sess)
 				og.Description = pelletTestDescription(sess, displayName)
 				og.Image = s.absolute("/og/pellet-tests/" + id + ".png")
 				og.ImageAlt = pelletTestImageAlt(sess, displayName)
 				og.Type = "article"
-				if displayName != "" {
+				if author != nil {
 					og.AuthorName = displayName
-					og.AuthorURL = s.absolute("/share/users/" + sess.UserID)
+					og.AuthorURL = s.absolute("/share/users/" + shareRef(author.Slug, author.ID))
 				}
 			}
 		}
@@ -171,11 +173,13 @@ func (s *ShareMeta) League() http.HandlerFunc {
 		if id != "" && s.leagues != nil {
 			league, err := s.leagues.GetByID(r.Context(), id, "", "")
 			if err == nil && league != nil {
+				ref := shareRef(league.Slug, league.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", league.Name)
 				og.Description = leagueDescription(league)
-				og.Image = s.absolute("/og/leagues/" + id + ".png")
+				og.Image = s.absolute("/og/leagues/" + ref + ".png")
 				og.ImageAlt = leagueImageAlt(league)
 				og.Type = "article"
+				og.URL = s.absolute("/share/leagues/" + ref)
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -190,11 +194,13 @@ func (s *ShareMeta) Club() http.HandlerFunc {
 		if id != "" && s.clubs != nil {
 			club, err := s.clubs.GetByID(r.Context(), id, "", "")
 			if err == nil && club != nil {
+				ref := shareRef(club.Slug, club.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", club.Name)
 				og.Description = clubDescription(club)
-				og.Image = s.absolute("/og/clubs/" + id + ".png")
+				og.Image = s.absolute("/og/clubs/" + ref + ".png")
 				og.ImageAlt = clubImageAlt(club)
 				og.Type = "article"
+				og.URL = s.absolute("/share/clubs/" + ref)
 			}
 		}
 		s.writeHTML(w, r, og)
@@ -209,11 +215,16 @@ func (s *ShareMeta) User() http.HandlerFunc {
 		if id != "" && s.users != nil {
 			profile, err := s.users.GetPublicProfile(r.Context(), id)
 			if err == nil && profile != nil && profile.ProfileVisibility != "private" {
+				ref := shareRef(profile.Slug, profile.ID)
 				og.Title = fmt.Sprintf("%s on sub-12", profile.DisplayName)
 				og.Description = userDescription(profile)
-				og.Image = s.absolute("/og/users/" + id + ".png")
+				og.Image = s.absolute("/og/users/" + ref + ".png")
 				og.ImageAlt = userImageAlt(profile)
 				og.Type = "profile"
+				// Point og:url and rel=canonical at the slug form even when the
+				// visitor arrived on the UUID one, so the two spellings of the
+				// same page consolidate instead of competing.
+				og.URL = s.absolute("/share/users/" + ref)
 				// profile:username is the property Open Graph defines for
 				// og:type=profile; without it a shared profile is just an
 				// untyped page to anything consuming the graph.
@@ -224,17 +235,25 @@ func (s *ShareMeta) User() http.HandlerFunc {
 	}
 }
 
-// lookupDisplayName returns the owner's display name if the profile is not
-// private. Returns "" on any error so callers can degrade gracefully.
-func (s *ShareMeta) lookupDisplayName(ctx context.Context, userID string) string {
+// lookupAuthor returns the owner's public profile, or nil when the owner is
+// private or unresolvable, so callers can degrade to an unattributed preview.
+func (s *ShareMeta) lookupAuthor(ctx context.Context, userID string) *model.PublicProfile {
 	if s.users == nil || userID == "" {
-		return ""
+		return nil
 	}
 	profile, err := s.users.GetPublicProfile(ctx, userID)
 	if err != nil || profile == nil || profile.ProfileVisibility == "private" {
+		return nil
+	}
+	return profile
+}
+
+// authorDisplayName is the nil-safe accessor callers use for copy.
+func authorDisplayName(p *model.PublicProfile) string {
+	if p == nil {
 		return ""
 	}
-	return profile.DisplayName
+	return p.DisplayName
 }
 
 // lookupUserAchievements returns the owner's earned achievements as an
@@ -284,6 +303,16 @@ func (s *ShareMeta) defaultOG(r *http.Request) openGraph {
 		URL:         s.absoluteFromRequest(r),
 		Type:        "website",
 	}
+}
+
+// shareRef prefers an entity's human-readable slug for public URLs, falling
+// back to its UUID. The fallback covers the window between a row being
+// inserted and its slug being claimed, and any row a backfill missed.
+func shareRef(slug, id string) string {
+	if slug != "" {
+		return slug
+	}
+	return id
 }
 
 // isValidUUID reports whether s parses as a UUID. Used to short-circuit

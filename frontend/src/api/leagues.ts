@@ -3,6 +3,8 @@ import { api } from './client'
 export interface League {
   id: string
   name: string
+  /** Human-readable identifier used in public share URLs. */
+  slug?: string
   description?: string
   type: string
   post_visibility: 'members' | 'public'
