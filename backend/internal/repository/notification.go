@@ -150,6 +150,16 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		       club_join_approved_email, mention_email, post_flagged_email, ticket_created_email,
 		       ticket_replied_email, ticket_assigned_email, ticket_status_changed_email,
 		       feature_request_state_changed_email,
+		       score_validation_requested, league_join_request, league_join_rejected,
+		       league_role_changed, league_round_opened, club_join_request,
+		       club_join_rejected, club_role_changed, event_invitation,
+		       event_participant_joined, event_went_live, event_results_posted,
+		       score_validation_requested_email, league_join_request_email,
+		       league_join_rejected_email, league_role_changed_email,
+		       league_round_opened_email, club_join_request_email,
+		       club_join_rejected_email, club_role_changed_email, event_invitation_email,
+		       event_participant_joined_email, event_went_live_email,
+		       event_results_posted_email,
 		       updated_at
 		FROM notification_preferences
 		WHERE user_id = $1
@@ -165,6 +175,16 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		&p.ClubJoinApprovedEmail, &p.MentionEmail, &p.PostFlaggedEmail, &p.TicketCreatedEmail,
 		&p.TicketRepliedEmail, &p.TicketAssignedEmail, &p.TicketStatusChangedEmail,
 		&p.FeatureRequestStateChangedEmail,
+		&p.ScoreValidationRequested, &p.LeagueJoinRequest, &p.LeagueJoinRejected,
+		&p.LeagueRoleChanged, &p.LeagueRoundOpened, &p.ClubJoinRequest,
+		&p.ClubJoinRejected, &p.ClubRoleChanged, &p.EventInvitation,
+		&p.EventParticipantJoined, &p.EventWentLive, &p.EventResultsPosted,
+		&p.ScoreValidationRequestedEmail, &p.LeagueJoinRequestEmail,
+		&p.LeagueJoinRejectedEmail, &p.LeagueRoleChangedEmail,
+		&p.LeagueRoundOpenedEmail, &p.ClubJoinRequestEmail,
+		&p.ClubJoinRejectedEmail, &p.ClubRoleChangedEmail, &p.EventInvitationEmail,
+		&p.EventParticipantJoinedEmail, &p.EventWentLiveEmail,
+		&p.EventResultsPostedEmail,
 		&p.UpdatedAt,
 	)
 	if err != nil {
@@ -290,6 +310,78 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.FeatureRequestStateChangedEmail != nil {
 		current.FeatureRequestStateChangedEmail = *in.FeatureRequestStateChangedEmail
 	}
+	if in.ScoreValidationRequested != nil {
+		current.ScoreValidationRequested = *in.ScoreValidationRequested
+	}
+	if in.LeagueJoinRequest != nil {
+		current.LeagueJoinRequest = *in.LeagueJoinRequest
+	}
+	if in.LeagueJoinRejected != nil {
+		current.LeagueJoinRejected = *in.LeagueJoinRejected
+	}
+	if in.LeagueRoleChanged != nil {
+		current.LeagueRoleChanged = *in.LeagueRoleChanged
+	}
+	if in.LeagueRoundOpened != nil {
+		current.LeagueRoundOpened = *in.LeagueRoundOpened
+	}
+	if in.ClubJoinRequest != nil {
+		current.ClubJoinRequest = *in.ClubJoinRequest
+	}
+	if in.ClubJoinRejected != nil {
+		current.ClubJoinRejected = *in.ClubJoinRejected
+	}
+	if in.ClubRoleChanged != nil {
+		current.ClubRoleChanged = *in.ClubRoleChanged
+	}
+	if in.EventInvitation != nil {
+		current.EventInvitation = *in.EventInvitation
+	}
+	if in.EventParticipantJoined != nil {
+		current.EventParticipantJoined = *in.EventParticipantJoined
+	}
+	if in.EventWentLive != nil {
+		current.EventWentLive = *in.EventWentLive
+	}
+	if in.EventResultsPosted != nil {
+		current.EventResultsPosted = *in.EventResultsPosted
+	}
+	if in.ScoreValidationRequestedEmail != nil {
+		current.ScoreValidationRequestedEmail = *in.ScoreValidationRequestedEmail
+	}
+	if in.LeagueJoinRequestEmail != nil {
+		current.LeagueJoinRequestEmail = *in.LeagueJoinRequestEmail
+	}
+	if in.LeagueJoinRejectedEmail != nil {
+		current.LeagueJoinRejectedEmail = *in.LeagueJoinRejectedEmail
+	}
+	if in.LeagueRoleChangedEmail != nil {
+		current.LeagueRoleChangedEmail = *in.LeagueRoleChangedEmail
+	}
+	if in.LeagueRoundOpenedEmail != nil {
+		current.LeagueRoundOpenedEmail = *in.LeagueRoundOpenedEmail
+	}
+	if in.ClubJoinRequestEmail != nil {
+		current.ClubJoinRequestEmail = *in.ClubJoinRequestEmail
+	}
+	if in.ClubJoinRejectedEmail != nil {
+		current.ClubJoinRejectedEmail = *in.ClubJoinRejectedEmail
+	}
+	if in.ClubRoleChangedEmail != nil {
+		current.ClubRoleChangedEmail = *in.ClubRoleChangedEmail
+	}
+	if in.EventInvitationEmail != nil {
+		current.EventInvitationEmail = *in.EventInvitationEmail
+	}
+	if in.EventParticipantJoinedEmail != nil {
+		current.EventParticipantJoinedEmail = *in.EventParticipantJoinedEmail
+	}
+	if in.EventWentLiveEmail != nil {
+		current.EventWentLiveEmail = *in.EventWentLiveEmail
+	}
+	if in.EventResultsPostedEmail != nil {
+		current.EventResultsPostedEmail = *in.EventResultsPostedEmail
+	}
 
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO notification_preferences (
@@ -304,11 +396,23 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			club_join_approved_email, mention_email, post_flagged_email, ticket_created_email,
 			ticket_replied_email, ticket_assigned_email, ticket_status_changed_email,
 			feature_request_state_changed_email,
+			score_validation_requested, league_join_request, league_join_rejected,
+			league_role_changed, league_round_opened, club_join_request,
+			club_join_rejected, club_role_changed, event_invitation,
+			event_participant_joined, event_went_live, event_results_posted,
+			score_validation_requested_email, league_join_request_email,
+			league_join_rejected_email, league_role_changed_email,
+			league_round_opened_email, club_join_request_email,
+			club_join_rejected_email, club_role_changed_email, event_invitation_email,
+			event_participant_joined_email, event_went_live_email,
+			event_results_posted_email,
 			updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
 			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
 			$27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
+			$38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
+			$50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
 			NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
@@ -348,6 +452,30 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			ticket_assigned_email      = EXCLUDED.ticket_assigned_email,
 			ticket_status_changed_email = EXCLUDED.ticket_status_changed_email,
 			feature_request_state_changed_email = EXCLUDED.feature_request_state_changed_email,
+			score_validation_requested = EXCLUDED.score_validation_requested,
+			league_join_request        = EXCLUDED.league_join_request,
+			league_join_rejected       = EXCLUDED.league_join_rejected,
+			league_role_changed        = EXCLUDED.league_role_changed,
+			league_round_opened        = EXCLUDED.league_round_opened,
+			club_join_request          = EXCLUDED.club_join_request,
+			club_join_rejected         = EXCLUDED.club_join_rejected,
+			club_role_changed          = EXCLUDED.club_role_changed,
+			event_invitation           = EXCLUDED.event_invitation,
+			event_participant_joined   = EXCLUDED.event_participant_joined,
+			event_went_live            = EXCLUDED.event_went_live,
+			event_results_posted       = EXCLUDED.event_results_posted,
+			score_validation_requested_email = EXCLUDED.score_validation_requested_email,
+			league_join_request_email  = EXCLUDED.league_join_request_email,
+			league_join_rejected_email = EXCLUDED.league_join_rejected_email,
+			league_role_changed_email  = EXCLUDED.league_role_changed_email,
+			league_round_opened_email  = EXCLUDED.league_round_opened_email,
+			club_join_request_email    = EXCLUDED.club_join_request_email,
+			club_join_rejected_email   = EXCLUDED.club_join_rejected_email,
+			club_role_changed_email    = EXCLUDED.club_role_changed_email,
+			event_invitation_email     = EXCLUDED.event_invitation_email,
+			event_participant_joined_email = EXCLUDED.event_participant_joined_email,
+			event_went_live_email      = EXCLUDED.event_went_live_email,
+			event_results_posted_email = EXCLUDED.event_results_posted_email,
 			updated_at                 = NOW()
 	`,
 		current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
@@ -361,6 +489,16 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 		current.ClubJoinApprovedEmail, current.MentionEmail, current.PostFlaggedEmail, current.TicketCreatedEmail,
 		current.TicketRepliedEmail, current.TicketAssignedEmail, current.TicketStatusChangedEmail,
 		current.FeatureRequestStateChangedEmail,
+		current.ScoreValidationRequested, current.LeagueJoinRequest, current.LeagueJoinRejected,
+		current.LeagueRoleChanged, current.LeagueRoundOpened, current.ClubJoinRequest,
+		current.ClubJoinRejected, current.ClubRoleChanged, current.EventInvitation,
+		current.EventParticipantJoined, current.EventWentLive, current.EventResultsPosted,
+		current.ScoreValidationRequestedEmail, current.LeagueJoinRequestEmail,
+		current.LeagueJoinRejectedEmail, current.LeagueRoleChangedEmail,
+		current.LeagueRoundOpenedEmail, current.ClubJoinRequestEmail,
+		current.ClubJoinRejectedEmail, current.ClubRoleChangedEmail, current.EventInvitationEmail,
+		current.EventParticipantJoinedEmail, current.EventWentLiveEmail,
+		current.EventResultsPostedEmail,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("upsert prefs: %w", err)

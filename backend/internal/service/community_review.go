@@ -49,6 +49,18 @@ type ScoreCardLookupRepo interface {
 	GetPublicByID(ctx context.Context, id string) (*model.ScoreCard, error)
 }
 
+// FollowerLister returns the ids of a user's followers, newest first. A
+// community review is addressed to them: they are the people the request's
+// feed post reaches, and the ones who can act on it.
+type FollowerLister interface {
+	ListFollowerIDs(ctx context.Context, userID string, limit int) ([]string, error)
+}
+
+// reviewRequestFanoutLimit caps how many followers are told about a review
+// request. A shooter with a large following would otherwise write one
+// notification row per follower on a single button press.
+const reviewRequestFanoutLimit = 200
+
 type CommunityReviewService struct {
 	requests      CommunityReviewRepo
 	cards         ScoreCardLookupRepo
@@ -56,6 +68,7 @@ type CommunityReviewService struct {
 	activity      *ActivityService
 	achievement   *AchievementService
 	notifications *NotificationService // nil disables notification fan-out
+	followers     FollowerLister       // nil disables review-request fan-out
 	log           zerolog.Logger
 }
 
@@ -78,6 +91,12 @@ func NewCommunityReviewService(
 // SetNotifications wires notification fan-out. Optional — nil disables it.
 func (s *CommunityReviewService) SetNotifications(n *NotificationService) {
 	s.notifications = n
+}
+
+// SetFollowers wires the follower lookup used to tell people a personal card
+// is waiting on validation. Optional — nil leaves the request feed-only.
+func (s *CommunityReviewService) SetFollowers(f FollowerLister) {
+	s.followers = f
 }
 
 // SetLogger wires the logger used by background goroutines for panic recovery.
@@ -140,7 +159,43 @@ func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID,
 			s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewRequested, &scoreCardID, &tt, meta, nil, nil, visibility)
 		})
 	}
+	s.notifyValidationRequested(scoreCardID, ownerID, card.TotalScore, req.RequiredConfirmations)
 	return req, nil
+}
+
+// notifyValidationRequested rings the bell for the owner's followers: a
+// personal card is waiting on the community to confirm it. Runs in the
+// background because the fan-out is one row per follower and the shooter is
+// waiting on the response.
+func (s *CommunityReviewService) notifyValidationRequested(
+	scoreCardID, ownerID string, totalScore, requiredConfirmations int16,
+) {
+	if s.notifications == nil || s.followers == nil {
+		return
+	}
+	s.safeGo("notifications.Fanout(validation_requested)", func() {
+		bg := context.Background()
+		ids, err := s.followers.ListFollowerIDs(bg, ownerID, reviewRequestFanoutLimit)
+		if err != nil {
+			s.log.Warn().Err(err).Str("owner_id", ownerID).Msg("community_review: load followers for validation fan-out failed")
+			return
+		}
+		tid, tt := scoreCardID, "score_card"
+		for _, rid := range ids {
+			s.notifications.Fanout(bg, NotifEvent{
+				RecipientID: rid,
+				ActorID:     ownerID,
+				Type:        model.NotificationTypeScoreValidationRequested,
+				TargetID:    &tid,
+				TargetType:  &tt,
+				Metadata: map[string]any{
+					"scope":                  "personal",
+					"total_score":            totalScore,
+					"required_confirmations": requiredConfirmations,
+				},
+			})
+		}
+	})
 }
 
 // CancelReview removes an open community review request. Owner-only. The

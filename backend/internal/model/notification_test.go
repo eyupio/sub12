@@ -37,6 +37,18 @@ func TestEnabledForType_PerType(t *testing.T) {
 		{NotificationTypeTicketAssigned, func(p *NotificationPreferences, v bool) { p.TicketAssigned = v }},
 		{NotificationTypeTicketStatusChanged, func(p *NotificationPreferences, v bool) { p.TicketStatusChanged = v }},
 		{NotificationTypeFeatureRequestStateChanged, func(p *NotificationPreferences, v bool) { p.FeatureRequestStateChanged = v }},
+		{NotificationTypeScoreValidationRequested, func(p *NotificationPreferences, v bool) { p.ScoreValidationRequested = v }},
+		{NotificationTypeLeagueJoinRequest, func(p *NotificationPreferences, v bool) { p.LeagueJoinRequest = v }},
+		{NotificationTypeLeagueJoinRejected, func(p *NotificationPreferences, v bool) { p.LeagueJoinRejected = v }},
+		{NotificationTypeLeagueRoleChanged, func(p *NotificationPreferences, v bool) { p.LeagueRoleChanged = v }},
+		{NotificationTypeLeagueRoundOpened, func(p *NotificationPreferences, v bool) { p.LeagueRoundOpened = v }},
+		{NotificationTypeClubJoinRequest, func(p *NotificationPreferences, v bool) { p.ClubJoinRequest = v }},
+		{NotificationTypeClubJoinRejected, func(p *NotificationPreferences, v bool) { p.ClubJoinRejected = v }},
+		{NotificationTypeClubRoleChanged, func(p *NotificationPreferences, v bool) { p.ClubRoleChanged = v }},
+		{NotificationTypeEventInvitation, func(p *NotificationPreferences, v bool) { p.EventInvitation = v }},
+		{NotificationTypeEventParticipantJoined, func(p *NotificationPreferences, v bool) { p.EventParticipantJoined = v }},
+		{NotificationTypeEventWentLive, func(p *NotificationPreferences, v bool) { p.EventWentLive = v }},
+		{NotificationTypeEventResultsPosted, func(p *NotificationPreferences, v bool) { p.EventResultsPosted = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
@@ -53,30 +65,46 @@ func TestEnabledForType_PerType(t *testing.T) {
 
 func TestEmailEnabledForType_PerType(t *testing.T) {
 	cases := []struct {
-		typ    string
-		setter func(*NotificationPreferences, bool)
+		typ string
+		// defaultOff marks the broadcast types whose email delivery is opt-in:
+		// they reach every member, participant or follower, so shipping them to
+		// an inbox by default would be spam.
+		defaultOff bool
+		setter     func(*NotificationPreferences, bool)
 	}{
-		{NotificationTypeFollowRequest, func(p *NotificationPreferences, v bool) { p.FollowRequestEmail = v }},
-		{NotificationTypeFollowAccepted, func(p *NotificationPreferences, v bool) { p.FollowAcceptedEmail = v }},
-		{NotificationTypeCommentOnCard, func(p *NotificationPreferences, v bool) { p.CommentOnMyCardEmail = v }},
-		{NotificationTypeReplyToMyComment, func(p *NotificationPreferences, v bool) { p.ReplyToMyCommentEmail = v }},
-		{NotificationTypeLikeOnMyContent, func(p *NotificationPreferences, v bool) { p.LikeOnMyContentEmail = v }},
-		{NotificationTypeScoreVerified, func(p *NotificationPreferences, v bool) { p.ScoreVerifiedEmail = v }},
-		{NotificationTypeScoreRejected, func(p *NotificationPreferences, v bool) { p.ScoreRejectedEmail = v }},
-		{NotificationTypeScoreAmended, func(p *NotificationPreferences, v bool) { p.ScoreAmendedEmail = v }},
-		{NotificationTypeLeagueJoinApproved, func(p *NotificationPreferences, v bool) { p.LeagueJoinApprovedEmail = v }},
-		{NotificationTypeClubJoinApproved, func(p *NotificationPreferences, v bool) { p.ClubJoinApprovedEmail = v }},
-		{NotificationTypeMention, func(p *NotificationPreferences, v bool) { p.MentionEmail = v }},
-		{NotificationTypeTicketCreated, func(p *NotificationPreferences, v bool) { p.TicketCreatedEmail = v }},
-		{NotificationTypeTicketReplied, func(p *NotificationPreferences, v bool) { p.TicketRepliedEmail = v }},
-		{NotificationTypeTicketAssigned, func(p *NotificationPreferences, v bool) { p.TicketAssignedEmail = v }},
-		{NotificationTypeTicketStatusChanged, func(p *NotificationPreferences, v bool) { p.TicketStatusChangedEmail = v }},
-		{NotificationTypeFeatureRequestStateChanged, func(p *NotificationPreferences, v bool) { p.FeatureRequestStateChangedEmail = v }},
+		{NotificationTypeFollowRequest, false, func(p *NotificationPreferences, v bool) { p.FollowRequestEmail = v }},
+		{NotificationTypeFollowAccepted, false, func(p *NotificationPreferences, v bool) { p.FollowAcceptedEmail = v }},
+		{NotificationTypeCommentOnCard, false, func(p *NotificationPreferences, v bool) { p.CommentOnMyCardEmail = v }},
+		{NotificationTypeReplyToMyComment, false, func(p *NotificationPreferences, v bool) { p.ReplyToMyCommentEmail = v }},
+		{NotificationTypeLikeOnMyContent, false, func(p *NotificationPreferences, v bool) { p.LikeOnMyContentEmail = v }},
+		{NotificationTypeScoreVerified, false, func(p *NotificationPreferences, v bool) { p.ScoreVerifiedEmail = v }},
+		{NotificationTypeScoreRejected, false, func(p *NotificationPreferences, v bool) { p.ScoreRejectedEmail = v }},
+		{NotificationTypeScoreAmended, false, func(p *NotificationPreferences, v bool) { p.ScoreAmendedEmail = v }},
+		{NotificationTypeLeagueJoinApproved, false, func(p *NotificationPreferences, v bool) { p.LeagueJoinApprovedEmail = v }},
+		{NotificationTypeClubJoinApproved, false, func(p *NotificationPreferences, v bool) { p.ClubJoinApprovedEmail = v }},
+		{NotificationTypeMention, false, func(p *NotificationPreferences, v bool) { p.MentionEmail = v }},
+		{NotificationTypeTicketCreated, false, func(p *NotificationPreferences, v bool) { p.TicketCreatedEmail = v }},
+		{NotificationTypeTicketReplied, false, func(p *NotificationPreferences, v bool) { p.TicketRepliedEmail = v }},
+		{NotificationTypeTicketAssigned, false, func(p *NotificationPreferences, v bool) { p.TicketAssignedEmail = v }},
+		{NotificationTypeTicketStatusChanged, false, func(p *NotificationPreferences, v bool) { p.TicketStatusChangedEmail = v }},
+		{NotificationTypeFeatureRequestStateChanged, false, func(p *NotificationPreferences, v bool) { p.FeatureRequestStateChangedEmail = v }},
+		{NotificationTypeScoreValidationRequested, true, func(p *NotificationPreferences, v bool) { p.ScoreValidationRequestedEmail = v }},
+		{NotificationTypeLeagueJoinRequest, false, func(p *NotificationPreferences, v bool) { p.LeagueJoinRequestEmail = v }},
+		{NotificationTypeLeagueJoinRejected, false, func(p *NotificationPreferences, v bool) { p.LeagueJoinRejectedEmail = v }},
+		{NotificationTypeLeagueRoleChanged, false, func(p *NotificationPreferences, v bool) { p.LeagueRoleChangedEmail = v }},
+		{NotificationTypeLeagueRoundOpened, true, func(p *NotificationPreferences, v bool) { p.LeagueRoundOpenedEmail = v }},
+		{NotificationTypeClubJoinRequest, false, func(p *NotificationPreferences, v bool) { p.ClubJoinRequestEmail = v }},
+		{NotificationTypeClubJoinRejected, false, func(p *NotificationPreferences, v bool) { p.ClubJoinRejectedEmail = v }},
+		{NotificationTypeClubRoleChanged, false, func(p *NotificationPreferences, v bool) { p.ClubRoleChangedEmail = v }},
+		{NotificationTypeEventInvitation, false, func(p *NotificationPreferences, v bool) { p.EventInvitationEmail = v }},
+		{NotificationTypeEventParticipantJoined, true, func(p *NotificationPreferences, v bool) { p.EventParticipantJoinedEmail = v }},
+		{NotificationTypeEventWentLive, true, func(p *NotificationPreferences, v bool) { p.EventWentLiveEmail = v }},
+		{NotificationTypeEventResultsPosted, true, func(p *NotificationPreferences, v bool) { p.EventResultsPostedEmail = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
-		if !p.EmailEnabledForType(tc.typ) {
-			t.Errorf("%s: default email pref should be true, got false", tc.typ)
+		if got := p.EmailEnabledForType(tc.typ); got == tc.defaultOff {
+			t.Errorf("%s: default email pref should be %t, got %t", tc.typ, !tc.defaultOff, got)
 		}
 		tc.setter(p, false)
 		if p.EmailEnabledForType(tc.typ) {

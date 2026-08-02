@@ -123,9 +123,7 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	if !prefs.EmailEnabledForType(ev.Type) {
 		return
 	}
-	if isTicketNotificationType(ev.Type) {
-		// Ticket-related emails are rendered by SupportTicketService using
-		// ticket-specific templates instead of notification_generic.
+	if hasDedicatedEmailTemplate(ev.Type) {
 		return
 	}
 	if s.users == nil || s.emailer == nil {
@@ -185,17 +183,53 @@ func (s *NotificationService) pushFanout(ctx context.Context, ev NotifEvent) {
 	s.push.Send(ctx, tokens, PushMessage{Title: title, Body: body, Data: data})
 }
 
-func isTicketNotificationType(t string) bool {
+// hasDedicatedEmailTemplate reports whether another service already renders
+// this type's email from a purpose-built template, so Fanout must not also
+// send the generic notification_generic one. Ticket mail is rendered by
+// SupportTicketService; the event invitation carries an accept link and is
+// rendered by EventInvitationService, which applies the same email preference
+// before sending.
+func hasDedicatedEmailTemplate(t string) bool {
 	switch t {
 	case model.NotificationTypeTicketCreated,
 		model.NotificationTypeTicketReplied,
 		model.NotificationTypeTicketAssigned,
 		model.NotificationTypeTicketStatusChanged,
-		model.NotificationTypeFeatureRequestStateChanged:
+		model.NotificationTypeFeatureRequestStateChanged,
+		model.NotificationTypeEventInvitation:
 		return true
 	default:
 		return false
 	}
+}
+
+// namedSuffix renders " <name>" from metadata, falling back to " <fallback>".
+// The leading space keeps call sites readable — they concatenate a sentence
+// fragment that reads the same whether or not the name resolved.
+func namedSuffix(meta map[string]any, key, fallback string) string {
+	if name, ok := meta[key].(string); ok && name != "" {
+		return " " + name
+	}
+	return " " + fallback
+}
+
+// namedPrefix is namedSuffix for a name that opens the sentence.
+func namedPrefix(meta map[string]any, key, fallback string) string {
+	if name, ok := meta[key].(string); ok && name != "" {
+		return name
+	}
+	return fallback
+}
+
+// inSuffix names the league, club or event a validation request belongs to,
+// and renders nothing for a personal card — which belongs to no group.
+func inSuffix(meta map[string]any) string {
+	for _, key := range []string{"league_name", "event_name", "club_name"} {
+		if name, ok := meta[key].(string); ok && name != "" {
+			return " in " + name
+		}
+	}
+	return ""
 }
 
 // notificationEmailContent maps a NotifEvent to a user-facing email subject
@@ -245,6 +279,36 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 		return "Support ticket status updated", actor + " updated a support ticket status."
 	case model.NotificationTypeFeatureRequestStateChanged:
 		return "Feature request status updated", actor + " updated the state of a feature request."
+	case model.NotificationTypeScoreValidationRequested:
+		return "A score card needs validating", actor + " asked for a score card to be validated" + inSuffix(ev.Metadata) + "."
+	case model.NotificationTypeLeagueJoinRequest:
+		return "New league join request", actor + " asked to join" + namedSuffix(ev.Metadata, "league_name", "your league") + "."
+	case model.NotificationTypeLeagueJoinRejected:
+		return "League join request declined", "Your request to join" + namedSuffix(ev.Metadata, "league_name", "a league") + " was declined."
+	case model.NotificationTypeLeagueRoleChanged:
+		if promoted, _ := ev.Metadata["is_moderator"].(bool); promoted {
+			return "You now help run a league", "You were made a moderator of" + namedSuffix(ev.Metadata, "league_name", "a league") + "."
+		}
+		return "Your league role changed", "You are no longer a moderator of" + namedSuffix(ev.Metadata, "league_name", "a league") + "."
+	case model.NotificationTypeLeagueRoundOpened:
+		return "A new league round is open", "A new round is open in" + namedSuffix(ev.Metadata, "league_name", "your league") + "."
+	case model.NotificationTypeClubJoinRequest:
+		return "New club join request", actor + " asked to join" + namedSuffix(ev.Metadata, "club_name", "your club") + "."
+	case model.NotificationTypeClubJoinRejected:
+		return "Club join request declined", "Your request to join" + namedSuffix(ev.Metadata, "club_name", "a club") + " was declined."
+	case model.NotificationTypeClubRoleChanged:
+		if promoted, _ := ev.Metadata["is_moderator"].(bool); promoted {
+			return "You now help run a club", "You were made a moderator of" + namedSuffix(ev.Metadata, "club_name", "a club") + "."
+		}
+		return "Your club role changed", "You are no longer a moderator of" + namedSuffix(ev.Metadata, "club_name", "a club") + "."
+	case model.NotificationTypeEventInvitation:
+		return "You're invited to an event", actor + " invited you to" + namedSuffix(ev.Metadata, "event_name", "an event") + "."
+	case model.NotificationTypeEventParticipantJoined:
+		return "New entry for your event", actor + " entered" + namedSuffix(ev.Metadata, "event_name", "your event") + "."
+	case model.NotificationTypeEventWentLive:
+		return "An event has gone live", namedPrefix(ev.Metadata, "event_name", "An event you entered") + " is now live."
+	case model.NotificationTypeEventResultsPosted:
+		return "Event results are in", "The results for" + namedSuffix(ev.Metadata, "event_name", "an event you entered") + " have been posted."
 	}
 	return "New sub12.io notification", "You have a new notification on sub12.io."
 }

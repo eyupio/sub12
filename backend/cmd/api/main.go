@@ -224,6 +224,7 @@ func main() {
 	postSvc.SetNotifications(notificationSvc)
 	clubSvc.SetNotifications(notificationSvc)
 	leagueSvc.SetNotifications(notificationSvc)
+	scoreCardSvc.SetNotifications(notificationSvc)
 
 	// Wire the export aggregators into UserService so GDPR data-export
 	// can include score cards, posts, clubs and leagues without forcing
@@ -249,6 +250,7 @@ func main() {
 
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 	communityReviewSvc.SetNotifications(notificationSvc)
+	communityReviewSvc.SetFollowers(socialRepo)
 	communityReviewSvc.SetLogger(log.Logger)
 
 	// Live Events
@@ -256,12 +258,14 @@ func main() {
 	categorySvc := service.NewCategoryService(categoryRepo)
 	eventRepo := repository.NewEventRepository(pool)
 	eventSvc := service.NewEventService(eventRepo, clubRepo, categoryRepo, activitySvc, achievementSvc)
+	eventSvc.SetNotifications(notificationSvc)
 	achievementSvc.SetEventCounts(eventRepo)
 	eventSvc.SetCardVerificationDeps(leagueRepo, scoreCardRepo)
 	scoreCardSvc.SetEventService(eventSvc)
 
 	eventInvitationRepo := repository.NewEventInvitationRepository(pool)
 	eventInvitationSvc := service.NewEventInvitationService(eventInvitationRepo, eventRepo, userRepo, clubRepo, emailSenderSvc, cfg.EventInvitationURL, log.Logger)
+	eventInvitationSvc.SetNotifications(notificationSvc)
 
 	// Daily archive sweep for completed events whose 30-day window has elapsed.
 	go runEventArchiveSweep(ctx, eventSvc)

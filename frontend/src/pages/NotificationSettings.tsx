@@ -13,25 +13,74 @@ interface PrefRow {
   description: string
 }
 
-const ROWS: PrefRow[] = [
-  { inAppKey: 'follow_request', emailKey: 'follow_request_email', label: 'Follow requests', description: 'Someone wants to follow your private profile.' },
-  { inAppKey: 'follow_accepted', emailKey: 'follow_accepted_email', label: 'New followers', description: 'A follow was accepted or a public follow happened.' },
-  { inAppKey: 'comment_on_my_card', emailKey: 'comment_on_my_card_email', label: 'Comments on my score cards', description: '' },
-  { inAppKey: 'reply_to_my_comment', emailKey: 'reply_to_my_comment_email', label: 'Replies to my comments', description: '' },
-  { inAppKey: 'like_on_my_content', emailKey: 'like_on_my_content_email', label: 'Likes on my content', description: '' },
-  { inAppKey: 'score_verified', emailKey: 'score_verified_email', label: 'Score verified', description: 'A league moderator confirmed your score.' },
-  { inAppKey: 'score_rejected', emailKey: 'score_rejected_email', label: 'Score rejected', description: '' },
-  { inAppKey: 'score_amended', emailKey: 'score_amended_email', label: 'Score amended', description: '' },
-  { inAppKey: 'league_join_approved', emailKey: 'league_join_approved_email', label: 'League join approved', description: '' },
-  { inAppKey: 'club_join_approved', emailKey: 'club_join_approved_email', label: 'Club join approved', description: '' },
-  { inAppKey: 'mention', emailKey: 'mention_email', label: 'Mentions', description: '@-mentions in comments or posts.' },
-  { inAppKey: 'post_flagged', emailKey: 'post_flagged_email', label: 'Post flagged', description: 'A moderator asked you to amend one of your posts.' },
-  { inAppKey: 'ticket_created', emailKey: 'ticket_created_email', label: 'Ticket created', description: 'When a support ticket is opened in your scope.' },
-  { inAppKey: 'ticket_replied', emailKey: 'ticket_replied_email', label: 'Ticket replies', description: 'New replies on tickets you participate in.' },
-  { inAppKey: 'ticket_assigned', emailKey: 'ticket_assigned_email', label: 'Ticket assignments', description: 'When a ticket is assigned to you.' },
-  { inAppKey: 'ticket_status_changed', emailKey: 'ticket_status_changed_email', label: 'Ticket status changes', description: 'Updates to support ticket lifecycle state.' },
-  { inAppKey: 'feature_request_state_changed', emailKey: 'feature_request_state_changed_email', label: 'Feature request state', description: 'Status changes for feature request tickets.' },
+interface PrefGroup {
+  title: string
+  rows: PrefRow[]
+}
+
+const GROUPS: PrefGroup[] = [
+  {
+    title: 'Social',
+    rows: [
+      { inAppKey: 'follow_request', emailKey: 'follow_request_email', label: 'Follow requests', description: 'Someone wants to follow your private profile.' },
+      { inAppKey: 'follow_accepted', emailKey: 'follow_accepted_email', label: 'New followers', description: 'A follow was accepted or a public follow happened.' },
+      { inAppKey: 'comment_on_my_card', emailKey: 'comment_on_my_card_email', label: 'Comments on my score cards', description: '' },
+      { inAppKey: 'reply_to_my_comment', emailKey: 'reply_to_my_comment_email', label: 'Replies to my comments', description: '' },
+      { inAppKey: 'like_on_my_content', emailKey: 'like_on_my_content_email', label: 'Likes on my content', description: '' },
+      { inAppKey: 'mention', emailKey: 'mention_email', label: 'Mentions', description: '@-mentions in comments or posts.' },
+      { inAppKey: 'post_flagged', emailKey: 'post_flagged_email', label: 'Post flagged', description: 'A moderator asked you to amend one of your posts.' },
+    ],
+  },
+  {
+    title: 'Score validation',
+    rows: [
+      { inAppKey: 'score_validation_requested', emailKey: 'score_validation_requested_email', label: 'Validation requested', description: 'A card is waiting on you — a league or event card you can rule on, or a personal card someone asked the community to confirm.' },
+      { inAppKey: 'score_verified', emailKey: 'score_verified_email', label: 'Score verified', description: 'A league moderator confirmed your score.' },
+      { inAppKey: 'score_rejected', emailKey: 'score_rejected_email', label: 'Score rejected', description: '' },
+      { inAppKey: 'score_amended', emailKey: 'score_amended_email', label: 'Score amended', description: '' },
+    ],
+  },
+  {
+    title: 'Leagues',
+    rows: [
+      { inAppKey: 'league_join_request', emailKey: 'league_join_request_email', label: 'Join requests', description: 'Someone asked to join a league you run.' },
+      { inAppKey: 'league_join_approved', emailKey: 'league_join_approved_email', label: 'Join approved', description: '' },
+      { inAppKey: 'league_join_rejected', emailKey: 'league_join_rejected_email', label: 'Join declined', description: '' },
+      { inAppKey: 'league_role_changed', emailKey: 'league_role_changed_email', label: 'My role changed', description: 'You were made a league moderator, or stood down.' },
+      { inAppKey: 'league_round_opened', emailKey: 'league_round_opened_email', label: 'New round open', description: 'A league you are in opened a new round.' },
+    ],
+  },
+  {
+    title: 'Clubs',
+    rows: [
+      { inAppKey: 'club_join_request', emailKey: 'club_join_request_email', label: 'Join requests', description: 'Someone asked to join a club you run.' },
+      { inAppKey: 'club_join_approved', emailKey: 'club_join_approved_email', label: 'Join approved', description: '' },
+      { inAppKey: 'club_join_rejected', emailKey: 'club_join_rejected_email', label: 'Join declined', description: '' },
+      { inAppKey: 'club_role_changed', emailKey: 'club_role_changed_email', label: 'My role changed', description: 'You were made a club moderator, or stood down.' },
+    ],
+  },
+  {
+    title: 'Events',
+    rows: [
+      { inAppKey: 'event_invitation', emailKey: 'event_invitation_email', label: 'Invitations', description: 'You were invited to an event.' },
+      { inAppKey: 'event_participant_joined', emailKey: 'event_participant_joined_email', label: 'New entries', description: 'Someone entered an event you host.' },
+      { inAppKey: 'event_went_live', emailKey: 'event_went_live_email', label: 'Event went live', description: 'An event you entered has started.' },
+      { inAppKey: 'event_results_posted', emailKey: 'event_results_posted_email', label: 'Results posted', description: 'Final standings for an event you shot.' },
+    ],
+  },
+  {
+    title: 'Support',
+    rows: [
+      { inAppKey: 'ticket_created', emailKey: 'ticket_created_email', label: 'Ticket created', description: 'When a support ticket is opened in your scope.' },
+      { inAppKey: 'ticket_replied', emailKey: 'ticket_replied_email', label: 'Ticket replies', description: 'New replies on tickets you participate in.' },
+      { inAppKey: 'ticket_assigned', emailKey: 'ticket_assigned_email', label: 'Ticket assignments', description: 'When a ticket is assigned to you.' },
+      { inAppKey: 'ticket_status_changed', emailKey: 'ticket_status_changed_email', label: 'Ticket status changes', description: 'Updates to support ticket lifecycle state.' },
+      { inAppKey: 'feature_request_state_changed', emailKey: 'feature_request_state_changed_email', label: 'Feature request state', description: 'Status changes for feature request tickets.' },
+    ],
+  },
 ]
+
+const ROWS: PrefRow[] = GROUPS.flatMap((g) => g.rows)
 
 export default function NotificationSettings() {
   const queryClient = useQueryClient()
@@ -78,42 +127,47 @@ export default function NotificationSettings() {
             <span className="w-12 text-center">Email</span>
           </div>
 
-          <ul className="space-y-2">
-            {ROWS.map((row) => {
-              const inAppVal = data[row.inAppKey] as boolean
-              const emailVal = data[row.emailKey] as boolean
-              return (
-                <li key={row.inAppKey} className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-secondary font-medium">{row.label}</p>
-                    {row.description && <p className="text-xs text-muted">{row.description}</p>}
-                  </div>
-                  <div className="shrink-0 flex items-start gap-4 sm:gap-6">
-                    <label className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-muted cursor-pointer w-12">
-                      <span className="sm:hidden">In-app</span>
-                      <input
-                        type="checkbox"
-                        checked={inAppVal}
-                        onChange={(e) => mutation.mutate({ [row.inAppKey]: e.target.checked } as NotificationPreferencesPatch)}
-                        aria-label={`${row.label} in-app`}
-                        className="scale-125"
-                      />
-                    </label>
-                    <label className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-muted cursor-pointer w-12">
-                      <span className="sm:hidden">Email</span>
-                      <input
-                        type="checkbox"
-                        checked={emailVal}
-                        onChange={(e) => mutation.mutate({ [row.emailKey]: e.target.checked } as NotificationPreferencesPatch)}
-                        aria-label={`${row.label} email`}
-                        className="scale-125"
-                      />
-                    </label>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+          {GROUPS.map((group) => (
+            <div key={group.title} className="pt-2">
+              <h2 className="t-section-title mb-2">{group.title}</h2>
+              <ul className="space-y-2">
+                {group.rows.map((row) => {
+                  const inAppVal = data[row.inAppKey] as boolean
+                  const emailVal = data[row.emailKey] as boolean
+                  return (
+                    <li key={row.inAppKey} className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-secondary font-medium">{row.label}</p>
+                        {row.description && <p className="text-xs text-muted">{row.description}</p>}
+                      </div>
+                      <div className="shrink-0 flex items-start gap-4 sm:gap-6">
+                        <label className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-muted cursor-pointer w-12">
+                          <span className="sm:hidden">In-app</span>
+                          <input
+                            type="checkbox"
+                            checked={inAppVal}
+                            onChange={(e) => mutation.mutate({ [row.inAppKey]: e.target.checked } as NotificationPreferencesPatch)}
+                            aria-label={`${group.title} — ${row.label} in-app`}
+                            className="scale-125"
+                          />
+                        </label>
+                        <label className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-muted cursor-pointer w-12">
+                          <span className="sm:hidden">Email</span>
+                          <input
+                            type="checkbox"
+                            checked={emailVal}
+                            onChange={(e) => mutation.mutate({ [row.emailKey]: e.target.checked } as NotificationPreferencesPatch)}
+                            aria-label={`${group.title} — ${row.label} email`}
+                            className="scale-125"
+                          />
+                        </label>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
 
           <div className="pt-2">
             <h2 className="t-section-title mb-2">Moderation</h2>

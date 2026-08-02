@@ -22,6 +22,18 @@ const (
 	NotificationTypeTicketAssigned             = "ticket_assigned"
 	NotificationTypeTicketStatusChanged        = "ticket_status_changed"
 	NotificationTypeFeatureRequestStateChanged = "feature_request_state_changed"
+	NotificationTypeScoreValidationRequested   = "score_validation_requested"
+	NotificationTypeLeagueJoinRequest          = "league_join_request"
+	NotificationTypeLeagueJoinRejected         = "league_join_rejected"
+	NotificationTypeLeagueRoleChanged          = "league_role_changed"
+	NotificationTypeLeagueRoundOpened          = "league_round_opened"
+	NotificationTypeClubJoinRequest            = "club_join_request"
+	NotificationTypeClubJoinRejected           = "club_join_rejected"
+	NotificationTypeClubRoleChanged            = "club_role_changed"
+	NotificationTypeEventInvitation            = "event_invitation"
+	NotificationTypeEventParticipantJoined     = "event_participant_joined"
+	NotificationTypeEventWentLive              = "event_went_live"
+	NotificationTypeEventResultsPosted         = "event_results_posted"
 )
 
 // Notification is a single delivered in-app notification row.
@@ -66,6 +78,18 @@ type NotificationPreferences struct {
 	TicketAssigned                  bool      `json:"ticket_assigned"`
 	TicketStatusChanged             bool      `json:"ticket_status_changed"`
 	FeatureRequestStateChanged      bool      `json:"feature_request_state_changed"`
+	ScoreValidationRequested        bool      `json:"score_validation_requested"`
+	LeagueJoinRequest               bool      `json:"league_join_request"`
+	LeagueJoinRejected              bool      `json:"league_join_rejected"`
+	LeagueRoleChanged               bool      `json:"league_role_changed"`
+	LeagueRoundOpened               bool      `json:"league_round_opened"`
+	ClubJoinRequest                 bool      `json:"club_join_request"`
+	ClubJoinRejected                bool      `json:"club_join_rejected"`
+	ClubRoleChanged                 bool      `json:"club_role_changed"`
+	EventInvitation                 bool      `json:"event_invitation"`
+	EventParticipantJoined          bool      `json:"event_participant_joined"`
+	EventWentLive                   bool      `json:"event_went_live"`
+	EventResultsPosted              bool      `json:"event_results_posted"`
 	DigestEmail                     bool      `json:"digest_email"`
 	FollowRequestEmail              bool      `json:"follow_request_email"`
 	FollowAcceptedEmail             bool      `json:"follow_accepted_email"`
@@ -84,6 +108,18 @@ type NotificationPreferences struct {
 	TicketAssignedEmail             bool      `json:"ticket_assigned_email"`
 	TicketStatusChangedEmail        bool      `json:"ticket_status_changed_email"`
 	FeatureRequestStateChangedEmail bool      `json:"feature_request_state_changed_email"`
+	ScoreValidationRequestedEmail   bool      `json:"score_validation_requested_email"`
+	LeagueJoinRequestEmail          bool      `json:"league_join_request_email"`
+	LeagueJoinRejectedEmail         bool      `json:"league_join_rejected_email"`
+	LeagueRoleChangedEmail          bool      `json:"league_role_changed_email"`
+	LeagueRoundOpenedEmail          bool      `json:"league_round_opened_email"`
+	ClubJoinRequestEmail            bool      `json:"club_join_request_email"`
+	ClubJoinRejectedEmail           bool      `json:"club_join_rejected_email"`
+	ClubRoleChangedEmail            bool      `json:"club_role_changed_email"`
+	EventInvitationEmail            bool      `json:"event_invitation_email"`
+	EventParticipantJoinedEmail     bool      `json:"event_participant_joined_email"`
+	EventWentLiveEmail              bool      `json:"event_went_live_email"`
+	EventResultsPostedEmail         bool      `json:"event_results_posted_email"`
 	UpdatedAt                       time.Time `json:"updated_at"`
 }
 
@@ -109,6 +145,18 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		TicketAssigned:                  true,
 		TicketStatusChanged:             true,
 		FeatureRequestStateChanged:      true,
+		ScoreValidationRequested:        true,
+		LeagueJoinRequest:               true,
+		LeagueJoinRejected:              true,
+		LeagueRoleChanged:               true,
+		LeagueRoundOpened:               true,
+		ClubJoinRequest:                 true,
+		ClubJoinRejected:                true,
+		ClubRoleChanged:                 true,
+		EventInvitation:                 true,
+		EventParticipantJoined:          true,
+		EventWentLive:                   true,
+		EventResultsPosted:              true,
 		DigestEmail:                     false,
 		FollowRequestEmail:              true,
 		FollowAcceptedEmail:             true,
@@ -127,6 +175,22 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		TicketAssignedEmail:             true,
 		TicketStatusChangedEmail:        true,
 		FeatureRequestStateChangedEmail: true,
+		// A type addressed to one person defaults to email on; one broadcast to
+		// every member, participant or follower defaults to email off, so
+		// joining a busy league or event doesn't fill an inbox. These defaults
+		// mirror the column defaults in migration 000116.
+		ScoreValidationRequestedEmail: false,
+		LeagueJoinRequestEmail:        true,
+		LeagueJoinRejectedEmail:       true,
+		LeagueRoleChangedEmail:        true,
+		LeagueRoundOpenedEmail:        false,
+		ClubJoinRequestEmail:          true,
+		ClubJoinRejectedEmail:         true,
+		ClubRoleChangedEmail:          true,
+		EventInvitationEmail:          true,
+		EventParticipantJoinedEmail:   false,
+		EventWentLiveEmail:            false,
+		EventResultsPostedEmail:       false,
 	}
 }
 
@@ -169,6 +233,30 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 		return p.TicketStatusChanged
 	case NotificationTypeFeatureRequestStateChanged:
 		return p.FeatureRequestStateChanged
+	case NotificationTypeScoreValidationRequested:
+		return p.ScoreValidationRequested
+	case NotificationTypeLeagueJoinRequest:
+		return p.LeagueJoinRequest
+	case NotificationTypeLeagueJoinRejected:
+		return p.LeagueJoinRejected
+	case NotificationTypeLeagueRoleChanged:
+		return p.LeagueRoleChanged
+	case NotificationTypeLeagueRoundOpened:
+		return p.LeagueRoundOpened
+	case NotificationTypeClubJoinRequest:
+		return p.ClubJoinRequest
+	case NotificationTypeClubJoinRejected:
+		return p.ClubJoinRejected
+	case NotificationTypeClubRoleChanged:
+		return p.ClubRoleChanged
+	case NotificationTypeEventInvitation:
+		return p.EventInvitation
+	case NotificationTypeEventParticipantJoined:
+		return p.EventParticipantJoined
+	case NotificationTypeEventWentLive:
+		return p.EventWentLive
+	case NotificationTypeEventResultsPosted:
+		return p.EventResultsPosted
 	}
 	return true
 }
@@ -213,6 +301,30 @@ func (p *NotificationPreferences) EmailEnabledForType(t string) bool {
 		return p.TicketStatusChangedEmail
 	case NotificationTypeFeatureRequestStateChanged:
 		return p.FeatureRequestStateChangedEmail
+	case NotificationTypeScoreValidationRequested:
+		return p.ScoreValidationRequestedEmail
+	case NotificationTypeLeagueJoinRequest:
+		return p.LeagueJoinRequestEmail
+	case NotificationTypeLeagueJoinRejected:
+		return p.LeagueJoinRejectedEmail
+	case NotificationTypeLeagueRoleChanged:
+		return p.LeagueRoleChangedEmail
+	case NotificationTypeLeagueRoundOpened:
+		return p.LeagueRoundOpenedEmail
+	case NotificationTypeClubJoinRequest:
+		return p.ClubJoinRequestEmail
+	case NotificationTypeClubJoinRejected:
+		return p.ClubJoinRejectedEmail
+	case NotificationTypeClubRoleChanged:
+		return p.ClubRoleChangedEmail
+	case NotificationTypeEventInvitation:
+		return p.EventInvitationEmail
+	case NotificationTypeEventParticipantJoined:
+		return p.EventParticipantJoinedEmail
+	case NotificationTypeEventWentLive:
+		return p.EventWentLiveEmail
+	case NotificationTypeEventResultsPosted:
+		return p.EventResultsPostedEmail
 	}
 	return false
 }
@@ -237,6 +349,18 @@ type UpdateNotificationPrefsInput struct {
 	TicketAssigned                  *bool `json:"ticket_assigned,omitempty"`
 	TicketStatusChanged             *bool `json:"ticket_status_changed,omitempty"`
 	FeatureRequestStateChanged      *bool `json:"feature_request_state_changed,omitempty"`
+	ScoreValidationRequested        *bool `json:"score_validation_requested,omitempty"`
+	LeagueJoinRequest               *bool `json:"league_join_request,omitempty"`
+	LeagueJoinRejected              *bool `json:"league_join_rejected,omitempty"`
+	LeagueRoleChanged               *bool `json:"league_role_changed,omitempty"`
+	LeagueRoundOpened               *bool `json:"league_round_opened,omitempty"`
+	ClubJoinRequest                 *bool `json:"club_join_request,omitempty"`
+	ClubJoinRejected                *bool `json:"club_join_rejected,omitempty"`
+	ClubRoleChanged                 *bool `json:"club_role_changed,omitempty"`
+	EventInvitation                 *bool `json:"event_invitation,omitempty"`
+	EventParticipantJoined          *bool `json:"event_participant_joined,omitempty"`
+	EventWentLive                   *bool `json:"event_went_live,omitempty"`
+	EventResultsPosted              *bool `json:"event_results_posted,omitempty"`
 	DigestEmail                     *bool `json:"digest_email,omitempty"`
 	FollowRequestEmail              *bool `json:"follow_request_email,omitempty"`
 	FollowAcceptedEmail             *bool `json:"follow_accepted_email,omitempty"`
@@ -255,4 +379,16 @@ type UpdateNotificationPrefsInput struct {
 	TicketAssignedEmail             *bool `json:"ticket_assigned_email,omitempty"`
 	TicketStatusChangedEmail        *bool `json:"ticket_status_changed_email,omitempty"`
 	FeatureRequestStateChangedEmail *bool `json:"feature_request_state_changed_email,omitempty"`
+	ScoreValidationRequestedEmail   *bool `json:"score_validation_requested_email,omitempty"`
+	LeagueJoinRequestEmail          *bool `json:"league_join_request_email,omitempty"`
+	LeagueJoinRejectedEmail         *bool `json:"league_join_rejected_email,omitempty"`
+	LeagueRoleChangedEmail          *bool `json:"league_role_changed_email,omitempty"`
+	LeagueRoundOpenedEmail          *bool `json:"league_round_opened_email,omitempty"`
+	ClubJoinRequestEmail            *bool `json:"club_join_request_email,omitempty"`
+	ClubJoinRejectedEmail           *bool `json:"club_join_rejected_email,omitempty"`
+	ClubRoleChangedEmail            *bool `json:"club_role_changed_email,omitempty"`
+	EventInvitationEmail            *bool `json:"event_invitation_email,omitempty"`
+	EventParticipantJoinedEmail     *bool `json:"event_participant_joined_email,omitempty"`
+	EventWentLiveEmail              *bool `json:"event_went_live_email,omitempty"`
+	EventResultsPostedEmail         *bool `json:"event_results_posted_email,omitempty"`
 }

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 )
@@ -55,13 +57,14 @@ type CardReader interface {
 }
 
 type EventService struct {
-	events       *repository.EventRepository
-	clubs        *repository.ClubRepository
-	categories   *repository.CategoryRepository
-	activity     *ActivityService
-	achievements *AchievementService
-	verifyRepo   ScoreVerificationRepo
-	cardReader   CardReader
+	events        *repository.EventRepository
+	clubs         *repository.ClubRepository
+	categories    *repository.CategoryRepository
+	activity      *ActivityService
+	achievements  *AchievementService
+	verifyRepo    ScoreVerificationRepo
+	cardReader    CardReader
+	notifications *NotificationService // nil disables notification fan-out
 }
 
 func NewEventService(
@@ -78,6 +81,72 @@ func NewEventService(
 		activity:     activity,
 		achievements: achievements,
 	}
+}
+
+// SetNotifications wires notification fan-out. Optional — without it event
+// actions still succeed, they just notify nobody.
+func (s *EventService) SetNotifications(n *NotificationService) {
+	s.notifications = n
+}
+
+// ListVerifierIDs returns the people entitled to rule on a card submitted to
+// the event: its owner and any delegated scorers.
+func (s *EventService) ListVerifierIDs(ctx context.Context, eventID string) ([]string, error) {
+	return s.events.ListScorerIDs(ctx, eventID)
+}
+
+// notifyEvent fans an event-scoped notification out to a recipient list,
+// skipping the actor and any duplicates. Best-effort throughout.
+func (s *EventService) notifyEvent(ctx context.Context, ev *model.Event, actorID, notifType string, recipients []string) {
+	if s.notifications == nil || ev == nil {
+		return
+	}
+	tid, tt := ev.ID, "event"
+	meta := map[string]any{"event_name": ev.Name, "event_slug": ev.Slug}
+	seen := map[string]struct{}{actorID: {}}
+	for _, rid := range recipients {
+		if rid == "" {
+			continue
+		}
+		if _, dup := seen[rid]; dup {
+			continue
+		}
+		seen[rid] = struct{}{}
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: rid,
+			ActorID:     actorID,
+			Type:        notifType,
+			TargetID:    &tid,
+			TargetType:  &tt,
+			ClubID:      ev.ClubID,
+			Metadata:    meta,
+		})
+	}
+}
+
+// notifyEventBroadcast is notifyEvent for a whole field. One row per entrant is
+// too much work to keep the caller waiting on, so it runs on a background
+// context. Pass a nil recipient list to address everyone entered.
+func (s *EventService) notifyEventBroadcast(ev *model.Event, actorID, notifType string, recipients []string) {
+	if s.notifications == nil || ev == nil {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("type", notifType).Msg("event: notification fan-out panicked")
+			}
+		}()
+		ctx := context.Background()
+		ids := recipients
+		if ids == nil {
+			var err error
+			if ids, err = s.events.ListParticipantUserIDs(ctx, ev.ID); err != nil {
+				return
+			}
+		}
+		s.notifyEvent(ctx, ev, actorID, notifType, ids)
+	}()
 }
 
 // SetCardVerificationDeps wires the score-card audit repo and the card reader
@@ -351,6 +420,7 @@ func (s *EventService) Promote(ctx context.Context, slug, userID, target string)
 }
 
 func (s *EventService) fanOutWentLive(ctx context.Context, ev *model.Event) {
+	s.notifyEventBroadcast(ev, ev.OwnerUserID, model.NotificationTypeEventWentLive, nil)
 	if s.activity == nil {
 		return
 	}
@@ -411,6 +481,15 @@ func (s *EventService) handleCompletion(ctx context.Context, ev *model.Event) {
 		aggregate := buildEventResultsMeta(ev.Name, ev.Slug, clubName, standings)
 		go s.activity.Ingest(context.Background(), ev.OwnerUserID, model.ActivityEventResultsPosted, &tid, &tt, aggregate, nil, ev.ClubID, visibility)
 	}
+	// Address the results at whoever placed — guests have no account to notify.
+	placed := make([]string, 0, len(standings))
+	for _, row := range standings {
+		if row.UserID != nil {
+			placed = append(placed, *row.UserID)
+		}
+	}
+	s.notifyEventBroadcast(ev, ev.OwnerUserID, model.NotificationTypeEventResultsPosted, placed)
+
 	if s.achievements != nil {
 		s.achievements.EvaluateForEventCompletion(ctx, ev, standings)
 	}
@@ -533,6 +612,7 @@ func (s *EventService) Join(ctx context.Context, slug, userID string, in *model.
 		}
 		go s.activity.Ingest(context.Background(), userID, model.ActivityEventJoined, &tid, &tt, meta, nil, ev.ClubID, visibility)
 	}
+	s.notifyEvent(ctx, ev, userID, model.NotificationTypeEventParticipantJoined, []string{ev.OwnerUserID})
 	return p, nil
 }
 

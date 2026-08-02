@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import Notifications from '../Notifications'
-import { notificationLink } from '../notificationRouting'
+import { notificationLink, notificationSentence } from '../notificationRouting'
 import { notificationsApi, type Notification } from '../../api/notifications'
 import { routeTree } from '../../routeTree'
 
@@ -101,5 +101,76 @@ describe('Notifications routing', () => {
     expect(notificationLink(makeNotification({ type: 'follow_accepted', target_type: 'user', target_id: 'u-2' }))).toBe('/users/u-2')
     expect(notificationLink(makeNotification({ type: 'league_join_approved', league_id: 'lg-2' }))).toBe('/leagues/lg-2')
     expect(notificationLink(makeNotification({ type: 'club_join_approved', club_id: 'cb-2' }))).toBe('/clubs/cb-2')
+  })
+
+  it('routes league, club and event notifications to where the action is', () => {
+    // A personal card is confirmed from its review page; a league card is
+    // ruled on from the card itself.
+    expect(
+      notificationLink(
+        makeNotification({
+          type: 'score_validation_requested',
+          target_type: 'score_card',
+          target_id: 'sc-9',
+          metadata: { scope: 'personal' },
+        }),
+      ),
+    ).toBe('/scores/sc-9/review')
+    expect(
+      notificationLink(
+        makeNotification({
+          type: 'score_validation_requested',
+          target_type: 'score_card',
+          target_id: 'sc-9',
+          league_id: 'lg-3',
+          metadata: { scope: 'league' },
+        }),
+      ),
+    ).toBe('/scores/sc-9')
+
+    // Join requests land on the settings page that lists them.
+    expect(notificationLink(makeNotification({ type: 'league_join_request', league_id: 'lg-3', target_type: 'league', target_id: 'lg-3' }))).toBe('/leagues/lg-3/settings')
+    expect(notificationLink(makeNotification({ type: 'club_join_request', club_id: 'cb-3', target_type: 'club', target_id: 'cb-3' }))).toBe('/clubs/cb-3/settings')
+
+    expect(notificationLink(makeNotification({ type: 'league_join_rejected', league_id: 'lg-3', target_type: 'league', target_id: 'lg-3' }))).toBe('/leagues/lg-3')
+    expect(notificationLink(makeNotification({ type: 'league_role_changed', league_id: 'lg-3', target_type: 'league', target_id: 'lg-3' }))).toBe('/leagues/lg-3')
+    expect(notificationLink(makeNotification({ type: 'league_round_opened', league_id: 'lg-3', target_type: 'league', target_id: 'lg-3' }))).toBe('/leagues/lg-3')
+    expect(notificationLink(makeNotification({ type: 'club_role_changed', club_id: 'cb-3', target_type: 'club', target_id: 'cb-3' }))).toBe('/clubs/cb-3')
+
+    // A club-hosted event resolves to the event, not the club that hosts it.
+    for (const type of ['event_invitation', 'event_participant_joined', 'event_went_live', 'event_results_posted'] as const) {
+      expect(
+        notificationLink(
+          makeNotification({ type, club_id: 'cb-3', target_type: 'event', target_id: 'ev-1', metadata: { event_slug: 'winter-open' } }),
+        ),
+      ).toBe('/events/winter-open')
+    }
+    expect(notificationLink(makeNotification({ type: 'event_went_live', target_type: 'event', target_id: 'ev-1' }))).toBe('/events')
+  })
+
+  it('names the league, club or event in the sentence', () => {
+    expect(
+      notificationSentence(
+        makeNotification({ type: 'league_join_request', actor_display_name: 'Noah', metadata: { league_name: 'Sunday Bench' } }),
+      ),
+    ).toBe('Noah asked to join Sunday Bench')
+    expect(
+      notificationSentence(makeNotification({ type: 'league_role_changed', metadata: { is_moderator: true, league_name: 'Sunday Bench' } })),
+    ).toBe('You now help run Sunday Bench')
+    expect(
+      notificationSentence(makeNotification({ type: 'league_role_changed', metadata: { is_moderator: false, league_name: 'Sunday Bench' } })),
+    ).toBe('You no longer help run Sunday Bench')
+    expect(
+      notificationSentence(
+        makeNotification({ type: 'score_validation_requested', actor_display_name: 'Mia', metadata: { scope: 'personal' } }),
+      ),
+    ).toBe('Mia asked the community to validate a score card')
+    expect(
+      notificationSentence(makeNotification({ type: 'event_results_posted', metadata: { event_name: 'Winter Open' } })),
+    ).toBe('Results are in for Winter Open')
+    // A missing name still reads as a sentence.
+    expect(notificationSentence(makeNotification({ type: 'club_join_rejected' }))).toBe(
+      'Your request to join a club was declined',
+    )
   })
 })

@@ -463,6 +463,51 @@ func (r *EventRepository) IsScorer(ctx context.Context, eventID, userID string) 
 	return ok, nil
 }
 
+// ListScorerIDs returns the event owner plus every delegated scorer — the set
+// of people who can rule on a submitted card.
+func (r *EventRepository) ListScorerIDs(ctx context.Context, eventID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT owner_user_id FROM events WHERE id = $1
+		UNION
+		SELECT user_id FROM event_scorers WHERE event_id = $1
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list event scorer ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan event scorer id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// ListParticipantUserIDs returns the account-backed participants of an event.
+// Guests have no user_id and are skipped — there is nobody to notify.
+func (r *EventRepository) ListParticipantUserIDs(ctx context.Context, eventID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT user_id FROM event_participants
+		WHERE event_id = $1 AND user_id IS NOT NULL
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list event participant ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan event participant id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // AddScorer grants delegated scorer rights.
 func (r *EventRepository) AddScorer(ctx context.Context, eventID, userID, grantedBy string) error {
 	_, err := r.db.Exec(ctx, `

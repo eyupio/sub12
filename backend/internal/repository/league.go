@@ -972,10 +972,12 @@ func (r *LeagueRepository) ListJoinRequests(ctx context.Context, leagueID, statu
 	return requests, rows.Err()
 }
 
-func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requestID, adminID, decision string) error {
+// DecideJoinRequest settles a pending request and returns the id of the user
+// who asked, so callers can address the outcome back to them.
+func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requestID, adminID, decision string) (string, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return "", fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -987,10 +989,10 @@ func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requ
 		RETURNING user_id
 	`, requestID, decision, adminID, leagueID).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
+		return "", ErrNotFound
 	}
 	if err != nil {
-		return fmt.Errorf("update join request: %w", err)
+		return "", fmt.Errorf("update join request: %w", err)
 	}
 
 	if decision == "approved" {
@@ -1000,11 +1002,14 @@ func (r *LeagueRepository) DecideJoinRequest(ctx context.Context, leagueID, requ
 			ON CONFLICT DO NOTHING
 		`, leagueID, userID)
 		if err != nil {
-			return fmt.Errorf("insert member after approval: %w", err)
+			return "", fmt.Errorf("insert member after approval: %w", err)
 		}
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return userID, nil
 }
 
 // JoinWithCode adds a user to a league after verifying the invite code.
