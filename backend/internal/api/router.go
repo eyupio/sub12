@@ -484,6 +484,8 @@ func NewRouter(
 			r.Post("/events/{slug}/guests", eh.AddGuest)
 			r.Delete("/events/{slug}/participants/{participantId}", eh.RemoveParticipant)
 			r.Post("/events/{slug}/scorers", eh.AddScorer)
+			r.Get("/events/{slug}/scorers", eh.ListScorers)
+			r.Delete("/events/{slug}/scorers/{userId}", eh.RemoveScorer)
 			r.Post("/events/{slug}/scores", eh.RecordScores)
 			r.Post("/events/{slug}/cards/{cardId}/confirm", eh.ConfirmCard)
 			r.Post("/events/{slug}/cards/{cardId}/amend", eh.AmendCard)

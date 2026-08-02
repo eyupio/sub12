@@ -1,3 +1,5 @@
+import type { Dispatch, SetStateAction } from 'react'
+
 import { customPreset, disciplinePresets } from '../../config/disciplinePresets'
 import { PlaceSelector } from '../PlaceSelector'
 import type { LocationValue } from '../LocationField'
@@ -6,16 +8,23 @@ import {
   WIZARD_LABEL_CLS,
   applyPreset,
   toggleCls,
+  type WizardBasics,
   type WizardState,
 } from './wizardShared'
 
 interface Props {
   state: WizardState
-  onChange: (next: WizardState) => void
+  onChange: Dispatch<SetStateAction<WizardState>>
 }
 
 export function BasicsStep({ state, onChange }: Props) {
   const { basics } = state
+
+  // Patches merge onto the latest state, not the one this render closed over:
+  // picking a saved place sets its id and its label in the same tick, and a
+  // whole-object update would drop whichever of the two landed first.
+  const patchBasics = (patch: Partial<WizardBasics>) =>
+    onChange((prev) => ({ ...prev, basics: { ...prev.basics, ...patch } }))
   return (
     <section className="bg-surface border border-line rounded-lg p-5 lg:p-6 shadow-card space-y-5">
       <header>
@@ -30,7 +39,7 @@ export function BasicsStep({ state, onChange }: Props) {
           value={basics.name}
           autoFocus
           placeholder="Spring HFT shoot"
-          onChange={(e) => onChange({ ...state, basics: { ...basics, name: e.target.value } })}
+          onChange={(e) => patchBasics({ name: e.target.value })}
         />
       </label>
 
@@ -40,31 +49,47 @@ export function BasicsStep({ state, onChange }: Props) {
           rows={2}
           className={`${WIZARD_INPUT_CLS} resize-none`}
           value={basics.description}
-          onChange={(e) => onChange({ ...state, basics: { ...basics, description: e.target.value } })}
+          onChange={(e) => patchBasics({ description: e.target.value })}
         />
       </label>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <label className="block">
+          <span className={WIZARD_LABEL_CLS}>Starts (optional)</span>
+          <input
+            type="datetime-local"
+            className={WIZARD_INPUT_CLS}
+            value={basics.startsAt}
+            onChange={(e) => onChange({ ...state, basics: { ...basics, startsAt: e.target.value } })}
+          />
+        </label>
+        <label className="block">
+          <span className={WIZARD_LABEL_CLS}>Ends (optional)</span>
+          <input
+            type="datetime-local"
+            className={WIZARD_INPUT_CLS}
+            value={basics.endsAt}
+            min={basics.startsAt || undefined}
+            onChange={(e) => onChange({ ...state, basics: { ...basics, endsAt: e.target.value } })}
+          />
+        </label>
+      </div>
 
       <div className="block">
         <span className={WIZARD_LABEL_CLS}>Location (optional)</span>
         <PlaceSelector
           locationId={basics.locationId}
-          onLocationIdChange={(id) =>
-            onChange({ ...state, basics: { ...basics, locationId: id } })
-          }
+          onLocationIdChange={(id) => patchBasics({ locationId: id })}
           location={{
             label: basics.location,
             lat: basics.locationLat,
             lng: basics.locationLng,
           }}
           onLocationChange={(value: LocationValue) =>
-            onChange({
-              ...state,
-              basics: {
-                ...basics,
-                location: value.label,
-                locationLat: value.lat,
-                locationLng: value.lng,
-              },
+            patchBasics({
+              location: value.label,
+              locationLat: value.lat,
+              locationLng: value.lng,
             })
           }
           inputClassName={WIZARD_INPUT_CLS}
@@ -78,7 +103,7 @@ export function BasicsStep({ state, onChange }: Props) {
             <button
               key={p.id}
               type="button"
-              onClick={() => onChange(applyPreset(state, p.id))}
+              onClick={() => onChange((prev) => applyPreset(prev, p.id))}
               className={toggleCls(basics.presetId === p.id)}
             >
               {p.label}
@@ -93,7 +118,7 @@ export function BasicsStep({ state, onChange }: Props) {
           className={WIZARD_INPUT_CLS}
           placeholder="HFT, FT, …"
           value={basics.discipline}
-          onChange={(e) => onChange({ ...state, basics: { ...basics, discipline: e.target.value } })}
+          onChange={(e) => patchBasics({ discipline: e.target.value })}
         />
       </label>
     </section>

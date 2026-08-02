@@ -25,6 +25,10 @@ var (
 // the original send (or a re-send after expiry/decline).
 const EventInvitationTTL = 30 * 24 * time.Hour
 
+// EventInvitationBatchLimit bounds a single batch send so one request cannot
+// fan out unbounded emails.
+const EventInvitationBatchLimit = 50
+
 type EventInvitationService struct {
 	invitations   *repository.EventInvitationRepository
 	events        *repository.EventRepository
@@ -87,6 +91,9 @@ func (s *EventInvitationService) CreateBatch(
 	}
 	if ev.State != model.EventStateDraft && ev.State != model.EventStateOpenForEntries && ev.State != model.EventStateLive {
 		return nil, ErrEventNotJoinable
+	}
+	if len(in.InviteeUserIDs) > EventInvitationBatchLimit {
+		return nil, fmt.Errorf("%w: at most %d invitees per request", ErrInvalidEvent, EventInvitationBatchLimit)
 	}
 	results := make([]*CreateBatchResult, 0, len(in.InviteeUserIDs))
 	for _, inviteeID := range in.InviteeUserIDs {

@@ -191,7 +191,7 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		// A type addressed to one person defaults to email on; one broadcast to
 		// every member, participant or follower defaults to email off, so
 		// joining a busy league or event doesn't fill an inbox. These defaults
-		// mirror the column defaults in migration 000116.
+		// mirror the column defaults in migration 000117.
 		ScoreValidationRequestedEmail: false,
 		LeagueJoinRequestEmail:        true,
 		LeagueJoinRejectedEmail:       true,

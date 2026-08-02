@@ -13,6 +13,7 @@ import (
 
 	"github.com/jnnngs/sub-12/backend/internal/api/middleware"
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
 )
 
@@ -215,6 +216,8 @@ func (h *EventHandler) Join(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "event not found")
 		case errors.Is(err, service.ErrEventNotJoinable):
 			writeError(w, http.StatusConflict, "event is not open for entries")
+		case errors.Is(err, service.ErrEventFull):
+			writeError(w, http.StatusConflict, "event is full")
 		case errors.Is(err, service.ErrAlreadyEventParticipant):
 			writeError(w, http.StatusConflict, "already a participant of this event")
 		case errors.Is(err, service.ErrNotClubMember):
@@ -253,6 +256,10 @@ func (h *EventHandler) AddGuest(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "event not found")
 		case errors.Is(err, service.ErrNotEventOwner):
 			writeError(w, http.StatusForbidden, "not the event owner")
+		case errors.Is(err, service.ErrEventNotJoinable):
+			writeError(w, http.StatusConflict, "event no longer accepts entries")
+		case errors.Is(err, service.ErrEventFull):
+			writeError(w, http.StatusConflict, "event is full")
 		case errors.Is(err, service.ErrInvalidEvent):
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 		default:
@@ -286,12 +293,29 @@ func (h *EventHandler) RemoveParticipant(w http.ResponseWriter, r *http.Request)
 			writeError(w, http.StatusNotFound, "not found")
 		case errors.Is(err, service.ErrNotEventOwner):
 			writeError(w, http.StatusForbidden, "not the event owner")
+		case errors.Is(err, service.ErrInvalidEventState):
+			writeError(w, http.StatusConflict, "event is archived")
 		default:
 			writeError(w, http.StatusInternalServerError, "failed to remove participant")
 		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// writeEventReadError maps the shared read-path errors (visibility gating
+// included) for the public event endpoints.
+func writeEventReadError(w http.ResponseWriter, err error, fallback string) {
+	switch {
+	case errors.Is(err, service.ErrEventNotFound):
+		writeError(w, http.StatusNotFound, "event not found")
+	case errors.Is(err, service.ErrUnauthenticated):
+		writeError(w, http.StatusUnauthorized, "authentication required")
+	case errors.Is(err, service.ErrEventForbidden):
+		writeError(w, http.StatusForbidden, "not authorised to view this event")
+	default:
+		writeError(w, http.StatusInternalServerError, fallback)
+	}
 }
 
 // GET /api/v1/events/{slug}/participants
@@ -301,19 +325,78 @@ func (h *EventHandler) ListParticipants(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid event slug")
 		return
 	}
-	items, err := h.svc.ListParticipants(r.Context(), slug)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	items, err := h.svc.ListParticipants(r.Context(), slug, viewerID, viewerRole)
 	if err != nil {
-		if errors.Is(err, service.ErrEventNotFound) {
-			writeError(w, http.StatusNotFound, "event not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to list participants")
+		writeEventReadError(w, err, "failed to list participants")
 		return
 	}
 	if items == nil {
 		items = []*model.EventParticipant{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// GET /api/v1/events/{slug}/scorers — owner-only management view.
+func (h *EventHandler) ListScorers(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	items, err := h.svc.ListScorers(r.Context(), slug, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrEventNotFound):
+			writeError(w, http.StatusNotFound, "event not found")
+		case errors.Is(err, service.ErrNotEventOwner):
+			writeError(w, http.StatusForbidden, "not the event owner")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to list scorers")
+		}
+		return
+	}
+	if items == nil {
+		items = []*repository.EventScorerRow{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// DELETE /api/v1/events/{slug}/scorers/{userId}
+func (h *EventHandler) RemoveScorer(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	targetID := chi.URLParam(r, "userId")
+	if !isEventSlug(slug) {
+		writeError(w, http.StatusBadRequest, "invalid event slug")
+		return
+	}
+	if !isUUID(targetID) {
+		writeInvalidUUIDError(w, "user id")
+		return
+	}
+	if err := h.svc.RemoveScorer(r.Context(), slug, userID, targetID); err != nil {
+		switch {
+		case errors.Is(err, service.ErrEventNotFound):
+			writeError(w, http.StatusNotFound, "not found")
+		case errors.Is(err, service.ErrNotEventOwner):
+			writeError(w, http.StatusForbidden, "not the event owner")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to remove scorer")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // POST /api/v1/events/{slug}/scorers
@@ -394,13 +477,11 @@ func (h *EventHandler) ListScores(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid event slug")
 		return
 	}
-	scores, err := h.svc.ListScores(r.Context(), slug)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	scores, err := h.svc.ListScores(r.Context(), slug, viewerID, viewerRole)
 	if err != nil {
-		if errors.Is(err, service.ErrEventNotFound) {
-			writeError(w, http.StatusNotFound, "event not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to load scores")
+		writeEventReadError(w, err, "failed to load scores")
 		return
 	}
 	if scores == nil {
@@ -417,13 +498,11 @@ func (h *EventHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid event slug")
 		return
 	}
-	rows, err := h.svc.Standings(r.Context(), slug)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	rows, err := h.svc.Standings(r.Context(), slug, viewerID, viewerRole)
 	if err != nil {
-		if errors.Is(err, service.ErrEventNotFound) {
-			writeError(w, http.StatusNotFound, "event not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to load scoreboard")
+		writeEventReadError(w, err, "failed to load scoreboard")
 		return
 	}
 	if rows == nil {
@@ -442,13 +521,11 @@ func (h *EventHandler) ListEventCards(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid event slug")
 		return
 	}
-	_, items, err := h.svc.ListEventCards(r.Context(), slug)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	_, items, err := h.svc.ListEventCards(r.Context(), slug, viewerID, viewerRole)
 	if err != nil {
-		if errors.Is(err, service.ErrEventNotFound) {
-			writeError(w, http.StatusNotFound, "event not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to list event cards")
+		writeEventReadError(w, err, "failed to list event cards")
 		return
 	}
 	if items == nil {
@@ -574,13 +651,11 @@ func (h *EventHandler) ResultsCSV(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid event slug")
 		return
 	}
-	ev, parts, scores, err := h.svc.ListScoresForCSV(r.Context(), slug)
+	viewerID, _ := middleware.UserIDFromContext(r.Context())
+	viewerRole, _ := middleware.UserRoleFromContext(r.Context())
+	ev, parts, scores, err := h.svc.ListScoresForCSV(r.Context(), slug, viewerID, viewerRole)
 	if err != nil {
-		if errors.Is(err, service.ErrEventNotFound) {
-			writeError(w, http.StatusNotFound, "event not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to export results")
+		writeEventReadError(w, err, "failed to export results")
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")

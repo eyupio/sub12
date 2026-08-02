@@ -36,6 +36,7 @@ export interface EventDTO {
   state: EventState
   owner_user_id: string
   club_id?: string
+  max_participants?: number
   require_score_verification: boolean
   required_confirmations: number
   require_image_upload: boolean
@@ -114,6 +115,7 @@ export interface CreateEventPayload {
   category_ids: string[]
   visibility?: EventVisibility
   club_id?: string
+  max_participants?: number
   require_score_verification?: boolean
   required_confirmations?: number
   require_image_upload?: boolean
@@ -132,6 +134,8 @@ export interface UpdateEventPayload {
   scoring_rules?: EventScoringRules
   category_ids?: string[]
   visibility?: EventVisibility
+  /** 0 clears the cap; omit to keep the current value. */
+  max_participants?: number
   require_score_verification?: boolean
   required_confirmations?: number
   require_image_upload?: boolean
@@ -177,6 +181,12 @@ export interface EventScoreDTO {
   client_id: string
 }
 
+export interface EventScorerDTO {
+  user_id: string
+  display_name: string
+  avatar_url?: string
+}
+
 export interface MyEventSummary {
   id: string
   slug: string
@@ -208,6 +218,8 @@ export const eventsApi = {
   removeParticipant: (slug: string, participantId: string) => api.del<void>(`/events/${slug}/participants/${participantId}`),
   listParticipants: (slug: string) => api.get<{ items: EventParticipantDTO[] }>(`/events/${slug}/participants`),
   addScorer: (slug: string, userId: string) => api.post<{ added: boolean }>(`/events/${slug}/scorers`, { user_id: userId }),
+  listScorers: (slug: string) => api.get<{ items: EventScorerDTO[] }>(`/events/${slug}/scorers`),
+  removeScorer: (slug: string, userId: string) => api.del<void>(`/events/${slug}/scorers/${userId}`),
   scoreboard: (slug: string) => api.get<{ items: EventStandingRow[] }>(`/events/${slug}/scoreboard`),
   listScores: (slug: string) => api.get<{ items: EventScoreDTO[] }>(`/events/${slug}/scores`),
   recordScores: (slug: string, scores: RecordScoreItem[]) => api.post<{ written: number }>(`/events/${slug}/scores`, { scores }),

@@ -175,6 +175,8 @@ func (h *EventInvitationHandler) Accept(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusConflict, "invitation already decided")
 		case errors.Is(err, service.ErrEventNotJoinable):
 			writeError(w, http.StatusConflict, "event is not open for entries")
+		case errors.Is(err, service.ErrEventFull):
+			writeError(w, http.StatusConflict, "event is full")
 		case errors.Is(err, service.ErrAlreadyEventParticipant):
 			// Idempotent — already accepted, treat as success.
 			writeJSON(w, http.StatusOK, map[string]any{"already_participant": true})

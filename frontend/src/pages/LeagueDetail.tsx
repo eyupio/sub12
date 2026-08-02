@@ -57,6 +57,10 @@ function normalizeInviteCode(value: unknown): string {
 type StandingsTab = 'table' | 'form' | 'history'
 type ScoreTab = '' | 'pending' | 'verified' | 'rejected'
 
+// Anchor for the submitted-scores queue, so the pending-review banner can jump
+// the page to the rows it just filtered.
+const SCORES_SECTION_ID = 'league-submitted-scores'
+
 function statusBadge(verification: string) {
   if (verification === 'verified') return <Badge variant="green">Verified</Badge>
   if (verification === 'rejected') return <Badge variant="red">Rejected</Badge>
@@ -291,6 +295,15 @@ export default function LeagueDetail() {
   const isModerator = currentMember?.is_moderator ?? false
   const canReviewScores = can(currentMember, PERM.verifyScores)
   const isMember = !!currentMember
+
+  // The banner sits a full screen above the queue it filters, so flipping the
+  // tab on its own looks like the tap did nothing. Take the page there too.
+  function showPendingScores() {
+    setScoreFilter('pending')
+    requestAnimationFrame(() => {
+      document.getElementById(SCORES_SECTION_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -615,7 +628,7 @@ export default function LeagueDetail() {
         {canReviewScores && scoreCounts && scoreCounts.pending > 0 && (
           <button
             type="button"
-            onClick={() => setScoreFilter('pending')}
+            onClick={showPendingScores}
             className="lc-status-row warn"
             style={{ width: '100%', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
           >
@@ -721,6 +734,7 @@ export default function LeagueDetail() {
 
         {/* Submitted Scores */}
         <Section
+          id={SCORES_SECTION_ID}
           title="Submitted Scores"
           icon={<ListChecks size={12} />}
           tabs={<Tabs<ScoreTab> tabs={scoreTabs} active={scoreFilter} onChange={setScoreFilter} />}

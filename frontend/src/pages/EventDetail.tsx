@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { CalendarClock, Check, ChevronRight, Plus, RotateCcw, Settings, Share2, Trash2, Trophy, UserPlus, Users } from 'lucide-react'
-import { eventsApi, type EventState, type EventStandingRow, type EventCardStatus } from '../api/events'
+import { eventsApi, type EventState, type EventStandingRow, type EventCardStatus, type JoinEventPayload } from '../api/events'
 import { scoreCardApi } from '../api/scoreCards'
 import { categoriesApi } from '../api/categories'
 import { HelpIcon } from '../components/Tooltip'
@@ -10,9 +10,11 @@ import { pageHelp } from '../components/tooltips'
 import { Badge, EntityDetailHeader, PageGrid, Section } from '../components/leagues'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DisciplineThumb } from '../components/leagues/structure'
+import { SkeletonCard } from '../components/Skeleton'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { siteOrigin } from '../utils/site'
+import { courseLabel, isEventFull, participantsLabel } from '../utils/eventDisplay'
 
 function StateBadge({ state }: { state: EventState }) {
   switch (state) {
@@ -35,7 +37,10 @@ export default function EventDetail() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [showAddGuest, setShowAddGuest] = useState(false)
+  const [showJoinForm, setShowJoinForm] = useState(false)
   const [showReopenConfirm, setShowReopenConfirm] = useState(false)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+  const [removingParticipant, setRemovingParticipant] = useState<{ id: string; name: string } | null>(null)
 
   const eventQuery = useQuery({ queryKey: ['event', slug], queryFn: () => eventsApi.get(slug) })
   const partsQuery = useQuery({
@@ -86,10 +91,11 @@ export default function EventDetail() {
   )
 
   const join = useMutation({
-    mutationFn: () => eventsApi.join(slug, {}),
+    mutationFn: (payload: JoinEventPayload) => eventsApi.join(slug, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-participants', slug] })
       queryClient.invalidateQueries({ queryKey: ['event', slug] })
+      setShowJoinForm(false)
       toast('Joined event', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to join', 'error'),
@@ -97,7 +103,13 @@ export default function EventDetail() {
 
   const removeParticipant = useMutation({
     mutationFn: (participantId: string) => eventsApi.removeParticipant(slug, participantId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['event-participants', slug] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event-participants', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event', slug] })
+      queryClient.invalidateQueries({ queryKey: ['event-scoreboard', slug] })
+      toast('Participant removed', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to remove participant', 'error'),
   })
 
   function copyLink() {
@@ -111,8 +123,10 @@ export default function EventDetail() {
   if (eventQuery.isLoading) {
     return (
       <PageGrid>
-        <div style={{ height: 96, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', marginBottom: 12 }} />
-        <div style={{ height: 200, background: 'var(--lc-surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }} />
+        <div className="lc-stack" aria-busy>
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </PageGrid>
     )
   }
@@ -135,12 +149,15 @@ export default function EventDetail() {
         tag={
           <span style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
             <StateBadge state={ev.state} />
+            {isEventFull(ev) && ev.state !== 'complete' && ev.state !== 'archived' && (
+              <Badge variant="red">Full</Badge>
+            )}
           </span>
         }
         sub={
           <>
             <span>
-              {ev.discipline} · {ev.course.lanes} lanes
+              {ev.discipline} · {courseLabel(ev)} · {participantsLabel(ev)}
             </span>
             {ev.location && (
               <>
@@ -182,7 +199,7 @@ export default function EventDetail() {
           <Link to="/events/$slug/live" params={{ slug: ev.slug }} className="lc-action-ghost">
             {ev.state === 'complete' ? 'View full results' : 'Live scoreboard'} <ChevronRight size={14} />
           </Link>
-          {!ev.is_owner && (ev.state === 'open_for_entries' || ev.state === 'live') && (
+          {(ev.state === 'open_for_entries' || ev.state === 'live') && (
             isParticipant ? (
               <button
                 type="button"
@@ -192,10 +209,20 @@ export default function EventDetail() {
               >
                 <Check size={14} /> Joined
               </button>
+            ) : isEventFull(ev) ? (
+              <button type="button" disabled className="lc-action-ghost" aria-label="Event full">
+                <UserPlus size={14} /> Event full
+              </button>
             ) : (
               <button
                 type="button"
-                onClick={() => join.mutate()}
+                onClick={() => {
+                  if (ev.category_ids.length > 0) {
+                    setShowJoinForm((v) => !v)
+                  } else {
+                    join.mutate({})
+                  }
+                }}
                 disabled={join.isPending}
                 className="lc-action-ghost"
               >
@@ -206,7 +233,13 @@ export default function EventDetail() {
           {ev.is_owner && nextState && (
             <button
               type="button"
-              onClick={() => promote.mutate(nextState)}
+              onClick={() => {
+                if (nextState === 'complete') {
+                  setShowCompleteConfirm(true)
+                } else {
+                  promote.mutate(nextState)
+                }
+              }}
               disabled={promote.isPending}
               className="lc-cta"
               style={{ width: 'auto', padding: '8px 14px' }}
@@ -226,6 +259,17 @@ export default function EventDetail() {
           )}
         </div>
 
+        {showJoinForm && !isParticipant && (
+          <JoinForm
+            categoryOptions={ev.category_ids
+              .map((id) => categoryLookup.get(id))
+              .filter((c): c is NonNullable<typeof c> => Boolean(c))}
+            isPending={join.isPending}
+            onSubmit={(payload) => join.mutate(payload)}
+            onCancel={() => setShowJoinForm(false)}
+          />
+        )}
+
         <ConfirmDialog
           open={showReopenConfirm}
           title="Reopen this event?"
@@ -236,6 +280,30 @@ export default function EventDetail() {
             promote.mutate('live')
           }}
           onCancel={() => setShowReopenConfirm(false)}
+        />
+
+        <ConfirmDialog
+          open={showCompleteConfirm}
+          title="Mark this event complete?"
+          message="Final results are published to participants' feeds and scoring closes. You can reopen the event later if something needs correcting."
+          confirmLabel="Mark complete"
+          onConfirm={() => {
+            setShowCompleteConfirm(false)
+            promote.mutate('complete')
+          }}
+          onCancel={() => setShowCompleteConfirm(false)}
+        />
+
+        <ConfirmDialog
+          open={!!removingParticipant}
+          title={`Remove ${removingParticipant?.name ?? 'participant'}?`}
+          message="Their recorded shots and any submitted card for this event are deleted with them. This cannot be undone."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (removingParticipant) removeParticipant.mutate(removingParticipant.id)
+            setRemovingParticipant(null)
+          }}
+          onCancel={() => setRemovingParticipant(null)}
         />
 
         {ev.state === 'complete' && podium.winner && <PodiumSection podium={podium} />}
@@ -262,7 +330,11 @@ export default function EventDetail() {
         )}
 
         <Section
-          title={`Participants (${participants.length})`}
+          title={
+            ev.max_participants
+              ? `Participants (${participants.length} of ${ev.max_participants})`
+              : `Participants (${participants.length})`
+          }
           icon={<Users size={12} />}
           actions={
             ev.is_owner ? (
@@ -315,6 +387,9 @@ export default function EventDetail() {
                         {p.display_name}
                       </span>
                       {!p.user_id && <Badge variant="gold">Guest</Badge>}
+                      {p.lane_assignment != null && (
+                        <Badge variant="neutral">Lane {p.lane_assignment}</Badge>
+                      )}
                     </div>
                     <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                       {[cat?.label, p.team, p.weapon_label].filter(Boolean).join(' · ') || ' '}
@@ -323,7 +398,8 @@ export default function EventDetail() {
                   {ev.is_owner && (
                     <button
                       type="button"
-                      onClick={() => removeParticipant.mutate(p.id)}
+                      onClick={() => setRemovingParticipant({ id: p.id, name: p.display_name })}
+                      disabled={removeParticipant.isPending}
                       aria-label={`Remove ${p.display_name}`}
                       className="lc-icon-btn"
                       style={{ color: 'var(--red)' }}
@@ -338,6 +414,68 @@ export default function EventDetail() {
         </Section>
       </div>
     </PageGrid>
+  )
+}
+
+function JoinForm({
+  categoryOptions,
+  isPending,
+  onSubmit,
+  onCancel,
+}: {
+  categoryOptions: { id: string; label: string }[]
+  isPending: boolean
+  onSubmit: (payload: JoinEventPayload) => void
+  onCancel: () => void
+}) {
+  const [categoryId, setCategoryId] = useState('')
+  const [team, setTeam] = useState('')
+
+  const inputCls =
+    'w-full bg-surface border border-subtle rounded px-3 py-2 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--gold)]/50 transition-colors'
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    onSubmit({
+      category_id: categoryId || undefined,
+      team: team.trim() || undefined,
+    })
+  }
+
+  return (
+    <Section title="Join this event">
+      <form onSubmit={submit} className="space-y-2" style={{ padding: '14px 18px' }}>
+        {categoryOptions.length > 0 && (
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
+            <option value="">Category (optional)</option>
+            {categoryOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <input
+          type="text"
+          value={team}
+          onChange={(e) => setTeam(e.target.value)}
+          placeholder="Team (optional)"
+          className={inputCls}
+        />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[11px] tracking-widest uppercase px-4 py-2 rounded transition-all"
+          >
+            {isPending ? 'Joining…' : 'Join event'}
+          </button>
+          <button type="button" onClick={onCancel} className="lc-action-ghost">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Section>
   )
 }
 
@@ -529,6 +667,7 @@ function ResultsTableSection({
         </Link>
       }
     >
+      <div style={{ overflowX: 'auto' }}>
       <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: 'var(--bg-2)' }}>
@@ -660,6 +799,7 @@ function ResultsTableSection({
           })}
         </tbody>
       </table>
+      </div>
     </Section>
   )
 }

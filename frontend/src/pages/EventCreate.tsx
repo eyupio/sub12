@@ -36,12 +36,23 @@ const LABELS: Record<StepKey, string> = {
   invite: 'Invite',
 }
 
-function readDraft(): WizardState | null {
+function readDraft(clubId?: string): WizardState | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object') return parsed as WizardState
+    if (parsed && typeof parsed === 'object') {
+      // Merge over the initial state so drafts saved before a field existed
+      // still hydrate every input with a defined value.
+      const base = initialState(clubId)
+      const draft = parsed as Partial<WizardState>
+      return {
+        basics: { ...base.basics, ...draft.basics },
+        format: { ...base.format, ...draft.format },
+        course: { ...base.course, ...draft.course },
+        verification: { ...base.verification, ...draft.verification },
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -70,7 +81,7 @@ export default function EventCreate() {
   const search = useSearch({ strict: false }) as { clubId?: string; step?: number }
   const clubId = search.clubId
 
-  const [state, setState] = useState<WizardState>(() => readDraft() ?? initialState(clubId))
+  const [state, setState] = useState<WizardState>(() => readDraft(clubId) ?? initialState(clubId))
   const [createdEvent, setCreatedEvent] = useState<EventDTO | null>(null)
   const [stepIndex, setStepIndex] = useState<number>(() => {
     if (typeof search.step === 'number' && search.step >= 1 && search.step <= STEPS.length) return search.step - 1

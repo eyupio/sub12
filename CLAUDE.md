@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **119** (000001–000119). Latest: `000119_review_volunteer_prefs`.
+Current migration count: **120** (000001–000120). Latest: `000120_review_volunteer_prefs`.
 
 ## Critical Migration Rules
 
@@ -246,6 +246,13 @@ picker, the "save this as a new place" dialog, and the recent-location chips:
 2. then whatever the user typed;
 3. then the reverse geocoder's name for the spot;
 4. and only then `53.862, -1.958`.
+
+A row labelled `53.862, -1.958` but stored with no `location_lat`/`location_lng`
+still knows where it was: `coordsForLabel` reads the point back out of the label
+(three decimals, ~110m — inside the radius at which we'd call two points the
+same place). Without that, such a row matches no saved place and is never sent
+to the geocoder, so its recent-location chip stays a grid reference forever and
+seeds the next card with no coordinates either.
 
 `GET /api/v1/geo/reverse?lat=&lng=` fronts a Nominatim-compatible endpoint
 (`GEOCODE_URL`; empty disables the lookup). It caches hits *and* misses in Redis

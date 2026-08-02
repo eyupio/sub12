@@ -1,7 +1,7 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
-import { isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
+import { coordsForLabel, isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
 
 export interface ReverseGeocode {
   name: string
@@ -50,8 +50,11 @@ export async function nameForPick<
 ): Promise<string> {
   const known = resolveLocationLabel(label, lat, lng, places)
   if (!isCoordinateLabel(known)) return known
-  if (typeof lat !== 'number' || typeof lng !== 'number') return known
-  const found = await qc.fetchQuery(reverseGeocodeQuery(lat, lng))
+  // A label that is itself a grid reference stands in for the coordinates when
+  // none were passed, so a point picked from stored text is still named.
+  const coords = coordsForLabel(label, lat, lng)
+  if (!coords) return known
+  const found = await qc.fetchQuery(reverseGeocodeQuery(coords.lat, coords.lng))
   return found?.name || known
 }
 

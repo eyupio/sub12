@@ -116,7 +116,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **119** (000001–000119). Latest: `000119_review_volunteer_prefs`.
+Current migration count: **120** (000001–000120). Latest: `000120_review_volunteer_prefs`.
 
 ## Critical Migration Rules
 
