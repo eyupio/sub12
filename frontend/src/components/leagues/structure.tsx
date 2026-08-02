@@ -81,6 +81,7 @@ export function FilterRow<T extends string>({
 }
 
 export function Section({
+  id,
   title,
   icon,
   actions,
@@ -88,6 +89,7 @@ export function Section({
   children,
   noPad = false,
 }: {
+  id?: string
   title?: string
   icon?: ReactNode
   actions?: ReactNode
@@ -96,7 +98,7 @@ export function Section({
   noPad?: boolean
 }) {
   return (
-    <section className="lc-section">
+    <section id={id} className="lc-section" style={id ? { scrollMarginTop: 72 } : undefined}>
       {(title || actions) && (
         <header className="lc-section-head">
           {title && (

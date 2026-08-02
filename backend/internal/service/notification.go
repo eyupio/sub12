@@ -175,12 +175,23 @@ func (s *NotificationService) pushFanout(ctx context.Context, ev NotifEvent) {
 		}
 	}
 	title, body := notificationEmailContent(ev, actorName)
+	// Mirrors the identifying fields on the in-app notification row, so a
+	// tapped push resolves to the same destination the notification list does.
 	data := map[string]string{"type": ev.Type}
+	if ev.ActorID != "" {
+		data["actor_id"] = ev.ActorID
+	}
 	if ev.TargetID != nil {
 		data["target_id"] = *ev.TargetID
 	}
 	if ev.TargetType != nil {
 		data["target_type"] = *ev.TargetType
+	}
+	if ev.LeagueID != nil {
+		data["league_id"] = *ev.LeagueID
+	}
+	if ev.ClubID != nil {
+		data["club_id"] = *ev.ClubID
 	}
 	s.push.Send(ctx, tokens, PushMessage{Title: title, Body: body, Data: data})
 }

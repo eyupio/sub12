@@ -1,7 +1,9 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { devicesApi, type DevicePlatform } from '../api/devices'
+import type { NotificationType } from '../api/notifications'
 import { router } from '../router'
+import { notificationLink } from './notificationRouting'
 
 let started = false
 let currentToken: string | null = null
@@ -11,16 +13,24 @@ function platform(): DevicePlatform {
 }
 
 // Map a tapped notification's data payload to an in-app route. The backend
-// attaches target_type / target_id; fall back to the notifications screen so a
-// tap always lands somewhere sensible.
+// attaches the same identifying fields the in-app notification carries, so a
+// tapped push and a tapped row in the notification list land on the same page.
 function pathFromData(data: Record<string, unknown> | undefined): string {
-  const targetId = typeof data?.target_id === 'string' ? data.target_id : ''
-  const targetType = typeof data?.target_type === 'string' ? data.target_type : ''
-  if (targetId) {
-    if (targetType === 'score_card') return `/scores/${targetId}`
-    if (targetType === 'pellet_test') return `/pellet-testing/${targetId}`
-  }
-  return '/notifications'
+  const str = (key: string): string | undefined =>
+    typeof data?.[key] === 'string' && data[key] ? (data[key] as string) : undefined
+  const type = str('type')
+  if (!type) return '/notifications'
+  return notificationLink({
+    id: '',
+    recipient_id: '',
+    type: type as NotificationType,
+    created_at: '',
+    actor_id: str('actor_id'),
+    target_id: str('target_id'),
+    target_type: str('target_type'),
+    league_id: str('league_id'),
+    club_id: str('club_id'),
+  })
 }
 
 // Register this device for push and forward its token to the backend. Native

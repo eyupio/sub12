@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ExternalLink, Flag, Inbox } from 'lucide-react'
 import { reportsApi, type ModerationAction, type Report, type ReportStatus } from '../api/reports'
+import { useHashTarget } from '../hooks/useHashTarget'
 import { toast } from '../store/toast'
 
 function ReportTargetLink({ report }: { report: Report }) {
@@ -44,7 +45,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
   const isOpen = report.status === 'open'
 
   return (
-    <li className="p-3 rounded border border-subtle bg-surface space-y-2">
+    <li id={report.id} className="p-3 rounded border border-subtle bg-surface space-y-2 scroll-mt-24">
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-[var(--brass)] shrink-0">
           <Flag size={14} />
@@ -112,6 +113,7 @@ export default function AdminReportsQueue() {
   })
 
   const items = list.data?.items ?? []
+  useHashTarget(items.length > 0)
 
   return (
     <div className="p-4 lg:p-8 max-w-2xl mx-auto space-y-4">

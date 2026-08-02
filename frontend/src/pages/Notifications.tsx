@@ -3,7 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy } from 'lucide-react'
 import { notificationsApi, type NotificationType } from '../api/notifications'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
-import { notificationLink, notificationSentence } from './notificationRouting'
+import { notificationSentence, notificationTarget } from '../utils/notificationRouting'
 
 const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   follow_request: UserPlus,
@@ -101,8 +101,8 @@ export default function Notifications() {
 
       <ul className="space-y-2">
         {items.map((n) => {
-          const Icon = ICON_MAP[n.type]
-          const href = notificationLink(n)
+          const Icon = ICON_MAP[n.type] ?? AlertCircle
+          const target = notificationTarget(n)
           const unread = !n.read_at
           const sentence = notificationSentence(n)
           const content = (
@@ -135,15 +135,9 @@ export default function Notifications() {
           }
           return (
             <li key={n.id}>
-              {href ? (
-                <Link to={href} onClick={handleClick}>
-                  {content}
-                </Link>
-              ) : (
-                <button type="button" onClick={handleClick} className="w-full text-left">
-                  {content}
-                </button>
-              )}
+              <Link to={target.to} search={target.search} hash={target.hash} onClick={handleClick}>
+                {content}
+              </Link>
             </li>
           )
         })}
