@@ -300,6 +300,7 @@
   bottom: calc(100% + 8px);
   z-index: 30;
   min-width: 230px;
+  max-width: calc(100vw - 32px);
   max-height: 320px;
   overflow: auto;
   padding: 6px;
@@ -1245,9 +1246,20 @@
 
   .feed-header-actions,
   .composer-actions,
-  .composer-right {
+  .composer-right,
+  .composer-tools {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  /* The actions row wraps here, so the destination picker sits at the left of
+     its own line — a right-anchored menu would open off the left edge. */
+  .dest-menu {
+    left: 0;
+    right: auto;
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 40px);
   }
 
   .feed-filter-spacer {

@@ -153,7 +153,7 @@ function CommentReplies({ commentId, cardId, communityName }: { commentId: strin
             onChange={(e) => setReplyBody(e.target.value)}
             placeholder="Reply… (⌘/Ctrl + Enter to post)"
             aria-label="Reply body"
-            rows={1}
+            rows={2}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && replyBody.trim()) {
                 e.preventDefault()
@@ -439,7 +439,7 @@ export function ScoreCardComments({
             onChange={(e) => setNewBody(e.target.value)}
             placeholder="Add a comment… (⌘/Ctrl + Enter to post)"
             aria-label="Comment body"
-            rows={1}
+            rows={2}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && newBody.trim()) {
                 e.preventDefault()
