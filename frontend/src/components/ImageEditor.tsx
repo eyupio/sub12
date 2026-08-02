@@ -2,6 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Crop, RotateCcw, RotateCw, X as XIcon } from 'lucide-react'
 import { ChipSelector } from './ChipSelector'
 import { toast } from '../store/toast'
+import {
+  HANDLE_SIZE,
+  STAGE_INSET,
+  TOUCH_GRAB,
+  applyAspect,
+  clampRect,
+  hitTestCrop,
+  type Handle,
+  type Rect,
+} from '../utils/cropGeometry'
 
 interface Props {
   file: File
@@ -25,12 +35,6 @@ const ASPECTS: { key: AspectKey; ratio: number | null }[] = [
   { key: '3:2', ratio: 3 / 2 },
   { key: '16:9', ratio: 16 / 9 },
 ]
-
-const HANDLE_SIZE = 12
-
-type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'move' | null
-
-interface Rect { x: number; y: number; w: number; h: number }
 
 // Read EXIF Orientation tag (1..8) from a JPEG File. Returns 1 (no rotation)
 // for non-JPEGs or when the tag isn't present.
@@ -92,37 +96,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error('decode'))
     img.src = url
   })
-}
-
-function clampRect(r: Rect, maxW: number, maxH: number, minSize = 16): Rect {
-  const w = Math.max(minSize, Math.min(r.w, maxW))
-  const h = Math.max(minSize, Math.min(r.h, maxH))
-  const x = Math.max(0, Math.min(r.x, maxW - w))
-  const y = Math.max(0, Math.min(r.y, maxH - h))
-  return { x, y, w, h }
-}
-
-function applyAspect(r: Rect, ratio: number, anchor: 'center' | Handle, maxW: number, maxH: number): Rect {
-  // Try preserving width first; clamp height by ratio.
-  let w = r.w
-  let h = w / ratio
-  if (h > maxH) {
-    h = maxH
-    w = h * ratio
-  }
-  if (w > maxW) {
-    w = maxW
-    h = w / ratio
-  }
-  let x = r.x
-  let y = r.y
-  if (anchor === 'center' || anchor === null || anchor === 'move') {
-    const cx = r.x + r.w / 2
-    const cy = r.y + r.h / 2
-    x = cx - w / 2
-    y = cy - h / 2
-  }
-  return clampRect({ x, y, w, h }, maxW, maxH)
 }
 
 export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = 'Edit photo', quality = 0.92 }: Props) {
@@ -193,7 +166,9 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     const swapped = totalRot === 90 || totalRot === 270
     const sourceW = swapped ? image.naturalHeight : image.naturalWidth
     const sourceH = swapped ? image.naturalWidth : image.naturalHeight
-    const scale = Math.min(stageSize.w / sourceW, stageSize.h / sourceH)
+    const availW = Math.max(1, stageSize.w - STAGE_INSET * 2)
+    const availH = Math.max(1, stageSize.h - STAGE_INSET * 2)
+    const scale = Math.min(availW / sourceW, availH / sourceH)
     const drawW = sourceW * scale
     const drawH = sourceH * scale
     const offsetX = (stageSize.w - drawW) / 2
@@ -292,29 +267,11 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     }
   }, [image, stageSize, displayMetrics, crop, exifFlipH])
 
-  // Hit-test which handle (if any) the pointer is over.
-  function hitTest(px: number, py: number): Handle {
-    if (!crop) return null
-    const near = (a: number, b: number) => Math.abs(a - b) < HANDLE_SIZE
-    const onLeft = near(px, crop.x)
-    const onRight = near(px, crop.x + crop.w)
-    const onTop = near(py, crop.y)
-    const onBottom = near(py, crop.y + crop.h)
-    const inX = px >= crop.x - HANDLE_SIZE && px <= crop.x + crop.w + HANDLE_SIZE
-    const inY = py >= crop.y - HANDLE_SIZE && py <= crop.y + crop.h + HANDLE_SIZE
-    if (onLeft && onTop) return 'nw'
-    if (onRight && onTop) return 'ne'
-    if (onLeft && onBottom) return 'sw'
-    if (onRight && onBottom) return 'se'
-    if (onTop && inX) return 'n'
-    if (onBottom && inX) return 's'
-    if (onLeft && inY) return 'w'
-    if (onRight && inY) return 'e'
-    if (px > crop.x && px < crop.x + crop.w && py > crop.y && py < crop.y + crop.h) return 'move'
-    return null
-  }
-
   const dragRef = useRef<{ handle: Handle; start: { x: number; y: number }; orig: Rect } | null>(null)
+
+  function grabTolerance(e: React.PointerEvent<HTMLCanvasElement>) {
+    return e.pointerType === 'mouse' ? HANDLE_SIZE : TOUCH_GRAB
+  }
 
   function pointerCoords(e: React.PointerEvent<HTMLCanvasElement>) {
     const c = canvasRef.current
@@ -326,7 +283,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!crop) return
     const { x, y } = pointerCoords(e)
-    const handle = hitTest(x, y)
+    const handle = hitTestCrop(crop, x, y, grabTolerance(e))
     if (!handle) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = { handle, start: { x, y }, orig: crop }
@@ -338,7 +295,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     if (!c) return
     if (!drag) {
       const { x, y } = pointerCoords(e)
-      const handle = crop ? hitTest(x, y) : null
+      const handle = crop ? hitTestCrop(crop, x, y, grabTolerance(e)) : null
       const cursor =
         handle === 'move' ? 'move'
         : handle === 'n' || handle === 's' ? 'ns-resize'
@@ -352,7 +309,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     const { x, y } = pointerCoords(e)
     const dx = x - drag.start.x
     const dy = y - drag.start.y
-    let next = { ...drag.orig }
+    const next = { ...drag.orig }
     switch (drag.handle) {
       case 'move':
         next.x = drag.orig.x + dx
@@ -400,29 +357,24 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     if (next.h < 0) { next.y += next.h; next.h = -next.h }
 
     const { drawW, drawH, offsetX, offsetY } = displayMetrics
-    const maxX = offsetX
-    const maxY = offsetY
-    const maxRight = offsetX + drawW
-    const maxBottom = offsetY + drawH
+    const bounds: Rect = { x: offsetX, y: offsetY, w: drawW, h: drawH }
 
-    // Clamp to image bounds (the image footprint, not the whole canvas).
-    if (next.x < maxX) { next.w -= (maxX - next.x); next.x = maxX }
-    if (next.y < maxY) { next.h -= (maxY - next.y); next.y = maxY }
-    if (next.x + next.w > maxRight) next.w = maxRight - next.x
-    if (next.y + next.h > maxBottom) next.h = maxBottom - next.y
+    if (drag.handle === 'move') {
+      // Moving slides the rectangle inside the image; it never resizes it,
+      // which would silently break a locked ratio at the edges.
+      setCrop(clampRect(next, bounds))
+      return
+    }
+
+    // Resizing clips the dragged edge at the image footprint.
+    if (next.x < bounds.x) { next.w -= (bounds.x - next.x); next.x = bounds.x }
+    if (next.y < bounds.y) { next.h -= (bounds.y - next.y); next.y = bounds.y }
+    if (next.x + next.w > bounds.x + bounds.w) next.w = bounds.x + bounds.w - next.x
+    if (next.y + next.h > bounds.y + bounds.h) next.h = bounds.y + bounds.h - next.y
     next.w = Math.max(16, next.w)
     next.h = Math.max(16, next.h)
 
-    if (activeRatio != null && drag.handle !== 'move') {
-      next = applyAspect(next, activeRatio, drag.handle, drawW, drawH)
-      // Re-clamp after aspect enforcement
-      if (next.x < maxX) next.x = maxX
-      if (next.y < maxY) next.y = maxY
-      if (next.x + next.w > maxRight) next.x = maxRight - next.w
-      if (next.y + next.h > maxBottom) next.y = maxBottom - next.h
-    }
-
-    setCrop(next)
+    setCrop(activeRatio != null ? applyAspect(next, activeRatio, drag.handle, bounds) : clampRect(next, bounds))
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
