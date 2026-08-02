@@ -387,6 +387,13 @@ function FeedComposer() {
     onError: () => toast('Failed to create post', 'error'),
   })
 
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = `${ta.scrollHeight}px`
+  }, [body])
+
   if (!currentUser) return null
 
   const submit = (e: FormEvent) => {
@@ -530,7 +537,7 @@ function FeedComposer() {
           ref={textareaRef}
           value={body}
           onChange={handleBodyChange}
-          rows={1}
+          rows={2}
           placeholder="Share an update, log a card, ask a question..."
           aria-label="Post body"
         />
