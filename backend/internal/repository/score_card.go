@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -541,7 +542,9 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 
 	// $21 carries the request's intent (NULL = keep, '' = detach) and $22 the
 	// round to move to, kept in a separate parameter so the uuid cast is never
-	// applied to the empty string. $23/$24 do the same for the club.
+	// applied to the empty string. $23/$24 do the same for the club, and $25
+	// for the event link — which only ever detaches ('' → NULL), since
+	// attaching is submit-to-event's job.
 	const newRoundExpr = `CASE
 			WHEN $21::text IS NULL THEN score_cards.league_round_id
 			WHEN $21::text = ''    THEN NULL
@@ -551,6 +554,10 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			WHEN $23::text IS NULL THEN score_cards.club_id
 			WHEN $23::text = ''    THEN NULL
 			ELSE $24::uuid
+		END`
+	const newEventExpr = `CASE
+			WHEN $25::text = '' THEN NULL
+			ELSE score_cards.event_participant_id
 		END`
 	var newRound *string
 	if input.LeagueRoundID != nil && *input.LeagueRoundID != "" {
@@ -583,8 +590,9 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 			card_image_rotation = COALESCE($20, card_image_rotation),
 			league_round_id = `+newRoundExpr+`,
 			club_id = `+newClubExpr+`,
+			event_participant_id = `+newEventExpr+`,
 			verification = CASE
-				WHEN `+newRoundExpr+` IS NOT NULL OR event_participant_id IS NOT NULL
+				WHEN `+newRoundExpr+` IS NOT NULL OR `+newEventExpr+` IS NOT NULL
 					THEN 'pending'::verification_status
 				ELSE 'verified'::verification_status
 			END,
@@ -604,7 +612,7 @@ func (r *ScoreCardRepository) Update(ctx context.Context, id, userID string, inp
 		pgtype.FlatArray[int16](input.ShotScores),
 		pgtype.FlatArray[bool](input.ShotXs),
 		totalScore, xCount, input.Visibility, input.LocationID, input.CardImageRotation,
-		input.LeagueRoundID, newRound, input.ClubID, newClub,
+		input.LeagueRoundID, newRound, input.ClubID, newClub, input.EventParticipantID,
 	).Scan(
 		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
 		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
@@ -818,6 +826,80 @@ func (r *ScoreCardRepository) SubmitToLeague(ctx context.Context, cardID, userID
 	// longer exists, and its moderators are no longer the ones ruling on it.
 	if _, err := tx.Exec(ctx, `DELETE FROM score_card_actions WHERE score_card_id = $1`, cardID); err != nil {
 		return nil, fmt.Errorf("clear audit trail on league submit: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+	return &card, nil
+}
+
+// SubmitToEvent links an existing score card to an event participant and
+// restarts verification. Only personal cards move — the WHERE refuses cards
+// sitting in a league round or already bound to a participant, so the service
+// layer's rules can't be bypassed by a racing request. Discipline and club are
+// overwritten from the event (empty/nil leaves them alone), matching what
+// applyEventDefaults does on create so an event-bound card can't disagree with
+// its event. Confirmations, community-review requests and the audit trail are
+// cleared in the same transaction — the card arrives at the event with no
+// history, exactly as on a league move.
+func (r *ScoreCardRepository) SubmitToEvent(ctx context.Context, cardID, userID, participantID, discipline string, clubID *string) (*model.ScoreCard, error) {
+	var card model.ScoreCard
+	var shotScores pgtype.FlatArray[int16]
+	var shotXs pgtype.FlatArray[bool]
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx, `
+		UPDATE score_cards SET
+			event_participant_id = $3,
+			discipline      = COALESCE(NULLIF($4, ''), discipline),
+			club_id         = COALESCE($5, club_id),
+			verification    = 'pending'::verification_status,
+			updated_at      = NOW()
+		WHERE id = $1 AND user_id = $2 AND league_round_id IS NULL AND event_participant_id IS NULL
+		RETURNING
+			id, user_id, rifle_id, pellet_id,
+			shot_at::text, location, location_lat, location_lng, wind_mph, temp_celsius, distance_m, discipline, notes,
+			shot_scores, shot_xs, total_score, x_count,
+			card_image_url, card_image_rotation, verification::text, visibility, league_round_id, club_id, location_id,
+			like_count, comment_count, is_draft, event_participant_id,
+			created_at, updated_at
+	`, cardID, userID, participantID, discipline, clubID).Scan(
+		&card.ID, &card.UserID, &card.RifleID, &card.PelletID,
+		&card.ShotAt, &card.Location, &card.LocationLat, &card.LocationLng, &card.WindMPH, &card.TempCelsius, &card.DistanceM, &card.Discipline, &card.Notes,
+		&shotScores, &shotXs, &card.TotalScore, &card.XCount,
+		&card.CardImageURL, &card.CardImageRotation, &card.Verification, &card.Visibility, &card.LeagueRoundID, &card.ClubID, &card.LocationID,
+		&card.LikeCount, &card.CommentCount, &card.IsDraft, &card.EventParticipantID,
+		&card.CreatedAt, &card.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		// The partial unique index on (event_participant_id) WHERE NOT is_draft
+		// closes the race between the service's duplicate check and this write.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrConflict
+		}
+		return nil, fmt.Errorf("submit score card to event: %w", err)
+	}
+	card.ShotScores = []int16(shotScores)
+	card.ShotXs = []bool(shotXs)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM score_confirmations WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear confirmations on event submit: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM community_review_requests WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear community review request on event submit: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM score_card_actions WHERE score_card_id = $1`, cardID); err != nil {
+		return nil, fmt.Errorf("clear audit trail on event submit: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -330,6 +330,53 @@ func (h *ScoreCardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /api/v1/score-cards/{id}/submit-to-event
+func (h *ScoreCardHandler) SubmitToEvent(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		EventSlug string `json:"event_slug"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.EventSlug == "" {
+		writeError(w, http.StatusBadRequest, "event_slug is required")
+		return
+	}
+
+	card, err := h.svc.SubmitToEvent(r.Context(), id, userID, body.EventSlug)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotEventParticipant) {
+			writeError(w, http.StatusForbidden, "join the event before submitting a card to it")
+			return
+		}
+		if errors.Is(err, service.ErrEventNotFound) {
+			writeError(w, http.StatusNotFound, "event not found")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "score card not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to submit score card to event")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, card)
+}
+
 // POST /api/v1/score-cards/{id}/submit-to-league
 func (h *ScoreCardHandler) SubmitToLeague(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

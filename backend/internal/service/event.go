@@ -18,6 +18,7 @@ var (
 	ErrInvalidEvent           = errors.New("invalid event")
 	ErrNotEventOwner          = errors.New("not the event owner")
 	ErrNotEventScorer         = errors.New("not authorised to score this event")
+	ErrNotEventParticipant    = errors.New("event participation required")
 	ErrAlreadyEventParticipant = errors.New("already a participant of this event")
 	ErrEventNotJoinable       = errors.New("event is not open for entries")
 	ErrEventFull              = errors.New("event is full")
@@ -975,6 +976,18 @@ func (s *EventService) LookupParticipantWithEvent(ctx context.Context, participa
 		return nil, nil, err
 	}
 	return ev, p, nil
+}
+
+// LookupSelfParticipant returns the caller's own entry in an event, mapping a
+// missing row to ErrNotEventParticipant — submitting a card to an event is
+// something an entrant does, so a non-entrant is told to join first rather
+// than getting a generic not-found.
+func (s *EventService) LookupSelfParticipant(ctx context.Context, eventID, userID string) (*model.EventParticipant, error) {
+	p, err := s.events.GetParticipantByEventAndUser(ctx, eventID, userID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrNotEventParticipant
+	}
+	return p, err
 }
 
 // LoadEventBySlug exposes a slug→event lookup for sibling services that need

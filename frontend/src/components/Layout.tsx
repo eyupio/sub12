@@ -1,6 +1,6 @@
 import { PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw, Megaphone } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw, Megaphone, Images } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -28,6 +28,7 @@ const baseNavItems = [
   { to: '/gear', icon: Package, label: 'Gear', mobileLabel: 'Gear' },
   { to: '/locations', icon: MapPin, label: 'Locations', mobileLabel: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores', mobileLabel: 'Scores' },
+  { to: '/gallery', icon: Images, label: 'Gallery', mobileLabel: 'Gallery' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing', mobileLabel: 'Tests' },
   { to: '/drafts', icon: Zap, label: 'Drafts', mobileLabel: 'Drafts' },
   { to: '/profile', icon: User, label: 'Profile', mobileLabel: 'Me' },
@@ -66,6 +67,7 @@ const moreMenuItems = [
   { to: '/gear', icon: Package, label: 'Gear' },
   { to: '/locations', icon: MapPin, label: 'Places' },
   { to: '/scores', icon: Target, label: 'Scores' },
+  { to: '/gallery', icon: Images, label: 'Gallery' },
   { to: '/pellet-testing', icon: Crosshair, label: 'Testing' },
   { to: '/drafts', icon: Zap, label: 'Drafts' },
   { to: '/profile', icon: User, label: 'Profile' },

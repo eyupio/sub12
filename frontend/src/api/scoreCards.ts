@@ -129,6 +129,8 @@ export interface UpdateScoreCardPayload {
   club_id?: string
   visibility?: string
   card_image_rotation?: number
+  // Empty string withdraws the card from its event; omit to keep the link.
+  event_participant_id?: string
 }
 
 export interface Comment {
@@ -189,6 +191,9 @@ export const scoreCardApi = {
 
   submitToLeague: (cardId: string, leagueRoundId: string) =>
     api.post<ScoreCard>(`/score-cards/${cardId}/submit-to-league`, { league_round_id: leagueRoundId }),
+
+  submitToEvent: (cardId: string, eventSlug: string) =>
+    api.post<ScoreCard>(`/score-cards/${cardId}/submit-to-event`, { event_slug: eventSlug }),
 
   listComments: (cardId: string) =>
     api.get<{ items: Comment[] }>(`/score-cards/${cardId}/comments`),

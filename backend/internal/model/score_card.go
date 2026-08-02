@@ -146,6 +146,12 @@ type UpdateScoreCardInput struct {
 	// set to the empty string. Omit to keep the current club. The caller must
 	// be a member of any club they name.
 	ClubID *string `json:"club_id"`
+	// EventParticipantID withdraws the card from its event when set to the
+	// empty string, turning it back into a personal card. Omit to keep the
+	// current link. A non-empty value must match the participant the card is
+	// already bound to — attaching a card to an event is
+	// POST /score-cards/{id}/submit-to-event.
+	EventParticipantID *string `json:"event_participant_id"`
 }
 
 // Comment is a user comment on any content type (score_card, post, etc.).

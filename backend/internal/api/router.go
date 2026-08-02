@@ -61,6 +61,7 @@ func NewRouter(
 	adminGear *service.AdminGearService,
 	geocode *service.GeocodeService,
 	announcements *service.AnnouncementService,
+	gallery *service.GalleryService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -175,6 +176,12 @@ func NewRouter(
 			r.Post("/score-cards/{id}/image", sc.UploadImage)
 			r.Post("/score-cards/{id}/rotate", sc.Rotate)
 			r.Post("/score-cards/{id}/submit-to-league", sc.SubmitToLeague)
+			r.Post("/score-cards/{id}/submit-to-event", sc.SubmitToEvent)
+
+			// Gallery: every uploaded item the caller owns, with its
+			// submission context resolved for display.
+			galh := handler.NewGallery(gallery)
+			r.Get("/users/me/gallery", galh.ListMine)
 
 			// Rifles
 			rh := handler.NewRifle(rifles, images)

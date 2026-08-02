@@ -230,6 +230,12 @@ league, or one whose round filled up, is moved rather than re-shot. The same
 - A card that **moves between rounds** arrives with no history: the previous
   league's confirmations, community-review request and `score_card_actions`
   audit trail are cleared in the same transaction, and verification restarts.
+- **Events** follow the same pattern: `POST /score-cards/{id}/submit-to-event`
+  (body `event_slug`) attaches a personal card to the caller's own entry in a
+  live card-submission event — enforcing the one-finalised-card-per-entry rule
+  and the event's image rule — and `PATCH` with `event_participant_id: ""`
+  withdraws it again. A league card must be detached before an event can claim
+  it, and vice versa; a card never sits in both.
 - **Locked** cards (verified or rejected under `lock_edits_after_verification`)
   refuse both the detach and the move, the same as any other edit.
 - `frontend/src/utils/cardContext.ts` (`contextChangePlan`) is the single place
@@ -452,6 +458,11 @@ as invariants and lean on the tests that pin them.
 ### Protected (requires `Authorization: Bearer <jwt>`)
 
 - **Score cards:** CRUD + image upload + comments (write) + community review (`/score-cards/{id}/review-request` + `/confirm`): the owner of a public/followers personal card opens a peer-review request (drafts, private and league cards are refused); any non-owner can confirm, and at the request's `required_confirmations` the request flips to verified (guarded so racing confirms emit one event), notifying the owner. Feed activities inherit the card's visibility, and each one links to `/scores/{id}/review` — a page carrying the review progress, the reviewers who confirmed, the confirm/cancel action and the card's comments (`components/ScoreCardComments.tsx`, shared with the card detail page). Cancelling discards gathered confirmations and removes the feed post; submitting the card to a league clears both. `PATCH /score-cards/{id}` takes `league_round_id` on the "omit to keep, empty string to clear" convention: clearing it detaches the card from its round and keeps it as a personal one, which is how a shooter rescues a card whose round is full. A non-empty value must name the round the card already sits in, and `club_id` follows the same convention — joining or moving between rounds stays with `submit-to-league`, which runs the membership and cap checks (see "A card's context is never final"). The refine flow can also save a draft without graduating it, so a card with nowhere to go yet stays editable in Drafts.
+- **Gallery:** `GET /users/me/gallery` lists every uploaded photo the caller
+  owns — score cards (with league/club/event submission context resolved to
+  names), rifles, pellets and pellet-test images — newest first. The
+  `/gallery` page renders it with a top-shots showcase, kind/submission
+  filters, and submit-to-league / submit-to-event / withdraw actions.
 - **Rifles:** CRUD + image upload + showcase (`GET /rifles/{id}/showcase`)
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.

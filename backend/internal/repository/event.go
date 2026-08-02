@@ -753,6 +753,36 @@ func (r *EventRepository) GetParticipant(ctx context.Context, participantID stri
 	return &p, nil
 }
 
+// GetParticipantByEventAndUser returns the given user's own entry in an
+// event, or ErrNotFound when they never joined it. Guests have no user_id and
+// are never returned here.
+func (r *EventRepository) GetParticipantByEventAndUser(ctx context.Context, eventID, userID string) (*model.EventParticipant, error) {
+	var p model.EventParticipant
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			p.id, p.event_id, p.user_id, p.guest_name,
+			COALESCE(u.display_name, p.guest_name) AS display_name,
+			p.team, p.category_id, p.weapon_class, p.weapon_label, p.lane_assignment,
+			p.scorecard_id, p.created_by, p.created_at
+		FROM event_participants p
+		LEFT JOIN users u ON u.id = p.user_id
+		WHERE p.event_id = $1 AND p.user_id = $2
+		ORDER BY p.created_at
+		LIMIT 1
+	`, eventID, userID).Scan(
+		&p.ID, &p.EventID, &p.UserID, &p.GuestName, &p.DisplayName,
+		&p.Team, &p.CategoryID, &p.WeaponClass, &p.WeaponLabel, &p.LaneAssignment,
+		&p.ScorecardID, &p.CreatedBy, &p.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get participant by event and user: %w", err)
+	}
+	return &p, nil
+}
+
 // UpsertScores inserts or updates a batch of shot results. Idempotent on
 // client_id (secondary key) and (participant_id, lane, shot_number)
 // (primary). Returns the count of rows that hit the table (insert + update).
