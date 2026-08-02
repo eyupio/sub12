@@ -44,6 +44,28 @@ export function BasicsStep({ state, onChange }: Props) {
         />
       </label>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <label className="block">
+          <span className={WIZARD_LABEL_CLS}>Starts (optional)</span>
+          <input
+            type="datetime-local"
+            className={WIZARD_INPUT_CLS}
+            value={basics.startsAt}
+            onChange={(e) => onChange({ ...state, basics: { ...basics, startsAt: e.target.value } })}
+          />
+        </label>
+        <label className="block">
+          <span className={WIZARD_LABEL_CLS}>Ends (optional)</span>
+          <input
+            type="datetime-local"
+            className={WIZARD_INPUT_CLS}
+            value={basics.endsAt}
+            min={basics.startsAt || undefined}
+            onChange={(e) => onChange({ ...state, basics: { ...basics, endsAt: e.target.value } })}
+          />
+        </label>
+      </div>
+
       <div className="block">
         <span className={WIZARD_LABEL_CLS}>Location (optional)</span>
         <PlaceSelector

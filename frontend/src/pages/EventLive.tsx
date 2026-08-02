@@ -129,6 +129,7 @@ export default function EventLive() {
             </p>
           )}
           {rows.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-2)' }}>
@@ -259,6 +260,7 @@ export default function EventLive() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </Section>
       </div>

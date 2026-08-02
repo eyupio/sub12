@@ -25,11 +25,15 @@ func NewEventRepository(db *pgxpool.Pool) *EventRepository {
 	return &EventRepository{db: db}
 }
 
+// ErrEventFull is returned when a join would exceed the event's
+// max_participants cap.
+var ErrEventFull = errors.New("event is full")
+
 const eventColumns = `
 	e.id, e.slug, e.name, e.description, e.location,
 	e.starts_at, e.ends_at, e.archive_at,
 	e.discipline, e.format, e.course, e.scoring_rules, e.category_ids,
-	e.visibility, e.state, e.owner_user_id, e.club_id,
+	e.visibility, e.state, e.owner_user_id, e.club_id, e.max_participants,
 	e.require_score_verification, e.required_confirmations,
 	e.require_image_upload, e.lock_edits_after_verification,
 	e.created_at, e.updated_at
@@ -41,7 +45,7 @@ func scanEvent(row pgx.Row, e *model.Event) error {
 		&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
 		&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
 		&e.Discipline, &e.Format, &courseRaw, &rulesRaw, &e.CategoryIDs,
-		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
+		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID, &e.MaxParticipants,
 		&e.RequireScoreVerification, &e.RequiredConfirmations,
 		&e.RequireImageUpload, &e.LockEditsAfterVerification,
 		&e.CreatedAt, &e.UpdatedAt,
@@ -123,19 +127,19 @@ func (r *EventRepository) Create(ctx context.Context, ownerID string, in *model.
 			INSERT INTO events AS e (
 				slug, name, description, location, starts_at, ends_at,
 				discipline, format, course, scoring_rules, category_ids,
-				visibility, state, owner_user_id, club_id,
+				visibility, state, owner_user_id, club_id, max_participants,
 				require_score_verification, required_confirmations,
 				require_image_upload, lock_edits_after_verification
 			) VALUES (
 				$1, $2, $3, $4, $5, $6,
 				$7, $8, $9::jsonb, $10::jsonb, $11::uuid[],
-				$12, 'draft', $13, $14,
-				$15, $16, $17, $18
+				$12, 'draft', $13, $14, $15,
+				$16, $17, $18, $19
 			)
 			RETURNING `+eventColumns+`
 		`, slug, in.Name, in.Description, in.Location, in.StartsAt, in.EndsAt,
 			in.Discipline, format, courseJSON, rulesJSON, categoryIDs,
-			visibility, ownerID, in.ClubID,
+			visibility, ownerID, in.ClubID, in.MaxParticipants,
 			requireVerify, requiredConfirmations, requireImage, lockAfterVerify,
 		)
 		err = scanEvent(row, &ev)
@@ -159,7 +163,7 @@ func scanEventWithCount(row pgx.Row, e *model.Event) error {
 		&e.ID, &e.Slug, &e.Name, &e.Description, &e.Location,
 		&e.StartsAt, &e.EndsAt, &e.ArchiveAt,
 		&e.Discipline, &e.Format, &courseRaw, &rulesRaw, &e.CategoryIDs,
-		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID,
+		&e.Visibility, &e.State, &e.OwnerUserID, &e.ClubID, &e.MaxParticipants,
 		&e.RequireScoreVerification, &e.RequiredConfirmations,
 		&e.RequireImageUpload, &e.LockEditsAfterVerification,
 		&e.CreatedAt, &e.UpdatedAt,
@@ -200,8 +204,12 @@ func (r *EventRepository) GetBySlug(ctx context.Context, slug string) (*model.Ev
 
 func (r *EventRepository) GetByID(ctx context.Context, id string) (*model.Event, error) {
 	var e model.Event
-	row := r.db.QueryRow(ctx, `SELECT `+eventColumns+` FROM events e WHERE e.id = $1`, id)
-	if err := scanEvent(row, &e); err != nil {
+	row := r.db.QueryRow(ctx, `
+		SELECT `+eventColumns+`,
+			(SELECT COUNT(*) FROM event_participants p WHERE p.event_id = e.id) AS participant_count
+		FROM events e WHERE e.id = $1
+	`, id)
+	if err := scanEventWithCount(row, &e); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -210,19 +218,22 @@ func (r *EventRepository) GetByID(ctx context.Context, id string) (*model.Event,
 	return &e, nil
 }
 
-// List returns events filtered by state and an optional viewer scope. When
-// includeClub is non-empty, club-scoped events for that club are included
-// (the caller must already have verified club membership). userID may be
-// empty for unauthenticated public listings.
+// List returns events for the public directory. Only public-visibility,
+// non-draft events are listed for everyone; an authenticated viewer also sees
+// their own events regardless of visibility or draft state (unlisted events
+// stay link-only for everyone else). Archived events never appear.
 func (r *EventRepository) List(ctx context.Context, viewerID string, stateFilter string) ([]*model.Event, error) {
 	args := []any{}
-	conds := []string{`e.visibility != 'club_only'`}
+	visible := `(e.visibility = 'public' AND e.state != 'draft')`
+	if viewerID != "" {
+		visible = fmt.Sprintf(`((e.visibility = 'public' AND e.state != 'draft') OR e.owner_user_id = $%d)`, len(args)+1)
+		args = append(args, viewerID)
+	}
+	conds := []string{visible, `e.state != 'archived'`}
 	if stateFilter != "" {
 		conds = append(conds, fmt.Sprintf("e.state = $%d", len(args)+1))
 		args = append(args, stateFilter)
 	}
-	// Hide archived events from default listings.
-	conds = append(conds, `e.state != 'archived'`)
 	where := strings.Join(conds, " AND ")
 
 	rows, err := r.db.Query(ctx, `
@@ -245,20 +256,21 @@ func (r *EventRepository) List(ctx context.Context, viewerID string, stateFilter
 		}
 		items = append(items, &e)
 	}
-	_ = viewerID // viewer-scoped filtering happens in the service layer
 	return items, rows.Err()
 }
 
-// ListByClub returns all events hosted under a club (any state except
-// archived). Caller is responsible for membership checks.
-func (r *EventRepository) ListByClub(ctx context.Context, clubID string) ([]*model.Event, error) {
+// ListByClub returns events hosted under a club (any state except archived).
+// Drafts are only visible to their owner. Caller is responsible for
+// membership checks.
+func (r *EventRepository) ListByClub(ctx context.Context, clubID, viewerID string) ([]*model.Event, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT `+eventColumns+`,
 			(SELECT COUNT(*) FROM event_participants p WHERE p.event_id = e.id) AS participant_count
 		FROM events e
 		WHERE e.club_id = $1 AND e.state != 'archived'
+		  AND (e.state != 'draft' OR e.owner_user_id = NULLIF($2, '')::uuid)
 		ORDER BY COALESCE(e.starts_at, e.created_at) DESC
-	`, clubID)
+	`, clubID, viewerID)
 	if err != nil {
 		return nil, fmt.Errorf("list events by club: %w", err)
 	}
@@ -349,6 +361,7 @@ func (r *EventRepository) Update(ctx context.Context, id string, in *model.Updat
 			category_ids                  = CASE WHEN $11::boolean THEN $10::uuid[] ELSE category_ids END,
 			visibility                    = COALESCE($12, visibility),
 			format                        = COALESCE($13, format),
+			max_participants              = CASE WHEN $18::boolean THEN NULLIF($19::int, 0) ELSE max_participants END,
 			require_score_verification    = COALESCE($14, require_score_verification),
 			required_confirmations        = COALESCE($15, required_confirmations),
 			require_image_upload          = COALESCE($16, require_image_upload),
@@ -374,6 +387,8 @@ func (r *EventRepository) Update(ctx context.Context, id string, in *model.Updat
 		in.RequiredConfirmations,
 		in.RequireImageUpload,
 		in.LockEditsAfterVerification,
+		in.MaxParticipants != nil,
+		in.MaxParticipants,
 	)
 	var e model.Event
 	if err := scanEvent(row, &e); err != nil {
@@ -476,11 +491,97 @@ func (r *EventRepository) AddScorer(ctx context.Context, eventID, userID, grante
 	return nil
 }
 
+// EventScorerRow is a delegated scorer joined with their display identity.
+type EventScorerRow struct {
+	UserID      string  `json:"user_id"`
+	DisplayName string  `json:"display_name"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
+}
+
+// ListScorers returns the delegated scorers for an event (the owner is not
+// included — ownership implies scoring rights).
+func (r *EventRepository) ListScorers(ctx context.Context, eventID string) ([]*EventScorerRow, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT s.user_id, COALESCE(u.display_name, '') AS display_name, u.avatar_url
+		FROM event_scorers s
+		LEFT JOIN users u ON u.id = s.user_id
+		WHERE s.event_id = $1
+		ORDER BY display_name
+	`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list scorers: %w", err)
+	}
+	defer rows.Close()
+	var items []*EventScorerRow
+	for rows.Next() {
+		var s EventScorerRow
+		if err := rows.Scan(&s.UserID, &s.DisplayName, &s.AvatarURL); err != nil {
+			return nil, fmt.Errorf("scan scorer: %w", err)
+		}
+		items = append(items, &s)
+	}
+	return items, rows.Err()
+}
+
+// RemoveScorer revokes delegated scorer rights.
+func (r *EventRepository) RemoveScorer(ctx context.Context, eventID, userID string) error {
+	tag, err := r.db.Exec(ctx, `
+		DELETE FROM event_scorers WHERE event_id = $1 AND user_id = $2
+	`, eventID, userID)
+	if err != nil {
+		return fmt.Errorf("remove scorer: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// reserveCapacity locks the event row and returns ErrEventFull when the
+// participant count has already reached max_participants. Must run inside the
+// same transaction as the insert so concurrent joins serialise on the lock
+// and cannot overshoot the cap.
+func reserveCapacity(ctx context.Context, tx pgx.Tx, eventID string) error {
+	var maxParticipants *int
+	if err := tx.QueryRow(ctx, `
+		SELECT max_participants FROM events WHERE id = $1 FOR UPDATE
+	`, eventID).Scan(&maxParticipants); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("lock event for capacity check: %w", err)
+	}
+	if maxParticipants == nil {
+		return nil
+	}
+	var count int
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*) FROM event_participants WHERE event_id = $1
+	`, eventID).Scan(&count); err != nil {
+		return fmt.Errorf("count participants: %w", err)
+	}
+	if count >= *maxParticipants {
+		return ErrEventFull
+	}
+	return nil
+}
+
 // AddRegisteredParticipant joins a registered user to the event. Returns
-// ErrConflict if the user is already a participant.
+// ErrConflict if the user is already a participant and ErrEventFull when the
+// event's capacity has been reached.
 func (r *EventRepository) AddRegisteredParticipant(ctx context.Context, eventID, userID, createdBy string, in *model.JoinEventInput) (*model.EventParticipant, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := reserveCapacity(ctx, tx, eventID); err != nil {
+		return nil, err
+	}
+
 	var p model.EventParticipant
-	err := r.db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO event_participants (
 			event_id, user_id, team, category_id, weapon_class, weapon_label, lane_assignment, created_by
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -496,14 +597,27 @@ func (r *EventRepository) AddRegisteredParticipant(ctx context.Context, eventID,
 		}
 		return nil, fmt.Errorf("add participant: %w", err)
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit participant: %w", err)
+	}
 	return &p, nil
 }
 
-// AddGuest adds a guest (non-account) participant. Always allowed multiple
-// guests per event (no uniqueness on guest_name).
+// AddGuest adds a guest (non-account) participant. Multiple guests per event
+// are allowed (no uniqueness on guest_name); the capacity cap still applies.
 func (r *EventRepository) AddGuest(ctx context.Context, eventID, createdBy string, in *model.AddGuestInput) (*model.EventParticipant, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := reserveCapacity(ctx, tx, eventID); err != nil {
+		return nil, err
+	}
+
 	var p model.EventParticipant
-	err := r.db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO event_participants (
 			event_id, guest_name, team, category_id, weapon_class, weapon_label, lane_assignment, created_by
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -514,6 +628,9 @@ func (r *EventRepository) AddGuest(ctx context.Context, eventID, createdBy strin
 	)
 	if err != nil {
 		return nil, fmt.Errorf("add guest: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit guest: %w", err)
 	}
 	return &p, nil
 }
@@ -631,10 +748,9 @@ func (r *EventRepository) UpsertScores(ctx context.Context, eventID, recordedBy 
 		if s.RecordedAt != nil {
 			recordedAt = *s.RecordedAt
 		}
+		// Lane/shot bounds are validated in the service layer against the
+		// event's course; nothing is silently clamped here.
 		shot := s.ShotNumber
-		if shot < 1 {
-			shot = 1
-		}
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO event_scores (
 				participant_id, lane, shot_number, result, note, recorded_at, recorded_by, client_id
@@ -746,9 +862,7 @@ func (r *EventRepository) Standings(ctx context.Context, eventID string, rules m
 
 	// Sort by points desc, hit_count desc, display_name asc.
 	sortStandings(items)
-	for i := range items {
-		items[i].Position = i + 1
-	}
+	assignPositions(items)
 	return items, nil
 }
 
@@ -795,9 +909,7 @@ func (r *EventRepository) StandingsFromCards(ctx context.Context, eventID string
 		return nil, err
 	}
 	sortStandings(items)
-	for i := range items {
-		items[i].Position = i + 1
-	}
+	assignPositions(items)
 	return items, nil
 }
 
@@ -850,12 +962,26 @@ func sortStandings(items []*model.EventStandingRow) {
 			a, b := items[j-1], items[j]
 			if a.Points < b.Points ||
 				(a.Points == b.Points && a.HitCount < b.HitCount) ||
-				(a.Points == b.Points && a.HitCount == b.HitCount && strings.Compare(a.DisplayName, b.DisplayName) > 0) {
+				(a.Points == b.Points && a.HitCount == b.HitCount &&
+					strings.Compare(strings.ToLower(a.DisplayName), strings.ToLower(b.DisplayName)) > 0) {
 				items[j-1], items[j] = items[j], items[j-1]
 				continue
 			}
 			break
 		}
+	}
+}
+
+// assignPositions applies standard competition ranking ("1224"): rows tied on
+// points and hit count share a position, and the next distinct result takes
+// the position it would have held without the tie.
+func assignPositions(items []*model.EventStandingRow) {
+	for i := range items {
+		if i > 0 && items[i].Points == items[i-1].Points && items[i].HitCount == items[i-1].HitCount {
+			items[i].Position = items[i-1].Position
+			continue
+		}
+		items[i].Position = i + 1
 	}
 }
 
@@ -933,7 +1059,7 @@ func (r *EventRepository) AdminListAll(ctx context.Context) ([]*AdminEventRow, e
 			&row.ID, &row.Slug, &row.Name, &row.Description, &row.Location,
 			&row.StartsAt, &row.EndsAt, &row.ArchiveAt,
 			&row.Discipline, &row.Format, &courseRaw, &rulesRaw, &row.CategoryIDs,
-			&row.Visibility, &row.State, &row.OwnerUserID, &row.ClubID,
+			&row.Visibility, &row.State, &row.OwnerUserID, &row.ClubID, &row.MaxParticipants,
 			&row.RequireScoreVerification, &row.RequiredConfirmations,
 			&row.RequireImageUpload, &row.LockEditsAfterVerification,
 			&row.CreatedAt, &row.UpdatedAt,

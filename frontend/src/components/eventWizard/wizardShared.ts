@@ -21,6 +21,9 @@ export interface WizardBasics {
   locationId: string | null
   locationLat?: number
   locationLng?: number
+  // datetime-local input values ('' = unset); converted to ISO on submit.
+  startsAt: string
+  endsAt: string
   presetId: string
   discipline: string
 }
@@ -36,6 +39,8 @@ export interface WizardCourse {
   shotsPerTarget: number
   standing: string
   kneeling: string
+  // '' = no cap; otherwise a positive integer as typed.
+  maxParticipants: string
 }
 
 export interface WizardVerification {
@@ -60,6 +65,8 @@ export const initialState = (clubId?: string): WizardState => {
       description: '',
       location: '',
       locationId: null,
+      startsAt: '',
+      endsAt: '',
       presetId: preset.id,
       discipline: preset.discipline,
     },
@@ -73,6 +80,7 @@ export const initialState = (clubId?: string): WizardState => {
       shotsPerTarget: preset.course.shots_per_target,
       standing: '',
       kneeling: '',
+      maxParticipants: '',
     },
     verification: {
       requireScoreVerification: false,
@@ -126,9 +134,23 @@ export function formatValid(s: WizardState): boolean {
   return s.format.format === 'shot_grid' || s.format.format === 'card_submission'
 }
 
+export function parseMaxParticipants(input: string): number | undefined {
+  if (!input.trim()) return undefined
+  const n = Number.parseInt(input, 10)
+  if (!Number.isFinite(n) || n < 1) return undefined
+  return n
+}
+
 export function courseValid(s: WizardState): boolean {
-  if (isCardSubmission(s)) return true
-  return s.course.lanes >= 1 && s.course.lanes <= 200 && s.course.shotsPerTarget >= 1 && s.course.shotsPerTarget <= 10
+  const capOk = !s.course.maxParticipants.trim() || parseMaxParticipants(s.course.maxParticipants) !== undefined
+  if (isCardSubmission(s)) return capOk
+  return (
+    capOk &&
+    s.course.lanes >= 1 &&
+    s.course.lanes <= 200 &&
+    s.course.shotsPerTarget >= 1 &&
+    s.course.shotsPerTarget <= 10
+  )
 }
 
 export function buildCreatePayload(s: WizardState, clubId?: string): CreateEventPayload {
@@ -138,6 +160,8 @@ export function buildCreatePayload(s: WizardState, clubId?: string): CreateEvent
     name: s.basics.name.trim(),
     description: s.basics.description.trim() || undefined,
     location: s.basics.location.trim() || undefined,
+    starts_at: s.basics.startsAt ? new Date(s.basics.startsAt).toISOString() : undefined,
+    ends_at: s.basics.endsAt ? new Date(s.basics.endsAt).toISOString() : undefined,
     discipline: s.basics.discipline.trim(),
     format: s.format.format,
     course: card
@@ -152,6 +176,7 @@ export function buildCreatePayload(s: WizardState, clubId?: string): CreateEvent
     category_ids: s.format.categoryIds,
     visibility: s.format.visibility,
     club_id: clubId,
+    max_participants: parseMaxParticipants(s.course.maxParticipants),
   }
   if (card) {
     payload.require_score_verification = s.verification.requireScoreVerification
