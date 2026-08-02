@@ -53,7 +53,9 @@ var LeagueModeratorPermissions = []ModeratorPermission{
 	{PermManageMembers, "Manage members", "Approve or reject join requests and remove members.", true},
 	{PermVerifyScores, "Verify scores", "Verify, amend, reject and reopen submitted cards.", true},
 	{PermModerateContent, "Moderate content", "Handle reports and hide, flag or delete posts and comments.", true},
-	{PermManageSeasons, "Manage seasons", "Create seasons and rounds.", false},
+	// Opening the next round is the week-to-week work of running a league, so
+	// it is granted on promotion alongside the other day-to-day duties.
+	{PermManageSeasons, "Manage seasons", "Create seasons and rounds.", true},
 	{PermSendAnnouncements, "Send announcements", "Broadcast a message to every league member.", false},
 	{PermManageSettings, "Manage settings", "Edit league details, scoring config, image and join code.", false},
 	{PermManageSupport, "Handle support", "Work the league's support tickets and feature board.", false},

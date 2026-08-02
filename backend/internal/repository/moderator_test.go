@@ -170,3 +170,90 @@ func TestLeagueModeratorPermissions(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, role.IsModerator)
 }
+
+func TestClubStandingRunsLeagues(t *testing.T) {
+	tests := []struct {
+		name string
+		club clubStanding
+		want bool
+	}{
+		{"non-club league scans as the zero standing", clubStanding{}, false},
+		{"club owner", clubStanding{isOwner: true}, true},
+		{"club moderator holding manage_leagues", clubStanding{
+			isModerator: true,
+			permissions: []string{model.PermManageMembers, model.PermManageLeagues},
+		}, true},
+		{"club moderator without it", clubStanding{
+			isModerator: true,
+			permissions: []string{model.PermManageMembers, model.PermManageEvents},
+		}, false},
+		{"plain club member with a stale grant", clubStanding{
+			permissions: []string{model.PermManageLeagues},
+		}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.club.runsLeagues())
+		})
+	}
+}
+
+// Whoever runs a club runs the leagues hosted under it — otherwise a club
+// owner who did not personally create the league cannot open its next round.
+func TestClubAuthorityReachesItsLeagues(t *testing.T) {
+	pool := clubTestPool(t)
+	clubs := NewClubRepository(pool)
+	repo := NewLeagueRepository(pool)
+	ctx := context.Background()
+
+	clubOwnerID := newClubTestUser(t, pool, "club-league-owner@example.test")
+	leagueOwnerID := newClubTestUser(t, pool, "club-league-runner@example.test")
+	helperID := newClubTestUser(t, pool, "club-league-helper@example.test")
+	strangerID := newClubTestUser(t, pool, "club-league-stranger@example.test")
+
+	club, err := clubs.Create(ctx, clubOwnerID, &model.CreateClubInput{Name: "Host Club"})
+	require.NoError(t, err)
+	t.Cleanup(func() { mustExec(t, pool, `DELETE FROM clubs WHERE id = $1`, club.ID) })
+	require.NoError(t, clubs.Join(ctx, club.ID, leagueOwnerID))
+	require.NoError(t, clubs.Join(ctx, club.ID, helperID))
+	require.NoError(t, clubs.Join(ctx, club.ID, strangerID))
+
+	league, err := repo.Create(ctx, leagueOwnerID, &model.CreateLeagueInput{
+		Name: "Club Winter League", Type: "private", ClubID: &club.ID,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { mustExec(t, pool, `DELETE FROM leagues WHERE id = $1`, league.ID) })
+
+	// The club's owner runs it without holding a league membership row.
+	role, err := repo.GetMemberRole(ctx, league.ID, clubOwnerID)
+	require.NoError(t, err)
+	assert.False(t, role.IsMember, "running the league is not the same as entering it")
+	assert.True(t, role.IsModerator)
+	assert.ElementsMatch(t, model.AllModeratorPermissions(model.LeagueModeratorPermissions), role.Permissions)
+
+	// A club moderator reaches it only through the delegated capability.
+	require.NoError(t, clubs.PromoteMember(ctx, club.ID, helperID, []string{model.PermManageMembers}))
+	can, err := repo.Can(ctx, league.ID, helperID, model.PermManageSeasons)
+	require.NoError(t, err)
+	assert.False(t, can, "a club moderator without manage_leagues does not run the club's leagues")
+
+	require.NoError(t, clubs.PromoteMember(ctx, club.ID, helperID,
+		[]string{model.PermManageMembers, model.PermManageLeagues}))
+	can, err = repo.Can(ctx, league.ID, helperID, model.PermManageSeasons)
+	require.NoError(t, err)
+	assert.True(t, can)
+
+	// A plain club member is still nobody here.
+	role, err = repo.GetMemberRole(ctx, league.ID, strangerID)
+	require.NoError(t, err)
+	assert.False(t, role.IsModerator)
+	assert.Empty(t, role.Permissions)
+
+	// And none of this leaks into a league the club does not host.
+	solo, err := repo.Create(ctx, leagueOwnerID, &model.CreateLeagueInput{Name: "Standalone League", Type: "public"})
+	require.NoError(t, err)
+	t.Cleanup(func() { mustExec(t, pool, `DELETE FROM leagues WHERE id = $1`, solo.ID) })
+	role, err = repo.GetMemberRole(ctx, solo.ID, clubOwnerID)
+	require.NoError(t, err)
+	assert.False(t, role.IsModerator)
+}
