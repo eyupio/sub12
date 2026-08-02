@@ -221,6 +221,7 @@ function QuickAddPellet({ onCreated, onCancel }: { onCreated: (id: string) => vo
 
 export default function QuickCapture() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const smartBack = useSmartBack('/')
   const search = useSearch({ strict: false }) as {
     type?: CaptureType
@@ -331,6 +332,8 @@ export default function QuickCapture() {
       return { id: card.id, kind: 'score' as const }
     },
     onSuccess: () => {
+      // The captured photo is a gallery item from the moment it's saved.
+      qc.invalidateQueries({ queryKey: ['gallery'] })
       toast('Draft saved — refine it later from Drafts', 'success')
       navigate({ to: '/drafts' })
     },

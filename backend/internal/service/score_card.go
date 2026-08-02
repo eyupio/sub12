@@ -35,6 +35,7 @@ type ScoreCardRepo interface {
 	GetPriorScoreStats(ctx context.Context, userID, excludeID string) (*repository.PriorScoreStats, error)
 	GetGearLabels(ctx context.Context, cardID string) (string, string, error)
 	SubmitToLeague(ctx context.Context, cardID, userID, roundID string) (*model.ScoreCard, error)
+	SubmitToEvent(ctx context.Context, cardID, userID, participantID, discipline string, clubID *string) (*model.ScoreCard, error)
 	SetVerification(ctx context.Context, id, verification string) error
 	GetExistingCardForParticipant(ctx context.Context, eventParticipantID string) (*model.ScoreCard, error)
 }
@@ -754,6 +755,9 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	if err := s.resolveClubChange(ctx, userID, card, input); err != nil {
 		return nil, err
 	}
+	if err := resolveEventDetach(card, input); err != nil {
+		return nil, err
+	}
 	// Editing a rejected league card is the shooter's recourse, but it must
 	// leave a trace: the silent rejected → pending flip the update performs is
 	// recorded as an owner reopen in the audit trail. A card on its way out of
@@ -822,6 +826,33 @@ func (s *ScoreCardService) resolveLeagueDetach(card *model.ScoreCard, input *mod
 	}
 	if *input.LeagueRoundID != "" {
 		return fmt.Errorf("%w: use submit-to-league to move a card to a different round", ErrInvalidCard)
+	}
+	return nil
+}
+
+// resolveEventDetach validates input.EventParticipantID against the card's
+// current event link and normalises it for the repository. An empty string
+// withdraws the card from its event, keeping it as a personal card — the
+// escape hatch mirroring the league detach, so a card submitted to the wrong
+// event can be pulled back and submitted elsewhere. A non-empty value is only
+// accepted when it names the participant the card is already bound to;
+// attaching is SubmitToEvent's job, which runs the event-state and duplicate
+// checks. Omitting the field, or repeating the current link, clears it so the
+// repository leaves the link alone.
+func resolveEventDetach(card *model.ScoreCard, input *model.UpdateScoreCardInput) error {
+	if input.EventParticipantID == nil {
+		return nil
+	}
+	current := ""
+	if card.EventParticipantID != nil {
+		current = *card.EventParticipantID
+	}
+	if *input.EventParticipantID == current {
+		input.EventParticipantID = nil
+		return nil
+	}
+	if *input.EventParticipantID != "" {
+		return fmt.Errorf("%w: use submit-to-event to move a card to an event", ErrInvalidCard)
 	}
 	return nil
 }
@@ -1013,6 +1044,83 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 		return nil, err
 	}
 	submitted = s.applyLeagueAutoVerify(ctx, submitted)
+	s.notifyValidationRequested(ctx, submitted, userID)
+	return submitted, nil
+}
+
+// validateEventSubmission holds SubmitToEvent's pure rules, split from the
+// orchestration so they are testable without an event repository: only a
+// personal card moves into an event, the event must be a live card-submission
+// one, and a graduated card must carry an image when the event demands one.
+// A draft is checked at graduation, exactly as on the league path.
+func validateEventSubmission(card *model.ScoreCard, ev *model.Event) error {
+	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" {
+		return fmt.Errorf("%w: a league card cannot be submitted to an event — remove it from its league first", ErrInvalidCard)
+	}
+	if card.EventParticipantID != nil && *card.EventParticipantID != "" {
+		return fmt.Errorf("%w: this card is already submitted to another event — withdraw it first", ErrInvalidCard)
+	}
+	if ev.Format != model.EventFormatCardSubmission {
+		return fmt.Errorf("%w: event does not accept card submissions", ErrInvalidCard)
+	}
+	if ev.State != model.EventStateLive {
+		return fmt.Errorf("%w: event is not live", ErrInvalidCard)
+	}
+	if !card.IsDraft && ev.RequireImageUpload && (card.CardImageURL == nil || *card.CardImageURL == "") {
+		return fmt.Errorf("%w: this event requires an image upload", ErrInvalidCard)
+	}
+	return nil
+}
+
+// SubmitToEvent links an existing score card to the caller's own entry in a
+// live card-submission event — the "submit again or for the first time" path
+// from the gallery, mirroring SubmitToLeague. The caller must already be
+// entered in the event; a duplicate submission for the participant is refused
+// (one finalised card per entry); verification restarts under the event's
+// rules, auto-verifying when the event runs without peer verification.
+func (s *ScoreCardService) SubmitToEvent(ctx context.Context, cardID, userID, eventSlug string) (*model.ScoreCard, error) {
+	card, err := s.cards.GetByID(ctx, cardID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if s.events == nil {
+		return nil, fmt.Errorf("%w: event submissions are not enabled", ErrInvalidCard)
+	}
+	ev, err := s.events.LoadEventBySlug(ctx, eventSlug)
+	if err != nil {
+		return nil, err
+	}
+	p, err := s.events.LookupSelfParticipant(ctx, ev.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+	// Submitting to the entry the card already sits in is a no-op, not an
+	// error — the same convention as submit-to-league.
+	if card.EventParticipantID != nil && *card.EventParticipantID == p.ID {
+		return card, nil
+	}
+	if err := validateEventSubmission(card, ev); err != nil {
+		return nil, err
+	}
+	if existing, exErr := s.cards.GetExistingCardForParticipant(ctx, p.ID); exErr == nil && existing != nil && !existing.IsDraft {
+		return nil, fmt.Errorf("%w: you already have a submitted card in this event", ErrInvalidCard)
+	}
+
+	discipline := ev.Discipline
+	submitted, err := s.cards.SubmitToEvent(ctx, cardID, userID, p.ID, discipline, ev.ClubID)
+	if err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return nil, fmt.Errorf("%w: you already have a submitted card in this event", ErrInvalidCard)
+		}
+		return nil, err
+	}
+	// The exact counterpart of applyLeagueAutoVerify: an event that runs
+	// without peer verification must not leave the card pending forever.
+	if !submitted.IsDraft && submitted.Verification == "pending" && !ev.RequireScoreVerification {
+		if err := s.cards.SetVerification(ctx, submitted.ID, "verified"); err == nil {
+			submitted.Verification = "verified"
+		}
+	}
 	s.notifyValidationRequested(ctx, submitted, userID)
 	return submitted, nil
 }

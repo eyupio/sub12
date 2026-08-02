@@ -89,6 +89,7 @@ const LazyHelp = lazy(() => import('./pages/Help'))
 const LazyPostDetail = lazy(() => import('./pages/PostDetail'))
 const LazyQuickCapture = lazy(() => import('./pages/QuickCapture'))
 const LazyDrafts = lazy(() => import('./pages/Drafts'))
+const LazyGallery = lazy(() => import('./pages/Gallery'))
 const LazyPrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const LazyTermsOfUse = lazy(() => import('./pages/TermsOfUse'))
 const LazyCookiePolicy = lazy(() => import('./pages/CookiePolicy'))
@@ -194,6 +195,12 @@ const draftsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/drafts',
   component: lz(LazyDrafts),
+})
+
+const galleryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/gallery',
+  component: lz(LazyGallery),
 })
 
 const scoreCardDetailRoute = createRoute({
@@ -714,6 +721,7 @@ export const routeTree = rootRoute.addChildren([
     scoreCompareRoute,
     quickCaptureRoute,
     draftsRoute,
+    galleryRoute,
     scoreCardDetailRoute,
     communityReviewRoute,
     announcementDetailRoute,

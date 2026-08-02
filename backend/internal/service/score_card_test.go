@@ -25,6 +25,7 @@ type mockScoreCardRepo struct {
 	lastUpdateInput      *model.UpdateScoreCardInput
 	lastRotation         int16
 	submitToLeagueCalled bool
+	submitToEventCalled  bool
 	// card is returned from GetByID; if nil, a placeholder is returned.
 	card *model.ScoreCard
 	// priorStats overrides the GetPriorScoreStats response when non-nil.
@@ -104,6 +105,14 @@ func (m *mockScoreCardRepo) SubmitToLeague(_ context.Context, _, _, _ string) (*
 		return m.card, nil
 	}
 	return &model.ScoreCard{ID: "test-id"}, nil
+}
+func (m *mockScoreCardRepo) SubmitToEvent(_ context.Context, _, _, participantID, _ string, _ *string) (*model.ScoreCard, error) {
+	m.submitToEventCalled = true
+	if m.card != nil {
+		m.card.EventParticipantID = &participantID
+		return m.card, nil
+	}
+	return &model.ScoreCard{ID: "test-id", EventParticipantID: &participantID}, nil
 }
 func (m *mockScoreCardRepo) SetVerification(_ context.Context, _, _ string) error { return nil }
 func (m *mockScoreCardRepo) GetExistingCardForParticipant(_ context.Context, _ string) (*model.ScoreCard, error) {
@@ -813,6 +822,98 @@ func TestSubmitToLeague_MemberWithImageSucceeds(t *testing.T) {
 	_, err := svc.SubmitToLeague(context.Background(), "card-1", "user1", "round-1")
 	require.NoError(t, err)
 	assert.True(t, repo.submitToLeagueCalled)
+}
+
+// --- SubmitToEvent rule tests ---
+// SubmitToEvent's orchestration needs a live EventService, but its business
+// rules live in validateEventSubmission (pure) and resolveEventDetach, split
+// out exactly so they are testable without an event repository.
+
+func liveCardEvent() *model.Event {
+	return &model.Event{
+		ID:     "event-1",
+		Format: model.EventFormatCardSubmission,
+		State:  model.EventStateLive,
+	}
+}
+
+// A personal card with an image goes in; so does a draft, whose image rule is
+// graduation's job even when the event demands one.
+func TestValidateEventSubmission_Accepts(t *testing.T) {
+	url := "/api/v1/images/img-1"
+	assert.NoError(t, validateEventSubmission(&model.ScoreCard{ID: "c1", CardImageURL: &url}, liveCardEvent()))
+
+	strict := liveCardEvent()
+	strict.RequireImageUpload = true
+	assert.NoError(t, validateEventSubmission(&model.ScoreCard{ID: "c2", IsDraft: true}, strict))
+}
+
+// A league card belongs to its league — it must be detached before an event
+// can claim it, mirroring SubmitToLeague's refusal of event cards.
+func TestValidateEventSubmission_LeagueCardRejected(t *testing.T) {
+	round := "round-1"
+	err := validateEventSubmission(&model.ScoreCard{ID: "c1", LeagueRoundID: &round}, liveCardEvent())
+	assert.ErrorIs(t, err, ErrInvalidCard)
+}
+
+// A card already in another event must be withdrawn first, never silently moved.
+func TestValidateEventSubmission_OtherEventRejected(t *testing.T) {
+	p := "participant-9"
+	err := validateEventSubmission(&model.ScoreCard{ID: "c1", EventParticipantID: &p}, liveCardEvent())
+	assert.ErrorIs(t, err, ErrInvalidCard)
+}
+
+// Only a live card-submission event accepts cards.
+func TestValidateEventSubmission_WrongFormatOrState(t *testing.T) {
+	grid := liveCardEvent()
+	grid.Format = model.EventFormatShotGrid
+	assert.ErrorIs(t, validateEventSubmission(&model.ScoreCard{ID: "c1"}, grid), ErrInvalidCard)
+
+	closed := liveCardEvent()
+	closed.State = model.EventStateComplete
+	assert.ErrorIs(t, validateEventSubmission(&model.ScoreCard{ID: "c1"}, closed), ErrInvalidCard)
+}
+
+// require_image_upload applies to graduated cards at submit time, exactly as
+// on the league path.
+func TestValidateEventSubmission_ImageRequired(t *testing.T) {
+	strict := liveCardEvent()
+	strict.RequireImageUpload = true
+	assert.ErrorIs(t, validateEventSubmission(&model.ScoreCard{ID: "c1"}, strict), ErrInvalidCard)
+}
+
+// --- resolveEventDetach tests ---
+// PATCH event_participant_id follows the omit-to-keep / empty-to-clear
+// convention the league round established; attaching stays with submit-to-event.
+
+// An empty string withdraws the card; the repository sees it unchanged.
+func TestResolveEventDetach_EmptyStringWithdraws(t *testing.T) {
+	p := "participant-1"
+	card := &model.ScoreCard{ID: "c1", EventParticipantID: &p}
+	empty := ""
+	input := &model.UpdateScoreCardInput{EventParticipantID: &empty}
+	require.NoError(t, resolveEventDetach(card, input))
+	require.NotNil(t, input.EventParticipantID)
+	assert.Equal(t, "", *input.EventParticipantID)
+}
+
+// Echoing the current participant back is a keep, normalised to nil so the
+// repository leaves the link alone.
+func TestResolveEventDetach_SameParticipantIsKeep(t *testing.T) {
+	p := "participant-1"
+	card := &model.ScoreCard{ID: "c1", EventParticipantID: &p}
+	same := "participant-1"
+	input := &model.UpdateScoreCardInput{EventParticipantID: &same}
+	require.NoError(t, resolveEventDetach(card, input))
+	assert.Nil(t, input.EventParticipantID)
+}
+
+// Naming a different participant is not how a card joins an event.
+func TestResolveEventDetach_DifferentParticipantRejected(t *testing.T) {
+	card := &model.ScoreCard{ID: "c1"}
+	other := "participant-2"
+	input := &model.UpdateScoreCardInput{EventParticipantID: &other}
+	assert.ErrorIs(t, resolveEventDetach(card, input), ErrInvalidCard)
 }
 
 // mockUserReader implements UserProfileReader for GetForViewer privacy tests.
