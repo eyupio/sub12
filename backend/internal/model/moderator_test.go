@@ -51,7 +51,17 @@ func TestDefaultModeratorPermissionsExcludeTheDangerousOnes(t *testing.T) {
 		assert.NotEmpty(t, defaults, "a fresh moderator should be able to do something")
 		assert.NotContains(t, defaults, PermManageModerators, "promotion must not hand out the ability to re-grant")
 		assert.NotContains(t, defaults, PermManageSettings, "promotion must not hand out the group's own settings")
+		assert.NotContains(t, defaults, PermSendAnnouncements, "promotion must not hand out the megaphone")
 		assert.Less(t, len(defaults), len(catalogue), "defaults must leave something for the owner to grant")
+	}
+}
+
+// Both groups can delegate announcements — a club that runs its own leagues
+// and a standalone league both need somebody other than the owner able to
+// tell the members something.
+func TestBothCataloguesOfferAnnouncements(t *testing.T) {
+	for _, catalogue := range [][]ModeratorPermission{LeagueModeratorPermissions, ClubModeratorPermissions} {
+		assert.Contains(t, AllModeratorPermissions(catalogue), PermSendAnnouncements)
 	}
 }
 

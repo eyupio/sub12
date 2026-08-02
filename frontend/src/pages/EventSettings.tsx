@@ -7,6 +7,7 @@ import { eventInvitationsApi } from '../api/eventInvitations'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader, Section, LoadingRows } from '../components/leagues'
+import AnnouncementComposer from '../components/AnnouncementComposer'
 import { toast } from '../store/toast'
 
 const inputCls =
@@ -124,6 +125,17 @@ export default function EventSettings() {
         </Section>
 
         <ScorersSection slug={slug} />
+
+        <Section title="Announcements">
+          <div style={{ padding: 18 }}>
+            <AnnouncementComposer
+              scope="event"
+              scopeId={slug}
+              audienceLabel={`everyone entered in ${ev.data.name}`}
+              canSend
+            />
+          </div>
+        </Section>
       </div>
     </PageGrid>
   )

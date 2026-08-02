@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import ClubDetail from '../ClubDetail'
 import ClubSettings from '../ClubSettings'
 import { clubsApi, type Club, type ClubOpeningHours } from '../../api/clubs'
+import { announcementsApi } from '../../api/announcements'
 import { useAuthStore } from '../../store/auth'
 
 vi.mock('@tanstack/react-router', async () => {
@@ -94,6 +95,7 @@ beforeEach(() => {
   vi.spyOn(clubsApi, 'getOpeningHours').mockResolvedValue({ items: [] })
   // Every club API the pages call must be stubbed: an unmocked call reaches the
   // real client, 401s, and clears the auth store mid-test.
+  vi.spyOn(announcementsApi, 'list').mockResolvedValue({ items: [] })
   vi.spyOn(clubsApi, 'listDisciplines').mockResolvedValue({ items: ['air rifle', 'benchrest'] })
   vi.spyOn(clubsApi, 'getModeratorPermissions').mockResolvedValue({
     catalogue: CLUB_PERMISSIONS,

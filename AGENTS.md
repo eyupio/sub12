@@ -116,7 +116,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **116** (000001–000116). Latest: `000116_event_max_participants`.
+Current migration count: **120** (000001–000120). Latest: `000120_review_volunteer_prefs`.
 
 ## Critical Migration Rules
 
@@ -272,6 +272,95 @@ under coordinates rounded to three decimals (~110m), paces upstream calls to the
 one per second Nominatim's usage policy allows, and reports every failure as
 "nowhere named here" (204) — a flaky third party must never block saving a card,
 it just means the coordinates stand.
+
+### Notifications
+
+Every notification is one row per recipient, written by
+`NotificationService.Fanout` and delivered in-app, by push, and by email —
+each gated by the recipient's own preference. Fan-out is best-effort: it never
+returns an error and must never be able to fail the action that caused it.
+
+Adding a type means touching all of these, and the two per-type tests in
+`model/notification_test.go` will fail until you do:
+
+1. a `NotificationTypeX` constant, the two preference fields (`X` and
+   `XEmail`), the defaults, both `…ForType` switches and the PATCH input, in
+   `model/notification.go`;
+2. two `BOOLEAN NOT NULL DEFAULT` columns in a new migration, whose defaults
+   match `DefaultNotificationPreferences`;
+3. the SELECT/Scan, the patch application and the upsert's column, `$n`, arg
+   and `DO UPDATE SET` lists in `repository/notification.go` — all four are
+   positional, so append to each in the same order;
+4. subject and body in `notificationEmailContent`, which serves the email *and*
+   the push title/body;
+5. the union, the two preference interfaces in `api/notifications.ts`, the
+   sentence and link in `pages/notificationRouting.ts`, the icon in
+   `pages/Notifications.tsx` and the row in `pages/NotificationSettings.tsx`.
+
+Conventions worth keeping:
+
+- **Email defaults track reach.** A type addressed to one person defaults to
+  email on; one broadcast to every member, participant or follower defaults to
+  email off (`score_validation_requested`, `league_round_opened`,
+  `event_participant_joined`, `event_went_live`, `event_results_posted`).
+  In-app always defaults on.
+- **A type with its own email template is listed in
+  `hasDedicatedEmailTemplate`**, or the recipient gets two emails. The support
+  ticket types and `event_invitation` are there; the invitation's own send
+  applies the same preference, so the toggle still means something.
+- **Name the group in `Metadata`** (`league_name`, `club_name`, `event_name`,
+  and `event_slug` for the link) rather than making the reader open the
+  notification to find out which league it was about. Both the server copy and
+  `notificationRouting.ts` fall back to a generic phrase when it's missing.
+- **Moderator fan-out includes the owner.** `ListAdminIDs` returns
+  `is_admin` rows only; the owner holds every capability implicitly and has to
+  be added from `created_by`. Always drop the actor from the recipient set.
+- **Validation requests go to whoever can act.** A league card notifies the
+  league's moderators and owner, an event card its owner and delegated
+  scorers, and a personal community review the shooter's followers (capped at
+  `reviewRequestFanoutLimit`). The recipient rules live in
+  `ScoreCardService.validationRequestPlan`, split from the fan-out so they're
+  testable without a database.
+- **Volunteers widen that audience, never replace it.** The three
+  `review_requests_*` preferences are how somebody asks to be sent other
+  shooters' cards: `public` adds them to any *public* personal card's request,
+  `leagues` to cards in leagues they're in, and `club_leagues` to cards in
+  leagues run under a club they're in, whether or not they're in the league.
+  All three default off and each pool is separately capped at
+  `reviewVolunteerLimit` and randomised — being asked is a favour, and asking
+  the same first N every time burns them out. A *followers-only* card stays
+  with the followers: a validation request must never be the thing that widens
+  who can see a card.
+
+### Announcements
+
+An announcement is a human-authored message broadcast to a group's whole
+audience. The delivered copies are ordinary `announcement` notification rows;
+the `announcements` table is the one stored original they point at.
+
+- **Who may send** is the scope: platform → `middleware.RequireAdmin`; league
+  and club → the owner or a moderator granted `PermSendAnnouncements`, which
+  is deliberately *not* in the default promotion grant; event → its owner, since
+  an event has no capability catalogue and a delegated scorer is trusted with
+  cards, not the megaphone. A platform admin does not thereby become a league's
+  moderator — the scopes don't nest.
+- **Who receives** it: every live non-simulated account, the league's members,
+  the club's members, or everyone entered in the event. The sender is always
+  excluded, and `recipient_count` is recorded at send time — it is the reach of
+  the message, not a live membership count.
+- **Delivery is bulk.** `NotificationService.FanoutAnnouncement` returns
+  immediately and works on a background context: the in-app preference is
+  applied inside a single `INSERT … SELECT FROM unnest(…)`, push tokens are
+  fetched for the whole delivered set at once, and only the SMTP sends are per
+  person. Blocks and mutes don't apply — an announcement comes from a group you
+  joined, not a person you chose to hear from.
+- **Email is opted into twice**: by the sender per announcement (`send_email`,
+  default off) and by the recipient (`announcement_email`, default on). The
+  in-app copy always goes.
+- **Reading one** is gated on having been sent it — `HasNotificationForTarget`
+  — so somebody who left the club can still open the message they were given,
+  and somebody who joined later can't read backwards through the archive. The
+  per-scope *log* is gated on membership instead, since it's the sender's view.
 
 ## Environment Variables
 

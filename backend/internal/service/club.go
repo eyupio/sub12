@@ -60,6 +60,65 @@ func (s *ClubService) SetNotifications(n *NotificationService) {
 	s.notifications = n
 }
 
+// clubName resolves a club's display name for notification copy. Empty on any
+// lookup failure — the copy falls back to "your club" rather than dropping the
+// notification.
+func (s *ClubService) clubName(ctx context.Context, clubID string) string {
+	club, err := s.repo.GetByID(ctx, clubID, "")
+	if err != nil || club == nil {
+		return ""
+	}
+	return club.Name
+}
+
+// notifyClubModerators fans an event out to everyone who runs the club — the
+// moderators and the owner, who holds every capability implicitly and so is not
+// necessarily carried in club_members.is_admin.
+func (s *ClubService) notifyClubModerators(ctx context.Context, clubID, actorID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	recipients := map[string]struct{}{}
+	if ids, err := s.repo.ListAdminIDs(ctx, clubID); err == nil {
+		for _, id := range ids {
+			recipients[id] = struct{}{}
+		}
+	}
+	if club, err := s.repo.GetByID(ctx, clubID, ""); err == nil && club != nil {
+		recipients[club.CreatedBy] = struct{}{}
+	}
+	delete(recipients, actorID)
+	cid, tt := clubID, "club"
+	for rid := range recipients {
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: rid,
+			ActorID:     actorID,
+			Type:        notifType,
+			TargetID:    &cid,
+			TargetType:  &tt,
+			ClubID:      &cid,
+			Metadata:    metadata,
+		})
+	}
+}
+
+// notifyClubMember tells one member about something addressed to them.
+func (s *ClubService) notifyClubMember(ctx context.Context, clubID, actorID, recipientID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	cid, tt := clubID, "club"
+	s.notifications.Fanout(ctx, NotifEvent{
+		RecipientID: recipientID,
+		ActorID:     actorID,
+		Type:        notifType,
+		TargetID:    &cid,
+		TargetType:  &tt,
+		ClubID:      &cid,
+		Metadata:    metadata,
+	})
+}
+
 func (s *ClubService) Create(ctx context.Context, userID string, input *model.CreateClubInput) (*model.Club, error) {
 	if input.Name == "" {
 		return nil, ErrInvalidClub
@@ -202,6 +261,9 @@ func (s *ClubService) Join(ctx context.Context, clubID, userID, joinCode string)
 		if err != nil {
 			return false, false, err
 		}
+		s.notifyClubModerators(ctx, clubID, userID, model.NotificationTypeClubJoinRequest, map[string]any{
+			"club_name": club.Name,
+		})
 		return false, true, nil
 	default:
 		return false, false, fmt.Errorf("unknown club join policy")
@@ -394,6 +456,10 @@ func (s *ClubService) DecideJoinRequest(ctx context.Context, clubID, requestID, 
 		if s.achievements != nil {
 			go s.achievements.EvaluateForClubJoin(context.Background(), req.UserID)
 		}
+	} else {
+		s.notifyClubMember(ctx, clubID, adminID, req.UserID, model.NotificationTypeClubJoinRejected, map[string]any{
+			"club_name": s.clubName(ctx, clubID),
+		})
 	}
 	return nil
 }
@@ -752,7 +818,14 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 		if errors.Is(err, repository.ErrClubMemberNotFound) {
 			return ErrClubNotMember
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		s.notifyClubMember(ctx, clubID, requesterID, targetID, model.NotificationTypeClubRoleChanged, map[string]any{
+			"club_name":    s.clubName(ctx, clubID),
+			"is_moderator": false,
+		})
+		return nil
 	}
 
 	// Promotion, or a re-grant on somebody already promoted.
@@ -775,6 +848,14 @@ func (s *ClubService) UpdateMemberRole(ctx context.Context, clubID, requesterID,
 			return ErrClubNotMember
 		}
 		return err
+	}
+	// A bare re-grant on somebody already running the club is not a role
+	// change; only the promotion itself is worth telling them about.
+	if !targetRole.IsModerator {
+		s.notifyClubMember(ctx, clubID, requesterID, targetID, model.NotificationTypeClubRoleChanged, map[string]any{
+			"club_name":    s.clubName(ctx, clubID),
+			"is_moderator": true,
+		})
 	}
 	return nil
 }

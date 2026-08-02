@@ -49,6 +49,32 @@ func (r *DeviceRepository) Delete(ctx context.Context, userID, token string) err
 	return nil
 }
 
+// ListTokensByUsers returns the push tokens registered to any of the given
+// users, in one query. Used by announcement fan-out, where per-user lookups
+// would be one round trip per recipient.
+func (r *DeviceRepository) ListTokensByUsers(ctx context.Context, userIDs []string) ([]string, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT token FROM device_tokens WHERE user_id = ANY($1)`,
+		userIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list device tokens for users: %w", err)
+	}
+	defer rows.Close()
+	var tokens []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, fmt.Errorf("scan device token: %w", err)
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
+}
+
 // ListTokensByUser returns all push tokens registered to a user.
 func (r *DeviceRepository) ListTokensByUser(ctx context.Context, userID string) ([]string, error) {
 	rows, err := r.db.Query(ctx,

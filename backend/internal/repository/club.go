@@ -427,6 +427,27 @@ func (r *ClubRepository) IsMember(ctx context.Context, clubID, userID string) (b
 }
 
 // ListAdminIDs returns the user IDs of all admins for a club.
+// ListMemberIDs returns the club's whole roster, for fan-out that doesn't need
+// the display columns ListMembers joins in.
+func (r *ClubRepository) ListMemberIDs(ctx context.Context, clubID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id FROM club_members WHERE club_id = $1
+	`, clubID)
+	if err != nil {
+		return nil, fmt.Errorf("list club member ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan club member id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *ClubRepository) ListAdminIDs(ctx context.Context, clubID string) ([]string, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT user_id FROM club_members WHERE club_id = $1 AND is_admin = TRUE

@@ -30,13 +30,14 @@ const EventInvitationTTL = 30 * 24 * time.Hour
 const EventInvitationBatchLimit = 50
 
 type EventInvitationService struct {
-	invitations *repository.EventInvitationRepository
-	events      *repository.EventRepository
-	users       *repository.UserRepository
-	clubs       *repository.ClubRepository
-	emailSender *EmailSenderService
-	acceptURL   string
-	log         zerolog.Logger
+	invitations   *repository.EventInvitationRepository
+	events        *repository.EventRepository
+	users         *repository.UserRepository
+	clubs         *repository.ClubRepository
+	emailSender   *EmailSenderService
+	notifications *NotificationService // nil disables notification fan-out
+	acceptURL     string
+	log           zerolog.Logger
 }
 
 func NewEventInvitationService(
@@ -57,6 +58,12 @@ func NewEventInvitationService(
 		acceptURL:   strings.TrimRight(acceptURL, "/"),
 		log:         log,
 	}
+}
+
+// SetNotifications wires notification fan-out. Optional — without it an
+// invitation still sends its email, it just doesn't ring the bell in-app.
+func (s *EventInvitationService) SetNotifications(n *NotificationService) {
+	s.notifications = n
 }
 
 // CreateBatchResult captures the outcome of a single invitee in a batch send.
@@ -129,6 +136,22 @@ func (s *EventInvitationService) CreateBatch(
 		res.Status = "invited"
 		res.Invitation = inv
 
+		if s.notifications != nil {
+			tid, tt := ev.ID, "event"
+			s.notifications.Fanout(ctx, NotifEvent{
+				RecipientID: inviteeID,
+				ActorID:     inviterID,
+				Type:        model.NotificationTypeEventInvitation,
+				TargetID:    &tid,
+				TargetType:  &tt,
+				ClubID:      ev.ClubID,
+				Metadata: map[string]any{
+					"event_name": ev.Name,
+					"event_slug": ev.Slug,
+				},
+			})
+		}
+
 		// Best-effort email; failures don't fail the row.
 		go s.sendInvitationEmail(context.Background(), ev, inviterID, invitee, inv.Token)
 
@@ -140,6 +163,15 @@ func (s *EventInvitationService) CreateBatch(
 func (s *EventInvitationService) sendInvitationEmail(ctx context.Context, ev *model.Event, inviterID string, invitee *model.User, token string) {
 	if s.emailSender == nil {
 		return
+	}
+	// The invitation has its own template (it carries the accept link), so
+	// NotificationService suppresses the generic email for this type. That
+	// makes this send the one the event_invitation_email preference gates.
+	if s.notifications != nil {
+		prefs, err := s.notifications.GetPreferences(ctx, invitee.ID)
+		if err == nil && prefs != nil && !prefs.EmailEnabledForType(model.NotificationTypeEventInvitation) {
+			return
+		}
 	}
 	inviter, err := s.users.GetByID(ctx, inviterID)
 	if err != nil {

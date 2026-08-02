@@ -44,8 +44,63 @@ export function notificationSentence(n: Notification): string {
       return `${actor} changed a support ticket status`
     case 'feature_request_state_changed':
       return `${actor} updated a feature request status`
+    case 'score_validation_requested': {
+      const where = groupName(n)
+      return where
+        ? `${actor} needs a score card validated in ${where}`
+        : `${actor} asked the community to validate a score card`
+    }
+    case 'league_join_request':
+      return `${actor} asked to join ${groupName(n) ?? 'your league'}`
+    case 'league_join_rejected':
+      return `Your request to join ${groupName(n) ?? 'a league'} was declined`
+    case 'league_role_changed':
+      return n.metadata?.is_moderator
+        ? `You now help run ${groupName(n) ?? 'a league'}`
+        : `You no longer help run ${groupName(n) ?? 'a league'}`
+    case 'league_round_opened': {
+      const round = n.metadata?.round_name as string | undefined
+      return round
+        ? `${round} is open in ${groupName(n) ?? 'your league'}`
+        : `A new round is open in ${groupName(n) ?? 'your league'}`
+    }
+    case 'club_join_request':
+      return `${actor} asked to join ${groupName(n) ?? 'your club'}`
+    case 'club_join_rejected':
+      return `Your request to join ${groupName(n) ?? 'a club'} was declined`
+    case 'club_role_changed':
+      return n.metadata?.is_moderator
+        ? `You now help run ${groupName(n) ?? 'a club'}`
+        : `You no longer help run ${groupName(n) ?? 'a club'}`
+    case 'event_invitation':
+      return `${actor} invited you to ${groupName(n) ?? 'an event'}`
+    case 'event_participant_joined':
+      return `${actor} entered ${groupName(n) ?? 'your event'}`
+    case 'event_went_live':
+      return `${groupName(n) ?? 'An event you entered'} is now live`
+    case 'event_results_posted':
+      return `Results are in for ${groupName(n) ?? 'an event you entered'}`
+    case 'announcement': {
+      // The announcement's own title is the sentence — it was written to be
+      // read, and paraphrasing it would bury what the sender said.
+      const title = n.metadata?.title
+      if (typeof title === 'string' && title !== '') return title
+      const where = groupName(n)
+      return where ? `${actor} posted an announcement in ${where}` : `${actor} posted an announcement`
+    }
   }
   return 'You have a new notification'
+}
+
+// groupName is the league, club or event a notification belongs to, as the
+// server named it. Undefined when the notification carries no group — a
+// personal card's validation request belongs to nobody.
+function groupName(n: Notification): string | undefined {
+  for (const key of ['league_name', 'club_name', 'event_name'] as const) {
+    const value = n.metadata?.[key]
+    if (typeof value === 'string' && value !== '') return value
+  }
+  return undefined
 }
 
 /**
@@ -154,6 +209,43 @@ export function notificationTarget(n: Notification): NotificationTarget {
       // on target_type so a ticket id is never read as a feature-request id.
       if (n.target_type === 'support_ticket' && n.target_id) return { to: `/support/tickets/${n.target_id}` }
       return n.target_id ? { to: `/feature-requests/${n.target_id}` } : { to: '/feature-requests' }
+
+    case 'score_validation_requested':
+      // A personal card is confirmed from its review page — the confirm action
+      // and the progress live there; a league or event card is ruled on from
+      // the card itself.
+      if (!n.target_id) return communityTarget(n) ?? { to: '/scores' }
+      return n.metadata?.scope === 'personal'
+        ? { to: `/scores/${n.target_id}/review` }
+        : { to: `/scores/${n.target_id}` }
+
+    // Join requests are decided on the settings page that lists them.
+    case 'league_join_request':
+      return n.league_id ? { to: `/leagues/${n.league_id}/settings` } : { to: '/leagues' }
+    case 'club_join_request':
+      return n.club_id ? { to: `/clubs/${n.club_id}/settings` } : { to: '/clubs' }
+
+    case 'league_join_rejected':
+    case 'league_role_changed':
+    case 'league_round_opened':
+      return n.league_id ? { to: `/leagues/${n.league_id}` } : { to: '/leagues' }
+
+    case 'club_join_rejected':
+    case 'club_role_changed':
+      return n.club_id ? { to: `/clubs/${n.club_id}` } : { to: '/clubs' }
+
+    case 'event_invitation':
+    case 'event_participant_joined':
+    case 'event_went_live':
+    case 'event_results_posted': {
+      // A club-hosted event's notifications carry club_id, so they have to
+      // resolve to the event before communityTarget claims them for the club.
+      const slug = n.metadata?.event_slug
+      return typeof slug === 'string' && slug !== '' ? { to: `/events/${slug}` } : { to: '/events' }
+    }
+
+    case 'announcement':
+      return n.target_id ? { to: `/announcements/${n.target_id}` } : { to: '/notifications' }
 
     case 'comment_on_my_card':
     case 'reply_to_my_comment':

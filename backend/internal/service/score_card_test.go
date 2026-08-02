@@ -115,6 +115,8 @@ type mockLeagueRepo struct {
 	cfg             *model.LeagueConfig
 	isMember        bool
 	submissionCount int
+	adminIDs        []string
+	league          *model.League
 }
 
 func (m *mockLeagueRepo) GetConfigByRoundID(_ context.Context, _ string) (*model.LeagueConfig, error) {
@@ -127,10 +129,13 @@ func (m *mockLeagueRepo) GetLeagueIDByRoundID(_ context.Context, _ string) (stri
 	return "league-1", nil
 }
 func (m *mockLeagueRepo) GetByID(_ context.Context, _ string) (*model.League, error) {
-	return nil, nil
+	return m.league, nil
 }
 func (m *mockLeagueRepo) IsMember(_ context.Context, _, _ string) (bool, error) {
 	return m.isMember, nil
+}
+func (m *mockLeagueRepo) ListAdminIDs(_ context.Context, _ string) ([]string, error) {
+	return m.adminIDs, nil
 }
 func (m *mockLeagueRepo) RecordOwnerReopen(_ context.Context, _, _ string) error { return nil }
 
@@ -847,4 +852,116 @@ func TestGetForViewer_NonOwnerAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidationRequestPlan_League(t *testing.T) {
+	roundID := "round-1"
+	leagues := &mockLeagueRepo{
+		adminIDs: []string{"mod-1", "shooter", "mod-1"},
+		league:   &model.League{ID: "league-1", Name: "Sunday Bench", CreatedBy: "owner-1"},
+	}
+	svc := &ScoreCardService{cards: &mockScoreCardRepo{}, leagueRepo: leagues}
+
+	card := &model.ScoreCard{
+		ID:            "card-1",
+		UserID:        "shooter",
+		LeagueRoundID: &roundID,
+		Verification:  "pending",
+		TotalScore:    241,
+	}
+	plan := svc.validationRequestPlan(context.Background(), card, "shooter")
+
+	assert.NotNil(t, plan)
+	// The shooter is dropped, the duplicate collapses, the owner is added.
+	assert.Equal(t, []string{"mod-1", "owner-1"}, plan.Recipients)
+	assert.Equal(t, "league-1", *plan.LeagueID)
+	assert.Equal(t, "league", plan.Metadata["scope"])
+	assert.Equal(t, "Sunday Bench", plan.Metadata["league_name"])
+}
+
+func TestValidationRequestPlan_SkippedCards(t *testing.T) {
+	roundID := "round-1"
+	svc := &ScoreCardService{cards: &mockScoreCardRepo{}, leagueRepo: &mockLeagueRepo{adminIDs: []string{"mod-1"}}}
+
+	tests := []struct {
+		name string
+		card *model.ScoreCard
+	}{
+		{"draft", &model.ScoreCard{ID: "c", UserID: "u", LeagueRoundID: &roundID, IsDraft: true, Verification: "pending"}},
+		{"already verified", &model.ScoreCard{ID: "c", UserID: "u", LeagueRoundID: &roundID, Verification: "verified"}},
+		{"personal card", &model.ScoreCard{ID: "c", UserID: "u", Verification: "pending"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Nil(t, svc.validationRequestPlan(context.Background(), tt.card, "u"))
+		})
+	}
+}
+
+// mockReviewVolunteers stands in for the opt-in pools that widen a validation
+// request beyond the people who run the league.
+type mockReviewVolunteers struct {
+	public     []string
+	league     []string
+	clubLeague []string
+	lastLeague string
+	lastClubID string
+}
+
+func (m *mockReviewVolunteers) ListPublicReviewVolunteers(_ context.Context, _ int) ([]string, error) {
+	return m.public, nil
+}
+func (m *mockReviewVolunteers) ListLeagueReviewVolunteers(_ context.Context, leagueID string, _ int) ([]string, error) {
+	m.lastLeague = leagueID
+	return m.league, nil
+}
+func (m *mockReviewVolunteers) ListClubLeagueReviewVolunteers(_ context.Context, clubID string, _ int) ([]string, error) {
+	m.lastClubID = clubID
+	return m.clubLeague, nil
+}
+
+func TestValidationRequestPlan_IncludesLeagueAndClubVolunteers(t *testing.T) {
+	roundID := "round-1"
+	clubID := "club-1"
+	leagues := &mockLeagueRepo{
+		adminIDs: []string{"mod-1"},
+		league:   &model.League{ID: "league-1", Name: "Sunday Bench", CreatedBy: "owner-1", ClubID: &clubID},
+	}
+	volunteers := &mockReviewVolunteers{
+		league:     []string{"vol-league", "mod-1"},
+		clubLeague: []string{"vol-club", "vol-league"},
+	}
+	svc := &ScoreCardService{cards: &mockScoreCardRepo{}, leagueRepo: leagues, volunteers: volunteers}
+
+	plan := svc.validationRequestPlan(context.Background(), &model.ScoreCard{
+		ID: "card-1", UserID: "shooter", LeagueRoundID: &roundID, Verification: "pending",
+	}, "shooter")
+
+	require.NotNil(t, plan)
+	// Moderators and owner first, then volunteers; duplicates collapse and the
+	// shooter is never in the list.
+	assert.Equal(t, []string{"mod-1", "owner-1", "vol-league", "vol-club"}, plan.Recipients)
+	assert.Equal(t, "league-1", volunteers.lastLeague)
+	assert.Equal(t, "club-1", volunteers.lastClubID)
+	require.NotNil(t, plan.ClubID)
+	assert.Equal(t, "club-1", *plan.ClubID)
+}
+
+func TestValidationRequestPlan_ClublessLeagueSkipsClubVolunteers(t *testing.T) {
+	roundID := "round-1"
+	leagues := &mockLeagueRepo{
+		adminIDs: []string{"mod-1"},
+		league:   &model.League{ID: "league-1", Name: "Sunday Bench", CreatedBy: "owner-1"},
+	}
+	volunteers := &mockReviewVolunteers{clubLeague: []string{"vol-club"}}
+	svc := &ScoreCardService{cards: &mockScoreCardRepo{}, leagueRepo: leagues, volunteers: volunteers}
+
+	plan := svc.validationRequestPlan(context.Background(), &model.ScoreCard{
+		ID: "card-1", UserID: "shooter", LeagueRoundID: &roundID, Verification: "pending",
+	}, "shooter")
+
+	require.NotNil(t, plan)
+	assert.Equal(t, []string{"mod-1", "owner-1"}, plan.Recipients)
+	assert.Empty(t, volunteers.lastClubID, "a league with no club must not query club volunteers")
+	assert.Nil(t, plan.ClubID)
 }

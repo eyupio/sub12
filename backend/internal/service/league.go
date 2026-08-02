@@ -93,6 +93,102 @@ func (s *LeagueService) notifyScoreOutcome(ctx context.Context, scoreCardID, act
 	})
 }
 
+// leagueName resolves a league's display name for notification copy. Empty on
+// any lookup failure — the copy falls back to "your league" rather than
+// dropping the notification.
+func (s *LeagueService) leagueName(ctx context.Context, leagueID string) string {
+	league, err := s.leagues.GetByID(ctx, leagueID)
+	if err != nil || league == nil {
+		return ""
+	}
+	return league.Name
+}
+
+// notifyLeagueModerators fans an event out to everyone who runs the league —
+// the moderators and the owner, who holds every capability implicitly and so
+// is not necessarily carried in league_members.is_admin.
+func (s *LeagueService) notifyLeagueModerators(ctx context.Context, leagueID, actorID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	recipients := map[string]struct{}{}
+	if ids, err := s.leagues.ListAdminIDs(ctx, leagueID); err == nil {
+		for _, id := range ids {
+			recipients[id] = struct{}{}
+		}
+	}
+	if league, err := s.leagues.GetByID(ctx, leagueID); err == nil && league != nil {
+		recipients[league.CreatedBy] = struct{}{}
+	}
+	delete(recipients, actorID)
+	lid, tt := leagueID, "league"
+	for rid := range recipients {
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: rid,
+			ActorID:     actorID,
+			Type:        notifType,
+			TargetID:    &lid,
+			TargetType:  &tt,
+			LeagueID:    &lid,
+			Metadata:    metadata,
+		})
+	}
+}
+
+// notifyLeagueMembers fans an event out to the whole roster, minus the actor.
+// One row per member is too much work to keep the caller waiting on, so it runs
+// on a background context — the request that triggered it is long gone by the
+// time a large league finishes.
+func (s *LeagueService) notifyLeagueMembers(leagueID, actorID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("type", notifType).Msg("league: notification fan-out panicked")
+			}
+		}()
+		ctx := context.Background()
+		members, err := s.leagues.ListMembers(ctx, leagueID)
+		if err != nil {
+			return
+		}
+		lid, tt := leagueID, "league"
+		for _, m := range members {
+			if m.UserID == actorID {
+				continue
+			}
+			s.notifications.Fanout(ctx, NotifEvent{
+				RecipientID: m.UserID,
+				ActorID:     actorID,
+				Type:        notifType,
+				TargetID:    &lid,
+				TargetType:  &tt,
+				LeagueID:    &lid,
+				Metadata:    metadata,
+			})
+		}
+	}()
+}
+
+// notifyLeagueMember tells one member about something addressed to them.
+func (s *LeagueService) notifyLeagueMember(ctx context.Context, leagueID, actorID, recipientID, notifType string, metadata map[string]any) {
+	if s.notifications == nil {
+		return
+	}
+	lid, tt := leagueID, "league"
+	s.notifications.Fanout(ctx, NotifEvent{
+		RecipientID: recipientID,
+		ActorID:     actorID,
+		Type:        notifType,
+		TargetID:    &lid,
+		TargetType:  &tt,
+		LeagueID:    &lid,
+		Metadata:    metadata,
+	})
+}
+
 // GetMemberRole reports the caller's standing in a league — owner, moderator
 // or plain member — together with the capabilities the owner delegated.
 func (s *LeagueService) GetMemberRole(ctx context.Context, leagueID, userID string) (*model.MemberRole, error) {
@@ -227,7 +323,14 @@ func (s *LeagueService) UpdateMemberRole(ctx context.Context, leagueID, requeste
 		if errors.Is(err, repository.ErrNotFound) {
 			return ErrNotMember
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		s.notifyLeagueMember(ctx, leagueID, requesterID, targetID, model.NotificationTypeLeagueRoleChanged, map[string]any{
+			"league_name":  s.leagueName(ctx, leagueID),
+			"is_moderator": false,
+		})
+		return nil
 	}
 
 	// Promotion, or a re-grant on somebody already promoted. Either way the
@@ -252,7 +355,18 @@ func (s *LeagueService) UpdateMemberRole(ctx context.Context, leagueID, requeste
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrNotMember
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	// A bare re-grant on somebody already running the league is not a role
+	// change; only the promotion itself is worth telling them about.
+	if !targetRole.IsModerator {
+		s.notifyLeagueMember(ctx, leagueID, requesterID, targetID, model.NotificationTypeLeagueRoleChanged, map[string]any{
+			"league_name":  s.leagueName(ctx, leagueID),
+			"is_moderator": true,
+		})
+	}
+	return nil
 }
 
 // delegatable narrows a requested grant to the recognised capabilities the
@@ -479,6 +593,9 @@ func (s *LeagueService) Join(ctx context.Context, leagueID, userID, joinCode str
 		if err != nil {
 			return false, false, err
 		}
+		s.notifyLeagueModerators(ctx, leagueID, userID, model.NotificationTypeLeagueJoinRequest, map[string]any{
+			"league_name": league.Name,
+		})
 		return false, true, nil
 
 	default:
@@ -635,16 +752,16 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	if err != nil {
 		return nil, err
 	}
+	leagueName := s.leagueName(ctx, leagueID)
 	if s.activity != nil {
-		league, _ := s.leagues.GetByID(ctx, leagueID)
-		leagueName := ""
-		if league != nil {
-			leagueName = league.Name
-		}
 		tid, tt := round.ID, "round"
 		meta := model.LeagueRoundOpenedMeta{LeagueName: leagueName, RoundName: round.Name}
 		go s.activity.Ingest(context.Background(), userID, model.ActivityLeagueRoundOpened, &tid, &tt, meta, &leagueID, nil, "public")
 	}
+	s.notifyLeagueMembers(leagueID, userID, model.NotificationTypeLeagueRoundOpened, map[string]any{
+		"league_name": leagueName,
+		"round_name":  round.Name,
+	})
 	return round, nil
 }
 
@@ -765,11 +882,20 @@ func (s *LeagueService) DecideJoinRequest(ctx context.Context, leagueID, request
 	if decision != "approved" && decision != "rejected" {
 		return fmt.Errorf("%w: decision must be 'approved' or 'rejected'", ErrInvalidLeague)
 	}
-	err := s.leagues.DecideJoinRequest(ctx, leagueID, requestID, adminID, decision)
+	requesterID, err := s.leagues.DecideJoinRequest(ctx, leagueID, requestID, adminID, decision)
 	if errors.Is(err, repository.ErrNotFound) {
 		return ErrLeagueNotFound
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	meta := map[string]any{"league_name": s.leagueName(ctx, leagueID)}
+	if decision == "approved" {
+		s.notifyLeagueMember(ctx, leagueID, adminID, requesterID, model.NotificationTypeLeagueJoinApproved, meta)
+	} else {
+		s.notifyLeagueMember(ctx, leagueID, adminID, requesterID, model.NotificationTypeLeagueJoinRejected, meta)
+	}
+	return nil
 }
 
 func (s *LeagueService) RegenerateJoinCode(ctx context.Context, leagueID, userID string) (string, error) {

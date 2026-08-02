@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 import { can, PERM } from '../utils/moderators'
 import { ModeratorPermissionEditor, PermissionSummary, RoleBadge } from '../components/ModeratorPermissions'
+import AnnouncementComposer from '../components/AnnouncementComposer'
 
 const TIMEZONES: string[] = (() => {
   const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
@@ -1081,6 +1082,11 @@ export default function LeagueSettings() {
     queryFn: () => leagueApi.listMembers(id),
   })
 
+  const { data: permissionData } = useQuery({
+    queryKey: ['leagues', id, 'moderator-permissions'],
+    queryFn: () => leagueApi.getModeratorPermissions(id),
+  })
+
   const isLoading = leagueLoading || configLoading || membersLoading
   const isModerator = !isLoading && members && currentUser
     ? members.items.some(m => m.user_id === currentUser.id && m.is_moderator)
@@ -1134,6 +1140,16 @@ export default function LeagueSettings() {
       <RegionalSection leagueId={id} league={league} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} isClubLeague={!!league.club_id} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
+
+      <div className={sectionCls}>
+        <h2 className={labelCls}>Announcements</h2>
+        <AnnouncementComposer
+          scope="league"
+          scopeId={id}
+          audienceLabel={`every member of ${league.name}`}
+          canSend={can(permissionData?.role, PERM.sendAnnouncements)}
+        />
+      </div>
 
       <Link
         to="/leagues/$id/reports"

@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy } from 'lucide-react'
+import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy, ClipboardCheck, ShieldCheck, CalendarPlus, CalendarClock, Medal, Target, Megaphone } from 'lucide-react'
 import { notificationsApi, type NotificationType } from '../api/notifications'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 import { notificationSentence, notificationTarget } from '../utils/notificationRouting'
@@ -24,6 +24,19 @@ const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   ticket_assigned: UsersIcon,
   ticket_status_changed: AlertCircle,
   feature_request_state_changed: Trophy,
+  score_validation_requested: ClipboardCheck,
+  league_join_request: UserPlus,
+  league_join_rejected: XCircle,
+  league_role_changed: ShieldCheck,
+  league_round_opened: Target,
+  club_join_request: UserPlus,
+  club_join_rejected: XCircle,
+  club_role_changed: ShieldCheck,
+  event_invitation: CalendarPlus,
+  event_participant_joined: UsersIcon,
+  event_went_live: CalendarClock,
+  event_results_posted: Medal,
+  announcement: Megaphone,
 }
 
 export default function Notifications() {

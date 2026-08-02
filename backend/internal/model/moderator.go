@@ -33,6 +33,10 @@ const (
 	PermManageLeagues = "manage_leagues"
 	// PermManageEvents covers hosting club events.
 	PermManageEvents = "manage_events"
+	// PermSendAnnouncements covers broadcasting a written message to every
+	// member. It reaches more people than any other capability and cannot be
+	// taken back once sent, so it is never granted by default.
+	PermSendAnnouncements = "send_announcements"
 )
 
 // ModeratorPermission describes one delegated capability for the settings UI.
@@ -50,6 +54,7 @@ var LeagueModeratorPermissions = []ModeratorPermission{
 	{PermVerifyScores, "Verify scores", "Verify, amend, reject and reopen submitted cards.", true},
 	{PermModerateContent, "Moderate content", "Handle reports and hide, flag or delete posts and comments.", true},
 	{PermManageSeasons, "Manage seasons", "Create seasons and rounds.", false},
+	{PermSendAnnouncements, "Send announcements", "Broadcast a message to every league member.", false},
 	{PermManageSettings, "Manage settings", "Edit league details, scoring config, image and join code.", false},
 	{PermManageSupport, "Handle support", "Work the league's support tickets and feature board.", false},
 	{PermManageModerators, "Manage moderators", "Promote and demote moderators and change what they can do.", false},
@@ -61,6 +66,7 @@ var ClubModeratorPermissions = []ModeratorPermission{
 	{PermModerateContent, "Moderate content", "Handle reports and hide, flag or delete posts and comments.", true},
 	{PermManageEvents, "Manage events", "Host and run club events.", false},
 	{PermManageLeagues, "Manage leagues", "Create and run leagues under the club.", false},
+	{PermSendAnnouncements, "Send announcements", "Broadcast a message to every club member.", false},
 	{PermManageSettings, "Manage settings", "Edit the club profile, opening hours, image and join code.", false},
 	{PermManageSupport, "Handle support", "Work the club's support tickets and feature board.", false},
 	{PermManageModerators, "Manage moderators", "Promote and demote moderators and change what they can do.", false},

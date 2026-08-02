@@ -318,6 +318,34 @@ func (r *SocialRepository) ListFollowers(ctx context.Context, userID string, lim
 	return items, nil
 }
 
+// ListFollowerIDs returns the ids of the user's most recent followers, newest
+// first, capped at limit. Used for fan-out where only the recipient set
+// matters and the profile columns would be wasted work.
+func (r *SocialRepository) ListFollowerIDs(ctx context.Context, userID string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT follower_id FROM user_follows
+		WHERE following_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list follower ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan follower id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // ListFollowingProfiles returns a paginated list of users the given user follows.
 func (r *SocialRepository) ListFollowingProfiles(ctx context.Context, userID string, limit, offset int) ([]*model.FollowListItem, error) {
 	rows, err := r.db.Query(ctx, `

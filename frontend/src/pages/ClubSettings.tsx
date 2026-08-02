@@ -20,6 +20,7 @@ import { requestPosition } from '../utils/geolocation'
 import { DATE_FORMAT_OPTIONS, DEFAULT_PREFS, formatDate, useRegionalPrefs, type DateFormat, type TimeFormat } from '../utils/date'
 import { can, PERM } from '../utils/moderators'
 import { ModeratorPermissionEditor, PermissionSummary, RoleBadge } from '../components/ModeratorPermissions'
+import AnnouncementComposer from '../components/AnnouncementComposer'
 
 const TIMEZONES: string[] = (() => {
   const fn = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
@@ -1274,6 +1275,11 @@ export default function ClubSettings() {
   })
 
   const isLoading = clubLoading || membersLoading
+  const { data: permissionData } = useQuery({
+    queryKey: ['club', id, 'moderator-permissions'],
+    queryFn: () => clubsApi.getModeratorPermissions(id),
+  })
+
   const isModerator = club?.is_moderator ?? false
 
   useEffect(() => {
@@ -1331,6 +1337,17 @@ export default function ClubSettings() {
       <RegionalSection clubId={id} club={club} />
       {club.join_policy === 'approval' && <JoinRequestsSection clubId={id} />}
       <MembersSection clubId={id} currentUserId={currentUser.id} />
+
+      <div className={sectionCls}>
+        <h2 className={labelCls}>Announcements</h2>
+        <AnnouncementComposer
+          scope="club"
+          scopeId={id}
+          audienceLabel={`every member of ${club.name}`}
+          canSend={can(permissionData?.role, PERM.sendAnnouncements)}
+        />
+      </div>
+
       <LeaveSection clubId={id} club={club} members={members} currentUserId={currentUser.id} />
     </div>
   )

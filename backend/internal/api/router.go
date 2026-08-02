@@ -60,6 +60,7 @@ func NewRouter(
 	gearShowcase *service.GearShowcaseService,
 	adminGear *service.AdminGearService,
 	geocode *service.GeocodeService,
+	announcements *service.AnnouncementService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -499,6 +500,18 @@ func NewRouter(
 			r.Post("/events/invitations/{token}/accept", eih.Accept)
 			r.Post("/events/invitations/{token}/decline", eih.Decline)
 
+			// Announcements. Sending is gated per scope inside the service —
+			// the platform-wide send lives in the admin block below.
+			annH := handler.NewAnnouncement(announcements)
+			r.Get("/announcements/platform", annH.ListPlatform)
+			r.Get("/announcements/{id}", annH.Get)
+			r.Post("/leagues/{id}/announcements", annH.SendLeague)
+			r.Get("/leagues/{id}/announcements", annH.ListLeague)
+			r.Post("/clubs/{id}/announcements", annH.SendClub)
+			r.Get("/clubs/{id}/announcements", annH.ListClub)
+			r.Post("/events/{slug}/announcements", annH.SendEvent)
+			r.Get("/events/{slug}/announcements", annH.ListEvent)
+
 			// Admin routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
@@ -512,6 +525,11 @@ func NewRouter(
 				r.Get("/admin/email/templates/{key}", aeh.GetTemplate)
 				r.Patch("/admin/email/templates/{key}", aeh.PatchTemplate)
 				r.Post("/admin/email/templates/{key}/preview", aeh.PreviewTemplate)
+
+				// Platform-wide announcements. Every other scope is gated by
+				// a league/club capability or event ownership; this one
+				// reaches every account, so it lives behind RequireAdmin.
+				r.Post("/admin/announcements", handler.NewAnnouncement(announcements).SendPlatform)
 
 				// User management
 				auh := handler.NewAdminUsers(users)

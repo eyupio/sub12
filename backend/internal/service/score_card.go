@@ -46,6 +46,7 @@ type LeagueConfigRepo interface {
 	GetLeagueIDByRoundID(ctx context.Context, roundID string) (string, error)
 	GetByID(ctx context.Context, id string) (*model.League, error)
 	IsMember(ctx context.Context, leagueID, userID string) (bool, error)
+	ListAdminIDs(ctx context.Context, leagueID string) ([]string, error)
 	RecordOwnerReopen(ctx context.Context, scoreCardID, userID string) error
 }
 
@@ -69,7 +70,13 @@ type ScoreCardService struct {
 	events      *EventService       // optional; nil disables event-bound submissions
 	activity    *ActivityService    // optional; nil disables feed ingestion
 	achievement *AchievementService // optional; nil disables achievement evaluation
-	log         zerolog.Logger
+	// notifications is optional; nil disables the "this card needs validating"
+	// fan-out to the league moderators or event scorers who can rule on it.
+	notifications *NotificationService
+	// volunteers is optional; nil keeps a league card's validation request with
+	// the moderators instead of also offering it to members who opted in.
+	volunteers ReviewVolunteerRepo
+	log        zerolog.Logger
 }
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
@@ -94,10 +101,154 @@ func (s *ScoreCardService) SetUserReader(users UserProfileReader) {
 	s.users = users
 }
 
+// SetNotifications wires notification fan-out. Optional — nil leaves a card
+// landing in a league or event to be found by its moderators unprompted.
+func (s *ScoreCardService) SetNotifications(n *NotificationService) {
+	s.notifications = n
+}
+
+// SetReviewVolunteers wires the opt-in pool that widens a league card's
+// validation request beyond the people who run the league.
+func (s *ScoreCardService) SetReviewVolunteers(v ReviewVolunteerRepo) {
+	s.volunteers = v
+}
+
 // SetLogger wires a logger used by background goroutines for panic recovery
 // and best-effort failure reporting on activity/achievement ingestion.
 func (s *ScoreCardService) SetLogger(log zerolog.Logger) {
 	s.log = log
+}
+
+// notifyValidationRequested tells whoever can rule on a card that one is
+// waiting: the league's moderators and owner, or the event's owner and
+// delegated scorers. A card that is still a draft, or that arrived already
+// verified because its league or event runs without peer verification, asks
+// nobody for anything and is skipped.
+//
+// actorID is who put the card there — usually the shooter, but a scorer
+// submitting on a participant's behalf at an event — so they never notify
+// themselves.
+func (s *ScoreCardService) notifyValidationRequested(ctx context.Context, card *model.ScoreCard, actorID string) {
+	if s.notifications == nil {
+		return
+	}
+	plan := s.validationRequestPlan(ctx, card, actorID)
+	if plan == nil {
+		return
+	}
+	tid, tt := card.ID, "score_card"
+	for _, rid := range plan.Recipients {
+		s.notifications.Fanout(ctx, NotifEvent{
+			RecipientID: rid,
+			ActorID:     actorID,
+			Type:        model.NotificationTypeScoreValidationRequested,
+			TargetID:    &tid,
+			TargetType:  &tt,
+			LeagueID:    plan.LeagueID,
+			ClubID:      plan.ClubID,
+			Metadata:    plan.Metadata,
+		})
+	}
+}
+
+// validationRequestPlan is who to tell and what to say. Split out from the
+// fan-out so the recipient rules — moderators but not the shooter, owner
+// included, scorers for an event — are testable without a database.
+type validationRequestPlan struct {
+	Recipients []string
+	LeagueID   *string
+	ClubID     *string
+	Metadata   map[string]any
+}
+
+func (s *ScoreCardService) validationRequestPlan(ctx context.Context, card *model.ScoreCard, actorID string) *validationRequestPlan {
+	if card == nil || card.IsDraft || card.Verification != "pending" {
+		return nil
+	}
+	// The shooter and whoever filed the card already know it is there.
+	skip := map[string]struct{}{actorID: {}, card.UserID: {}}
+
+	if card.LeagueRoundID != nil && *card.LeagueRoundID != "" && s.leagueRepo != nil {
+		leagueID, err := s.leagueRepo.GetLeagueIDByRoundID(ctx, *card.LeagueRoundID)
+		if err != nil {
+			return nil
+		}
+		meta := map[string]any{"scope": "league", "total_score": card.TotalScore}
+		ids, err := s.leagueRepo.ListAdminIDs(ctx, leagueID)
+		if err != nil {
+			ids = nil
+		}
+		// The owner holds every capability implicitly and is not necessarily
+		// carried in league_members.is_admin.
+		var clubID *string
+		if league, err := s.leagueRepo.GetByID(ctx, leagueID); err == nil && league != nil {
+			ids = append(ids, league.CreatedBy)
+			meta["league_name"] = league.Name
+			clubID = league.ClubID
+		}
+		// Members who volunteered to check league cards, and — for a league run
+		// under a club — club members who volunteered for their clubs' leagues,
+		// who need not be in the league themselves.
+		if s.volunteers != nil {
+			if v, err := s.volunteers.ListLeagueReviewVolunteers(ctx, leagueID, reviewVolunteerLimit); err == nil {
+				ids = append(ids, v...)
+			}
+			if clubID != nil && *clubID != "" {
+				if v, err := s.volunteers.ListClubLeagueReviewVolunteers(ctx, *clubID, reviewVolunteerLimit); err == nil {
+					ids = append(ids, v...)
+				}
+			}
+		}
+		return &validationRequestPlan{
+			Recipients: dedupeExcluding(ids, skip),
+			LeagueID:   &leagueID,
+			ClubID:     clubID,
+			Metadata:   meta,
+		}
+	}
+
+	if card.EventParticipantID != nil && *card.EventParticipantID != "" && s.events != nil {
+		ev, _, err := s.events.LookupParticipantWithEvent(ctx, *card.EventParticipantID)
+		if err != nil || ev == nil {
+			return nil
+		}
+		ids, err := s.events.ListVerifierIDs(ctx, ev.ID)
+		if err != nil {
+			return nil
+		}
+		return &validationRequestPlan{
+			Recipients: dedupeExcluding(ids, skip),
+			ClubID:     ev.ClubID,
+			Metadata: map[string]any{
+				"scope":       "event",
+				"event_name":  ev.Name,
+				"event_slug":  ev.Slug,
+				"total_score": card.TotalScore,
+			},
+		}
+	}
+	return nil
+}
+
+// dedupeExcluding preserves order, drops blanks and duplicates, and skips the
+// ids in skip.
+func dedupeExcluding(ids []string, skip map[string]struct{}) []string {
+	out := make([]string, 0, len(ids))
+	seen := map[string]struct{}{}
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, excluded := skip[id]; excluded {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // safeGo runs fn in a goroutine, recovering panics so a failure in async
@@ -289,6 +440,8 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 			s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
 		})
 	}
+
+	s.notifyValidationRequested(ctx, card, userID)
 
 	return card, nil
 }
@@ -558,6 +711,8 @@ func (s *ScoreCardService) Graduate(ctx context.Context, id, userID string) (*mo
 			s.achievement.EvaluateForPersonalBest(context.Background(), userID, isPB)
 		})
 	}
+
+	s.notifyValidationRequested(ctx, updated, userID)
 
 	return updated, nil
 }
@@ -857,5 +1012,7 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 	if err != nil {
 		return nil, err
 	}
-	return s.applyLeagueAutoVerify(ctx, submitted), nil
+	submitted = s.applyLeagueAutoVerify(ctx, submitted)
+	s.notifyValidationRequested(ctx, submitted, userID)
+	return submitted, nil
 }

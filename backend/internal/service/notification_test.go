@@ -32,6 +32,21 @@ func TestNotificationEmailContent_AllTypes(t *testing.T) {
 		{"ticket_assigned", NotifEvent{Type: model.NotificationTypeTicketAssigned}, "Ivy", "Support ticket assigned to you", []string{"Ivy", "assigned", "support ticket"}},
 		{"ticket_status", NotifEvent{Type: model.NotificationTypeTicketStatusChanged}, "Jake", "Support ticket status updated", []string{"Jake", "updated", "status"}},
 		{"feature_state", NotifEvent{Type: model.NotificationTypeFeatureRequestStateChanged}, "Kim", "Feature request status updated", []string{"Kim", "feature request", "updated"}},
+		{"validation_league", NotifEvent{Type: model.NotificationTypeScoreValidationRequested, Metadata: map[string]any{"league_name": "Sunday Bench"}}, "Liam", "A score card needs validating", []string{"Liam", "validated", "in Sunday Bench"}},
+		{"validation_personal", NotifEvent{Type: model.NotificationTypeScoreValidationRequested}, "Mia", "A score card needs validating", []string{"Mia", "validated"}},
+		{"league_join_request", NotifEvent{Type: model.NotificationTypeLeagueJoinRequest, Metadata: map[string]any{"league_name": "Sunday Bench"}}, "Noah", "New league join request", []string{"Noah", "asked to join", "Sunday Bench"}},
+		{"league_join_rejected", NotifEvent{Type: model.NotificationTypeLeagueJoinRejected}, "", "League join request declined", []string{"declined", "a league"}},
+		{"league_promoted", NotifEvent{Type: model.NotificationTypeLeagueRoleChanged, Metadata: map[string]any{"is_moderator": true, "league_name": "Sunday Bench"}}, "Olive", "You now help run a league", []string{"moderator", "Sunday Bench"}},
+		{"league_demoted", NotifEvent{Type: model.NotificationTypeLeagueRoleChanged, Metadata: map[string]any{"is_moderator": false}}, "Olive", "Your league role changed", []string{"no longer a moderator"}},
+		{"league_round", NotifEvent{Type: model.NotificationTypeLeagueRoundOpened, Metadata: map[string]any{"league_name": "Sunday Bench"}}, "", "A new league round is open", []string{"new round", "Sunday Bench"}},
+		{"club_join_request", NotifEvent{Type: model.NotificationTypeClubJoinRequest, Metadata: map[string]any{"club_name": "Dales RC"}}, "Pip", "New club join request", []string{"Pip", "asked to join", "Dales RC"}},
+		{"club_join_rejected", NotifEvent{Type: model.NotificationTypeClubJoinRejected}, "", "Club join request declined", []string{"declined", "a club"}},
+		{"club_promoted", NotifEvent{Type: model.NotificationTypeClubRoleChanged, Metadata: map[string]any{"is_moderator": true, "club_name": "Dales RC"}}, "Quinn", "You now help run a club", []string{"moderator", "Dales RC"}},
+		{"club_demoted", NotifEvent{Type: model.NotificationTypeClubRoleChanged}, "Quinn", "Your club role changed", []string{"no longer a moderator"}},
+		{"event_invitation", NotifEvent{Type: model.NotificationTypeEventInvitation, Metadata: map[string]any{"event_name": "Winter Open"}}, "Rae", "You're invited to an event", []string{"Rae", "invited you", "Winter Open"}},
+		{"event_entry", NotifEvent{Type: model.NotificationTypeEventParticipantJoined, Metadata: map[string]any{"event_name": "Winter Open"}}, "Sam", "New entry for your event", []string{"Sam", "entered", "Winter Open"}},
+		{"event_live", NotifEvent{Type: model.NotificationTypeEventWentLive, Metadata: map[string]any{"event_name": "Winter Open"}}, "", "An event has gone live", []string{"Winter Open", "now live"}},
+		{"event_results", NotifEvent{Type: model.NotificationTypeEventResultsPosted, Metadata: map[string]any{"event_name": "Winter Open"}}, "", "Event results are in", []string{"results", "Winter Open", "posted"}},
 		{"unknown", NotifEvent{Type: "made_up_type"}, "", "New sub12.io notification", []string{"new notification", "sub12.io"}},
 	}
 	for _, tc := range cases {
@@ -47,5 +62,72 @@ func TestNotificationEmailContent_AllTypes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// An announcement's own words are the notification: the title becomes the
+// subject/push title and the trimmed body the message.
+func TestNotificationEmailContent_Announcement(t *testing.T) {
+	subject, body := notificationEmailContent(NotifEvent{
+		Type:     model.NotificationTypeAnnouncement,
+		Metadata: map[string]any{"title": "Range closed Sunday", "body_preview": "Gates locked all day."},
+	}, "Tess")
+	if subject != "Range closed Sunday" {
+		t.Errorf("subject: got %q, want the announcement title", subject)
+	}
+	if body != "Gates locked all day." {
+		t.Errorf("body: got %q, want the announcement preview", body)
+	}
+
+	// A row written before the metadata existed still reads as a sentence.
+	subject, body = notificationEmailContent(NotifEvent{Type: model.NotificationTypeAnnouncement}, "Tess")
+	if subject != "New announcement" || !strings.Contains(body, "Tess") {
+		t.Errorf("fallback: got %q / %q", subject, body)
+	}
+}
+
+// The metadata key an announcement's group name travels under has to be the
+// one the client already reads group names from, or the bell renders an
+// announcement without saying which league it came from.
+func TestScopeNameKey(t *testing.T) {
+	cases := map[string]string{
+		model.AnnouncementScopeLeague:   "league_name",
+		model.AnnouncementScopeClub:     "club_name",
+		model.AnnouncementScopeEvent:    "event_name",
+		model.AnnouncementScopePlatform: "scope_name",
+	}
+	for scope, want := range cases {
+		if got := scopeNameKey(scope); got != want {
+			t.Errorf("scopeNameKey(%q) = %q, want %q", scope, got, want)
+		}
+	}
+}
+
+// The invitation email carries the accept link and is rendered by
+// EventInvitationService, so Fanout must not also send the generic one.
+func TestHasDedicatedEmailTemplate(t *testing.T) {
+	dedicated := []string{
+		model.NotificationTypeTicketCreated,
+		model.NotificationTypeTicketReplied,
+		model.NotificationTypeTicketAssigned,
+		model.NotificationTypeTicketStatusChanged,
+		model.NotificationTypeFeatureRequestStateChanged,
+		model.NotificationTypeEventInvitation,
+	}
+	for _, typ := range dedicated {
+		if !hasDedicatedEmailTemplate(typ) {
+			t.Errorf("%s: expected a dedicated email template", typ)
+		}
+	}
+	generic := []string{
+		model.NotificationTypeScoreValidationRequested,
+		model.NotificationTypeLeagueJoinRequest,
+		model.NotificationTypeClubRoleChanged,
+		model.NotificationTypeEventResultsPosted,
+	}
+	for _, typ := range generic {
+		if hasDedicatedEmailTemplate(typ) {
+			t.Errorf("%s: expected the generic notification email", typ)
+		}
 	}
 }

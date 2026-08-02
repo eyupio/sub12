@@ -19,6 +19,19 @@ export type NotificationType =
   | 'ticket_assigned'
   | 'ticket_status_changed'
   | 'feature_request_state_changed'
+  | 'score_validation_requested'
+  | 'league_join_request'
+  | 'league_join_rejected'
+  | 'league_role_changed'
+  | 'league_round_opened'
+  | 'club_join_request'
+  | 'club_join_rejected'
+  | 'club_role_changed'
+  | 'event_invitation'
+  | 'event_participant_joined'
+  | 'event_went_live'
+  | 'event_results_posted'
+  | 'announcement'
 
 export interface Notification {
   id: string
@@ -61,6 +74,22 @@ export interface NotificationPreferences {
   ticket_assigned: boolean
   ticket_status_changed: boolean
   feature_request_state_changed: boolean
+  score_validation_requested: boolean
+  league_join_request: boolean
+  league_join_rejected: boolean
+  league_role_changed: boolean
+  league_round_opened: boolean
+  club_join_request: boolean
+  club_join_rejected: boolean
+  club_role_changed: boolean
+  event_invitation: boolean
+  event_participant_joined: boolean
+  event_went_live: boolean
+  event_results_posted: boolean
+  announcement: boolean
+  review_requests_public: boolean
+  review_requests_leagues: boolean
+  review_requests_club_leagues: boolean
   digest_email: boolean
   follow_request_email: boolean
   follow_accepted_email: boolean
@@ -79,6 +108,19 @@ export interface NotificationPreferences {
   ticket_assigned_email: boolean
   ticket_status_changed_email: boolean
   feature_request_state_changed_email: boolean
+  score_validation_requested_email: boolean
+  league_join_request_email: boolean
+  league_join_rejected_email: boolean
+  league_role_changed_email: boolean
+  league_round_opened_email: boolean
+  club_join_request_email: boolean
+  club_join_rejected_email: boolean
+  club_role_changed_email: boolean
+  event_invitation_email: boolean
+  event_participant_joined_email: boolean
+  event_went_live_email: boolean
+  event_results_posted_email: boolean
+  announcement_email: boolean
   updated_at: string
 }
 
