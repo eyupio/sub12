@@ -61,3 +61,4 @@ describe('ImageEditor', () => {
     expect(screen.getByLabelText(/edit avatar/i)).toBeInTheDocument()
   })
 })
+
