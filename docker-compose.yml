@@ -37,9 +37,11 @@ services:
       SEED_ADMIN: ${SEED_ADMIN:-false}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Lets the share-meta handler fetch the SPA index.html from the
-      # frontend container at startup so per-page Open Graph tags can be
-      # injected for shared links.
-      FRONTEND_ORIGIN: http://frontend:8080
+      # frontend container so per-page Open Graph tags can be injected for
+      # shared links. Set here as well as defaulted in code: if the backend
+      # cannot reach it, every shared link and every fixed public page serves
+      # a holding page marked noindex, and nothing anywhere reports an error.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://frontend:8080}
       # Public URLs used in outgoing emails. SITE_URL is the canonical host;
       # the specific URLs are derived from it in code if left unset, but we
       # set them explicitly here so operators can see all the email-link

@@ -62,10 +62,16 @@ type Config struct {
 
 	// Internal URL where the frontend container serves index.html. Used by
 	// the share-meta handler to fetch the SPA shell so it can inject
-	// per-page Open Graph / Twitter card tags. Empty falls back to a
-	// minimal embedded template (crawlers still get correct tags; humans
-	// get a Loading… placeholder).
-	FrontendOrigin string `envconfig:"FRONTEND_ORIGIN" default:""`
+	// per-page Open Graph / Twitter card tags.
+	//
+	// Defaulted to the service name the shipped docker-compose stack uses,
+	// because there is no such thing as a working deployment where this is
+	// unset: without it every shared link, and every page in StaticPages,
+	// serves a holding page marked noindex. That failure is silent — nothing
+	// errors, the links just stop working and the pages quietly leave the
+	// search index — so the default has to be the right answer for the
+	// topology we ship rather than a blank that has to be discovered.
+	FrontendOrigin string `envconfig:"FRONTEND_ORIGIN" default:"http://frontend:8080"`
 
 	// Seed
 	SeedAdmin     bool   `envconfig:"SEED_ADMIN" default:"false"`
