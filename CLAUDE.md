@@ -2,54 +2,71 @@
 
 ## Project Overview
 
-sub-12 is a target shooting companion app (PWA + Capacitor) for logging 25-shot score cards, managing gear (rifles & pellets), running leagues, pellet testing with image-based measurement, clubs, achievements, and social features (follows, activity feed, comments). Monorepo with `backend/` (Go) and `frontend/` (React/TypeScript).
+sub-12 is a target shooting companion app (PWA + Capacitor) for logging 25-shot score cards, managing gear (rifles & pellets), running leagues and events, pellet testing with image-based measurement, clubs, achievements, and social features (follows, activity feed, posts, comments). Monorepo with `backend/` (Go) and `frontend/` (React/TypeScript).
+
+`AGENTS.md` is a pointer to this file — this is the single source of truth, so
+document a change here and nowhere else.
 
 ## Repository Structure
+
+Layer directories hold one file per domain, named after it (`league.go`,
+`leagues.ts`), so the file you want is usually the domain name. Counts below
+are orientation, not inventory — don't update them for a single new file.
 
 ```
 backend/              Go API server
   cmd/api/            Entrypoint (main.go)
   internal/
     api/
-      handler/        HTTP handlers (one file per domain)
-      middleware/      Auth (JWT extraction) and request logger
-      router.go       Chi route definitions
-    config/           Env-based config (envconfig struct tags)
+      handler/        HTTP handlers, ~45 domains
+      middleware/     auth.go (JWT → context), logger.go, ratelimit.go
+      router.go       Chi route definitions — the one map of the whole API
+    config/           Env-based config (envconfig struct tags) + Validate()
     db/
       db.go           pgxpool connection
       migrate.go      Embedded golang-migrate runner
-      migrations/     Sequential SQL migrations (000001–000019)
+      migrations/     Sequential SQL migrations (000001–000121)
       redis.go        Redis client setup
       seed/           Dev seed data (seed.sql + seed.go)
     email/            Email template renderer (renderer.go)
-    model/            Domain types (15 files: user, score_card, league, club, pellet, rifle, achievement, activity, image, stats, social, smtp, email_template, pellet_testing, admin)
-    repository/       Data access layer (pgx queries, one file per domain)
-    service/          Business logic layer (one file per domain + auth, email_sender)
+    model/            Domain types, ~36 files. Also holds the pure rules worth
+                      unit-testing without a DB (moderator.go, notification.go)
+    repository/       Data access layer (pgx queries), ~40 domains
+    service/          Business logic layer, ~44 domains
 frontend/             React SPA
   src/
     api/              API client modules (typed fetch wrappers per domain)
       client.ts       Base fetch client with Bearer token injection
-      __tests__/      API module tests
     catalog/          Static data catalogs (pelletCatalog.ts, rifleCatalog.ts)
-    components/       Shared UI components (Layout, AuthLayout, ThemeToggle, Toast, ConfirmDialog, ImageMeasurement, etc.)
+    components/       Shared UI components, plus per-feature subfolders
+                      (dashboard/, leagues/, wizard/, pelletWizard/, eventWizard/)
     config/           App configuration (targetPresets.ts)
-    pages/            Route page components (~37 pages)
-      __tests__/      Page-level tests
-    store/            Zustand stores (auth, theme, toast)
-    utils/            Utilities (ballistics, holeDetection, date)
-    routeTree.ts      TanStack Router file-based route tree
+    hooks/            usePullToRefresh, useSmartBack, autosave/measurement hooks
+    offline/          scoreOutbox.ts — queued score submissions
+    pages/            Route page components, ~88 pages
+    store/            Zustand stores (auth, theme, toast, navigation, nativeToken)
+    utils/            Ballistics, hole detection, dates, share, push, routing rules
+    routeTree.tsx     TanStack Router route tree (rootRoute/authRoute/appRoute)
+    router.ts         Router instance
+e2e/                  Playwright suite (see E2E_TESTING.md)
+docs/                 Long-form design notes
+landing/              Static landing page (index.html, robots.txt, sitemap.xml)
 brand/                SVG brand assets
-landing/              Static landing page (index.html + favicon.svg)
+scripts/              build-mobile + e2e helpers (.sh and .ps1)
 ```
+
+`__tests__/` folders sit next to the code they cover (`api/`, `pages/`,
+`components/`, `hooks/`, `store/`, `utils/`).
 
 ## Tech Stack
 
-- **Backend:** Go 1.24, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5, go-redis v9
+- **Backend:** Go 1.25, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5, go-redis v9
 - **Database:** PostgreSQL 16, Redis 7
-- **Frontend:** React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts, Lucide React icons
+- **Frontend:** React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts 3, Lucide React icons
 - **Mobile:** Capacitor 6 (PWA-first, via vite-plugin-pwa)
-- **Testing:** Go test + testify (backend), Vitest + Testing Library (frontend)
-- **CI/CD:** GitHub Actions (ci.yml + release.yml) → GHCR container images; android.yml + ios.yml build the Capacitor apps
+- **Also in the backend:** `fogleman/gg` + `golang.org/x/image` render the `/og/*.png` share cards, `pquerna/otp` backs two-factor auth, `minio-go` ships encrypted database backups to S3-compatible storage, `alicebob/miniredis` fakes Redis in tests
+- **Testing:** Go test + testify (backend), Vitest + Testing Library (frontend), Playwright (e2e)
+- **CI/CD:** GitHub Actions → GHCR container images (see CI Pipeline below)
 - **Migrations:** golang-migrate with embedded SQL files (pgx5 driver)
 
 ## Build & Run Commands
@@ -82,7 +99,14 @@ cd frontend && npm run build    # Production build (tsc -b && vite build)
 cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
 cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
+
+# End-to-end (Playwright) — drives a real browser against a real stack.
+./scripts/e2e.sh                # or scripts/e2e.ps1 on Windows; see E2E_TESTING.md
+cd e2e && npm test              # once a stack is already up
 ```
+
+The e2e suite is **not** in the PR gate (`e2e.yml` is manual only), so run it
+yourself when changing a flow it covers — score capture, leagues, events, clubs.
 
 `npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
 solution file — `"files": []` plus references to `tsconfig.app.json` and
@@ -90,7 +114,7 @@ solution file — `"files": []` plus references to `tsconfig.app.json` and
 exits 0 on any codebase, however broken. It type-checked nothing for as long as
 it was the CI step. Only build mode follows the references.
 
-Both the `android/` and `ios/` projects are committed (`ios/` was generated with
+Both `frontend/android/` and `frontend/ios/` are committed (the iOS project was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
 `cap sync` copies into the native projects are git-ignored (regenerated from
 `dist/`). CI builds both: `android.yml` on a Linux runner, `ios.yml` on a
@@ -99,7 +123,7 @@ Blacksmith macOS runner.
 ### Production
 
 ```bash
-docker compose up -d            # pulls GHCR images, runs all 4 services
+docker compose up -d            # pulls GHCR images: postgres, redis, backend, frontend
 docker compose logs backend     # check for migration/startup errors
 ```
 
@@ -123,7 +147,8 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **121** (000001–000121). Latest: `000121_league_moderators_manage_seasons`.
+`ls backend/internal/db/migrations | tail` is the current head — don't trust a
+number written down here. `make migrate-create` picks the next prefix for you.
 
 ## Critical Migration Rules
 
@@ -165,7 +190,7 @@ Current migration count: **121** (000001–000121). Latest: `000121_league_moder
 
 ### Frontend (TypeScript/React)
 
-- **Routing:** TanStack Router with file-based route tree (`routeTree.ts`)
+- **Routing:** TanStack Router, one route tree in `routeTree.tsx`. A page goes under `rootRoute`/`authRoute` (public) or `appRoute` (`beforeLoad: requireAuth`) — the choice decides whether it can be indexed, so read "Indexable surface" before adding one
 - **Data fetching:** TanStack Query — define queries/mutations in `src/api/` modules (one per domain)
 - **State:** Zustand stores in `src/store/` (auth persisted to localStorage, theme, toast)
 - **Styling:** Tailwind CSS utility classes; dark mode via `ThemeToggle` and `theme` store
@@ -182,8 +207,8 @@ Any link sent to a user via email, push, or other out-of-band channel **must** b
 - Add new such config to `backend/internal/config/config.go` with an empty default.
 - Derive it from `SITE_URL` in `applyDerivedDefaults()` when the specific env var is unset, so a single `SITE_URL` change rolls out to every link type.
 - Add the new field name to the `Validate()` localhost guard so production refuses to boot with a localhost link.
-- Document the new env var in this file (and `AGENTS.md`), in `.env.example`, and in `docker-compose.yml`.
-- Existing examples to copy: `PasswordResetURL` (used in `backend/internal/service/auth.go` `buildResetLink`), `EventInvitationURL` (used in `backend/internal/service/event_invitation.go`).
+- Document the new env var in this file, in `.env.example`, and in `docker-compose.yml`.
+- Existing examples to copy: `PasswordResetURL` (used in `backend/internal/service/auth.go` `buildResetLink`), `EventInvitationURL` (used in `backend/internal/service/event_invitation.go`), `DefaultAvatarURL`.
 
 ### General
 
@@ -194,7 +219,16 @@ Any link sent to a user via email, push, or other out-of-band channel **must** b
 
 ## API Structure
 
-All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
+`backend/internal/api/router.go` is the authoritative map — read it rather than
+trusting the summary below, which is a guide to the parts with rules attached.
+
+Application routes live under `/api/v1/`. The root is not empty, though: it
+serves `/healthz` and `/readyz`, the crawler surface (`/sitemap.xml`,
+`/siteindex.xml`, the IndexNow `/{key}.txt`), the `ShareMeta` HTML routes
+(`/share/…`, `/score-cards/{id}`, `/pellet-tests/{id}` and every
+`handler.StaticPages` entry) and the generated preview cards at
+`/og/{entity}/{id}.png`. Those root paths are what search engines and link
+unfurlers hit, so a change there is governed by "Indexable surface" below.
 
 ### Share URLs and slugs
 
@@ -511,9 +545,11 @@ as invariants and lean on the tests that pin them.
 
 ### Public (no auth)
 
-- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/login/2fa`, `POST /auth/refresh`, `POST /auth/logout`
 - `POST /auth/forgot-password`, `POST /auth/reset-password`
+  - Every password-bearing endpoint above is rate-limited per IP (`rl.Limit("auth")`). `refresh` and `logout` are deliberately unbounded, so ordinary token refresh from a shared IP is never throttled by somebody else's login attempts.
 - `GET /images/{id}`
+- `GET /faqs`, `GET /faqs/{slug}`
 - `GET /leagues`, `GET /leagues/{id}`
 - `GET /clubs`, `GET /clubs/{id}`, `GET /clubs/{id}/standings`, `GET /clubs/{id}/opening-hours`, `GET /clubs/disciplines`
   - The club directory accepts `?q=` (name, town, region or postcode), `?discipline=`, and `?lat=&lng=[&radius_km=]` to return `distance_km` and sort nearest-first. `?code=` still resolves a single club by join code and ignores the other filters.
@@ -536,6 +572,13 @@ as invariants and lean on the tests that pin them.
 - **Clubs:** Create, update, delete (the club owner, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
 - **Moderators and delegated capabilities:** see "Moderator roles" above. `send_announcements` is in both catalogues and is never granted by default. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` return the delegable catalogue plus the caller's own role; `PATCH .../members/{userId}` promotes, demotes and re-grants.
 - **Feature board:** `GET /feature-requests` (recent) and `/feature-requests/ranking` (most-voted) list the ideas visible to the viewer — platform ideas for everyone, league/club ideas for members of that league or club. `POST /feature-requests/{id}/vote` toggles the viewer's upvote, `/comments` carries the discussion, and `GET /feature-requests/{id}/events` returns the request's history (created, status, priority and owner changes). Rows come back enriched with requester, owner, scope *name* and vote/comment counts so the board never renders a raw ID. New ideas are not created here: the board's composer opens a `feature`-category support ticket, which an admin refines onto the board via `POST /admin/tickets/{id}/feature-request`. Admins set `status` and `priority` with `PATCH /admin/feature-requests/{id}`; both changes are recorded in the history. The UI collapses the eight statuses into five stages (under review, planned, in progress, shipped, not planned) defined once in `frontend/src/utils/featureBoard.ts`.
+- **Events:** A shoot other people enter, addressed by `slug` rather than UUID. `POST`/`GET /events`, `/events/{slug}` and its participants, guests, scorers (delegated card-verification duty), invitations (`/events/invitations/{token}` + `/accept`, `/decline`), scores, scoreboard, `results.csv`, `promote` and per-card `confirm`/`amend`/`reject`. Cards reach an event through `submit-to-event` — see "A card's context is never final".
+- **Posts:** The social feed's own content — `POST`/`GET /posts`, `/posts/share` (share an entity into the feed), `/posts/{id}/comments`, `/like`, and `/flag`/`/unflag`. Writes are rate-limited (`RATELIMIT_POST_PER_MIN`, `_COMMENT_`, `_LIKE_`).
+- **Moderation:** `POST /reports` raises a report on a post, comment or user; an admin decides it at `/admin/reports/{id}/decide`. A flagged row is hidden by the background sweeper only after `MODERATION_FLAG_GRACE`, so the author gets a chance to amend first.
+- **Privacy:** `/users/me/blocks` and `/users/me/mutes`. Both are applied in the feed query itself (`repository/activity.go`), and a block is symmetric — neither side sees the other. Announcements are exempt: they come from a group the user joined, not a person they chose to hear from.
+- **Support & FAQ:** Support tickets carry the help desk and are the only way a feature request is born (see "Feature board"). Admins work the queue at `/admin/tickets` (`status`, `assign`, `feature-request`). `GET /faqs` and `/faqs/{slug}` are public; admins edit and reorder them under `/admin/faqs`.
+- **Two-factor:** `/users/me/2fa/status`, `/enroll/begin`, `/enroll/confirm`, `/disable`, `/backup-codes/regenerate` (TOTP via `pquerna/otp`). Login with 2FA on completes at `POST /auth/login/2fa`.
+- **Locations & categories:** `/locations` are the user's saved places — the first rule in "Naming a picked location". `/categories` are the shared taxonomy admins maintain at `/admin/categories`.
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users
 - **Devices:** Register/unregister push-notification tokens (`POST`/`DELETE /devices`)
@@ -554,6 +597,14 @@ as invariants and lean on the tests that pin them.
 - **Gear analytics:** Site-wide gear stats (`/admin/gear/stats`), a paginated/sortable gear-model leaderboard (`/admin/gear/models?kind=rifle|pellet`), and a per-model drill-down with owners and trend (`/admin/gear/model?kind=&make=&model=`). Admin views cover the whole estate — unlike the user-facing showcase they ignore `comparison_opt_in`, and report opt-in rates instead.
 - **Leagues:** List, get, update, delete, members management
 - **Clubs:** List (private clubs included), get, update, delete, members management
+- **Events:** List, get, update, delete (`/admin/events`)
+- **Reports:** Queue and `POST /admin/reports/{id}/decide`; `/admin/activities/{id}` hides and `/unhide` restores a feed row
+- **FAQ:** CRUD plus `reorder-sections` / `reorder-items`
+- **Categories:** CRUD for the shared taxonomy
+- **Feature board:** `PATCH /admin/feature-requests/{id}` and `POST /admin/tickets/{id}/feature-request` — see "Feature board"
+- **Announcements:** `POST /admin/announcements` sends platform-wide — see "Announcements"
+- **Sitemap & SEO:** `/admin/sitemap/stats` reports what is eligible and served, `/ping` submits to IndexNow, `/submissions` is the log, `/indexnow-key` shows the key — see "Indexable surface"
+- **Backup:** `/admin/backup/settings` (+ `test-s3`), `run`, `runs`, download and restore. Dumps are gzipped and AES-encrypted with a passphrase-derived key before upload, so a run without a configured passphrase fails rather than shipping plaintext.
 - **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.
 
   Personas are built to read as people rather than as a bot roster (see "Simulation realism" below for how, and which parts are admin-tunable).
@@ -639,10 +690,28 @@ read as generated.
 | `GEOCODE_USER_AGENT` | *(derived from `SITE_URL`)* | Identifies us to that endpoint, as Nominatim's usage policy requires. |
 | `FCM_CREDENTIALS_JSON` | *(empty)* | Firebase service-account JSON for push delivery (FCM HTTP v1). When empty, device tokens are still stored but no push is sent (no-op sender). |
 | `FRONTEND_ORIGIN` | `http://frontend:8080` | Internal URL the backend fetches the SPA `index.html` from so it can inject per-page Open Graph tags. Point it at the frontend container; every share link and every page in `StaticPages` degrades to a holding page if it can't be reached. |
+| `DEFAULT_AVATAR_URL` | *(empty)* | Absolute URL used as the avatar in emails and share cards when a user has none. Covered by the `Validate()` localhost guard. |
+| `INDEXNOW_KEY` | *(empty)* | IndexNow submission key. Empty disables pinging search engines on publish. |
+| `INDEXNOW_KEY_LOCATION` | *(derived)* | URL of the key file; the backend serves it at `/{key}.txt`. |
+| `RATELIMIT_ENABLED` | `true` | Master switch for `middleware/ratelimit.go` (Redis-backed, per-user, per-minute). |
+| `RATELIMIT_AUTH_PER_MIN` | `10` | Login/register/reset attempts. Keyed on IP, not user. |
+| `RATELIMIT_FOLLOW_PER_MIN` | `10` | Follow/unfollow. |
+| `RATELIMIT_COMMENT_PER_MIN` | `20` | Comment writes. |
+| `RATELIMIT_POST_PER_MIN` | `10` | Post creation. |
+| `RATELIMIT_REPORT_PER_MIN` | `5` | Content reports. |
+| `RATELIMIT_LIKE_PER_MIN` | `60` | Likes. |
+| `RATELIMIT_SOCIAL_TOGGLE_PER_MIN` | `30` | Other social toggles. |
+| `RATELIMIT_GEOCODE_PER_MIN` | `30` | Reverse-geocode lookups per user, on top of the global one-per-second pacing. |
+| `MODERATION_FLAG_GRACE` | `48h` | How long an author has to amend a flagged comment or post before the sweeper hides it. |
+| `MODERATION_SWEEP_INTERVAL` | `15m` | How often that sweeper runs. |
+
+`Validate()` only refuses a localhost value when `ENV=production`, and only for
+the four URL fields listed in it — see "Outgoing public URLs".
 
 ## CI Pipeline
 
-Four GitHub Actions workflows:
+Seven GitHub Actions workflows. `ci.yml` is the one that gates a PR; treat the
+rest as build/publish plumbing.
 
 ### ci.yml (push/PR to `main`)
 
@@ -670,7 +739,7 @@ Builds the Capacitor Android app and publishes the APK for download.
   running the build it already has. A cache eviction still rotates it, so the
   release notes carry the signer's SHA-256 fingerprint
 - `versionCode` / `versionName` come from `ANDROID_VERSION_CODE` /
-  `ANDROID_VERSION_NAME`, read in `android/app/build.gradle`
+  `ANDROID_VERSION_NAME`, read in `frontend/android/app/build.gradle`
 
 ### ios.yml (PR / push to `main` / tag `v*` / manual)
 
@@ -714,7 +783,7 @@ Other configuration:
   `CURRENT_PROJECT_VERSION` from the run number, passed as `xcodebuild`
   overrides. `CFBundleShortVersionString` must be a plain dotted number, so the
   Android trick of appending a short SHA isn't available.
-- `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` is committed —
+- `frontend/ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` is committed —
   `xcodebuild -scheme App` needs a *shared* scheme, and Xcode only writes a
   per-user one by default.
 
@@ -723,6 +792,22 @@ Other configuration:
 - Builds and pushes backend + frontend Docker images to GHCR
 - Tags: `sha-<commit>` + `latest`
 - Uses Docker Buildx with GitHub Actions cache
+
+### e2e.yml (manual only)
+
+Runs the Playwright suite in `e2e/` against a deployed staging environment. It
+is `workflow_dispatch` only and is **not** part of the PR gate, so a change
+that breaks a spec will not be caught by CI — run it locally when touching a
+flow the suite covers (`E2E_TESTING.md` for the one-command quickstart).
+
+### cleanup-packages.yml (scheduled)
+
+Deletes untagged GHCR package versions left behind by buildx, keeping a recent
+buffer. Tagged versions (`latest`, `sha-*`) are never touched.
+
+### opencode.yml (issue / review comment)
+
+Runs the opencode agent when a comment contains ` /oc`. Unrelated to the build.
 
 ## Frontend Design System
 
@@ -736,7 +821,8 @@ these over ad-hoc Tailwind so surfaces stay consistent.
   `.shadow-card`, `.shadow-float`, `.shadow-overlay`, `.shadow-gold` utilities.
 - **Entrance animations** — `.animate-fade-in`, `.animate-fade-in-up`,
   `.animate-scale-in` (modals), `.animate-sheet-up` (bottom sheets),
-  `.animate-pop` (value changes), `.u-stagger` (sequenced list children).
+  `.animate-slide-in` (drawers), `.animate-pop` (value changes), `.u-stagger`
+  (sequenced list children).
 - **Interaction utilities** — `.u-lift` (cards that link somewhere), `.u-press`
   (buttons and icon controls), `.u-nudge` (nav and list rows), `.u-sheen`
   (primary CTAs), `.u-hairline`, `.u-tnum`, `.u-text-gold-gradient`.
@@ -745,7 +831,7 @@ these over ad-hoc Tailwind so surfaces stay consistent.
   over an image) must carry `.tap-target`, or that floor stretches the circle
   into an ellipse; the class keeps the box and moves the 40px touch area onto a
   centred pseudo-element. `.no-min-target` opts out with no replacement area.
-- **Component classes** — `.btn` + `.btn-primary/secondary/ghost/danger` +
+- **Component classes** — `.btn` + `.btn-primary/secondary/ghost/danger/brass` +
   `.btn-sm/lg`, `.field`, `.surface-card`, `.skeleton`, `.spinner`,
   `.skip-link`, `.app-tab` (mobile bottom-nav dot/pill markers).
 - **Loading states** — use `src/components/Skeleton.tsx` (`Skeleton`,
@@ -766,7 +852,7 @@ these over ad-hoc Tailwind so surfaces stay consistent.
 - **Refreshing** — `Layout` owns the app's only reload affordances: pull down on
   the page scroller (`usePullToRefresh`, touch only) or tap the SUB12 lockup.
   Both refetch active TanStack queries rather than reloading the WebView, which
-  would reset the router. Android targets SDK 35, so `android/app/src/main/
+  would reset the router. Android targets SDK 35, so `frontend/android/app/src/main/
   res/values-v35/styles.xml` opts out of Android 15's forced edge-to-edge — the
   WebView never reports system-bar insets to `env(safe-area-inset-*)`, so the
   app shell would otherwise draw under the status and gesture bars.
