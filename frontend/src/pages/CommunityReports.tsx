@@ -3,6 +3,7 @@ import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Flag, Shield, ChevronLeft, ExternalLink } from 'lucide-react'
 import { reportsApi, ModerationAction, Report, ReportStatus } from '../api/reports'
+import { useHashTarget } from '../hooks/useHashTarget'
 import { toast } from '../store/toast'
 
 type Scope = 'league' | 'club'
@@ -32,6 +33,7 @@ function ReportsPanel({ scope, communityId }: { scope: Scope; communityId: strin
   })
 
   const items = list.data?.items ?? []
+  useHashTarget(items.length > 0)
 
   return (
     <div className="space-y-4">
@@ -114,7 +116,7 @@ function ReportRow({ report, onDecide, disabled }: { report: Report; onDecide: (
   const when = useMemo(() => new Date(report.created_at).toLocaleString(), [report.created_at])
   const isOpen = report.status === 'open'
   return (
-    <li className="p-3 rounded border border-subtle bg-surface space-y-2">
+    <li id={report.id} className="p-3 rounded border border-subtle bg-surface space-y-2 scroll-mt-24">
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-[var(--brass)] shrink-0">
           <Flag size={14} />
