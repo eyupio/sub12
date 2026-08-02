@@ -202,6 +202,54 @@ describe('LocationField', () => {
     expect(screen.queryByRole('button', { name: '53.862, -1.957' })).not.toBeInTheDocument()
   })
 
+  it('names a recent whose coordinates were never stored from its own label', async () => {
+    vi.spyOn(locationsApi, 'list').mockResolvedValue({ items: [makePlace()] })
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'a',
+          shot_at: '2026-01-01',
+          total_score: 0,
+          x_count: 0,
+          // Labelled with the point but stored with no lat/lng of its own.
+          location: '53.862, -1.958',
+          verification: 'verified',
+          is_draft: false,
+          created_at: '',
+        },
+      ],
+    } as Awaited<ReturnType<typeof scoreCardApi.list>>)
+
+    const { onChange } = renderField()
+    const chip = await screen.findByRole('button', { name: 'Ilkley Range' })
+    expect(screen.queryByRole('button', { name: '53.862, -1.958' })).not.toBeInTheDocument()
+    // Picking it puts the recovered point back on the next card.
+    fireEvent.click(chip)
+    expect(onChange).toHaveBeenCalledWith({ label: 'Ilkley Range', lat: 53.862, lng: -1.958 })
+  })
+
+  it('geocodes a recent whose coordinates were never stored', async () => {
+    vi.spyOn(geoApi, 'reverse').mockResolvedValue({ name: 'Otley Sports Ground, Otley' })
+    vi.spyOn(scoreCardApi, 'list').mockResolvedValue({
+      items: [
+        {
+          id: 'a',
+          shot_at: '2026-01-01',
+          total_score: 0,
+          x_count: 0,
+          location: '53.862, -1.958',
+          verification: 'verified',
+          is_draft: false,
+          created_at: '',
+        },
+      ],
+    } as Awaited<ReturnType<typeof scoreCardApi.list>>)
+
+    renderField()
+    expect(await screen.findByRole('button', { name: 'Otley Sports Ground, Otley' })).toBeInTheDocument()
+    expect(geoApi.reverse).toHaveBeenCalledWith(53.862, -1.958)
+  })
+
   it('renders a chip per recent score-card location and restores label + coords on click', async () => {
     vi.spyOn(scoreCardApi, 'list').mockResolvedValue({
       items: [

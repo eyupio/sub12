@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { findNearbyPlace, isCoordinateLabel, metersBetween, resolveLocationLabel } from '../geo'
+import {
+  coordsForLabel,
+  findNearbyPlace,
+  isCoordinateLabel,
+  metersBetween,
+  parseCoordLabel,
+  resolveLocationLabel,
+} from '../geo'
 
 describe('metersBetween', () => {
   it('returns 0 for identical points', () => {
@@ -74,6 +81,41 @@ describe('isCoordinateLabel', () => {
   })
 })
 
+describe('parseCoordLabel', () => {
+  it('reads back the point a coordinate label spells out', () => {
+    expect(parseCoordLabel('53.862, -1.958')).toEqual({ lat: 53.862, lng: -1.958 })
+    expect(parseCoordLabel(' 51.5,-0.12 ')).toEqual({ lat: 51.5, lng: -0.12 })
+  })
+
+  it('returns null for anything that isn\'t one', () => {
+    expect(parseCoordLabel('Bisley')).toBeNull()
+    expect(parseCoordLabel('')).toBeNull()
+    expect(parseCoordLabel(undefined)).toBeNull()
+  })
+
+  it('rejects out-of-range pairs rather than pointing off the globe', () => {
+    expect(parseCoordLabel('953.862, -1.958')).toBeNull()
+    expect(parseCoordLabel('53.862, -181.5')).toBeNull()
+  })
+})
+
+describe('coordsForLabel', () => {
+  it('prefers stored coordinates', () => {
+    expect(coordsForLabel('53.862, -1.958', 51.31, -0.62)).toEqual({ lat: 51.31, lng: -0.62 })
+  })
+
+  it('falls back to the label when a row was stored without coordinates', () => {
+    expect(coordsForLabel('53.862, -1.958', undefined, undefined)).toEqual({
+      lat: 53.862,
+      lng: -1.958,
+    })
+  })
+
+  it('has nothing to offer for a named label with no coordinates', () => {
+    expect(coordsForLabel('Bisley', undefined, undefined)).toBeNull()
+  })
+})
+
 describe('resolveLocationLabel', () => {
   const places = [{ id: 'home', name: 'Ilkley Range', lat: 53.862, lng: -1.957 }]
 
@@ -92,6 +134,16 @@ describe('resolveLocationLabel', () => {
   it('falls back to coordinates only when there is no name at all', () => {
     expect(resolveLocationLabel('', 51.31, -0.62, places)).toBe('51.310, -0.620')
     expect(resolveLocationLabel('51.31000, -0.62000', 51.31, -0.62, places)).toBe('51.310, -0.620')
+  })
+
+  it('names a saved place from a coordinate label alone, with nothing stored', () => {
+    expect(resolveLocationLabel('53.862, -1.958', undefined, undefined, places)).toBe('Ilkley Range')
+  })
+
+  it('normalises a coordinate label when no place is near it', () => {
+    expect(resolveLocationLabel('51.31000, -0.62000', undefined, undefined, places)).toBe(
+      '51.310, -0.620',
+    )
   })
 
   it('returns the typed label unchanged when there are no coordinates', () => {
