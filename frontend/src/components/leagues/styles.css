@@ -62,9 +62,22 @@
 }
 
 /* Tabs */
-.lc-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); padding: 0 8px; }
+/* The section clips its overflow, so a tab row wider than the panel would be
+   cut off with no way to reach the last tab on a phone. Scroll it instead. */
+.lc-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.lc-tabs::-webkit-scrollbar { display: none; }
 .lc-tab {
   position: relative;
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 10px 14px;
   font-size: 11px;
   letter-spacing: 0.14em;
@@ -85,7 +98,7 @@
 .lc-tab::after {
   content: '';
   position: absolute;
-  left: 8px; right: 8px; bottom: -1px;
+  left: 8px; right: 8px; bottom: 0;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--gold);

@@ -340,7 +340,10 @@ export default function Layout({ children }: PropsWithChildren) {
           <div className="flex-1">
             {children ?? <Outlet />}
           </div>
-          <footer className="shrink-0 mt-10 px-4 py-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-[linear-gradient(90deg,transparent,var(--line-2),transparent)]">
+          {/* The quick-capture FAB is fixed above the mobile nav, so the last
+              strip of the page sits underneath it. The extra bottom padding
+              lifts these links clear of it. */}
+          <footer className="shrink-0 mt-10 px-4 pt-4 pb-20 lg:pb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted tracking-wide relative before:absolute before:top-0 before:left-0 before:right-0 before:h-px before:bg-[linear-gradient(90deg,transparent,var(--line-2),transparent)]">
             <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
             <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
