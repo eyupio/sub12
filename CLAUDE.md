@@ -71,7 +71,7 @@ cd backend && make seed         # load dev seed data (admin accounts, password: 
 
 # Frontend
 cd frontend && npm run dev      # Vite dev server on :5173
-cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
+cd frontend && npm run check    # TypeScript type check (tsc -b — see below)
 cd frontend && npm run lint     # ESLint
 cd frontend && npm test         # Vitest (vitest run)
 cd frontend && npm run build    # Production build (tsc -b && vite build)
@@ -83,6 +83,12 @@ cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
 cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
 ```
+
+`npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
+solution file — `"files": []` plus references to `tsconfig.app.json` and
+`tsconfig.node.json` — so a plain `tsc --noEmit` resolves *no* input files and
+exits 0 on any codebase, however broken. It type-checked nothing for as long as
+it was the CI step. Only build mode follows the references.
 
 Both the `android/` and `ios/` projects are committed (`ios/` was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
@@ -261,6 +267,37 @@ one per second Nominatim's usage policy allows, and reports every failure as
 "nowhere named here" (204) — a flaky third party must never block saving a card,
 it just means the coordinates stand.
 
+### Seasons and rounds are maintained, not just created
+
+A league's calendar is edited far more often than it is written: a round runs
+long, a season is named wrong, an admin adds one twice. Everything under
+`manage_seasons` is therefore full CRUD — `POST`, `PATCH` and `DELETE` on
+`/leagues/{id}/seasons/{seasonId}` and `.../rounds/{roundId}` — and the same
+capability gates all of it, so a moderator who can open a round can also fix
+one. The lazily created "General" season and its "Submissions" round are
+ordinary rows and are editable like any other.
+
+- **Patches follow the "omit to keep, empty string to clear" convention.**
+  Clearing a round's `opens_at`/`closes_at` returns it to permanently open;
+  clearing a season's `ends_on` makes it open-ended. `name` and `starts_on` are
+  `NOT NULL`, so an empty string there is refused rather than treated as a
+  clear. The settings form sends only the fields the admin actually changed —
+  a stored timestamp it failed to render must never come back as a clear.
+- **Archiving is what retires a season that has been shot.** `is_active` is a
+  switch on the season, and `GetOrCreateDefaultRound` skips archived seasons
+  entirely rather than merely ranking them last: a retired season that kept
+  collecting cards would make the switch meaningless. A league whose every
+  season is archived is bootstrapped afresh, exactly as a brand-new one is.
+- **Deleting is refused once anybody has shot it.** `score_cards
+  .league_round_id` is `ON DELETE SET NULL`, so a delete that went through
+  would leave the cards and silently strip them out of the standings. A season
+  or round with cards in it returns 409 and points the admin at archiving (or
+  closing the round), which takes it out of use without detaching anything.
+- **A season or round of another league is reported as missing**, not
+  forbidden: the caller is a moderator here, and a stranger's calendar is not
+  theirs to know about. `RoundBelongsToLeague` is the round-side mirror of
+  `SeasonBelongsToLeague` and exists for that reason.
+
 ### Moderator roles
 
 Members a league or club **owner** promotes to help run it are **moderators**,
@@ -306,6 +343,19 @@ reach stops at the one league or club they were promoted in.
   alongside `is_moderator`, so a Capacitor app running an older bundle keeps
   working. Member listings redact `permissions` for viewers who don't help run
   the group.
+- **A control the viewer's grant doesn't cover is drawn read-only, with the
+  reason.** Reaching the settings page means being a moderator; it does not
+  mean holding every capability on it, and each section saves through a
+  different one — `manage_settings` for the league record (name, description,
+  privacy, image, join code, scoring config, regional defaults),
+  `manage_seasons` for the calendar, `manage_members` for the roster and the
+  join-request queue, `manage_moderators` for roles. Gating the page as a
+  whole and rendering every section live is what produced the original
+  complaint: the forms accepted input and each save came back "Failed to save
+  league" with nothing to explain it. `LeagueSettings.tsx` passes each section
+  the capability its own endpoint checks; the fields stay visible (a moderator
+  may need to read them), the submit disappears, and `CapabilityNote` says
+  which permission is missing and who grants it.
 
 ### Notifications
 
@@ -456,7 +506,7 @@ as invariants and lean on the tests that pin them.
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
-- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons, rounds, join requests, score verification (member confirm + moderator verify/amend/reject/reopen + audit trail). Leagues with `require_score_verification` off auto-verify submissions (create/graduate/submit and on config change), so cards never strand outside the standings; a threshold of 0 with verification on counts as 1. Rejected cards must be reopened before amending; an owner editing a rejected card is audited as a reopen. Non-members only see verified cards and counts. Verification outcomes notify the shooter (`score_verified`/`score_rejected`/`score_amended`).
+- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons and rounds (create, rename, re-date, archive/restore and delete — see "Seasons and rounds are maintained, not just created" above), join requests, score verification (member confirm + moderator verify/amend/reject/reopen + audit trail). Leagues with `require_score_verification` off auto-verify submissions (create/graduate/submit and on config change), so cards never strand outside the standings; a threshold of 0 with verification on counts as 1. Rejected cards must be reopened before amending; an owner editing a rejected card is audited as a reopen. Non-members only see verified cards and counts. Verification outcomes notify the shooter (`score_verified`/`score_rejected`/`score_amended`).
 - **Clubs:** Create, update, delete (the club owner, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
 - **Moderators and delegated capabilities:** see "Moderator roles" above. `send_announcements` is in both catalogues and is never granted by default. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` return the delegable catalogue plus the caller's own role; `PATCH .../members/{userId}` promotes, demotes and re-grants.
 - **Feature board:** `GET /feature-requests` (recent) and `/feature-requests/ranking` (most-voted) list the ideas visible to the viewer — platform ideas for everyone, league/club ideas for members of that league or club. `POST /feature-requests/{id}/vote` toggles the viewer's upvote, `/comments` carries the discussion, and `GET /feature-requests/{id}/events` returns the request's history (created, status, priority and owner changes). Rows come back enriched with requester, owner, scope *name* and vote/comment counts so the board never renders a raw ID. New ideas are not created here: the board's composer opens a `feature`-category support ticket, which an admin refines onto the board via `POST /admin/tickets/{id}/feature-request`. Admins set `status` and `priority` with `PATCH /admin/feature-requests/{id}`; both changes are recorded in the history. The UI collapses the eight statuses into five stages (under review, planned, in progress, shipped, not planned) defined once in `frontend/src/utils/featureBoard.ts`.

@@ -68,6 +68,55 @@ func TestCreate_RejectsInvalidJoinPolicy(t *testing.T) {
 	}
 }
 
+// --- Season and round windows ---
+//
+// Create and update share these, so a patch that moves only one end of a
+// window is judged against the value already stored at the other end.
+
+func TestValidateSeasonWindow(t *testing.T) {
+	ends := func(s string) *string { return &s }
+
+	if err := validateSeasonWindow("", nil); !errors.Is(err, ErrInvalidSeason) {
+		t.Errorf("empty starts_on: expected ErrInvalidSeason, got %v", err)
+	}
+	if err := validateSeasonWindow("2026-05-01", ends("2026-04-30")); !errors.Is(err, ErrInvalidSeason) {
+		t.Errorf("end before start: expected ErrInvalidSeason, got %v", err)
+	}
+	// An open-ended season is the normal case, and clearing the end date
+	// (empty string) must read as open-ended rather than as a bad date.
+	for _, ok := range []*string{nil, ends(""), ends("2026-05-01"), ends("2026-06-30")} {
+		if err := validateSeasonWindow("2026-05-01", ok); err != nil {
+			t.Errorf("ends_on %v: expected no error, got %v", ok, err)
+		}
+	}
+}
+
+func TestValidateRoundWindow(t *testing.T) {
+	at := func(s string) *string { return &s }
+
+	if err := validateRoundWindow(at("2026-05-08T09:00:00Z"), at("2026-05-01T09:00:00Z")); !errors.Is(err, ErrInvalidRound) {
+		t.Errorf("close before open: expected ErrInvalidRound, got %v", err)
+	}
+	// A patch that moves only one end is judged against the stored value at
+	// the other, which arrives in PostgreSQL's spelling rather than RFC3339.
+	if err := validateRoundWindow(at("2026-05-08 09:00:00+00"), at("2026-05-01T09:00:00Z")); !errors.Is(err, ErrInvalidRound) {
+		t.Errorf("stored opens_at: expected ErrInvalidRound, got %v", err)
+	}
+	// A round with no dates is permanently open, and one end alone is enough
+	// to schedule it — neither is an error.
+	for _, pair := range [][2]*string{
+		{nil, nil},
+		{at(""), at("")},
+		{at("2026-05-01T09:00:00Z"), nil},
+		{nil, at("2026-05-01T09:00:00Z")},
+		{at("2026-05-01T09:00:00Z"), at("2026-05-08T21:00:00Z")},
+	} {
+		if err := validateRoundWindow(pair[0], pair[1]); err != nil {
+			t.Errorf("window %v: expected no error, got %v", pair, err)
+		}
+	}
+}
+
 // --- AmendScore: score-range validation ---
 //
 // A 25-shot air-rifle card scores 0–10 per shot, giving a total range of 0–250

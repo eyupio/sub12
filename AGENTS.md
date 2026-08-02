@@ -70,7 +70,7 @@ cd backend && make seed         # load dev seed data (admin accounts, password: 
 
 # Frontend
 cd frontend && npm run dev      # Vite dev server on :5173
-cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
+cd frontend && npm run check    # TypeScript type check (tsc -b — see below)
 cd frontend && npm run lint     # ESLint
 cd frontend && npm test         # Vitest (vitest run)
 cd frontend && npm run build    # Production build (tsc -b && vite build)
@@ -82,6 +82,12 @@ cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
 cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
 ```
+
+`npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
+solution file — `"files": []` plus references to `tsconfig.app.json` and
+`tsconfig.node.json` — so a plain `tsc --noEmit` resolves *no* input files and
+exits 0 on any codebase, however broken. It type-checked nothing for as long as
+it was the CI step. Only build mode follows the references.
 
 Both the `android/` and `ios/` projects are committed (`ios/` was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
@@ -207,7 +213,7 @@ All API routes under `/api/v1/`. Health probes at root (`/healthz`, `/readyz`).
 - **Pellets:** CRUD + image upload + showcase (`GET /pellets/{id}/showcase`)
 - **Gear comparison:** `PATCH /users/me/gear-comparison` opts every owned rifle and pellet in or out at once. Per-item control is the `comparison_opt_in` field on the rifle/pellet PATCH. A showcase bundles the owner's own stats, trends, distributions and pairings with an anonymised cross-user comparison for the same make/model — built only from opted-in items owned by non-private profiles, and suppressed entirely below `model.GearMinComparisonOwners` (3) contributing owners.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
-- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons, rounds, join requests, score verification (confirm/amend/reject/reopen + audit trail)
+- **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons and rounds (full CRUD under `manage_seasons`: archiving a season stops it taking new cards; deleting one with cards in it is refused), join requests, score verification (confirm/amend/reject/reopen + audit trail)
 - **Moderators:** members a league or club *owner* (`created_by`) promotes to help run it are **moderators**, not admins — `admin` is the platform-wide `users.role`. What each may do is delegated per capability from the catalogue in `model/moderator.go`, stored in `league_members.moderator_permissions` / `club_members.moderator_permissions`, and resolved via `GetMemberRole`. The owner holds everything implicitly and cannot be demoted. Promotion grants the catalogue's `Default` set — the day-to-day duties, including a league's `manage_seasons`, never `manage_moderators` or `manage_settings`. A club's authority reaches its leagues: the club owner, and a club moderator granted `manage_leagues`, resolve as league moderators with the whole league catalogue and no `league_members` row, so anything gated on the members list rather than on `GetMemberRole` locks them out. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` serve the catalogue plus the caller's role; `PATCH .../members/{userId}` promotes, demotes and re-grants. `is_admin` stays on the wire as an accepted alias
 - **Clubs:** Create, update, delete (club admins, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
 - **Feature board:** `GET /feature-requests` (recent) and `/feature-requests/ranking` (most-voted) list the ideas visible to the viewer — platform ideas for everyone, league/club ideas for members of that league or club. `POST /feature-requests/{id}/vote` toggles the viewer's upvote, `/comments` carries the discussion, and `GET /feature-requests/{id}/events` returns the request's history (created, status, priority and owner changes). Rows come back enriched with requester, owner, scope *name* and vote/comment counts so the board never renders a raw ID. New ideas are not created here: the board's composer opens a `feature`-category support ticket, which an admin refines onto the board via `POST /admin/tickets/{id}/feature-request`. Admins set `status` and `priority` with `PATCH /admin/feature-requests/{id}`; both changes are recorded in the history. The UI collapses the eight statuses into five stages (under review, planned, in progress, shipped, not planned) defined once in `frontend/src/utils/featureBoard.ts`.

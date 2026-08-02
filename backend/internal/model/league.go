@@ -109,6 +109,18 @@ type CreateSeasonInput struct {
 	EndsOn   *string `json:"ends_on"`
 }
 
+// UpdateSeasonInput follows the "omit to keep, empty string to clear"
+// convention. StartsOn and Name are NOT NULL, so an empty string is refused
+// there rather than treated as a clear. IsActive is the archive switch: an
+// archived season keeps its history and standings but no longer takes new
+// cards.
+type UpdateSeasonInput struct {
+	Name     *string `json:"name"`
+	StartsOn *string `json:"starts_on"`
+	EndsOn   *string `json:"ends_on"`
+	IsActive *bool   `json:"is_active"`
+}
+
 type Round struct {
 	ID        string    `json:"id"`
 	SeasonID  string    `json:"season_id"`
@@ -120,6 +132,15 @@ type Round struct {
 
 type CreateRoundInput struct {
 	Name     string  `json:"name"`
+	OpensAt  *string `json:"opens_at"`
+	ClosesAt *string `json:"closes_at"`
+}
+
+// UpdateRoundInput follows the same convention as UpdateSeasonInput: omit a
+// field to keep it, send an empty string to clear it. Clearing both dates is
+// how a round is made permanently open again.
+type UpdateRoundInput struct {
+	Name     *string `json:"name"`
 	OpensAt  *string `json:"opens_at"`
 	ClosesAt *string `json:"closes_at"`
 }

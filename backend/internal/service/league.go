@@ -26,11 +26,19 @@ var (
 	ErrCannotEditOwner = fmt.Errorf("%w: the owner's role cannot be changed", ErrNotAdmin)
 	// ErrNotModerator is returned when a capability grant targets somebody who
 	// has not been promoted.
-	ErrNotModerator     = errors.New("that member is not a moderator")
-	ErrNotMember        = errors.New("not a league member")
-	ErrInvalidConfig    = errors.New("invalid league config")
-	ErrInvalidSeason    = errors.New("invalid season")
-	ErrInvalidRound     = errors.New("invalid round")
+	ErrNotModerator  = errors.New("that member is not a moderator")
+	ErrNotMember     = errors.New("not a league member")
+	ErrInvalidConfig = errors.New("invalid league config")
+	ErrInvalidSeason = errors.New("invalid season")
+	ErrInvalidRound  = errors.New("invalid round")
+	// ErrSeasonInUse and ErrRoundInUse refuse a delete that would quietly strip
+	// submitted cards out of the league — score_cards.league_round_id is
+	// ON DELETE SET NULL, so the cards would survive but the standings would
+	// not. Archiving the season is the way to retire one that has been shot.
+	ErrSeasonInUse      = errors.New("this season has cards submitted to it; archive it instead of deleting it")
+	ErrRoundInUse       = errors.New("this round has cards submitted to it and cannot be deleted")
+	ErrSeasonNotFound   = errors.New("season not found")
+	ErrRoundNotFound    = errors.New("round not found")
 	ErrInvalidJoinCode  = errors.New("invalid join code")
 	ErrPendingRequest   = errors.New("join request already pending")
 	ErrAlreadyConfirmed = errors.New("already confirmed this score")
@@ -681,6 +689,56 @@ func (s *LeagueService) UpdateConfig(ctx context.Context, leagueID, userID strin
 // Seasons & rounds
 // ---------------------------------------------------------------------------
 
+// validateSeasonWindow checks a season's resolved dates. Shared by create and
+// update so a patch that moves only one end of the window is judged against
+// the value already stored at the other end.
+func validateSeasonWindow(startsOn string, endsOn *string) error {
+	if startsOn == "" {
+		return fmt.Errorf("%w: starts_on is required", ErrInvalidSeason)
+	}
+	if endsOn == nil || *endsOn == "" {
+		return nil
+	}
+	start, errStart := time.Parse("2006-01-02", startsOn)
+	end, errEnd := time.Parse("2006-01-02", *endsOn)
+	if errStart == nil && errEnd == nil && end.Before(start) {
+		return fmt.Errorf("%w: ends_on must be on or after starts_on", ErrInvalidSeason)
+	}
+	return nil
+}
+
+// roundTimeLayouts covers both spellings a round window arrives in: RFC3339
+// from the client, and PostgreSQL's own rendering when one end of the window
+// is the value already stored (a patch that moves only the other end).
+var roundTimeLayouts = []string{
+	time.RFC3339,
+	"2006-01-02 15:04:05.999999-07",
+	"2006-01-02 15:04:05.999999-07:00",
+}
+
+func parseRoundTime(value string) (time.Time, bool) {
+	for _, layout := range roundTimeLayouts {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
+// validateRoundWindow is validateSeasonWindow for a round's open/close pair.
+// Either end may be absent — a round with no dates is permanently open.
+func validateRoundWindow(opensAt, closesAt *string) error {
+	if opensAt == nil || *opensAt == "" || closesAt == nil || *closesAt == "" {
+		return nil
+	}
+	opens, okOpens := parseRoundTime(*opensAt)
+	closes, okCloses := parseRoundTime(*closesAt)
+	if okOpens && okCloses && closes.Before(opens) {
+		return fmt.Errorf("%w: closes_at must be on or after opens_at", ErrInvalidRound)
+	}
+	return nil
+}
+
 func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID string, input *model.CreateSeasonInput) (*model.Season, error) {
 	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
 		return nil, err
@@ -688,15 +746,8 @@ func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID strin
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidSeason)
 	}
-	if input.StartsOn == "" {
-		return nil, fmt.Errorf("%w: starts_on is required", ErrInvalidSeason)
-	}
-	if input.EndsOn != nil && *input.EndsOn != "" {
-		start, errStart := time.Parse("2006-01-02", input.StartsOn)
-		end, errEnd := time.Parse("2006-01-02", *input.EndsOn)
-		if errStart == nil && errEnd == nil && end.Before(start) {
-			return nil, fmt.Errorf("%w: ends_on must be on or after starts_on", ErrInvalidSeason)
-		}
+	if err := validateSeasonWindow(input.StartsOn, input.EndsOn); err != nil {
+		return nil, err
 	}
 	season, err := s.leagues.CreateSeason(ctx, leagueID, input)
 	if err != nil {
@@ -724,6 +775,78 @@ func (s *LeagueService) ListSeasons(ctx context.Context, leagueID, viewerID, vie
 	return s.leagues.ListSeasons(ctx, leagueID)
 }
 
+// season resolves a season and confirms it belongs to the path league. A
+// season of another league is reported as missing rather than forbidden: the
+// caller is a moderator here, and telling them a stranger's season exists is
+// not theirs to know.
+func (s *LeagueService) season(ctx context.Context, leagueID, seasonID string) (*model.Season, error) {
+	current, err := s.leagues.GetSeason(ctx, seasonID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrSeasonNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if current.LeagueID != leagueID {
+		return nil, ErrSeasonNotFound
+	}
+	return current, nil
+}
+
+// UpdateSeason renames, re-dates, archives or restores a season.
+func (s *LeagueService) UpdateSeason(ctx context.Context, leagueID, userID, seasonID string, input *model.UpdateSeasonInput) (*model.Season, error) {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
+		return nil, err
+	}
+	current, err := s.season(ctx, leagueID, seasonID)
+	if err != nil {
+		return nil, err
+	}
+	if input.Name != nil && *input.Name == "" {
+		return nil, fmt.Errorf("%w: name is required", ErrInvalidSeason)
+	}
+	startsOn := current.StartsOn
+	if input.StartsOn != nil {
+		startsOn = *input.StartsOn
+	}
+	endsOn := current.EndsOn
+	if input.EndsOn != nil {
+		endsOn = input.EndsOn
+	}
+	if err := validateSeasonWindow(startsOn, endsOn); err != nil {
+		return nil, err
+	}
+	season, err := s.leagues.UpdateSeason(ctx, seasonID, input)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrSeasonNotFound
+	}
+	return season, err
+}
+
+// DeleteSeason removes an unused season and its rounds. A season anybody has
+// shot is refused — archiving keeps the history the standings are built from.
+func (s *LeagueService) DeleteSeason(ctx context.Context, leagueID, userID, seasonID string) error {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
+		return err
+	}
+	if _, err := s.season(ctx, leagueID, seasonID); err != nil {
+		return err
+	}
+	cards, err := s.leagues.CountSeasonCards(ctx, seasonID)
+	if err != nil {
+		return err
+	}
+	if cards > 0 {
+		return ErrSeasonInUse
+	}
+	if err := s.leagues.DeleteSeason(ctx, seasonID); errors.Is(err, repository.ErrNotFound) {
+		return ErrSeasonNotFound
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seasonID string, input *model.CreateRoundInput) (*model.Round, error) {
 	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
 		return nil, err
@@ -731,12 +854,8 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
 	}
-	if input.OpensAt != nil && *input.OpensAt != "" && input.ClosesAt != nil && *input.ClosesAt != "" {
-		opens, errOpens := time.Parse(time.RFC3339, *input.OpensAt)
-		closes, errCloses := time.Parse(time.RFC3339, *input.ClosesAt)
-		if errOpens == nil && errCloses == nil && closes.Before(opens) {
-			return nil, fmt.Errorf("%w: closes_at must be on or after opens_at", ErrInvalidRound)
-		}
+	if err := validateRoundWindow(input.OpensAt, input.ClosesAt); err != nil {
+		return nil, err
 	}
 	// The admin check above is scoped to the path league; make sure the season
 	// actually belongs to it, or an admin of any league could attach rounds to
@@ -763,6 +882,78 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 		"round_name":  round.Name,
 	})
 	return round, nil
+}
+
+// round resolves a round and confirms it belongs to the path league, for the
+// same reason season() does.
+func (s *LeagueService) round(ctx context.Context, leagueID, roundID string) (*model.Round, error) {
+	belongs, err := s.leagues.RoundBelongsToLeague(ctx, roundID, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	if !belongs {
+		return nil, ErrRoundNotFound
+	}
+	current, err := s.leagues.GetRound(ctx, roundID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrRoundNotFound
+	}
+	return current, err
+}
+
+// UpdateRound renames a round or moves its open/close window — which is how a
+// round is closed early, held open longer, or made permanently open again.
+func (s *LeagueService) UpdateRound(ctx context.Context, leagueID, userID, roundID string, input *model.UpdateRoundInput) (*model.Round, error) {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
+		return nil, err
+	}
+	current, err := s.round(ctx, leagueID, roundID)
+	if err != nil {
+		return nil, err
+	}
+	if input.Name != nil && *input.Name == "" {
+		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
+	}
+	opensAt := current.OpensAt
+	if input.OpensAt != nil {
+		opensAt = input.OpensAt
+	}
+	closesAt := current.ClosesAt
+	if input.ClosesAt != nil {
+		closesAt = input.ClosesAt
+	}
+	if err := validateRoundWindow(opensAt, closesAt); err != nil {
+		return nil, err
+	}
+	round, err := s.leagues.UpdateRound(ctx, roundID, input)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrRoundNotFound
+	}
+	return round, err
+}
+
+// DeleteRound removes a round nobody has submitted to. One that has cards in
+// it is refused — closing it takes it out of use without detaching them.
+func (s *LeagueService) DeleteRound(ctx context.Context, leagueID, userID, roundID string) error {
+	if err := s.require(ctx, leagueID, userID, model.PermManageSeasons); err != nil {
+		return err
+	}
+	if _, err := s.round(ctx, leagueID, roundID); err != nil {
+		return err
+	}
+	cards, err := s.leagues.CountRoundCards(ctx, roundID)
+	if err != nil {
+		return err
+	}
+	if cards > 0 {
+		return ErrRoundInUse
+	}
+	if err := s.leagues.DeleteRound(ctx, roundID); errors.Is(err, repository.ErrNotFound) {
+		return ErrRoundNotFound
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ListRounds returns a season's rounds, gated on access to the parent league.

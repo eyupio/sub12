@@ -405,6 +405,87 @@ func (h *LeagueHandler) ListSeasons(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": seasons})
 }
 
+// PATCH /api/v1/leagues/{id}/seasons/{seasonId}
+func (h *LeagueHandler) UpdateSeason(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	seasonID := chi.URLParam(r, "seasonId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(seasonID) {
+		writeInvalidUUIDError(w, "season id")
+		return
+	}
+
+	var input model.UpdateSeasonInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	season, err := h.svc.UpdateSeason(r.Context(), leagueID, userID, seasonID, &input)
+	if err != nil {
+		writeSeasonError(w, err, "failed to update season")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, season)
+}
+
+// DELETE /api/v1/leagues/{id}/seasons/{seasonId}
+func (h *LeagueHandler) DeleteSeason(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	seasonID := chi.URLParam(r, "seasonId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(seasonID) {
+		writeInvalidUUIDError(w, "season id")
+		return
+	}
+
+	if err := h.svc.DeleteSeason(r.Context(), leagueID, userID, seasonID); err != nil {
+		writeSeasonError(w, err, "failed to delete season")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// writeSeasonError maps the season and round refusals onto status codes. A
+// delete refused because cards were submitted is a 409: the request was
+// well-formed and permitted, the season is simply no longer disposable.
+func writeSeasonError(w http.ResponseWriter, err error, fallback string) {
+	switch {
+	case errors.Is(err, service.ErrNotAdmin):
+		writeError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, service.ErrSeasonNotFound):
+		writeError(w, http.StatusNotFound, "season not found")
+	case errors.Is(err, service.ErrRoundNotFound):
+		writeError(w, http.StatusNotFound, "round not found")
+	case errors.Is(err, service.ErrSeasonInUse), errors.Is(err, service.ErrRoundInUse):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, service.ErrInvalidSeason), errors.Is(err, service.ErrInvalidRound):
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, fallback)
+	}
+}
+
 // POST /api/v1/leagues/{id}/seasons/{seasonId}/rounds
 func (h *LeagueHandler) CreateRound(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
@@ -481,6 +562,67 @@ func (h *LeagueHandler) ListRounds(w http.ResponseWriter, r *http.Request) {
 		rounds = []*model.Round{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": rounds})
+}
+
+// PATCH /api/v1/leagues/{id}/seasons/{seasonId}/rounds/{roundId}
+func (h *LeagueHandler) UpdateRound(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	roundID := chi.URLParam(r, "roundId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(roundID) {
+		writeInvalidUUIDError(w, "round id")
+		return
+	}
+
+	var input model.UpdateRoundInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	round, err := h.svc.UpdateRound(r.Context(), leagueID, userID, roundID, &input)
+	if err != nil {
+		writeSeasonError(w, err, "failed to update round")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, round)
+}
+
+// DELETE /api/v1/leagues/{id}/seasons/{seasonId}/rounds/{roundId}
+func (h *LeagueHandler) DeleteRound(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	leagueID := chi.URLParam(r, "id")
+	roundID := chi.URLParam(r, "roundId")
+	if !isUUID(leagueID) {
+		writeInvalidUUIDError(w, "league id")
+		return
+	}
+	if !isUUID(roundID) {
+		writeInvalidUUIDError(w, "round id")
+		return
+	}
+
+	if err := h.svc.DeleteRound(r.Context(), leagueID, userID, roundID); err != nil {
+		writeSeasonError(w, err, "failed to delete round")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // POST /api/v1/leagues/{id}/ensure-round

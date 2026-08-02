@@ -1,9 +1,9 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import LeagueSettings from '../LeagueSettings'
-import { leagueApi, type League, type LeagueConfig, type LeagueMember } from '../../api/leagues'
+import { leagueApi, type League, type LeagueConfig, type LeagueMember, type Round, type Season } from '../../api/leagues'
 import { announcementsApi } from '../../api/announcements'
 import { useAuthStore } from '../../store/auth'
 
@@ -78,6 +78,29 @@ function makeMember(partial: Partial<LeagueMember> = {}): LeagueMember {
     member.permissions = member.is_moderator ? ['manage_members'] : []
   }
   return member
+}
+
+function makeSeason(partial: Partial<Season> = {}): Season {
+  return {
+    id: 'season-1',
+    league_id: 'league-1',
+    name: 'Season One',
+    starts_on: '2026-05-01',
+    ends_on: '2026-05-31',
+    is_active: true,
+    created_at: '2026-04-01T00:00:00Z',
+    ...partial,
+  }
+}
+
+function makeRound(partial: Partial<Round> = {}): Round {
+  return {
+    id: 'round-1',
+    season_id: 'season-1',
+    name: 'Submissions',
+    created_at: '2026-04-01T00:00:00Z',
+    ...partial,
+  }
 }
 
 const LEAGUE_PERMISSIONS = [
@@ -181,6 +204,15 @@ describe('LeagueSettings seasons and rounds', () => {
     useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
   })
 
+  function renderSeasons() {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+  }
+
   it('creates a season with its start date', async () => {
     vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
     const createSeason = vi.spyOn(leagueApi, 'createSeason').mockResolvedValue({
@@ -214,10 +246,96 @@ describe('LeagueSettings seasons and rounds', () => {
     )
   })
 
+  // Renaming or re-dating a season sends only what changed: the form is
+  // seeded from stored values, and re-sending one it failed to render would
+  // clear it under the "empty string clears" convention.
+  it('renames a season without touching its dates', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [makeSeason()] })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [] })
+    const updateSeason = vi.spyOn(leagueApi, 'updateSeason').mockResolvedValue(makeSeason({ name: 'Spring 2026' }))
+
+    renderSeasons()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^edit$/i }))
+    fireEvent.change(screen.getByLabelText(/season name/i), { target: { value: 'Spring 2026' } })
+    fireEvent.click(screen.getByRole('button', { name: /save season/i }))
+
+    await waitFor(() =>
+      expect(updateSeason).toHaveBeenCalledWith('league-1', 'season-1', {
+        name: 'Spring 2026',
+        starts_on: undefined,
+        ends_on: undefined,
+      }),
+    )
+  })
+
+  it('archives a season and offers to restore it', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [makeSeason({ is_active: false })] })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [] })
+    const updateSeason = vi.spyOn(leagueApi, 'updateSeason').mockResolvedValue(makeSeason())
+
+    renderSeasons()
+
+    // An archived season says so, and its action is Restore rather than Archive.
+    expect(await screen.findByText(/archived/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /restore/i }))
+
+    await waitFor(() =>
+      expect(updateSeason).toHaveBeenCalledWith('league-1', 'season-1', { is_active: true }),
+    )
+  })
+
+  it('deletes a season once the confirmation is accepted', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [makeSeason()] })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [] })
+    const deleteSeason = vi.spyOn(leagueApi, 'deleteSeason').mockResolvedValue(undefined)
+
+    renderSeasons()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^delete$/i }))
+    // Nothing is destroyed until the dialog's own confirm is pressed.
+    expect(deleteSeason).not.toHaveBeenCalled()
+
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }))
+
+    await waitFor(() => expect(deleteSeason).toHaveBeenCalledWith('league-1', 'season-1'))
+  })
+
+  it('re-dates a round and deletes another', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [makeSeason()] })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [makeRound()] })
+    const updateRound = vi.spyOn(leagueApi, 'updateRound').mockResolvedValue(makeRound())
+    const deleteRound = vi.spyOn(leagueApi, 'deleteRound').mockResolvedValue(undefined)
+
+    renderSeasons()
+
+    // Rounds live inside the season's expander.
+    fireEvent.click(await screen.findByRole('button', { name: /season one/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /edit submissions/i }))
+    fireEvent.change(screen.getByLabelText(/^closes$/i), { target: { value: '2026-05-31T18:00' } })
+    fireEvent.click(screen.getByRole('button', { name: /save round/i }))
+
+    await waitFor(() =>
+      expect(updateRound).toHaveBeenCalledWith('league-1', 'season-1', 'round-1', {
+        name: undefined,
+        opens_at: undefined,
+        closes_at: new Date('2026-05-31T18:00').toISOString(),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /delete submissions/i }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^delete$/i }))
+
+    await waitFor(() => expect(deleteRound).toHaveBeenCalledWith('league-1', 'season-1', 'round-1'))
+  })
+
   // The backend refuses a season to a moderator without the capability, so
   // offering the control just produces an unexplained 403.
   it('keeps the section read-only without the seasons capability', async () => {
-    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [makeSeason()] })
+    vi.spyOn(leagueApi, 'listRounds').mockResolvedValue({ items: [makeRound()] })
     vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
       catalogue: LEAGUE_PERMISSIONS,
       role: {
@@ -237,6 +355,10 @@ describe('LeagueSettings seasons and rounds', () => {
 
     expect(await screen.findByText(/seasons & rounds/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /\+ add season/i })).not.toBeInTheDocument()
+    // Maintenance is gated on the same capability as creation.
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
   })
 
   // Whoever runs the club hosting a league runs the league, and holds no
@@ -264,6 +386,79 @@ describe('LeagueSettings seasons and rounds', () => {
     )
 
     expect(await screen.findByRole('button', { name: /\+ add season/i })).toBeInTheDocument()
+  })
+})
+
+// Every section here saves through an endpoint gated on a capability the
+// promotion grant deliberately withholds. Rendering them live meant a
+// moderator could type into the form and get "Failed to save league" back with
+// no hint that a permission was missing.
+describe('LeagueSettings capability gating', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-2', email: 'mod@example.com', display_name: 'Mod User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig({ join_policy: 'approval' }))
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-3', display_name: 'Plain Member', is_admin: false })],
+    })
+    mockAnnouncements()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  function renderAs(permissions: string[]) {
+    vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
+      catalogue: LEAGUE_PERMISSIONS,
+      role: { is_member: true, is_moderator: true, is_owner: false, permissions },
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+  }
+
+  it('renders the league record read-only without manage_settings', async () => {
+    const listJoinRequests = vi.spyOn(leagueApi, 'listJoinRequests').mockResolvedValue({ items: [] })
+    renderAs(['manage_members', 'verify_scores'])
+
+    // The fields are still shown — a moderator may need to read them — but
+    // nothing here can be submitted.
+    expect(await screen.findByLabelText(/name/i)).toBeDisabled()
+    expect(screen.getByLabelText(/description/i)).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save rules/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save join policy/i })).not.toBeInTheDocument()
+    // Visibility and post visibility both offer a "public" switch.
+    screen.getAllByRole('button', { name: /^public$/i }).forEach(b => expect(b).toBeDisabled())
+    // ...and it says why, rather than leaving a dead form.
+    expect(screen.getAllByText(/manage settings.*permission/i).length).toBeGreaterThan(0)
+
+    // manage_members is a different grant and is unaffected: the join-request
+    // queue and the remove control both stay.
+    await waitFor(() => expect(listJoinRequests).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: /remove plain member/i })).toBeInTheDocument()
+  })
+
+  it('leaves the league record editable with manage_settings', async () => {
+    renderAs(['manage_settings'])
+
+    expect(await screen.findByLabelText(/name/i)).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save rules/i })).toBeInTheDocument()
+    expect(screen.queryByText(/manage settings.*permission/i)).not.toBeInTheDocument()
+    // The join-request queue belongs to manage_members, which this one lacks.
+    expect(screen.queryByRole('button', { name: /remove plain member/i })).not.toBeInTheDocument()
   })
 })
 
