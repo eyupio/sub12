@@ -294,8 +294,13 @@ Adding a type means touching all of these, and the two per-type tests in
 4. subject and body in `notificationEmailContent`, which serves the email *and*
    the push title/body;
 5. the union, the two preference interfaces in `api/notifications.ts`, the
-   sentence and link in `pages/notificationRouting.ts`, the icon in
-   `pages/Notifications.tsx` and the row in `pages/NotificationSettings.tsx`.
+   sentence and link in `utils/notificationRouting.ts`, the icon in
+   `pages/Notifications.tsx` and the row in
+   `components/NotificationPreferencesPanel.tsx` — the one place preferences are
+   drawn, rendered by both the profile's Notifications tab and
+   `pages/NotificationSettings.tsx`. Its test asserts every preference the API
+   serves has a toggle and that nothing else calls the preferences endpoints,
+   because a missing row fails silently: the toggle is simply absent.
 
 Conventions worth keeping:
 
