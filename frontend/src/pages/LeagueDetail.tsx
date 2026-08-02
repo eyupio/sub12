@@ -290,10 +290,20 @@ export default function LeagueDetail() {
     enabled: !!leagueId,
   })
 
+  // Who runs the league is the backend's answer, not the members list's:
+  // whoever runs the club hosting it runs its leagues too, and they need no
+  // membership row here to do it.
+  const { data: permissionData } = useQuery({
+    queryKey: ['leagues', leagueId ?? 'invalid', 'moderator-permissions'],
+    queryFn: () => leagueApi.getModeratorPermissions(leagueId!),
+    enabled: !!currentUser && !!leagueId,
+  })
+
   const isLoading = leagueLoading || standingsLoading
   const currentMember = currentUser && members ? members.items.find(m => m.user_id === currentUser.id) : null
-  const isModerator = currentMember?.is_moderator ?? false
-  const canReviewScores = can(currentMember, PERM.verifyScores)
+  const viewerRole = permissionData?.role ?? currentMember ?? null
+  const isModerator = viewerRole?.is_moderator ?? false
+  const canReviewScores = can(viewerRole, PERM.verifyScores)
   const isMember = !!currentMember
 
   // The banner sits a full screen above the queue it filters, so flipping the

@@ -562,15 +562,24 @@ func (r *LeagueRepository) GetMemberRole(ctx context.Context, leagueID, userID s
 		return role, nil
 	}
 	var permissions []string
+	var club clubStanding
 	err := r.db.QueryRow(ctx, `
 		SELECT l.created_by = $2,
 		       lm.user_id IS NOT NULL,
 		       COALESCE(lm.is_admin, FALSE),
-		       COALESCE(lm.moderator_permissions, '{}'::text[])
+		       COALESCE(lm.moderator_permissions, '{}'::text[]),
+		       COALESCE(c.created_by = $2, FALSE),
+		       COALESCE(cm.is_admin, FALSE),
+		       COALESCE(cm.moderator_permissions, '{}'::text[])
 		FROM leagues l
 		LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $2
+		LEFT JOIN clubs c          ON c.id = l.club_id
+		LEFT JOIN club_members cm  ON cm.club_id = c.id AND cm.user_id = $2
 		WHERE l.id = $1
-	`, leagueID, userID).Scan(&role.IsOwner, &role.IsMember, &role.IsModerator, &permissions)
+	`, leagueID, userID).Scan(
+		&role.IsOwner, &role.IsMember, &role.IsModerator, &permissions,
+		&club.isOwner, &club.isModerator, &club.permissions,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return role, nil
 	}
@@ -578,8 +587,9 @@ func (r *LeagueRepository) GetMemberRole(ctx context.Context, leagueID, userID s
 		return nil, fmt.Errorf("get league member role: %w", err)
 	}
 	// The owner runs the league whether or not they hold a membership row, and
-	// holds every capability without anything being granted to them.
-	if role.IsOwner {
+	// holds every capability without anything being granted to them. So does
+	// whoever runs the club hosting it.
+	if role.IsOwner || club.runsLeagues() {
 		role.IsModerator = true
 		permissions = model.AllModeratorPermissions(model.LeagueModeratorPermissions)
 	}
@@ -587,6 +597,33 @@ func (r *LeagueRepository) GetMemberRole(ctx context.Context, leagueID, userID s
 		role.Permissions = permissions
 	}
 	return role, nil
+}
+
+// clubStanding is the hosting club's half of a league role lookup.
+type clubStanding struct {
+	isOwner     bool
+	isModerator bool
+	permissions []string
+}
+
+// runsLeagues reports whether this standing carries authority over the club's
+// leagues. A club owner runs everything under the club; a club moderator does
+// so only where the owner delegated `manage_leagues`, which the catalogue
+// describes as creating *and running* the club's leagues. Non-club leagues
+// scan as the zero standing and never match.
+func (c clubStanding) runsLeagues() bool {
+	if c.isOwner {
+		return true
+	}
+	if !c.isModerator {
+		return false
+	}
+	for _, p := range c.permissions {
+		if p == model.PermManageLeagues {
+			return true
+		}
+	}
+	return false
 }
 
 // IsModerator reports whether the user runs the league — its owner, or a
@@ -1478,26 +1515,35 @@ func (r *LeagueRepository) GetMemberRoleForScoreCard(ctx context.Context, scoreC
 	var leagueID string
 	role := &model.MemberRole{Permissions: []string{}}
 	var permissions []string
+	var club clubStanding
 	err := r.db.QueryRow(ctx, `
 		SELECT l.id,
 		       l.created_by = $2,
 		       lm.user_id IS NOT NULL,
 		       COALESCE(lm.is_admin, FALSE),
-		       COALESCE(lm.moderator_permissions, '{}'::text[])
+		       COALESCE(lm.moderator_permissions, '{}'::text[]),
+		       COALESCE(c.created_by = $2, FALSE),
+		       COALESCE(cm.is_admin, FALSE),
+		       COALESCE(cm.moderator_permissions, '{}'::text[])
 		FROM leagues l
 		JOIN seasons s  ON s.league_id = l.id
 		JOIN rounds rd  ON rd.season_id = s.id
 		JOIN score_cards sc ON sc.league_round_id = rd.id
 		LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.user_id = $2
+		LEFT JOIN clubs c          ON c.id = l.club_id
+		LEFT JOIN club_members cm  ON cm.club_id = c.id AND cm.user_id = $2
 		WHERE sc.id = $1
-	`, scoreCardID, userID).Scan(&leagueID, &role.IsOwner, &role.IsMember, &role.IsModerator, &permissions)
+	`, scoreCardID, userID).Scan(
+		&leagueID, &role.IsOwner, &role.IsMember, &role.IsModerator, &permissions,
+		&club.isOwner, &club.isModerator, &club.permissions,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, "", ErrNotFound
 	}
 	if err != nil {
 		return nil, "", fmt.Errorf("get league member role for score card: %w", err)
 	}
-	if role.IsOwner {
+	if role.IsOwner || club.runsLeagues() {
 		role.IsModerator = true
 		permissions = model.AllModeratorPermissions(model.LeagueModeratorPermissions)
 	}

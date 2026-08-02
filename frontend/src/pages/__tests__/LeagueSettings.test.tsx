@@ -84,7 +84,7 @@ const LEAGUE_PERMISSIONS = [
   { key: 'manage_members', label: 'Manage members', description: '', default: true },
   { key: 'verify_scores', label: 'Verify scores', description: '', default: true },
   { key: 'moderate_content', label: 'Moderate content', description: '', default: true },
-  { key: 'manage_seasons', label: 'Manage seasons', description: '', default: false },
+  { key: 'manage_seasons', label: 'Manage seasons', description: '', default: true },
   { key: 'manage_settings', label: 'Manage settings', description: '', default: false },
   { key: 'manage_support', label: 'Handle support', description: '', default: false },
   { key: 'manage_moderators', label: 'Manage moderators', description: '', default: false },
@@ -212,6 +212,58 @@ describe('LeagueSettings seasons and rounds', () => {
         ends_on: undefined,
       }),
     )
+  })
+
+  // The backend refuses a season to a moderator without the capability, so
+  // offering the control just produces an unexplained 403.
+  it('keeps the section read-only without the seasons capability', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
+      catalogue: LEAGUE_PERMISSIONS,
+      role: {
+        is_member: true,
+        is_moderator: true,
+        is_owner: false,
+        permissions: ['manage_members', 'verify_scores'],
+      },
+    })
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText(/seasons & rounds/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /\+ add season/i })).not.toBeInTheDocument()
+  })
+
+  // Whoever runs the club hosting a league runs the league, and holds no
+  // membership row in it — gating the page on the members list shut them out.
+  it('admits whoever runs the hosting club, with no membership row', async () => {
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember({ user_id: 'user-2', display_name: 'Someone Else' })],
+    })
+    vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
+      catalogue: LEAGUE_PERMISSIONS,
+      role: {
+        is_member: false,
+        is_moderator: true,
+        is_owner: false,
+        permissions: LEAGUE_PERMISSIONS.map(p => p.key),
+      },
+    })
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('button', { name: /\+ add season/i })).toBeInTheDocument()
   })
 })
 

@@ -630,7 +630,7 @@ function isRoundOpen(round: Round): boolean {
   return true
 }
 
-function RoundList({ leagueId, seasonId }: { leagueId: string; seasonId: string }) {
+function RoundList({ leagueId, seasonId, canManage }: { leagueId: string; seasonId: string; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -686,7 +686,7 @@ function RoundList({ leagueId, seasonId }: { leagueId: string; seasonId: string 
         </div>
       ))}
 
-      {adding ? (
+      {!canManage ? null : adding ? (
         <div className="space-y-2 pt-1">
           <input
             type="text"
@@ -743,7 +743,7 @@ function RoundList({ leagueId, seasonId }: { leagueId: string; seasonId: string 
   )
 }
 
-function SeasonsSection({ leagueId }: { leagueId: string }) {
+function SeasonsSection({ leagueId, canManage }: { leagueId: string; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -784,9 +784,9 @@ function SeasonsSection({ leagueId }: { leagueId: string }) {
         <span className="text-[11px] text-muted font-mono">{seasons.length}</span>
       </div>
       <p className="text-[10px] text-muted -mt-2">
-        New cards land in whichever round is open now. Leave a round&rsquo;s dates
-        blank to keep it permanently open — a league with a single open round
-        behaves exactly as before.
+        {canManage
+          ? 'New cards land in whichever round is open now. Leave a round’s dates blank to keep it permanently open — a league with a single open round behaves exactly as before.'
+          : 'New cards land in whichever round is open now. The league owner has not given you the seasons capability, so this is read-only.'}
       </p>
 
       {seasons.map(season => (
@@ -806,11 +806,15 @@ function SeasonsSection({ leagueId }: { leagueId: string }) {
               className={`text-muted transition-transform ${expanded === season.id ? '-rotate-90' : 'rotate-180'}`}
             />
           </button>
-          {expanded === season.id && <RoundList leagueId={leagueId} seasonId={season.id} />}
+          {expanded === season.id && <RoundList leagueId={leagueId} seasonId={season.id} canManage={canManage} />}
         </div>
       ))}
 
-      {adding ? (
+      {seasons.length === 0 && !canManage && (
+        <p className="text-[11px] text-muted">No seasons yet.</p>
+      )}
+
+      {!canManage ? null : adding ? (
         <div className="space-y-2">
           <input
             type="text"
@@ -1077,20 +1081,17 @@ export default function LeagueSettings() {
     queryFn: () => leagueApi.getConfig(id),
   })
 
-  const { data: members, isLoading: membersLoading } = useQuery({
-    queryKey: ['leagues', id, 'members'],
-    queryFn: () => leagueApi.listMembers(id),
-  })
-
-  const { data: permissionData } = useQuery({
+  const { data: permissionData, isLoading: permissionsLoading } = useQuery({
     queryKey: ['leagues', id, 'moderator-permissions'],
     queryFn: () => leagueApi.getModeratorPermissions(id),
   })
 
-  const isLoading = leagueLoading || configLoading || membersLoading
-  const isModerator = !isLoading && members && currentUser
-    ? members.items.some(m => m.user_id === currentUser.id && m.is_moderator)
-    : null
+  const isLoading = leagueLoading || configLoading || permissionsLoading
+  // The role endpoint is the authority on who runs the league. Reading it off
+  // the members list locks out whoever runs the club hosting it, who holds
+  // every capability here without ever having entered the league.
+  const viewerRole = permissionData?.role ?? null
+  const isModerator = !isLoading && viewerRole && currentUser ? viewerRole.is_moderator : null
 
   useEffect(() => {
     if (isModerator === false) {
@@ -1136,7 +1137,7 @@ export default function LeagueSettings() {
       <GeneralInfoSection leagueId={id} league={league} />
       <PrivacySection leagueId={id} league={league} />
       <RulesSection leagueId={id} config={config} />
-      <SeasonsSection leagueId={id} />
+      <SeasonsSection leagueId={id} canManage={can(viewerRole, PERM.manageSeasons)} />
       <RegionalSection leagueId={id} league={league} />
       <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} isClubLeague={!!league.club_id} />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />

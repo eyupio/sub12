@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **120** (000001–000120). Latest: `000120_review_volunteer_prefs`.
+Current migration count: **121** (000001–000121). Latest: `000121_league_moderators_manage_seasons`.
 
 ## Critical Migration Rules
 
@@ -282,14 +282,26 @@ reach stops at the one league or club they were promoted in.
   effective `permissions`). Services gate with `require(ctx, id, userID, perm)`;
   `requireForScoreCard` does the same for actions addressed by card. A stranger
   or missing entity resolves to the zero role rather than an error.
+- **A club's authority reaches its leagues.** `manage_leagues` is creating *and
+  running* the club's leagues, so `LeagueRepository.GetMemberRole` folds the
+  hosting club's standing in: the club's owner, and a club moderator granted
+  `manage_leagues`, resolve as league moderators holding the whole league
+  catalogue, with no `league_members` row of their own. Without it a club owner
+  could not open the next round of a league one of their moderators created.
+  `is_member` stays false for them — running a league is not entering it — so
+  anything gated on the *members list* rather than on the role (the settings
+  page, the settings gear on the league page) must read `GetMemberRole`.
 - **Errors** distinguish the two refusals: `ErrNotAdmin` / `ErrClubNotAdmin`
   ("you don't run this") from `ErrNotPermitted` / `ErrClubNotPermitted` ("the
   owner didn't delegate this"). The latter wrap the former, so every handler
   branch that already returned 403 keeps doing so.
 - **Promotion** grants the catalogue's `Default` set — the day-to-day duties,
-  never `manage_moderators` or `manage_settings`. Demotion clears the grant, so
-  a re-promotion never resurrects an old one. A moderator holding
-  `manage_moderators` can only delegate capabilities they hold themselves.
+  never `manage_moderators` or `manage_settings`. For a league that includes
+  `manage_seasons`: opening the next round is the week-to-week work of running
+  one, and a moderator who cannot do it has to fetch the owner every week.
+  Demotion clears the grant, so a re-promotion never resurrects an old one. A
+  moderator holding `manage_moderators` can only delegate capabilities they
+  hold themselves.
 - **Wire compatibility:** `is_admin` is still emitted and still accepted
   alongside `is_moderator`, so a Capacitor app running an older bundle keeps
   working. Member listings redact `permissions` for viewers who don't help run
