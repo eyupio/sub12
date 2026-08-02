@@ -18,6 +18,7 @@ export const PERM = {
   manageSupport: 'manage_support',
   manageLeagues: 'manage_leagues',
   manageEvents: 'manage_events',
+  sendAnnouncements: 'send_announcements',
 } as const
 
 export type ModeratorPermission = (typeof PERM)[keyof typeof PERM]

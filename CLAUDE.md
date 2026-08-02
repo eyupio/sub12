@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **116** (000001–000116). Latest: `000116_league_club_event_notification_prefs`.
+Current migration count: **119** (000001–000119). Latest: `000119_review_volunteer_prefs`.
 
 ## Critical Migration Rules
 
@@ -336,6 +336,46 @@ Conventions worth keeping:
   `reviewRequestFanoutLimit`). The recipient rules live in
   `ScoreCardService.validationRequestPlan`, split from the fan-out so they're
   testable without a database.
+- **Volunteers widen that audience, never replace it.** The three
+  `review_requests_*` preferences are how somebody asks to be sent other
+  shooters' cards: `public` adds them to any *public* personal card's request,
+  `leagues` to cards in leagues they're in, and `club_leagues` to cards in
+  leagues run under a club they're in, whether or not they're in the league.
+  All three default off and each pool is separately capped at
+  `reviewVolunteerLimit` and randomised — being asked is a favour, and asking
+  the same first N every time burns them out. A *followers-only* card stays
+  with the followers: a validation request must never be the thing that widens
+  who can see a card.
+
+### Announcements
+
+An announcement is a human-authored message broadcast to a group's whole
+audience. The delivered copies are ordinary `announcement` notification rows;
+the `announcements` table is the one stored original they point at.
+
+- **Who may send** is the scope: platform → `middleware.RequireAdmin`; league
+  and club → the owner or a moderator granted `PermSendAnnouncements`, which
+  is deliberately *not* in the default promotion grant; event → its owner, since
+  an event has no capability catalogue and a delegated scorer is trusted with
+  cards, not the megaphone. A platform admin does not thereby become a league's
+  moderator — the scopes don't nest.
+- **Who receives** it: every live non-simulated account, the league's members,
+  the club's members, or everyone entered in the event. The sender is always
+  excluded, and `recipient_count` is recorded at send time — it is the reach of
+  the message, not a live membership count.
+- **Delivery is bulk.** `NotificationService.FanoutAnnouncement` returns
+  immediately and works on a background context: the in-app preference is
+  applied inside a single `INSERT … SELECT FROM unnest(…)`, push tokens are
+  fetched for the whole delivered set at once, and only the SMTP sends are per
+  person. Blocks and mutes don't apply — an announcement comes from a group you
+  joined, not a person you chose to hear from.
+- **Email is opted into twice**: by the sender per announcement (`send_email`,
+  default off) and by the recipient (`announcement_email`, default on). The
+  in-app copy always goes.
+- **Reading one** is gated on having been sent it — `HasNotificationForTarget`
+  — so somebody who left the club can still open the message they were given,
+  and somebody who joined later can't read backwards through the archive. The
+  per-scope *log* is gated on membership instead, since it's the sender's view.
 
 ### Indexable surface (sitemap, robots.txt, canonicals)
 
@@ -391,12 +431,13 @@ as invariants and lean on the tests that pin them.
 - **Pellet tests:** CRUD + groups + images + measurements + detections + export + leaderboard + stats + compare + timeline + confidence + batch-report + combo-analytics
 - **Leagues:** Create, join, standings, scores, score counts, config, members (incl. promote/demote moderators and re-grant their capabilities), seasons, rounds, join requests, score verification (member confirm + moderator verify/amend/reject/reopen + audit trail). Leagues with `require_score_verification` off auto-verify submissions (create/graduate/submit and on config change), so cards never strand outside the standings; a threshold of 0 with verification on counts as 1. Rejected cards must be reopened before amending; an owner editing a rejected card is audited as a reopen. Non-members only see verified cards and counts. Verification outcomes notify the shooter (`score_verified`/`score_rejected`/`score_amended`).
 - **Clubs:** Create, update, delete (the club owner, not just platform admins), join, members, image upload, opening hours (`PUT /clubs/{id}/opening-hours` replaces the published week). The club profile carries a real-world identity — postal address, map pin, website/email/phone, disciplines, distances, facilities, membership and visitor info, founding year — surfaced as the About panel on the club page and editable from club settings. Text profile fields follow an "omit to keep, empty string to clear" convention; arrays clear with `[]`; coordinates clear only via `clear_coordinates`. Disciplines are validated against `model.ClubDisciplines`.
-- **Moderators and delegated capabilities:** see "Moderator roles" above. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` return the delegable catalogue plus the caller's own role; `PATCH .../members/{userId}` promotes, demotes and re-grants.
+- **Moderators and delegated capabilities:** see "Moderator roles" above. `send_announcements` is in both catalogues and is never granted by default. `GET /leagues/{id}/moderator-permissions` and `GET /clubs/{id}/moderator-permissions` return the delegable catalogue plus the caller's own role; `PATCH .../members/{userId}` promotes, demotes and re-grants.
 - **Feature board:** `GET /feature-requests` (recent) and `/feature-requests/ranking` (most-voted) list the ideas visible to the viewer — platform ideas for everyone, league/club ideas for members of that league or club. `POST /feature-requests/{id}/vote` toggles the viewer's upvote, `/comments` carries the discussion, and `GET /feature-requests/{id}/events` returns the request's history (created, status, priority and owner changes). Rows come back enriched with requester, owner, scope *name* and vote/comment counts so the board never renders a raw ID. New ideas are not created here: the board's composer opens a `feature`-category support ticket, which an admin refines onto the board via `POST /admin/tickets/{id}/feature-request`. Admins set `status` and `priority` with `PATCH /admin/feature-requests/{id}`; both changes are recorded in the history. The UI collapses the eight statuses into five stages (under review, planned, in progress, shipped, not planned) defined once in `frontend/src/utils/featureBoard.ts`.
 - **Users:** Update profile, avatar upload, email change, view profiles
 - **Social:** Follow/unfollow users
 - **Devices:** Register/unregister push-notification tokens (`POST`/`DELETE /devices`)
-- **Notifications:** `GET /notifications` (cursor-paged), `/unread-count`, `POST /notifications/read` (ids, or empty for all), and `GET`/`PATCH /notifications/preferences` — one in-app and one email flag per type. See "Notifications" above for the types and what fans them out.
+- **Notifications:** `GET /notifications` (cursor-paged), `/unread-count`, `POST /notifications/read` (ids, or empty for all), and `GET`/`PATCH /notifications/preferences` — one in-app and one email flag per type, plus the three `review_requests_*` opt-ins that widen who is asked to validate a card. See "Notifications" above for the types and what fans them out.
+- **Announcements:** `POST`/`GET /leagues/{id}/announcements`, `/clubs/{id}/announcements` and `/events/{slug}/announcements` send to and list a group's broadcasts; `GET /announcements/platform` lists the site-wide ones and `GET /announcements/{id}` reads one, gated on having been sent it. Sending platform-wide is `POST /admin/announcements`. See "Announcements" above.
 - **Activity:** `GET /feed`
 - **Achievements:** List own + list for user
 - **Stats:** User stats, rifle stats, score trends

@@ -225,6 +225,7 @@ func main() {
 	clubSvc.SetNotifications(notificationSvc)
 	leagueSvc.SetNotifications(notificationSvc)
 	scoreCardSvc.SetNotifications(notificationSvc)
+	scoreCardSvc.SetReviewVolunteers(notificationRepo)
 
 	// Wire the export aggregators into UserService so GDPR data-export
 	// can include score cards, posts, clubs and leagues without forcing
@@ -251,6 +252,7 @@ func main() {
 	communityReviewSvc := service.NewCommunityReviewService(communityReviewRepo, scoreCardRepo, leagueRepo, activitySvc, achievementSvc)
 	communityReviewSvc.SetNotifications(notificationSvc)
 	communityReviewSvc.SetFollowers(socialRepo)
+	communityReviewSvc.SetReviewVolunteers(notificationRepo)
 	communityReviewSvc.SetLogger(log.Logger)
 
 	// Live Events
@@ -266,6 +268,13 @@ func main() {
 	eventInvitationRepo := repository.NewEventInvitationRepository(pool)
 	eventInvitationSvc := service.NewEventInvitationService(eventInvitationRepo, eventRepo, userRepo, clubRepo, emailSenderSvc, cfg.EventInvitationURL, log.Logger)
 	eventInvitationSvc.SetNotifications(notificationSvc)
+
+	// Announcements. Constructed after events so every scope's audience
+	// lookup is available; delivery goes out through NotificationService.
+	announcementRepo := repository.NewAnnouncementRepository(pool)
+	announcementSvc := service.NewAnnouncementService(
+		announcementRepo, notificationRepo, notificationSvc, userRepo, leagueRepo, clubRepo, eventRepo,
+	)
 
 	// Daily archive sweep for completed events whose 30-day window has elapsed.
 	go runEventArchiveSweep(ctx, eventSvc)
@@ -297,7 +306,7 @@ func main() {
 	adminGearSvc := service.NewAdminGearService(repository.NewAdminGearRepository(pool))
 	go service.NewSimulationRunner(simulationSvc, log.Logger).Run(ctx)
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc, geocodeSvc)
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc, geocodeSvc, announcementSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

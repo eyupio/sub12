@@ -150,6 +150,136 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	}(recipient.Email, recipient.DisplayName, subject, body, ev.Type)
 }
 
+// announcementPushChunk bounds how many device tokens one push batch covers,
+// so a platform-wide announcement yields progress instead of one enormous call.
+const announcementPushChunk = 500
+
+// FanoutAnnouncement delivers one announcement to many recipients at once. It
+// returns immediately and does the work on a background context: the sender
+// gets their confirmation as soon as the announcement is stored, and a
+// platform-wide send keeps running after their request has closed.
+//
+// Unlike Fanout this is bulk throughout — the in-app preference is applied
+// inside the insert, push tokens are fetched for the whole delivered set in
+// one query, and email recipients likewise. Only the SMTP sends are per
+// person, because they have to be.
+func (s *NotificationService) FanoutAnnouncement(a *model.Announcement, recipientIDs []string) {
+	if s == nil || s.repo == nil || a == nil || len(recipientIDs) == 0 {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.logger.Error().Interface("panic", r).Str("announcement_id", a.ID).Msg("announcement fan-out panicked")
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		actor := a.CreatedBy
+		tid, tt := a.ID, "announcement"
+		n := &model.Notification{
+			ActorID:    &actor,
+			Type:       model.NotificationTypeAnnouncement,
+			TargetID:   &tid,
+			TargetType: &tt,
+			LeagueID:   a.LeagueID,
+			ClubID:     a.ClubID,
+			Metadata: map[string]any{
+				"scope":        a.Scope,
+				"title":        a.Title,
+				"body_preview": a.BodyPreview(),
+			},
+		}
+		if a.ScopeName != "" {
+			n.Metadata[scopeNameKey(a.Scope)] = a.ScopeName
+		}
+		if a.EventSlug != "" {
+			n.Metadata["event_slug"] = a.EventSlug
+		}
+
+		delivered, err := s.repo.InsertAnnouncementFanout(ctx, n, recipientIDs)
+		if err != nil {
+			s.logger.Warn().Err(err).Str("announcement_id", a.ID).Msg("insert announcement fan-out failed")
+			return
+		}
+		if len(delivered) == 0 {
+			return
+		}
+
+		s.announcementPush(ctx, a, delivered)
+		if a.EmailSent {
+			s.announcementEmail(ctx, a, delivered)
+		}
+	}()
+}
+
+// scopeNameKey maps an announcement scope onto the metadata key the client
+// already reads group names from, so the bell renders the sender's group
+// without a special case.
+func scopeNameKey(scope string) string {
+	switch scope {
+	case model.AnnouncementScopeLeague:
+		return "league_name"
+	case model.AnnouncementScopeClub:
+		return "club_name"
+	case model.AnnouncementScopeEvent:
+		return "event_name"
+	}
+	return "scope_name"
+}
+
+func (s *NotificationService) announcementPush(ctx context.Context, a *model.Announcement, recipients []string) {
+	if s.push == nil || s.devices == nil {
+		return
+	}
+	tokens, err := s.devices.ListTokensByUsers(ctx, recipients)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("announcement_id", a.ID).Msg("load device tokens for announcement failed")
+		return
+	}
+	msg := PushMessage{
+		Title: a.Title,
+		Body:  a.BodyPreview(),
+		Data: map[string]string{
+			"type":        model.NotificationTypeAnnouncement,
+			"target_id":   a.ID,
+			"target_type": "announcement",
+		},
+	}
+	for start := 0; start < len(tokens); start += announcementPushChunk {
+		end := min(start+announcementPushChunk, len(tokens))
+		s.push.Send(ctx, tokens[start:end], msg)
+	}
+}
+
+func (s *NotificationService) announcementEmail(ctx context.Context, a *model.Announcement, recipients []string) {
+	if s.emailer == nil {
+		return
+	}
+	people, err := s.repo.ListAnnouncementEmailRecipients(ctx, recipients)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("announcement_id", a.ID).Msg("load announcement email recipients failed")
+		return
+	}
+	subject := a.Title
+	if a.ScopeName != "" {
+		subject = a.ScopeName + ": " + a.Title
+	}
+	failures := 0
+	for _, p := range people {
+		if err := s.emailer.SendNotification(ctx, p.Email, p.DisplayName, subject, a.Body); err != nil {
+			failures++
+		}
+	}
+	if failures > 0 {
+		// One log line for the send, not one per recipient: a broken SMTP
+		// server would otherwise write a line per account on the platform.
+		s.logger.Warn().Str("announcement_id", a.ID).Int("failed", failures).Int("total", len(people)).
+			Msg("some announcement emails failed")
+	}
+}
+
 // pushFanout delivers a push notification for the event to the recipient's
 // registered devices. No-ops when push isn't wired or the recipient has no
 // devices. Delivery is handed to the PushSender, which is responsible for its
@@ -309,6 +439,19 @@ func notificationEmailContent(ev NotifEvent, actorName string) (subject, body st
 		return "An event has gone live", namedPrefix(ev.Metadata, "event_name", "An event you entered") + " is now live."
 	case model.NotificationTypeEventResultsPosted:
 		return "Event results are in", "The results for" + namedSuffix(ev.Metadata, "event_name", "an event you entered") + " have been posted."
+	case model.NotificationTypeAnnouncement:
+		// Announcement email is rendered from the announcement itself, not
+		// from here; this serves the push title/body when one is delivered
+		// through the ordinary path.
+		title, _ := ev.Metadata["title"].(string)
+		if title == "" {
+			title = "New announcement"
+		}
+		body, _ := ev.Metadata["body_preview"].(string)
+		if body == "" {
+			body = actor + " posted an announcement."
+		}
+		return title, body
 	}
 	return "New sub12.io notification", "You have a new notification on sub12.io."
 }

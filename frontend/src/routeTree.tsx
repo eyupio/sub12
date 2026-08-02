@@ -62,6 +62,7 @@ const LazyAdminClubDetail = lazy(() => import('./pages/AdminClubDetail'))
 const LazyAdminSitemap = lazy(() => import('./pages/AdminSitemap'))
 const LazyAdminBackup = lazy(() => import('./pages/AdminBackup'))
 const LazyAdminSimulation = lazy(() => import('./pages/AdminSimulation'))
+const LazyAdminAnnouncements = lazy(() => import('./pages/AdminAnnouncements'))
 const LazyAdminGear = lazy(() => import('./pages/AdminGearStats'))
 const LazyAdminReportsQueue = lazy(() => import('./pages/AdminReportsQueue'))
 const LazyAdminSupportInbox = lazy(() => import('./pages/AdminSupportInbox'))
@@ -78,6 +79,7 @@ const LazyComboAnalytics = lazy(() => import('./pages/ComboAnalytics'))
 const LazyNotifications = lazy(() => import('./pages/Notifications'))
 const LazyPrivacyCenter = lazy(() => import('./pages/PrivacyCenter'))
 const LazyNotificationSettings = lazy(() => import('./pages/NotificationSettings'))
+const LazyAnnouncementDetail = lazy(() => import('./pages/AnnouncementDetail'))
 const LazySecuritySettings = lazy(() => import('./pages/SecuritySettings'))
 const LazyFeatureBoard = lazy(() => import('./pages/FeatureBoard'))
 const LazyFeatureRequestDetail = lazy(() => import('./pages/FeatureRequestDetail'))
@@ -204,6 +206,12 @@ const communityReviewRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/scores/$id/review',
   component: lz(LazyCommunityReview),
+})
+
+const announcementDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/announcements/$id',
+  component: lz(LazyAnnouncementDetail),
 })
 
 const gearRoute = createRoute({
@@ -549,6 +557,12 @@ const adminSimulationRoute = createRoute({
   component: lz(LazyAdminSimulation),
 })
 
+const adminAnnouncementsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/announcements',
+  component: lz(LazyAdminAnnouncements),
+})
+
 const adminGearRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/gear',
@@ -702,6 +716,7 @@ export const routeTree = rootRoute.addChildren([
     draftsRoute,
     scoreCardDetailRoute,
     communityReviewRoute,
+    announcementDetailRoute,
     scoreTrendsRoute,
     pelletTestingRoute,
     newPelletTestRoute,
@@ -747,6 +762,7 @@ export const routeTree = rootRoute.addChildren([
     adminSitemapRoute,
     adminBackupRoute,
     adminSimulationRoute,
+    adminAnnouncementsRoute,
     adminGearRoute,
     adminReportsRoute,
     adminSupportRoute,

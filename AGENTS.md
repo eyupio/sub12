@@ -116,7 +116,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **116** (000001–000116). Latest: `000116_league_club_event_notification_prefs`.
+Current migration count: **119** (000001–000119). Latest: `000119_review_volunteer_prefs`.
 
 ## Critical Migration Rules
 
@@ -321,6 +321,46 @@ Conventions worth keeping:
   `reviewRequestFanoutLimit`). The recipient rules live in
   `ScoreCardService.validationRequestPlan`, split from the fan-out so they're
   testable without a database.
+- **Volunteers widen that audience, never replace it.** The three
+  `review_requests_*` preferences are how somebody asks to be sent other
+  shooters' cards: `public` adds them to any *public* personal card's request,
+  `leagues` to cards in leagues they're in, and `club_leagues` to cards in
+  leagues run under a club they're in, whether or not they're in the league.
+  All three default off and each pool is separately capped at
+  `reviewVolunteerLimit` and randomised — being asked is a favour, and asking
+  the same first N every time burns them out. A *followers-only* card stays
+  with the followers: a validation request must never be the thing that widens
+  who can see a card.
+
+### Announcements
+
+An announcement is a human-authored message broadcast to a group's whole
+audience. The delivered copies are ordinary `announcement` notification rows;
+the `announcements` table is the one stored original they point at.
+
+- **Who may send** is the scope: platform → `middleware.RequireAdmin`; league
+  and club → the owner or a moderator granted `PermSendAnnouncements`, which
+  is deliberately *not* in the default promotion grant; event → its owner, since
+  an event has no capability catalogue and a delegated scorer is trusted with
+  cards, not the megaphone. A platform admin does not thereby become a league's
+  moderator — the scopes don't nest.
+- **Who receives** it: every live non-simulated account, the league's members,
+  the club's members, or everyone entered in the event. The sender is always
+  excluded, and `recipient_count` is recorded at send time — it is the reach of
+  the message, not a live membership count.
+- **Delivery is bulk.** `NotificationService.FanoutAnnouncement` returns
+  immediately and works on a background context: the in-app preference is
+  applied inside a single `INSERT … SELECT FROM unnest(…)`, push tokens are
+  fetched for the whole delivered set at once, and only the SMTP sends are per
+  person. Blocks and mutes don't apply — an announcement comes from a group you
+  joined, not a person you chose to hear from.
+- **Email is opted into twice**: by the sender per announcement (`send_email`,
+  default off) and by the recipient (`announcement_email`, default on). The
+  in-app copy always goes.
+- **Reading one** is gated on having been sent it — `HasNotificationForTarget`
+  — so somebody who left the club can still open the message they were given,
+  and somebody who joined later can't read backwards through the archive. The
+  per-scope *log* is gated on membership instead, since it's the sender's view.
 
 ## Environment Variables
 

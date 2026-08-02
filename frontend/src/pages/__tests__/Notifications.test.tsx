@@ -148,6 +148,27 @@ describe('Notifications routing', () => {
     expect(notificationLink(makeNotification({ type: 'event_went_live', target_type: 'event', target_id: 'ev-1' }))).toBe('/events')
   })
 
+  it('renders an announcement in the sender&apos;s own words and links to it', () => {
+    const announcement = makeNotification({
+      type: 'announcement',
+      target_id: 'ann-1',
+      target_type: 'announcement',
+      club_id: 'cb-4',
+      actor_display_name: 'Tess',
+      metadata: { title: 'Range closed Sunday', club_name: 'Dales RC' },
+    })
+    expect(notificationSentence(announcement)).toBe('Range closed Sunday')
+    // The club that hosts it must not claim the link.
+    expect(notificationLink(announcement)).toBe('/announcements/ann-1')
+
+    // An announcement whose metadata predates the title falls back to a sentence.
+    expect(
+      notificationSentence(
+        makeNotification({ type: 'announcement', actor_display_name: 'Tess', metadata: { league_name: 'Sunday Bench' } }),
+      ),
+    ).toBe('Tess posted an announcement in Sunday Bench')
+  })
+
   it('names the league, club or event in the sentence', () => {
     expect(
       notificationSentence(

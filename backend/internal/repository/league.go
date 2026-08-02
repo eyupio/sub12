@@ -1687,6 +1687,27 @@ func (r *LeagueRepository) GetLeagueIDByRoundID(ctx context.Context, roundID str
 }
 
 // ListAdminIDs returns the user IDs of all admins for a league.
+// ListMemberIDs returns the league's whole roster, for fan-out that doesn't
+// need the display columns ListMembers joins in.
+func (r *LeagueRepository) ListMemberIDs(ctx context.Context, leagueID string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id FROM league_members WHERE league_id = $1
+	`, leagueID)
+	if err != nil {
+		return nil, fmt.Errorf("list league member ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan league member id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *LeagueRepository) ListAdminIDs(ctx context.Context, leagueID string) ([]string, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT user_id FROM league_members WHERE league_id = $1 AND is_admin = TRUE

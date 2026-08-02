@@ -329,6 +329,29 @@ func (r *UserRepository) ListAll(ctx context.Context, limit, offset int, hideSim
 }
 
 // GetAdminByID returns the full user record (including email) for admin use.
+// ListAllUserIDs returns every live account, for platform-wide fan-out.
+// Simulated personas are excluded: they are scenery, and notifying them would
+// inflate an announcement's reported reach with accounts nobody reads.
+func (r *UserRepository) ListAllUserIDs(ctx context.Context) ([]string, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id FROM users
+		WHERE deleted_at IS NULL AND NOT is_simulated
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list all user ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan user id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *UserRepository) GetAdminByID(ctx context.Context, id string) (*model.AdminUser, error) {
 	var u model.AdminUser
 	err := r.db.QueryRow(ctx, `

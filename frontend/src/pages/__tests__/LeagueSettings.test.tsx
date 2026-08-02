@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import LeagueSettings from '../LeagueSettings'
 import { leagueApi, type League, type LeagueConfig, type LeagueMember } from '../../api/leagues'
+import { announcementsApi } from '../../api/announcements'
 import { useAuthStore } from '../../store/auth'
 
 vi.mock('@tanstack/react-router', async () => {
@@ -90,7 +91,15 @@ const LEAGUE_PERMISSIONS = [
 ]
 
 /** The owner's view of the delegation catalogue. */
+// The settings page's announcement panel lists what has been sent. An
+// unmocked call reaches the real client, 401s, and clears the auth store
+// mid-test — which renders the page as nothing at all.
+function mockAnnouncements() {
+  vi.spyOn(announcementsApi, 'list').mockResolvedValue({ items: [] })
+}
+
 function mockModeratorPermissions() {
+  mockAnnouncements()
   vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
     catalogue: LEAGUE_PERMISSIONS,
     role: {

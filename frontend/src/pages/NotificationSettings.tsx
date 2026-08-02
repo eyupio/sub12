@@ -82,6 +82,29 @@ const GROUPS: PrefGroup[] = [
 
 const ROWS: PrefRow[] = GROUPS.flatMap((g) => g.rows)
 
+/**
+ * Opting in to be asked to validate other people's cards. Unlike the rows
+ * above these are not delivery switches — they widen the audience of a
+ * validation request — so they get a single toggle and their own section.
+ */
+const VOLUNTEER_ROWS: { key: keyof NotificationPreferences; label: string; description: string }[] = [
+  {
+    key: 'review_requests_public',
+    label: 'Public cards from anyone',
+    description: 'Community review requests on public personal cards, from shooters you may not follow.',
+  },
+  {
+    key: 'review_requests_leagues',
+    label: 'Cards in my leagues',
+    description: 'League cards waiting on verification in leagues you belong to.',
+  },
+  {
+    key: 'review_requests_club_leagues',
+    label: "Cards in my clubs' leagues",
+    description: 'League cards in leagues run under a club you belong to, whether or not you are in that league.',
+  },
+]
+
 export default function NotificationSettings() {
   const queryClient = useQueryClient()
 
@@ -168,6 +191,34 @@ export default function NotificationSettings() {
               </ul>
             </div>
           ))}
+
+          <div className="pt-2">
+            <h2 className="t-section-title mb-2">Volunteer to validate cards</h2>
+            <p className="text-xs text-muted mb-2">
+              Ask to be sent other shooters&rsquo; cards when they need confirming. These
+              widen who gets asked — you always hear about cards from people you
+              follow and leagues you help run.
+            </p>
+            <ul className="space-y-2">
+              {VOLUNTEER_ROWS.map((row) => (
+                <li key={row.key} className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-secondary font-medium">{row.label}</p>
+                    <p className="text-xs text-muted">{row.description}</p>
+                  </div>
+                  <label className="shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={data[row.key] as boolean}
+                      onChange={(e) => mutation.mutate({ [row.key]: e.target.checked } as NotificationPreferencesPatch)}
+                      aria-label={row.label}
+                      className="scale-125"
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <div className="pt-2">
             <h2 className="t-section-title mb-2">Moderation</h2>

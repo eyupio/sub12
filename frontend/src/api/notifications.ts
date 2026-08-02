@@ -31,6 +31,7 @@ export type NotificationType =
   | 'event_participant_joined'
   | 'event_went_live'
   | 'event_results_posted'
+  | 'announcement'
 
 export interface Notification {
   id: string
@@ -85,6 +86,10 @@ export interface NotificationPreferences {
   event_participant_joined: boolean
   event_went_live: boolean
   event_results_posted: boolean
+  announcement: boolean
+  review_requests_public: boolean
+  review_requests_leagues: boolean
+  review_requests_club_leagues: boolean
   digest_email: boolean
   follow_request_email: boolean
   follow_accepted_email: boolean
@@ -115,6 +120,7 @@ export interface NotificationPreferences {
   event_participant_joined_email: boolean
   event_went_live_email: boolean
   event_results_posted_email: boolean
+  announcement_email: boolean
   updated_at: string
 }
 

@@ -49,6 +49,7 @@ func TestEnabledForType_PerType(t *testing.T) {
 		{NotificationTypeEventParticipantJoined, func(p *NotificationPreferences, v bool) { p.EventParticipantJoined = v }},
 		{NotificationTypeEventWentLive, func(p *NotificationPreferences, v bool) { p.EventWentLive = v }},
 		{NotificationTypeEventResultsPosted, func(p *NotificationPreferences, v bool) { p.EventResultsPosted = v }},
+		{NotificationTypeAnnouncement, func(p *NotificationPreferences, v bool) { p.Announcement = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
@@ -100,6 +101,7 @@ func TestEmailEnabledForType_PerType(t *testing.T) {
 		{NotificationTypeEventParticipantJoined, true, func(p *NotificationPreferences, v bool) { p.EventParticipantJoinedEmail = v }},
 		{NotificationTypeEventWentLive, true, func(p *NotificationPreferences, v bool) { p.EventWentLiveEmail = v }},
 		{NotificationTypeEventResultsPosted, true, func(p *NotificationPreferences, v bool) { p.EventResultsPostedEmail = v }},
+		{NotificationTypeAnnouncement, false, func(p *NotificationPreferences, v bool) { p.AnnouncementEmail = v }},
 	}
 	for _, tc := range cases {
 		p := DefaultNotificationPreferences("u")
@@ -114,5 +116,17 @@ func TestEmailEnabledForType_PerType(t *testing.T) {
 		if !p.EmailEnabledForType(tc.typ) {
 			t.Errorf("%s: expected true after setter(true), got false", tc.typ)
 		}
+	}
+}
+
+// Being sent strangers' cards to check is a favour somebody volunteers for.
+// If any of these ever defaults on, every account starts receiving other
+// people's validation requests the moment they sign up.
+func TestReviewVolunteerPrefsAreOptIn(t *testing.T) {
+	p := DefaultNotificationPreferences("u")
+	if p.ReviewRequestsPublic || p.ReviewRequestsLeagues || p.ReviewRequestsClubLeagues {
+		t.Errorf("review volunteer flags must default off, got %+v", []bool{
+			p.ReviewRequestsPublic, p.ReviewRequestsLeagues, p.ReviewRequestsClubLeagues,
+		})
 	}
 }

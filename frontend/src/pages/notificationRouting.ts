@@ -80,6 +80,14 @@ export function notificationSentence(n: Notification): string {
       return `${groupName(n) ?? 'An event you entered'} is now live`
     case 'event_results_posted':
       return `Results are in for ${groupName(n) ?? 'an event you entered'}`
+    case 'announcement': {
+      // The announcement's own title is the sentence — it was written to be
+      // read, and paraphrasing it would bury what the sender said.
+      const title = n.metadata?.title
+      if (typeof title === 'string' && title !== '') return title
+      const where = groupName(n)
+      return where ? `${actor} posted an announcement in ${where}` : `${actor} posted an announcement`
+    }
   }
 }
 
@@ -114,6 +122,10 @@ export function notificationLink(n: Notification): string | null {
     // Land on the idea that moved — its history explains the change — and fall
     // back to the board for older notifications that carry no target.
     return n.target_id ? `/feature-requests/${n.target_id}` : '/feature-requests'
+  }
+
+  if (n.type === 'announcement') {
+    return n.target_id ? `/announcements/${n.target_id}` : null
   }
 
   if (n.type === 'score_validation_requested' && n.target_id) {

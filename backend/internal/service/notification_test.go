@@ -65,6 +65,44 @@ func TestNotificationEmailContent_AllTypes(t *testing.T) {
 	}
 }
 
+// An announcement's own words are the notification: the title becomes the
+// subject/push title and the trimmed body the message.
+func TestNotificationEmailContent_Announcement(t *testing.T) {
+	subject, body := notificationEmailContent(NotifEvent{
+		Type:     model.NotificationTypeAnnouncement,
+		Metadata: map[string]any{"title": "Range closed Sunday", "body_preview": "Gates locked all day."},
+	}, "Tess")
+	if subject != "Range closed Sunday" {
+		t.Errorf("subject: got %q, want the announcement title", subject)
+	}
+	if body != "Gates locked all day." {
+		t.Errorf("body: got %q, want the announcement preview", body)
+	}
+
+	// A row written before the metadata existed still reads as a sentence.
+	subject, body = notificationEmailContent(NotifEvent{Type: model.NotificationTypeAnnouncement}, "Tess")
+	if subject != "New announcement" || !strings.Contains(body, "Tess") {
+		t.Errorf("fallback: got %q / %q", subject, body)
+	}
+}
+
+// The metadata key an announcement's group name travels under has to be the
+// one the client already reads group names from, or the bell renders an
+// announcement without saying which league it came from.
+func TestScopeNameKey(t *testing.T) {
+	cases := map[string]string{
+		model.AnnouncementScopeLeague:   "league_name",
+		model.AnnouncementScopeClub:     "club_name",
+		model.AnnouncementScopeEvent:    "event_name",
+		model.AnnouncementScopePlatform: "scope_name",
+	}
+	for scope, want := range cases {
+		if got := scopeNameKey(scope); got != want {
+			t.Errorf("scopeNameKey(%q) = %q, want %q", scope, got, want)
+		}
+	}
+}
+
 // The invitation email carries the accept link and is rendered by
 // EventInvitationService, so Fanout must not also send the generic one.
 func TestHasDedicatedEmailTemplate(t *testing.T) {

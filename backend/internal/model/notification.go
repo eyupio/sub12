@@ -34,6 +34,7 @@ const (
 	NotificationTypeEventParticipantJoined     = "event_participant_joined"
 	NotificationTypeEventWentLive              = "event_went_live"
 	NotificationTypeEventResultsPosted         = "event_results_posted"
+	NotificationTypeAnnouncement               = "announcement"
 )
 
 // Notification is a single delivered in-app notification row.
@@ -59,37 +60,44 @@ type Notification struct {
 // (see DefaultNotificationPreferences). report_filed email delivery is
 // gated by DigestEmail and handled by ModerationService directly.
 type NotificationPreferences struct {
-	UserID                          string    `json:"user_id"`
-	FollowRequest                   bool      `json:"follow_request"`
-	FollowAccepted                  bool      `json:"follow_accepted"`
-	CommentOnMyCard                 bool      `json:"comment_on_my_card"`
-	ReplyToMyComment                bool      `json:"reply_to_my_comment"`
-	LikeOnMyContent                 bool      `json:"like_on_my_content"`
-	ScoreVerified                   bool      `json:"score_verified"`
-	ScoreRejected                   bool      `json:"score_rejected"`
-	ScoreAmended                    bool      `json:"score_amended"`
-	LeagueJoinApproved              bool      `json:"league_join_approved"`
-	ClubJoinApproved                bool      `json:"club_join_approved"`
-	Mention                         bool      `json:"mention"`
-	PostFlagged                     bool      `json:"post_flagged"`
-	ReportFiled                     bool      `json:"report_filed"`
-	TicketCreated                   bool      `json:"ticket_created"`
-	TicketReplied                   bool      `json:"ticket_replied"`
-	TicketAssigned                  bool      `json:"ticket_assigned"`
-	TicketStatusChanged             bool      `json:"ticket_status_changed"`
-	FeatureRequestStateChanged      bool      `json:"feature_request_state_changed"`
-	ScoreValidationRequested        bool      `json:"score_validation_requested"`
-	LeagueJoinRequest               bool      `json:"league_join_request"`
-	LeagueJoinRejected              bool      `json:"league_join_rejected"`
-	LeagueRoleChanged               bool      `json:"league_role_changed"`
-	LeagueRoundOpened               bool      `json:"league_round_opened"`
-	ClubJoinRequest                 bool      `json:"club_join_request"`
-	ClubJoinRejected                bool      `json:"club_join_rejected"`
-	ClubRoleChanged                 bool      `json:"club_role_changed"`
-	EventInvitation                 bool      `json:"event_invitation"`
-	EventParticipantJoined          bool      `json:"event_participant_joined"`
-	EventWentLive                   bool      `json:"event_went_live"`
-	EventResultsPosted              bool      `json:"event_results_posted"`
+	UserID                     string `json:"user_id"`
+	FollowRequest              bool   `json:"follow_request"`
+	FollowAccepted             bool   `json:"follow_accepted"`
+	CommentOnMyCard            bool   `json:"comment_on_my_card"`
+	ReplyToMyComment           bool   `json:"reply_to_my_comment"`
+	LikeOnMyContent            bool   `json:"like_on_my_content"`
+	ScoreVerified              bool   `json:"score_verified"`
+	ScoreRejected              bool   `json:"score_rejected"`
+	ScoreAmended               bool   `json:"score_amended"`
+	LeagueJoinApproved         bool   `json:"league_join_approved"`
+	ClubJoinApproved           bool   `json:"club_join_approved"`
+	Mention                    bool   `json:"mention"`
+	PostFlagged                bool   `json:"post_flagged"`
+	ReportFiled                bool   `json:"report_filed"`
+	TicketCreated              bool   `json:"ticket_created"`
+	TicketReplied              bool   `json:"ticket_replied"`
+	TicketAssigned             bool   `json:"ticket_assigned"`
+	TicketStatusChanged        bool   `json:"ticket_status_changed"`
+	FeatureRequestStateChanged bool   `json:"feature_request_state_changed"`
+	ScoreValidationRequested   bool   `json:"score_validation_requested"`
+	LeagueJoinRequest          bool   `json:"league_join_request"`
+	LeagueJoinRejected         bool   `json:"league_join_rejected"`
+	LeagueRoleChanged          bool   `json:"league_role_changed"`
+	LeagueRoundOpened          bool   `json:"league_round_opened"`
+	ClubJoinRequest            bool   `json:"club_join_request"`
+	ClubJoinRejected           bool   `json:"club_join_rejected"`
+	ClubRoleChanged            bool   `json:"club_role_changed"`
+	EventInvitation            bool   `json:"event_invitation"`
+	EventParticipantJoined     bool   `json:"event_participant_joined"`
+	EventWentLive              bool   `json:"event_went_live"`
+	EventResultsPosted         bool   `json:"event_results_posted"`
+	Announcement               bool   `json:"announcement"`
+	// The review_requests_* flags widen the audience of a validation request
+	// rather than gating delivery of one: they are how a shooter volunteers to
+	// be asked to check other people's cards. All three are opt-in.
+	ReviewRequestsPublic            bool      `json:"review_requests_public"`
+	ReviewRequestsLeagues           bool      `json:"review_requests_leagues"`
+	ReviewRequestsClubLeagues       bool      `json:"review_requests_club_leagues"`
 	DigestEmail                     bool      `json:"digest_email"`
 	FollowRequestEmail              bool      `json:"follow_request_email"`
 	FollowAcceptedEmail             bool      `json:"follow_accepted_email"`
@@ -120,6 +128,7 @@ type NotificationPreferences struct {
 	EventParticipantJoinedEmail     bool      `json:"event_participant_joined_email"`
 	EventWentLiveEmail              bool      `json:"event_went_live_email"`
 	EventResultsPostedEmail         bool      `json:"event_results_posted_email"`
+	AnnouncementEmail               bool      `json:"announcement_email"`
 	UpdatedAt                       time.Time `json:"updated_at"`
 }
 
@@ -157,6 +166,10 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		EventParticipantJoined:          true,
 		EventWentLive:                   true,
 		EventResultsPosted:              true,
+		Announcement:                    true,
+		ReviewRequestsPublic:            false,
+		ReviewRequestsLeagues:           false,
+		ReviewRequestsClubLeagues:       false,
 		DigestEmail:                     false,
 		FollowRequestEmail:              true,
 		FollowAcceptedEmail:             true,
@@ -191,6 +204,10 @@ func DefaultNotificationPreferences(userID string) *NotificationPreferences {
 		EventParticipantJoinedEmail:   false,
 		EventWentLiveEmail:            false,
 		EventResultsPostedEmail:       false,
+		// An announcement is the exception to the reach rule above: it is
+		// human-authored, and the sender opts into email per announcement, so
+		// this flag is the recipient's veto rather than the trigger.
+		AnnouncementEmail: true,
 	}
 }
 
@@ -257,6 +274,8 @@ func (p *NotificationPreferences) EnabledForType(t string) bool {
 		return p.EventWentLive
 	case NotificationTypeEventResultsPosted:
 		return p.EventResultsPosted
+	case NotificationTypeAnnouncement:
+		return p.Announcement
 	}
 	return true
 }
@@ -325,6 +344,8 @@ func (p *NotificationPreferences) EmailEnabledForType(t string) bool {
 		return p.EventWentLiveEmail
 	case NotificationTypeEventResultsPosted:
 		return p.EventResultsPostedEmail
+	case NotificationTypeAnnouncement:
+		return p.AnnouncementEmail
 	}
 	return false
 }
@@ -361,6 +382,10 @@ type UpdateNotificationPrefsInput struct {
 	EventParticipantJoined          *bool `json:"event_participant_joined,omitempty"`
 	EventWentLive                   *bool `json:"event_went_live,omitempty"`
 	EventResultsPosted              *bool `json:"event_results_posted,omitempty"`
+	Announcement                    *bool `json:"announcement,omitempty"`
+	ReviewRequestsPublic            *bool `json:"review_requests_public,omitempty"`
+	ReviewRequestsLeagues           *bool `json:"review_requests_leagues,omitempty"`
+	ReviewRequestsClubLeagues       *bool `json:"review_requests_club_leagues,omitempty"`
 	DigestEmail                     *bool `json:"digest_email,omitempty"`
 	FollowRequestEmail              *bool `json:"follow_request_email,omitempty"`
 	FollowAcceptedEmail             *bool `json:"follow_accepted_email,omitempty"`
@@ -391,4 +416,5 @@ type UpdateNotificationPrefsInput struct {
 	EventParticipantJoinedEmail     *bool `json:"event_participant_joined_email,omitempty"`
 	EventWentLiveEmail              *bool `json:"event_went_live_email,omitempty"`
 	EventResultsPostedEmail         *bool `json:"event_results_posted_email,omitempty"`
+	AnnouncementEmail               *bool `json:"announcement_email,omitempty"`
 }

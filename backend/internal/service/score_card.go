@@ -73,7 +73,10 @@ type ScoreCardService struct {
 	// notifications is optional; nil disables the "this card needs validating"
 	// fan-out to the league moderators or event scorers who can rule on it.
 	notifications *NotificationService
-	log           zerolog.Logger
+	// volunteers is optional; nil keeps a league card's validation request with
+	// the moderators instead of also offering it to members who opted in.
+	volunteers ReviewVolunteerRepo
+	log        zerolog.Logger
 }
 
 func NewScoreCardService(cards ScoreCardRepo, leagueRepo LeagueConfigRepo, activity *ActivityService, achievement *AchievementService) *ScoreCardService {
@@ -102,6 +105,12 @@ func (s *ScoreCardService) SetUserReader(users UserProfileReader) {
 // landing in a league or event to be found by its moderators unprompted.
 func (s *ScoreCardService) SetNotifications(n *NotificationService) {
 	s.notifications = n
+}
+
+// SetReviewVolunteers wires the opt-in pool that widens a league card's
+// validation request beyond the people who run the league.
+func (s *ScoreCardService) SetReviewVolunteers(v ReviewVolunteerRepo) {
+	s.volunteers = v
 }
 
 // SetLogger wires a logger used by background goroutines for panic recovery
@@ -171,13 +180,29 @@ func (s *ScoreCardService) validationRequestPlan(ctx context.Context, card *mode
 		}
 		// The owner holds every capability implicitly and is not necessarily
 		// carried in league_members.is_admin.
+		var clubID *string
 		if league, err := s.leagueRepo.GetByID(ctx, leagueID); err == nil && league != nil {
 			ids = append(ids, league.CreatedBy)
 			meta["league_name"] = league.Name
+			clubID = league.ClubID
+		}
+		// Members who volunteered to check league cards, and — for a league run
+		// under a club — club members who volunteered for their clubs' leagues,
+		// who need not be in the league themselves.
+		if s.volunteers != nil {
+			if v, err := s.volunteers.ListLeagueReviewVolunteers(ctx, leagueID, reviewVolunteerLimit); err == nil {
+				ids = append(ids, v...)
+			}
+			if clubID != nil && *clubID != "" {
+				if v, err := s.volunteers.ListClubLeagueReviewVolunteers(ctx, *clubID, reviewVolunteerLimit); err == nil {
+					ids = append(ids, v...)
+				}
+			}
 		}
 		return &validationRequestPlan{
 			Recipients: dedupeExcluding(ids, skip),
 			LeagueID:   &leagueID,
+			ClubID:     clubID,
 			Metadata:   meta,
 		}
 	}

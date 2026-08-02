@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy, ClipboardCheck, ShieldCheck, CalendarPlus, CalendarClock, Medal, Target } from 'lucide-react'
+import { UserPlus, UserCheck, MessageSquare, Heart, CheckCircle, XCircle, AlertCircle, Users as UsersIcon, Trophy, AtSign, Flag, LifeBuoy, ClipboardCheck, ShieldCheck, CalendarPlus, CalendarClock, Medal, Target, Megaphone } from 'lucide-react'
 import { notificationsApi, type NotificationType } from '../api/notifications'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 import { notificationLink, notificationSentence } from './notificationRouting'
@@ -36,6 +36,7 @@ const ICON_MAP: Record<NotificationType, typeof UserPlus> = {
   event_participant_joined: UsersIcon,
   event_went_live: CalendarClock,
   event_results_posted: Medal,
+  announcement: Megaphone,
 }
 
 export default function Notifications() {

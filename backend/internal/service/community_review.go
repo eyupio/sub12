@@ -56,10 +56,24 @@ type FollowerLister interface {
 	ListFollowerIDs(ctx context.Context, userID string, limit int) ([]string, error)
 }
 
+// ReviewVolunteerRepo lists the people who opted in to being asked to validate
+// other shooters' cards. Volunteers are additive: they widen an audience that
+// already has a natural core (the shooter's followers on a personal card, the
+// moderators on a league one), never replace it.
+type ReviewVolunteerRepo interface {
+	ListPublicReviewVolunteers(ctx context.Context, limit int) ([]string, error)
+	ListLeagueReviewVolunteers(ctx context.Context, leagueID string, limit int) ([]string, error)
+	ListClubLeagueReviewVolunteers(ctx context.Context, clubID string, limit int) ([]string, error)
+}
+
 // reviewRequestFanoutLimit caps how many followers are told about a review
 // request. A shooter with a large following would otherwise write one
 // notification row per follower on a single button press.
 const reviewRequestFanoutLimit = 200
+
+// reviewVolunteerLimit caps each volunteer pool separately, so opting in to
+// public review requests doesn't mean receiving every one ever raised.
+const reviewVolunteerLimit = 200
 
 type CommunityReviewService struct {
 	requests      CommunityReviewRepo
@@ -69,6 +83,7 @@ type CommunityReviewService struct {
 	achievement   *AchievementService
 	notifications *NotificationService // nil disables notification fan-out
 	followers     FollowerLister       // nil disables review-request fan-out
+	volunteers    ReviewVolunteerRepo  // nil limits the audience to followers
 	log           zerolog.Logger
 }
 
@@ -97,6 +112,12 @@ func (s *CommunityReviewService) SetNotifications(n *NotificationService) {
 // is waiting on validation. Optional — nil leaves the request feed-only.
 func (s *CommunityReviewService) SetFollowers(f FollowerLister) {
 	s.followers = f
+}
+
+// SetReviewVolunteers wires the opt-in pool that widens a public card's
+// validation request beyond the shooter's own followers.
+func (s *CommunityReviewService) SetReviewVolunteers(v ReviewVolunteerRepo) {
+	s.volunteers = v
 }
 
 // SetLogger wires the logger used by background goroutines for panic recovery.
@@ -159,29 +180,47 @@ func (s *CommunityReviewService) RequestReview(ctx context.Context, scoreCardID,
 			s.activity.Ingest(context.Background(), ownerID, model.ActivityCommunityReviewRequested, &scoreCardID, &tt, meta, nil, nil, visibility)
 		})
 	}
-	s.notifyValidationRequested(scoreCardID, ownerID, card.TotalScore, req.RequiredConfirmations)
+	s.notifyValidationRequested(scoreCardID, ownerID, card.Visibility, card.TotalScore, req.RequiredConfirmations)
 	return req, nil
 }
 
-// notifyValidationRequested rings the bell for the owner's followers: a
-// personal card is waiting on the community to confirm it. Runs in the
-// background because the fan-out is one row per follower and the shooter is
-// waiting on the response.
+// notifyValidationRequested rings the bell for the people who can confirm a
+// personal card: the shooter's followers, plus — on a public card — anyone who
+// volunteered to check public cards. A followers-only card stays with the
+// followers; it was never offered to strangers, and a validation request must
+// not be the thing that widens its audience.
+//
+// Runs in the background because the fan-out is one row per recipient and the
+// shooter is waiting on the response.
 func (s *CommunityReviewService) notifyValidationRequested(
-	scoreCardID, ownerID string, totalScore, requiredConfirmations int16,
+	scoreCardID, ownerID, visibility string, totalScore, requiredConfirmations int16,
 ) {
-	if s.notifications == nil || s.followers == nil {
+	if s.notifications == nil {
 		return
 	}
 	s.safeGo("notifications.Fanout(validation_requested)", func() {
 		bg := context.Background()
-		ids, err := s.followers.ListFollowerIDs(bg, ownerID, reviewRequestFanoutLimit)
-		if err != nil {
-			s.log.Warn().Err(err).Str("owner_id", ownerID).Msg("community_review: load followers for validation fan-out failed")
-			return
+
+		var ids []string
+		if s.followers != nil {
+			followers, err := s.followers.ListFollowerIDs(bg, ownerID, reviewRequestFanoutLimit)
+			if err != nil {
+				s.log.Warn().Err(err).Str("owner_id", ownerID).Msg("community_review: load followers for validation fan-out failed")
+			} else {
+				ids = append(ids, followers...)
+			}
 		}
+		if s.volunteers != nil && visibility == "public" {
+			volunteers, err := s.volunteers.ListPublicReviewVolunteers(bg, reviewVolunteerLimit)
+			if err != nil {
+				s.log.Warn().Err(err).Msg("community_review: load public review volunteers failed")
+			} else {
+				ids = append(ids, volunteers...)
+			}
+		}
+
 		tid, tt := scoreCardID, "score_card"
-		for _, rid := range ids {
+		for _, rid := range dedupeExcluding(ids, map[string]struct{}{ownerID: {}}) {
 			s.notifications.Fanout(bg, NotifEvent{
 				RecipientID: rid,
 				ActorID:     ownerID,

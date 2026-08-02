@@ -42,6 +42,174 @@ func (r *NotificationRepository) Insert(ctx context.Context, n *model.Notificati
 	return nil
 }
 
+// AnnouncementEmailRecipient is one person to email about an announcement.
+type AnnouncementEmailRecipient struct {
+	UserID      string
+	Email       string
+	DisplayName string
+}
+
+// InsertAnnouncementFanout writes one notification row per recipient in a
+// single statement, skipping anyone who has turned announcements off, and
+// returns the ids actually written.
+//
+// Fanout's per-recipient path would be three queries each; an announcement can
+// address the whole platform, so the preference check moves into the insert.
+// Blocks and mutes are deliberately not consulted: an announcement comes from
+// the group you joined, not from a person you chose to hear from.
+func (r *NotificationRepository) InsertAnnouncementFanout(ctx context.Context, n *model.Notification, recipientIDs []string) ([]string, error) {
+	if len(recipientIDs) == 0 {
+		return nil, nil
+	}
+	var metaBytes []byte
+	if n.Metadata != nil {
+		b, err := json.Marshal(n.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("marshal metadata: %w", err)
+		}
+		metaBytes = b
+	}
+	rows, err := r.db.Query(ctx, `
+		INSERT INTO notifications
+			(recipient_id, actor_id, type, target_id, target_type, league_id, club_id, metadata)
+		SELECT r.id, $2, $3, $4, $5, $6, $7, $8
+		FROM unnest($1::uuid[]) AS r(id)
+		LEFT JOIN notification_preferences p ON p.user_id = r.id
+		WHERE COALESCE(p.announcement, TRUE)
+		RETURNING recipient_id
+	`, recipientIDs, n.ActorID, n.Type, n.TargetID, n.TargetType, n.LeagueID, n.ClubID, metaBytes)
+	if err != nil {
+		return nil, fmt.Errorf("insert announcement fanout: %w", err)
+	}
+	defer rows.Close()
+	var delivered []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan announcement recipient: %w", err)
+		}
+		delivered = append(delivered, id)
+	}
+	return delivered, rows.Err()
+}
+
+// ListAnnouncementEmailRecipients narrows a recipient list to the live
+// accounts that accept announcement email.
+func (r *NotificationRepository) ListAnnouncementEmailRecipients(ctx context.Context, recipientIDs []string) ([]AnnouncementEmailRecipient, error) {
+	if len(recipientIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.email, u.display_name
+		FROM unnest($1::uuid[]) AS r(id)
+		JOIN users u ON u.id = r.id AND u.deleted_at IS NULL
+		LEFT JOIN notification_preferences p ON p.user_id = r.id
+		WHERE COALESCE(p.announcement_email, TRUE)
+	`, recipientIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list announcement email recipients: %w", err)
+	}
+	defer rows.Close()
+	var out []AnnouncementEmailRecipient
+	for rows.Next() {
+		var rec AnnouncementEmailRecipient
+		if err := rows.Scan(&rec.UserID, &rec.Email, &rec.DisplayName); err != nil {
+			return nil, fmt.Errorf("scan announcement email recipient: %w", err)
+		}
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
+// Review volunteers — people who asked to be sent other shooters' cards to
+// validate. The opt-in lives on notification_preferences, so these queries do
+// too even though two of them join a membership table: they answer "who wants
+// to be asked", which is a preference question scoped by where they belong.
+//
+// Each is capped and randomised. A validation request is a favour, and asking
+// the same first N volunteers every time would burn them out while the rest of
+// the pool never hears anything; ORDER BY random() sorts only the opted-in
+// rows, which are by definition a self-selected minority.
+
+// ListPublicReviewVolunteers returns people who accept validation requests for
+// anyone's public card.
+func (r *NotificationRepository) ListPublicReviewVolunteers(ctx context.Context, limit int) ([]string, error) {
+	return r.reviewVolunteers(ctx, `
+		SELECT p.user_id
+		FROM notification_preferences p
+		JOIN users u ON u.id = p.user_id AND u.deleted_at IS NULL AND NOT u.is_simulated
+		WHERE p.review_requests_public
+		ORDER BY random()
+		LIMIT $1
+	`, limit)
+}
+
+// ListLeagueReviewVolunteers returns members of the league who accept
+// validation requests for the leagues they are in.
+func (r *NotificationRepository) ListLeagueReviewVolunteers(ctx context.Context, leagueID string, limit int) ([]string, error) {
+	return r.reviewVolunteers(ctx, `
+		SELECT p.user_id
+		FROM notification_preferences p
+		JOIN league_members m ON m.user_id = p.user_id AND m.league_id = $2
+		JOIN users u ON u.id = p.user_id AND u.deleted_at IS NULL AND NOT u.is_simulated
+		WHERE p.review_requests_leagues
+		ORDER BY random()
+		LIMIT $1
+	`, limit, leagueID)
+}
+
+// ListClubLeagueReviewVolunteers returns members of the club hosting a league
+// who accept validation requests for their clubs' leagues. They need not be in
+// the league itself — the point is that a club vouches for its own shooters.
+func (r *NotificationRepository) ListClubLeagueReviewVolunteers(ctx context.Context, clubID string, limit int) ([]string, error) {
+	return r.reviewVolunteers(ctx, `
+		SELECT p.user_id
+		FROM notification_preferences p
+		JOIN club_members m ON m.user_id = p.user_id AND m.club_id = $2
+		JOIN users u ON u.id = p.user_id AND u.deleted_at IS NULL AND NOT u.is_simulated
+		WHERE p.review_requests_club_leagues
+		ORDER BY random()
+		LIMIT $1
+	`, limit, clubID)
+}
+
+func (r *NotificationRepository) reviewVolunteers(ctx context.Context, query string, limit int, args ...any) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	rows, err := r.db.Query(ctx, query, append([]any{limit}, args...)...)
+	if err != nil {
+		return nil, fmt.Errorf("list review volunteers: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan review volunteer: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// HasNotificationForTarget reports whether the user was sent a notification
+// pointing at a target. Announcements use it as the read gate: having been
+// sent one is exactly the right to read it, with no membership re-derivation.
+func (r *NotificationRepository) HasNotificationForTarget(ctx context.Context, recipientID, targetID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM notifications
+			WHERE recipient_id = $1 AND target_id = $2
+		)
+	`, recipientID, targetID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check notification for target: %w", err)
+	}
+	return exists, nil
+}
+
 // ListForUser returns notifications for a recipient ordered newest first.
 // cursor is the created_at timestamp (RFC3339) of the last row from the
 // previous page; empty means from the beginning.
@@ -159,7 +327,8 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		       league_round_opened_email, club_join_request_email,
 		       club_join_rejected_email, club_role_changed_email, event_invitation_email,
 		       event_participant_joined_email, event_went_live_email,
-		       event_results_posted_email,
+		       event_results_posted_email, announcement, announcement_email,
+		       review_requests_public, review_requests_leagues, review_requests_club_leagues,
 		       updated_at
 		FROM notification_preferences
 		WHERE user_id = $1
@@ -184,7 +353,8 @@ func (r *NotificationRepository) GetPreferences(ctx context.Context, userID stri
 		&p.LeagueRoundOpenedEmail, &p.ClubJoinRequestEmail,
 		&p.ClubJoinRejectedEmail, &p.ClubRoleChangedEmail, &p.EventInvitationEmail,
 		&p.EventParticipantJoinedEmail, &p.EventWentLiveEmail,
-		&p.EventResultsPostedEmail,
+		&p.EventResultsPostedEmail, &p.Announcement, &p.AnnouncementEmail,
+		&p.ReviewRequestsPublic, &p.ReviewRequestsLeagues, &p.ReviewRequestsClubLeagues,
 		&p.UpdatedAt,
 	)
 	if err != nil {
@@ -382,6 +552,21 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 	if in.EventResultsPostedEmail != nil {
 		current.EventResultsPostedEmail = *in.EventResultsPostedEmail
 	}
+	if in.Announcement != nil {
+		current.Announcement = *in.Announcement
+	}
+	if in.AnnouncementEmail != nil {
+		current.AnnouncementEmail = *in.AnnouncementEmail
+	}
+	if in.ReviewRequestsPublic != nil {
+		current.ReviewRequestsPublic = *in.ReviewRequestsPublic
+	}
+	if in.ReviewRequestsLeagues != nil {
+		current.ReviewRequestsLeagues = *in.ReviewRequestsLeagues
+	}
+	if in.ReviewRequestsClubLeagues != nil {
+		current.ReviewRequestsClubLeagues = *in.ReviewRequestsClubLeagues
+	}
 
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO notification_preferences (
@@ -405,7 +590,8 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			league_round_opened_email, club_join_request_email,
 			club_join_rejected_email, club_role_changed_email, event_invitation_email,
 			event_participant_joined_email, event_went_live_email,
-			event_results_posted_email,
+			event_results_posted_email, announcement, announcement_email,
+			review_requests_public, review_requests_leagues, review_requests_club_leagues,
 			updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
@@ -413,6 +599,7 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			$27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
 			$38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
 			$50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61,
+			$62, $63, $64, $65, $66,
 			NOW()
 		)
 		ON CONFLICT (user_id) DO UPDATE SET
@@ -476,6 +663,11 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 			event_participant_joined_email = EXCLUDED.event_participant_joined_email,
 			event_went_live_email      = EXCLUDED.event_went_live_email,
 			event_results_posted_email = EXCLUDED.event_results_posted_email,
+			announcement               = EXCLUDED.announcement,
+			announcement_email         = EXCLUDED.announcement_email,
+			review_requests_public     = EXCLUDED.review_requests_public,
+			review_requests_leagues    = EXCLUDED.review_requests_leagues,
+			review_requests_club_leagues = EXCLUDED.review_requests_club_leagues,
 			updated_at                 = NOW()
 	`,
 		current.UserID, current.FollowRequest, current.FollowAccepted, current.CommentOnMyCard,
@@ -498,7 +690,8 @@ func (r *NotificationRepository) UpsertPreferences(ctx context.Context, userID s
 		current.LeagueRoundOpenedEmail, current.ClubJoinRequestEmail,
 		current.ClubJoinRejectedEmail, current.ClubRoleChangedEmail, current.EventInvitationEmail,
 		current.EventParticipantJoinedEmail, current.EventWentLiveEmail,
-		current.EventResultsPostedEmail,
+		current.EventResultsPostedEmail, current.Announcement, current.AnnouncementEmail,
+		current.ReviewRequestsPublic, current.ReviewRequestsLeagues, current.ReviewRequestsClubLeagues,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("upsert prefs: %w", err)
