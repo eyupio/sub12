@@ -37,21 +37,22 @@ describe('IndexPage (signed out)', () => {
     render(<IndexPage />)
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
-    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument()
   })
 
-  it('shows the app welcome screen with coming soon inside the native shell', () => {
+  it('shows the functional app welcome screen inside the native shell', () => {
     isNative.mockReturnValue(true)
     render(<IndexPage />)
 
     expect(
-      screen.getByRole('heading', { name: /the full sub12 mobile experience is coming soon/i }),
+      screen.getByRole('heading', { name: /know which setup really improves your shooting/i }),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/login')
     expect(screen.getByRole('link', { name: /create an account/i })).toHaveAttribute('href', '/register')
 
-    // None of the marketing site should leak into the native welcome: no
-    // sticky header, no APK download link.
+    // The app is fully functional, not a placeholder, and none of the
+    // marketing site leaks in: no coming-soon copy, no sticky header, no APK
+    // download link.
+    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /download apk/i })).not.toBeInTheDocument()
   })

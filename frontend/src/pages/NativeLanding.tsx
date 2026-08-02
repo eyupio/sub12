@@ -1,12 +1,12 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, Crosshair } from 'lucide-react'
+import { ArrowRight, Crosshair, Target, Users2 } from 'lucide-react'
 
 // The native app's front door. Inside the Capacitor shell the marketing site
 // is the wrong first screen — download links, a comparison table and a
 // desktop-length scroll read as a wrapped web page rather than an app — so a
-// signed-out visitor gets this instead: the brand, a coming-soon note for the
-// full mobile experience, and the two actions that matter in thumb reach.
-// Web visitors keep the full LandingPage.
+// signed-out visitor gets this instead: the brand, what the app does in three
+// lines, and the two actions that matter in thumb reach. Web visitors keep
+// the full LandingPage.
 export default function NativeLanding() {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-page">
@@ -36,26 +36,33 @@ export default function NativeLanding() {
           Precision shooting, properly tracked
         </p>
 
-        <div className="mt-12 inline-flex items-center gap-2 rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--brass)]">
-          <Crosshair size={13} />
-          Coming soon
-        </div>
-        <h1 className="mt-5 max-w-sm text-3xl font-semibold leading-tight tracking-tight text-primary">
-          The full SUB12 mobile experience is coming soon.
+        <h1 className="mt-12 max-w-sm text-3xl font-semibold leading-tight tracking-tight text-primary">
+          Know which setup really improves your shooting.
         </h1>
-        <p className="mt-4 max-w-sm text-base leading-7 text-secondary">
-          Pellet testing, measured targets, score cards, clubs and leagues are being tuned for
-          this app. Already shooting with SUB12? Sign in and carry on where you left off.
-        </p>
+
+        <div className="mt-8 w-full max-w-sm space-y-3 text-left">
+          {[
+            { icon: Target, text: 'Log 25-shot score cards at the firing line, even with no signal.' },
+            { icon: Crosshair, text: 'Measure pellet groups from a photo and rank your setups on evidence.' },
+            { icon: Users2, text: 'Shoot in clubs and leagues with verified scores and live standings.' },
+          ].map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-center gap-3 rounded-2xl border border-subtle bg-surface/80 px-4 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brass)]/12 text-[var(--brass)]">
+                <Icon size={17} />
+              </span>
+              <p className="text-sm leading-6 text-secondary">{text}</p>
+            </div>
+          ))}
+        </div>
       </main>
 
-      <div className="relative z-10 flex flex-col gap-3 px-6 pb-8 pt-4 animate-fade-in-up">
-        <Link to="/login" className="btn btn-primary btn-lg u-sheen w-full">
-          Sign in
+      <div className="animate-fade-in-up relative z-10 mx-auto flex w-full max-w-sm flex-col gap-3 px-6 pb-8 pt-4">
+        <Link to="/register" className="btn btn-primary btn-lg u-sheen w-full">
+          Create an account
           <ArrowRight size={16} />
         </Link>
-        <Link to="/register" className="btn btn-secondary btn-lg w-full">
-          Create an account
+        <Link to="/login" className="btn btn-secondary btn-lg w-full">
+          Sign in
         </Link>
       </div>
     </div>

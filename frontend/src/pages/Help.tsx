@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
 import {
-  Search, ChevronDown, ChevronRight, Download, X, Link2, Compass,
+  Search, ChevronDown, ChevronRight, Clock3, X, Link2, Compass,
   Package, Target, Users, Crosshair, LifeBuoy, Lightbulb,
 } from 'lucide-react'
 import { faqApi, type FAQ } from '../api/faq'
@@ -13,7 +13,6 @@ import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { SkeletonList } from '../components/Skeleton'
 import { Capacitor } from '@capacitor/core'
-import { androidApkUrl } from '../utils/site'
 import { toast } from '../store/toast'
 
 function groupByCategory(items: FAQ[]): [string, FAQ[]][] {
@@ -28,8 +27,8 @@ function groupByCategory(items: FAQ[]): [string, FAQ[]][] {
     .map(([category, bucket]) => [category, bucket.list] as [string, FAQ[]])
 }
 
-// The APK download only makes sense on the web build — inside the native app
-// the user already has it installed.
+// The mobile-apps note only makes sense on the web build — inside the native
+// app the user is already holding it.
 const isNativeApp = Capacitor.isNativePlatform()
 
 // The same first-session path the Dashboard checklist walks people through,
@@ -218,21 +217,19 @@ export default function Help() {
             ))}
           </div>
 
-          {/* Hidden inside the native app, where the APK is already installed. */}
+          {/* Hidden inside the native app, which is the app being announced. */}
           {!isNativeApp && (
             <>
               <hr className="u-hairline my-3 hidden lg:block" />
               <div className="hidden lg:block">
-                <h2 className="t-section-title px-2 pb-2">Android App</h2>
-                <a
-                  href={androidApkUrl()}
-                  className="flex items-center gap-2 rounded px-2.5 py-2 text-sm text-secondary hover:bg-surface-hover hover:text-[var(--brass)] u-nudge"
-                >
-                  <Download size={15} className="shrink-0 text-muted" />
-                  Download the APK
-                </a>
-                <p className="px-2.5 pt-1 text-[11px] leading-4 text-muted">
-                  Direct install — Android will ask you to allow it the first time.
+                <h2 className="t-section-title px-2 pb-2">Mobile Apps</h2>
+                <span className="mx-2.5 inline-flex items-center gap-2 rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--brass)]">
+                  <Clock3 size={12} />
+                  Coming soon
+                </span>
+                <p className="px-2.5 pt-2 text-[11px] leading-4 text-muted">
+                  Native Android and iOS apps are on the way. Until then, install SUB12 from your
+                  browser: Share &rarr; Add to Home Screen.
                 </p>
               </div>
             </>
