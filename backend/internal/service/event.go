@@ -18,9 +18,13 @@ var (
 	ErrNotEventScorer         = errors.New("not authorised to score this event")
 	ErrAlreadyEventParticipant = errors.New("already a participant of this event")
 	ErrEventNotJoinable       = errors.New("event is not open for entries")
+	ErrEventFull              = errors.New("event is full")
 	ErrInvalidEventState      = errors.New("invalid event state transition")
 	ErrEventForbidden         = errors.New("not authorised to view this event")
 )
+
+// EventMaxCapacity bounds the optional max_participants setting.
+const EventMaxCapacity = 5000
 
 // allowedTransitions encodes the event state machine. archived is reachable
 // only via the daily sweep, never via user action. complete → live exists so
@@ -171,6 +175,11 @@ func validateEventInput(in *model.CreateEventInput) error {
 			return fmt.Errorf("%w: required_confirmations must be 0..10", ErrInvalidEvent)
 		}
 	}
+	if in.MaxParticipants != nil {
+		if *in.MaxParticipants < 1 || *in.MaxParticipants > EventMaxCapacity {
+			return fmt.Errorf("%w: max_participants must be 1..%d", ErrInvalidEvent, EventMaxCapacity)
+		}
+	}
 	if in.Visibility != nil {
 		switch *in.Visibility {
 		case model.EventVisibilityPublic, model.EventVisibilityClubOnly, model.EventVisibilityUnlisted:
@@ -186,8 +195,35 @@ func validateEventInput(in *model.CreateEventInput) error {
 	return nil
 }
 
-// GetBySlug enforces visibility rules. Site admins bypass all gating.
-func (s *EventService) GetBySlug(ctx context.Context, slug, viewerID, viewerRole string) (*model.Event, error) {
+// ensureViewable applies the event's visibility rules to a viewer. Site
+// admins and the owner bypass all gating; club_only events require club
+// membership; 'unlisted' is intentionally accessible to anyone with the slug.
+func (s *EventService) ensureViewable(ctx context.Context, ev *model.Event, viewerID, viewerRole string) error {
+	if viewerRole == "admin" || (viewerID != "" && ev.OwnerUserID == viewerID) {
+		return nil
+	}
+	if ev.Visibility == model.EventVisibilityClubOnly {
+		if ev.ClubID == nil {
+			return ErrEventNotFound
+		}
+		if viewerID == "" {
+			return ErrUnauthenticated
+		}
+		isMember, err := s.clubs.IsMember(ctx, *ev.ClubID, viewerID)
+		if err != nil {
+			return err
+		}
+		if !isMember {
+			return ErrEventForbidden
+		}
+	}
+	return nil
+}
+
+// getViewableBySlug loads an event and enforces visibility for the viewer.
+// Shared by every public read so club_only events never leak participants,
+// scores or exports to non-members who know the slug.
+func (s *EventService) getViewableBySlug(ctx context.Context, slug, viewerID, viewerRole string) (*model.Event, error) {
 	ev, err := s.events.GetBySlug(ctx, slug)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrEventNotFound
@@ -195,24 +231,17 @@ func (s *EventService) GetBySlug(ctx context.Context, slug, viewerID, viewerRole
 	if err != nil {
 		return nil, err
 	}
-	isSiteAdmin := viewerRole == "admin"
-	if !isSiteAdmin {
-		if ev.Visibility == model.EventVisibilityClubOnly {
-			if ev.ClubID == nil {
-				return nil, ErrEventNotFound
-			}
-			if viewerID == "" {
-				return nil, ErrUnauthenticated
-			}
-			isMember, err := s.clubs.IsMember(ctx, *ev.ClubID, viewerID)
-			if err != nil {
-				return nil, err
-			}
-			if !isMember {
-				return nil, ErrEventForbidden
-			}
-		}
-		// 'unlisted' is intentionally accessible to anyone with the slug.
+	if err := s.ensureViewable(ctx, ev, viewerID, viewerRole); err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
+// GetBySlug enforces visibility rules. Site admins bypass all gating.
+func (s *EventService) GetBySlug(ctx context.Context, slug, viewerID, viewerRole string) (*model.Event, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
+	if err != nil {
+		return nil, err
 	}
 	if viewerID != "" {
 		ev.IsOwner = ev.OwnerUserID == viewerID
@@ -244,7 +273,7 @@ func (s *EventService) List(ctx context.Context, viewerID, viewerRole, stateFilt
 				return nil, ErrEventForbidden
 			}
 		}
-		items, err := s.events.ListByClub(ctx, clubID)
+		items, err := s.events.ListByClub(ctx, clubID, viewerID)
 		if err != nil {
 			return nil, err
 		}
@@ -277,6 +306,9 @@ func (s *EventService) Update(ctx context.Context, slug, userID string, in *mode
 	if ev.OwnerUserID != userID {
 		return nil, ErrNotEventOwner
 	}
+	if err := validateEventUpdate(ev, in); err != nil {
+		return nil, err
+	}
 	if in.CategoryIDs != nil && len(*in.CategoryIDs) > 0 {
 		ok, err := s.categories.ExistAll(ctx, *in.CategoryIDs)
 		if err != nil {
@@ -286,18 +318,82 @@ func (s *EventService) Update(ctx context.Context, slug, userID string, in *mode
 			return nil, fmt.Errorf("%w: one or more categories are invalid or inactive", ErrInvalidEvent)
 		}
 	}
-	if in.Visibility != nil {
-		switch *in.Visibility {
-		case model.EventVisibilityPublic, model.EventVisibilityClubOnly, model.EventVisibilityUnlisted:
-		default:
-			return nil, fmt.Errorf("%w: visibility must be 'public', 'club_only' or 'unlisted'", ErrInvalidEvent)
+	if _, err := s.events.Update(ctx, ev.ID, in); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrEventNotFound
 		}
+		return nil, err
 	}
-	updated, err := s.events.Update(ctx, ev.ID, in)
+	// Re-fetch so the response carries the participant count like GetBySlug.
+	updated, err := s.events.GetByID(ctx, ev.ID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrEventNotFound
 	}
 	return updated, err
+}
+
+// validateEventUpdate mirrors validateEventInput for the PATCH path, plus the
+// rules that depend on the event's current state: the scoring format is fixed
+// once the event leaves draft, and the course cannot change once scoring has
+// started (recorded shots would fall outside the visible grid).
+func validateEventUpdate(ev *model.Event, in *model.UpdateEventInput) error {
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return fmt.Errorf("%w: name cannot be empty", ErrInvalidEvent)
+	}
+	if in.Discipline != nil && strings.TrimSpace(*in.Discipline) == "" {
+		return fmt.Errorf("%w: discipline cannot be empty", ErrInvalidEvent)
+	}
+	if in.Format != nil && *in.Format != ev.Format {
+		switch *in.Format {
+		case model.EventFormatShotGrid, model.EventFormatCardSubmission:
+		default:
+			return fmt.Errorf("%w: format must be 'shot_grid' or 'card_submission'", ErrInvalidEvent)
+		}
+		if ev.State != model.EventStateDraft {
+			return fmt.Errorf("%w: format can only be changed while the event is a draft", ErrInvalidEvent)
+		}
+	}
+	if in.Course != nil {
+		if ev.State != model.EventStateDraft && ev.State != model.EventStateOpenForEntries {
+			return fmt.Errorf("%w: the course cannot be changed once the event is live", ErrInvalidEvent)
+		}
+		format := ev.Format
+		if in.Format != nil && *in.Format != "" {
+			format = *in.Format
+		}
+		if format == model.EventFormatShotGrid {
+			if in.Course.Lanes < 1 || in.Course.Lanes > 200 {
+				return fmt.Errorf("%w: course.lanes must be 1..200", ErrInvalidEvent)
+			}
+			if in.Course.ShotsPerTarget < 1 || in.Course.ShotsPerTarget > 10 {
+				return fmt.Errorf("%w: course.shots_per_target must be 1..10", ErrInvalidEvent)
+			}
+		}
+	}
+	if in.RequiredConfirmations != nil {
+		if *in.RequiredConfirmations < 0 || *in.RequiredConfirmations > 10 {
+			return fmt.Errorf("%w: required_confirmations must be 0..10", ErrInvalidEvent)
+		}
+	}
+	if in.MaxParticipants != nil && *in.MaxParticipants != 0 {
+		if *in.MaxParticipants < 1 || *in.MaxParticipants > EventMaxCapacity {
+			return fmt.Errorf("%w: max_participants must be 1..%d (or 0 to remove the cap)", ErrInvalidEvent, EventMaxCapacity)
+		}
+		if *in.MaxParticipants < ev.ParticipantCount {
+			return fmt.Errorf("%w: max_participants cannot be below the current participant count (%d)", ErrInvalidEvent, ev.ParticipantCount)
+		}
+	}
+	if in.Visibility != nil {
+		switch *in.Visibility {
+		case model.EventVisibilityPublic, model.EventVisibilityClubOnly, model.EventVisibilityUnlisted:
+		default:
+			return fmt.Errorf("%w: visibility must be 'public', 'club_only' or 'unlisted'", ErrInvalidEvent)
+		}
+		if *in.Visibility == model.EventVisibilityClubOnly && ev.ClubID == nil {
+			return fmt.Errorf("%w: visibility 'club_only' requires the event to belong to a club", ErrInvalidEvent)
+		}
+	}
+	return nil
 }
 
 // Promote transitions the event to the requested state. Validates the
@@ -516,9 +612,15 @@ func (s *EventService) Join(ctx context.Context, slug, userID string, in *model.
 			return nil, fmt.Errorf("%w: category is not enabled for this event", ErrInvalidEvent)
 		}
 	}
+	if err := validateLaneAssignment(ev, in.LaneAssignment); err != nil {
+		return nil, err
+	}
 	p, err := s.events.AddRegisteredParticipant(ctx, ev.ID, userID, userID, in)
 	if errors.Is(err, repository.ErrConflict) {
 		return nil, ErrAlreadyEventParticipant
+	}
+	if errors.Is(err, repository.ErrEventFull) {
+		return nil, ErrEventFull
 	}
 	if err != nil {
 		return nil, err
@@ -536,8 +638,21 @@ func (s *EventService) Join(ctx context.Context, slug, userID string, in *model.
 	return p, nil
 }
 
-// AddGuest is owner-only. Allowed in any pre-archived state so owners can
-// recover from "this guy showed up after sign-up closed" reality.
+// validateLaneAssignment rejects a lane outside the event's course. Nil (no
+// assignment) is always fine.
+func validateLaneAssignment(ev *model.Event, lane *int) error {
+	if lane == nil {
+		return nil
+	}
+	if ev.Course.Lanes < 1 || *lane < 1 || *lane > ev.Course.Lanes {
+		return fmt.Errorf("%w: lane_assignment must be 1..%d", ErrInvalidEvent, ev.Course.Lanes)
+	}
+	return nil
+}
+
+// AddGuest is owner-only. Allowed in any pre-completion state so owners can
+// recover from "this guy showed up after sign-up closed" reality; completed
+// and archived events refuse new entries.
 func (s *EventService) AddGuest(ctx context.Context, slug, ownerID string, in *model.AddGuestInput) (*model.EventParticipant, error) {
 	ev, err := s.events.GetBySlug(ctx, slug)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -549,6 +664,9 @@ func (s *EventService) AddGuest(ctx context.Context, slug, ownerID string, in *m
 	if ev.OwnerUserID != ownerID {
 		return nil, ErrNotEventOwner
 	}
+	if ev.State == model.EventStateComplete || ev.State == model.EventStateArchived {
+		return nil, ErrEventNotJoinable
+	}
 	if strings.TrimSpace(in.GuestName) == "" {
 		return nil, fmt.Errorf("%w: guest_name is required", ErrInvalidEvent)
 	}
@@ -557,7 +675,14 @@ func (s *EventService) AddGuest(ctx context.Context, slug, ownerID string, in *m
 			return nil, fmt.Errorf("%w: category is not enabled for this event", ErrInvalidEvent)
 		}
 	}
-	return s.events.AddGuest(ctx, ev.ID, ownerID, in)
+	if err := validateLaneAssignment(ev, in.LaneAssignment); err != nil {
+		return nil, err
+	}
+	p, err := s.events.AddGuest(ctx, ev.ID, ownerID, in)
+	if errors.Is(err, repository.ErrEventFull) {
+		return nil, ErrEventFull
+	}
+	return p, err
 }
 
 func (s *EventService) RemoveParticipant(ctx context.Context, slug, ownerID, participantID string) error {
@@ -571,6 +696,9 @@ func (s *EventService) RemoveParticipant(ctx context.Context, slug, ownerID, par
 	if ev.OwnerUserID != ownerID {
 		return ErrNotEventOwner
 	}
+	if ev.State == model.EventStateArchived {
+		return fmt.Errorf("%w: event is archived", ErrInvalidEventState)
+	}
 	if err := s.events.RemoveParticipant(ctx, ev.ID, participantID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return ErrEventNotFound
@@ -580,11 +708,8 @@ func (s *EventService) RemoveParticipant(ctx context.Context, slug, ownerID, par
 	return nil
 }
 
-func (s *EventService) ListParticipants(ctx context.Context, slug string) ([]*model.EventParticipant, error) {
-	ev, err := s.events.GetBySlug(ctx, slug)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrEventNotFound
-	}
+func (s *EventService) ListParticipants(ctx context.Context, slug, viewerID, viewerRole string) ([]*model.EventParticipant, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
 	if err != nil {
 		return nil, err
 	}
@@ -608,6 +733,42 @@ func (s *EventService) AddScorer(ctx context.Context, slug, ownerID string, in *
 	return s.events.AddScorer(ctx, ev.ID, in.UserID, ownerID)
 }
 
+// ListScorers is owner-only: the scorer roster is a management view.
+func (s *EventService) ListScorers(ctx context.Context, slug, ownerID string) ([]*repository.EventScorerRow, error) {
+	ev, err := s.events.GetBySlug(ctx, slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrEventNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if ev.OwnerUserID != ownerID {
+		return nil, ErrNotEventOwner
+	}
+	return s.events.ListScorers(ctx, ev.ID)
+}
+
+// RemoveScorer revokes a delegated scorer. Owner-only.
+func (s *EventService) RemoveScorer(ctx context.Context, slug, ownerID, userID string) error {
+	ev, err := s.events.GetBySlug(ctx, slug)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrEventNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if ev.OwnerUserID != ownerID {
+		return ErrNotEventOwner
+	}
+	if err := s.events.RemoveScorer(ctx, ev.ID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrEventNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 // RecordScores is the offline-outbox flush endpoint. Caller must be a scorer.
 func (s *EventService) RecordScores(ctx context.Context, slug, userID string, in *model.RecordScoresInput) (int, error) {
 	ev, err := s.events.GetBySlug(ctx, slug)
@@ -627,9 +788,17 @@ func (s *EventService) RecordScores(ctx context.Context, slug, userID string, in
 	if !allowed {
 		return 0, ErrNotEventScorer
 	}
+	maxLane := ev.Course.Lanes
+	maxShot := ev.Course.ShotsPerTarget
 	for i, sc := range in.Scores {
-		if sc.ParticipantID == "" || sc.Result == "" || sc.ClientID == "" || sc.Lane < 1 {
+		if sc.ParticipantID == "" || sc.Result == "" || sc.ClientID == "" {
 			return 0, fmt.Errorf("%w: score[%d] missing required fields", ErrInvalidEvent, i)
+		}
+		if sc.Lane < 1 || (maxLane > 0 && sc.Lane > maxLane) {
+			return 0, fmt.Errorf("%w: score[%d] lane must be 1..%d", ErrInvalidEvent, i, maxLane)
+		}
+		if sc.ShotNumber < 1 || (maxShot > 0 && sc.ShotNumber > maxShot) {
+			return 0, fmt.Errorf("%w: score[%d] shot_number must be 1..%d", ErrInvalidEvent, i, maxShot)
 		}
 	}
 	return s.events.UpsertScores(ctx, ev.ID, userID, in.Scores)
@@ -637,22 +806,16 @@ func (s *EventService) RecordScores(ctx context.Context, slug, userID string, in
 
 // ListScores returns every per-shot result for an event so the scorecard can
 // hydrate its local state on reload. Visibility mirrors the scoreboard.
-func (s *EventService) ListScores(ctx context.Context, slug string) ([]*model.EventScore, error) {
-	ev, err := s.events.GetBySlug(ctx, slug)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrEventNotFound
-	}
+func (s *EventService) ListScores(ctx context.Context, slug, viewerID, viewerRole string) ([]*model.EventScore, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
 	if err != nil {
 		return nil, err
 	}
 	return s.events.ListScoresForCSV(ctx, ev.ID)
 }
 
-func (s *EventService) Standings(ctx context.Context, slug string) ([]*model.EventStandingRow, error) {
-	ev, err := s.events.GetBySlug(ctx, slug)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrEventNotFound
-	}
+func (s *EventService) Standings(ctx context.Context, slug, viewerID, viewerRole string) ([]*model.EventStandingRow, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
 	if err != nil {
 		return nil, err
 	}
@@ -663,12 +826,9 @@ func (s *EventService) Standings(ctx context.Context, slug string) ([]*model.Eve
 }
 
 // ListEventCards returns the per-participant card status for a card_submission
-// event. Public read; visibility mirrors the scoreboard.
-func (s *EventService) ListEventCards(ctx context.Context, slug string) (*model.Event, []*model.EventCardStatus, error) {
-	ev, err := s.events.GetBySlug(ctx, slug)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrEventNotFound
-	}
+// event. Visibility mirrors the scoreboard.
+func (s *EventService) ListEventCards(ctx context.Context, slug, viewerID, viewerRole string) (*model.Event, []*model.EventCardStatus, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -860,11 +1020,8 @@ func (s *EventService) RejectCard(ctx context.Context, slug, scoreCardID, userID
 	return s.verifyRepo.RejectScore(ctx, card.ID, userID, in)
 }
 
-func (s *EventService) ListScoresForCSV(ctx context.Context, slug string) (*model.Event, []*model.EventParticipant, []*model.EventScore, error) {
-	ev, err := s.events.GetBySlug(ctx, slug)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, nil, ErrEventNotFound
-	}
+func (s *EventService) ListScoresForCSV(ctx context.Context, slug, viewerID, viewerRole string) (*model.Event, []*model.EventParticipant, []*model.EventScore, error) {
+	ev, err := s.getViewableBySlug(ctx, slug, viewerID, viewerRole)
 	if err != nil {
 		return nil, nil, nil, err
 	}

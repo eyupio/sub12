@@ -117,7 +117,7 @@ make migrate-down                  # rollback last migration
 make migrate-lint                  # check for duplicate prefixes
 ```
 
-Current migration count: **115** (000001–000115). Latest: `000115_moderator_permissions`.
+Current migration count: **116** (000001–000116). Latest: `000116_event_max_participants`.
 
 ## Critical Migration Rules
 

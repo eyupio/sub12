@@ -88,6 +88,113 @@ func TestValidateEventInput(t *testing.T) {
 	})
 }
 
+func TestValidateEventInputMaxParticipants(t *testing.T) {
+	base := func(maxParticipants *int) *model.CreateEventInput {
+		return &model.CreateEventInput{
+			Name:            "Spring HFT",
+			Discipline:      "HFT",
+			Course:          model.EventCourse{Lanes: 25, ShotsPerTarget: 2},
+			MaxParticipants: maxParticipants,
+		}
+	}
+	valid := 30
+	require.NoError(t, validateEventInput(base(&valid)))
+
+	zero := 0
+	require.ErrorIs(t, validateEventInput(base(&zero)), ErrInvalidEvent)
+
+	tooBig := EventMaxCapacity + 1
+	require.ErrorIs(t, validateEventInput(base(&tooBig)), ErrInvalidEvent)
+}
+
+func TestValidateEventUpdate(t *testing.T) {
+	ev := func(state string) *model.Event {
+		return &model.Event{
+			State:            state,
+			Format:           model.EventFormatShotGrid,
+			Course:           model.EventCourse{Lanes: 25, ShotsPerTarget: 2},
+			ParticipantCount: 5,
+		}
+	}
+	strPtr := func(s string) *string { return &s }
+	intPtr := func(n int) *int { return &n }
+
+	t.Run("empty name rejected", func(t *testing.T) {
+		err := validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{Name: strPtr("  ")})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+	})
+
+	t.Run("course bounds enforced", func(t *testing.T) {
+		err := validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{
+			Course: &model.EventCourse{Lanes: 0, ShotsPerTarget: 2},
+		})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+
+		err = validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{
+			Course: &model.EventCourse{Lanes: 30, ShotsPerTarget: 2},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("course frozen once live", func(t *testing.T) {
+		err := validateEventUpdate(ev(model.EventStateLive), &model.UpdateEventInput{
+			Course: &model.EventCourse{Lanes: 30, ShotsPerTarget: 2},
+		})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+	})
+
+	t.Run("format change only in draft", func(t *testing.T) {
+		card := model.EventFormatCardSubmission
+		err := validateEventUpdate(ev(model.EventStateOpenForEntries), &model.UpdateEventInput{Format: &card})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+		require.NoError(t, validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{Format: &card}))
+	})
+
+	t.Run("invalid format rejected", func(t *testing.T) {
+		bad := "banana"
+		err := validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{Format: &bad})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+	})
+
+	t.Run("required confirmations bounds", func(t *testing.T) {
+		bad := int16(11)
+		err := validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{RequiredConfirmations: &bad})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+	})
+
+	t.Run("max participants below current count rejected", func(t *testing.T) {
+		err := validateEventUpdate(ev(model.EventStateOpenForEntries), &model.UpdateEventInput{MaxParticipants: intPtr(3)})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+		require.NoError(t, validateEventUpdate(ev(model.EventStateOpenForEntries), &model.UpdateEventInput{MaxParticipants: intPtr(5)}))
+	})
+
+	t.Run("zero clears the cap", func(t *testing.T) {
+		require.NoError(t, validateEventUpdate(ev(model.EventStateOpenForEntries), &model.UpdateEventInput{MaxParticipants: intPtr(0)}))
+	})
+
+	t.Run("club_only requires a club", func(t *testing.T) {
+		v := model.EventVisibilityClubOnly
+		err := validateEventUpdate(ev(model.EventStateDraft), &model.UpdateEventInput{Visibility: &v})
+		require.ErrorIs(t, err, ErrInvalidEvent)
+
+		withClub := ev(model.EventStateDraft)
+		club := "11111111-1111-1111-1111-111111111111"
+		withClub.ClubID = &club
+		require.NoError(t, validateEventUpdate(withClub, &model.UpdateEventInput{Visibility: &v}))
+	})
+}
+
+func TestValidateLaneAssignment(t *testing.T) {
+	ev := &model.Event{Course: model.EventCourse{Lanes: 25, ShotsPerTarget: 2}}
+	lane := func(n int) *int { return &n }
+
+	require.NoError(t, validateLaneAssignment(ev, nil))
+	require.NoError(t, validateLaneAssignment(ev, lane(1)))
+	require.NoError(t, validateLaneAssignment(ev, lane(25)))
+	require.ErrorIs(t, validateLaneAssignment(ev, lane(0)), ErrInvalidEvent)
+	require.ErrorIs(t, validateLaneAssignment(ev, lane(26)), ErrInvalidEvent)
+}
+
 func TestAllowedTransitionsTopology(t *testing.T) {
 	// Sanity check on the state machine: archived is unreachable from user
 	// actions (only the archive sweep flips into it). complete now has exactly

@@ -74,6 +74,8 @@ type Event struct {
 	State         string             `json:"state"`
 	OwnerUserID   string             `json:"owner_user_id"`
 	ClubID        *string            `json:"club_id,omitempty"`
+	// MaxParticipants caps entries (registered + guests). Nil = unlimited.
+	MaxParticipants *int `json:"max_participants,omitempty"`
 	// Verification settings, only meaningful for format='card_submission'.
 	// Defaults mirror league_config so the team's mental model carries over.
 	RequireScoreVerification   bool  `json:"require_score_verification"`
@@ -117,6 +119,7 @@ type CreateEventInput struct {
 	CategoryIDs  []string           `json:"category_ids"`
 	Visibility   *string            `json:"visibility"`
 	ClubID       *string            `json:"club_id"`
+	MaxParticipants *int            `json:"max_participants"`
 	RequireScoreVerification   *bool  `json:"require_score_verification"`
 	RequiredConfirmations      *int16 `json:"required_confirmations"`
 	RequireImageUpload         *bool  `json:"require_image_upload"`
@@ -136,6 +139,8 @@ type UpdateEventInput struct {
 	ScoringRules *EventScoringRules `json:"scoring_rules"`
 	CategoryIDs  *[]string          `json:"category_ids"`
 	Visibility   *string            `json:"visibility"`
+	// MaxParticipants follows the "omit to keep" convention; 0 clears the cap.
+	MaxParticipants *int `json:"max_participants"`
 	RequireScoreVerification   *bool  `json:"require_score_verification"`
 	RequiredConfirmations      *int16 `json:"required_confirmations"`
 	RequireImageUpload         *bool  `json:"require_image_upload"`

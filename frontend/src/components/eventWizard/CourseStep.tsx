@@ -25,6 +25,24 @@ export function CourseStep({ state, onChange }: Props) {
         </p>
       </header>
 
+      <label className="block">
+        <span className={WIZARD_LABEL_CLS}>Max participants (optional)</span>
+        <input
+          type="number"
+          min={1}
+          max={5000}
+          className={WIZARD_INPUT_CLS}
+          placeholder="No limit"
+          value={course.maxParticipants}
+          onChange={(e) =>
+            onChange({ ...state, course: { ...course, maxParticipants: e.target.value } })
+          }
+        />
+        <span className="block mt-1 text-xs text-muted">
+          Joining closes once this many shooters (including guests) have entered. Leave empty for no limit.
+        </span>
+      </label>
+
       {card ? (
         <p className="text-sm text-muted">No course settings to configure for card submission.</p>
       ) : (

@@ -13,6 +13,8 @@ import {
   PageGrid,
   PageHeader,
 } from '../components/leagues'
+import { SkeletonCard } from '../components/Skeleton'
+import { courseLabel, isEventFull, participantsLabel } from '../utils/eventDisplay'
 
 const FILTERS: { id: 'all' | EventState; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -79,16 +81,7 @@ export default function Events() {
         {isLoading && (
           <div className="lc-stack" aria-busy>
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  height: 88,
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'var(--lc-surface)',
-                  border: '1px solid var(--line)',
-                  opacity: 0.6,
-                }}
-              />
+              <SkeletonCard key={i} />
             ))}
           </div>
         )}
@@ -114,6 +107,9 @@ export default function Events() {
               const badges = (
                 <>
                   <StateBadge state={ev.state} />
+                  {isEventFull(ev) && ev.state !== 'complete' && ev.state !== 'archived' && (
+                    <Badge variant="red">Full</Badge>
+                  )}
                   {ev.visibility === 'club_only' && (
                     <Badge variant="neutral">
                       <Lock size={10} /> Club only
@@ -128,11 +124,8 @@ export default function Events() {
               )
               const meta: MetaItem[] = [
                 { icon: <Trophy size={12} />, text: ev.discipline },
-                { icon: <CalendarClock size={12} />, text: `${ev.course.lanes} lanes` },
-                {
-                  icon: <Users size={12} />,
-                  text: `${ev.participant_count} participant${ev.participant_count === 1 ? '' : 's'}`,
-                },
+                { icon: <CalendarClock size={12} />, text: courseLabel(ev) },
+                { icon: <Users size={12} />, text: participantsLabel(ev) },
               ]
               if (ev.location) {
                 meta.push({ text: ev.location })
