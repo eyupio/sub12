@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Clock3,
   Crosshair,
-  Download,
   Gauge,
   LineChart,
   Medal,
@@ -28,7 +27,6 @@ import {
 import { CornerMark } from '../components/CornerMark'
 import { Sub12BrandLockup } from '../components/Sub12BrandLockup'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { androidApkUrl } from '../utils/site'
 
 type SectionHeaderProps = {
   eyebrow: string
@@ -1072,7 +1070,7 @@ export default function LandingPage() {
             <SectionHeader
               eyebrow="On The Range"
               title="Take it to the firing line"
-              description="Score cards get logged where they're shot, not typed up later at a desk. SUB12 installs to the home screen on any phone, and Android shooters can grab the native build directly."
+              description="Score cards get logged where they're shot, not typed up later at a desk. SUB12 installs to the home screen on any phone today, and the native Android and iOS apps are coming soon."
               align="center"
             />
 
@@ -1081,20 +1079,16 @@ export default function LandingPage() {
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
                   <Smartphone size={20} />
                 </div>
-                <h3 className="mt-5 text-lg font-semibold text-primary">Android app</h3>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Android &amp; iOS apps</h3>
                 <p className="mt-2 text-sm leading-6 text-secondary">
-                  The native build — camera capture, offline score entry, and push notifications for league results.
+                  The native builds — camera capture, offline score entry, and push notifications for league results.
                 </p>
-                <a
-                  href={androidApkUrl()}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold uppercase tracking-[0.16em] text-inverse shadow-gold u-press u-sheen transition-shadow hover:shadow-float"
-                  style={{ background: 'linear-gradient(135deg, var(--gold-2), var(--gold))' }}
-                >
-                  <Download size={16} />
-                  Download APK
-                </a>
+                <span className="mt-6 inline-flex items-center gap-2 rounded-full border border-[var(--brass)]/25 bg-[var(--brass)]/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--brass)]">
+                  <Clock3 size={14} />
+                  Coming soon
+                </span>
                 <p className="mt-3 text-[11px] leading-5 text-muted">
-                  Android asks you to allow installs from your browser the first time — this is a direct download, not a Play Store listing.
+                  The store releases are being finished now. Until then, the home-screen install gives you the full experience on any phone.
                 </p>
               </SurfaceCard>
 

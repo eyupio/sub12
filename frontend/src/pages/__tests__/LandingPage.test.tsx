@@ -24,4 +24,11 @@ describe('LandingPage', () => {
     expect(classTokens).not.toContain('hidden')
     expect(classTokens.some((token) => token.endsWith(':hidden'))).toBe(false)
   })
+
+  it('advertises the native apps as coming soon instead of an APK download', () => {
+    render(<LandingPage />)
+
+    expect(screen.getAllByText(/coming soon/i).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('link', { name: /download apk/i })).not.toBeInTheDocument()
+  })
 })
