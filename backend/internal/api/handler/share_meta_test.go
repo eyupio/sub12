@@ -93,9 +93,9 @@ func TestWriteHTML_CacheControlMatchesTemplateSource(t *testing.T) {
 	s.writeHTML(rec, httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil), s.defaultOG(httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil)))
 	assert.Equal(t, "public, max-age=60", rec.Header().Get("Cache-Control"), "successful shell must remain cacheable")
 
-	// Fallback: the embedded holding page must never be cached, otherwise the
-	// in-page JS reload serves itself back from cache and the user is stuck on
-	// "Continue to sub-12" until a manual navigation clears the entry.
+	// Fallback: the embedded holding page must never be cached, or it outlives
+	// the outage — served back to the retry, and pinned against the share URL
+	// long after the backend can build the real thing again.
 	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -231,12 +231,74 @@ func TestImageAlt_EveryShareTypeProducesNonEmptyAlt(t *testing.T) {
 
 func TestFallbackTemplate_IsSafeForOutages(t *testing.T) {
 	// Crawlers landing on the holding page during a cold start must not index
-	// "Getting things ready" as the canonical title. The inline reload must
-	// also be the only retry mechanism — a <meta http-equiv="refresh"> would
-	// combine with the JS reload and hammer the backend from every tab.
+	// "Getting things ready" as the canonical title.
 	assert.Contains(t, fallbackTemplate, `name="robots" content="noindex"`)
 	assert.NotContains(t, fallbackTemplate, `http-equiv="refresh"`)
-	assert.Contains(t, fallbackTemplate, "fallbackReloadDelay", "reload should back off across retries")
+}
+
+func TestFallbackTemplate_NeedsNoJavaScript(t *testing.T) {
+	// The page is served with `script-src 'self'`, which blocks inline
+	// <script> and inline event handlers. A previous version told the visitor
+	// "this page will refresh automatically" from an inline script the browser
+	// silently refused to run, and offered a button wired to an onclick the
+	// browser also refused — so the holding page never left, which is the whole
+	// reason shared links dead-ended. Anything added here must work with no
+	// script at all.
+	assert.NotContains(t, fallbackTemplate, "<script", "the fallback must not depend on inline script")
+	assert.NotRegexp(t, `(?i)\son[a-z]+\s*=`, fallbackTemplate, "inline event handlers are blocked by our CSP")
+	assert.Contains(t, fallbackTemplate, `href="/"`, "the visitor needs a way out that is not this URL again")
+}
+
+func TestWriteHTML_FallbackAsksTheProxyToServeTheRealShell(t *testing.T) {
+	// The holding page cannot boot the app, so serving it 200 leaves whoever
+	// followed a shared link stuck on it. 503 is the signal nginx intercepts
+	// (`error_page 502 503 504 = @spa_shell`) to serve index.html off disk
+	// instead. Downgrade this to 200 and the dead end comes straight back.
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer down.Close()
+
+	s := newShareMetaForTest(down.URL, time.Minute)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/score-cards/abc", nil)
+	s.writeHTML(rec, req, s.defaultOG(req))
+
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, "5", rec.Header().Get("Retry-After"))
+}
+
+// TestNginx_ProxiedHTMLRoutesFallBackToTheStaticShell pins the other half of
+// the same contract. The backend can only ask; nginx is what actually rescues
+// the visitor, and the two files are edited independently.
+func TestNginx_ProxiedHTMLRoutesFallBackToTheStaticShell(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "frontend", "nginx.conf"))
+	if err != nil {
+		t.Skipf("nginx.conf not readable from this checkout: %v", err)
+	}
+	conf := string(raw)
+
+	assert.Contains(t, conf, "location @spa_shell", "no @spa_shell fallback defined")
+	assert.Contains(t, conf, "try_files /index.html", "@spa_shell must serve the bundled shell from disk")
+
+	// Every location that proxies an HTML page to the backend needs the
+	// fallback; the OG image and /api/ blocks deliberately do not.
+	for _, block := range []string{
+		`location ~ ^/(score-cards|pellet-tests)/[^/]+$ {`,
+		`location ~ ^/share/(leagues|clubs|users)/[^/]+$ {`,
+		`location ~ ^/(pellet-leaderboard|register|login|privacy|terms|cookies)$ {`,
+	} {
+		start := strings.Index(conf, block)
+		if !assert.NotEqual(t, -1, start, "location block missing from nginx.conf: %s", block) {
+			continue
+		}
+		body := conf[start:]
+		if end := strings.Index(body, "\n    }"); end != -1 {
+			body = body[:end]
+		}
+		assert.Contains(t, body, "proxy_intercept_errors on;", "%s does not intercept backend errors", block)
+		assert.Contains(t, body, "error_page 502 503 504 = @spa_shell;", "%s has no static-shell fallback", block)
+	}
 }
 
 func TestInjectOG_ReplacesTagsInPlace(t *testing.T) {
@@ -387,6 +449,9 @@ func newShareMetaForTest(frontendOrigin string, ttl time.Duration) *ShareMeta {
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            zerolog.Nop(),
 		ttl:            ttl,
+		// Scaled to the cache TTL so a test that flips a server healthy and
+		// waits out the TTL isn't answered from the negative cache.
+		failTTL: ttl / 4,
 	}
 }
 

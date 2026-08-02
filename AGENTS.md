@@ -407,6 +407,7 @@ the `announcements` table is the one stored original they point at.
 | `ADMIN_PASSWORD` | *(empty)* | Password for seeded admin user |
 | `GEOCODE_URL` | `https://nominatim.openstreetmap.org` | Nominatim-compatible endpoint used to name picked coordinates. Empty disables reverse geocoding; the UI then shows coordinates. |
 | `GEOCODE_USER_AGENT` | *(derived from `SITE_URL`)* | Identifies us to that endpoint, as Nominatim's usage policy requires. |
+| `FRONTEND_ORIGIN` | `http://frontend:8080` | Internal URL the backend fetches the SPA `index.html` from so it can inject per-page Open Graph tags. Point it at the frontend container; every share link and every fixed public page degrades to a holding page if it can't be reached. |
 
 ## CI Pipeline
 

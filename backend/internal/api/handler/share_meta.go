@@ -52,6 +52,15 @@ type ShareMeta struct {
 	cached   []byte
 	cachedAt time.Time
 	ttl      time.Duration
+
+	// Negative cache for a failing fetch. The fetch happens under the write
+	// lock, so a frontend that is unreachable makes every share, /login and
+	// /privacy request queue behind a 5s dial timeout — one broken container
+	// turns into a backend that looks hung. Remember the failure briefly and
+	// answer from the stale shell (or the fallback) instead of re-dialling on
+	// every hit.
+	failedAt time.Time
+	failTTL  time.Duration
 }
 
 // NewShareMeta constructs the share-meta handler. siteURL is the public
@@ -94,6 +103,7 @@ func NewShareMeta(
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            log,
 		ttl:            60 * time.Second,
+		failTTL:        10 * time.Second,
 	}
 }
 
@@ -442,17 +452,28 @@ func (s *ShareMeta) writeHTML(w http.ResponseWriter, r *http.Request, og openGra
 	body := injectOG(tmpl, og, s.siteName)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if isFallback {
-		// The fallback holding page embeds a JS reload so the real SPA takes
-		// over once the frontend container is reachable. If we let browsers
-		// or CDNs cache it, the reload serves the cached fallback back to
-		// itself and the user is stuck. no-store ensures the next request
-		// actually hits the backend and picks up the real shell.
+		// The holding page is a dead end for a human: it has no SPA bundle to
+		// boot, so whoever followed the shared link just sits on it. nginx has
+		// the real index.html on disk, so say "I could not build this" in the
+		// only way it can act on — a 5xx it intercepts (see the `error_page
+		// 502 503 504 = @spa_shell` blocks in frontend/nginx.conf) — and the
+		// visitor gets the working app with the site-wide tags instead. The
+		// body still carries the entity's OG tags for anything that reads a
+		// 503, and Retry-After tells a crawler to come back rather than record
+		// the degraded page.
+		//
+		// no-store because nothing about this response should outlive the
+		// outage: cached, it would serve itself back to the retry and pin the
+		// visitor on the holding page even after the frontend recovered.
 		w.Header().Set("Cache-Control", "no-store")
-	} else {
-		// Short CDN/proxy cache so social platforms see fresh metadata after
-		// edits without hammering the backend for every navigation.
-		w.Header().Set("Cache-Control", "public, max-age=60")
+		w.Header().Set("Retry-After", "5")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write(body)
+		return
 	}
+	// Short CDN/proxy cache so social platforms see fresh metadata after
+	// edits without hammering the backend for every navigation.
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
@@ -481,17 +502,31 @@ func (s *ShareMeta) template() (body []byte, isFallback bool) {
 	if s.frontendOrigin == "" {
 		return []byte(fallbackTemplate), true
 	}
-
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	html, err := fetchIndexHTML(fetchCtx, s.frontendOrigin)
-	if err != nil {
-		s.log.Warn().Err(err).Str("origin", s.frontendOrigin).Msg("share_meta: fetch failed, serving fallback")
+	if !s.failedAt.IsZero() && time.Since(s.failedAt) < s.failTTL {
 		if s.cached != nil {
 			return s.cached, false
 		}
 		return []byte(fallbackTemplate), true
 	}
+
+	fetchCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	html, err := fetchIndexHTML(fetchCtx, s.frontendOrigin)
+	if err != nil {
+		// Error, not Warn: with no cached shell to fall back on this is the
+		// whole public surface — every share link, /login, /privacy — degraded
+		// to a holding page that search engines are told not to index. A
+		// misconfigured FRONTEND_ORIGIN produces exactly this and nothing else
+		// fails, so it has to be loud.
+		s.failedAt = time.Now()
+		s.log.Error().Err(err).Str("origin", s.frontendOrigin).Bool("has_cached_shell", s.cached != nil).
+			Msg("share_meta: cannot fetch the SPA shell from the frontend; shared links degrade to the holding page")
+		if s.cached != nil {
+			return s.cached, false
+		}
+		return []byte(fallbackTemplate), true
+	}
+	s.failedAt = time.Time{}
 	s.cached = html
 	s.cachedAt = time.Now()
 	return s.cached, false

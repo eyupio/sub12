@@ -493,6 +493,21 @@ as invariants and lean on the tests that pin them.
   the admin Sitemap & SEO page reports a sitemap that was never served.
 - `lastmod` tracks `updated_at`, not `created_at` — reporting a creation date
   on a league whose standings move weekly tells crawlers to stop coming back.
+- **A page the backend can't build must still open.** `ShareMeta` composes its
+  response by fetching the frontend container's `index.html` over the internal
+  network (`FRONTEND_ORIGIN`); with no bundle it has nothing to serve, and the
+  embedded `share_meta_fallback.html` holding page cannot boot the app. So the
+  fallback goes out as **503**, and every location in `frontend/nginx.conf`
+  that proxies HTML to the backend carries `proxy_intercept_errors on` plus
+  `error_page 502 503 504 = @spa_shell`, which serves the bundled
+  `index.html` from disk at 200. The visitor gets the working app; only the
+  per-entity preview metadata is lost, and no human ever sees that. Both
+  halves are pinned by tests — a 200 on the fallback, or a proxied location
+  without the `error_page`, puts people back on a dead page that reloading
+  cannot leave. The same rule keeps the holding page **script-free**: it is
+  served under `script-src 'self'`, which blocks inline scripts and `onclick`
+  handlers alike, so anything it promises to do by itself will silently not
+  happen.
 
 ### Public (no auth)
 
@@ -623,6 +638,7 @@ read as generated.
 | `GEOCODE_URL` | `https://nominatim.openstreetmap.org` | Nominatim-compatible endpoint used to name picked coordinates. Empty disables reverse geocoding; the UI then shows coordinates. |
 | `GEOCODE_USER_AGENT` | *(derived from `SITE_URL`)* | Identifies us to that endpoint, as Nominatim's usage policy requires. |
 | `FCM_CREDENTIALS_JSON` | *(empty)* | Firebase service-account JSON for push delivery (FCM HTTP v1). When empty, device tokens are still stored but no push is sent (no-op sender). |
+| `FRONTEND_ORIGIN` | `http://frontend:8080` | Internal URL the backend fetches the SPA `index.html` from so it can inject per-page Open Graph tags. Point it at the frontend container; every share link and every page in `StaticPages` degrades to a holding page if it can't be reached. |
 
 ## CI Pipeline
 

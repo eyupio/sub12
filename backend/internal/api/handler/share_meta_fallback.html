@@ -7,9 +7,19 @@
 
     <title>SUB12</title>
     <meta name="description" content="SUB12 — Precision Shooting Platform" />
-    <!-- Holding page served only while the frontend container is unreachable.
-         Tell crawlers not to index the placeholder so a cold start can't poison
-         search results with "Getting things ready" titles. -->
+    <!-- Holding page served only while the frontend container is unreachable,
+         and only when nothing is in front of the backend to intercept the 503
+         it ships with — behind our own nginx the visitor gets the real shell
+         instead (see the @spa_shell block in frontend/nginx.conf). Tell
+         crawlers not to index the placeholder so a cold start can't poison
+         search results with "Getting things ready" titles.
+
+         Nothing here may depend on JavaScript. Our Content-Security-Policy is
+         `script-src 'self'`, which blocks inline scripts and inline event
+         handlers alike — an earlier version of this page promised to refresh
+         itself from an inline script that the browser silently refused to run,
+         which is how a "temporary" holding page became somewhere people got
+         stuck. -->
     <meta name="robots" content="noindex" />
 
     <meta property="og:site_name" content="SUB12" />
@@ -41,35 +51,13 @@
     </style>
   </head>
   <body>
-    <noscript>
-      <p style="padding: 2rem;">This page requires JavaScript. Please enable it in your browser.</p>
-    </noscript>
     <div class="wrap">
       <div class="card">
         <div class="brand">SUB12</div>
         <h1>Getting things ready<span class="dot"></span><span class="dot"></span><span class="dot"></span></h1>
-        <p>We're just warming up the app. This page will refresh automatically.</p>
-        <a href="" onclick="location.reload(); return false;">Continue to sub-12</a>
+        <p>sub-12 is still starting up. Give it a moment, then try again.</p>
+        <a href="/">Go to sub-12</a>
       </div>
     </div>
-    <script>
-      // Self-heal: when the backend serves this fallback during a brief
-      // cold-start window, retry the same URL. Backoff grows 8s → 60s across
-      // reloads so a longer outage doesn't hammer the backend from every open
-      // tab. Reset the counter as soon as the real SPA boots.
-      (function () {
-        var KEY = 'sub12.fallbackReloadDelay';
-        var MIN = 8000, MAX = 60000;
-        var next;
-        try {
-          var prev = parseInt(sessionStorage.getItem(KEY) || '', 10);
-          next = isFinite(prev) && prev > 0 ? Math.min(prev * 2, MAX) : MIN;
-          sessionStorage.setItem(KEY, String(next));
-        } catch (e) {
-          next = MIN;
-        }
-        setTimeout(function () { location.reload(); }, next);
-      })();
-    </script>
   </body>
 </html>
