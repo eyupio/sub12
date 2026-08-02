@@ -22,11 +22,27 @@ const labelCls = 't-section-title'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 
+/**
+ * The line a section shows when the viewer helps run the league but the owner
+ * kept this part of it to themselves. Every save in these sections is gated on
+ * `manage_settings`, which is deliberately not part of the promotion grant —
+ * without this the fields render live and the save comes back "Failed to save
+ * league" with no hint that a permission is missing.
+ */
+function CapabilityNote({ what }: { what: string }) {
+  return (
+    <p className="text-[10px] text-muted -mt-2">
+      Read-only — {what} needs the “Manage settings” permission. The league owner
+      grants it from Members, below.
+    </p>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // League Image Section
 // ---------------------------------------------------------------------------
 
-function LeagueImageSection({ leagueId, league }: { leagueId: string; league: League }) {
+function LeagueImageSection({ leagueId, league, canManage }: { leagueId: string; league: League; canManage: boolean }) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -46,6 +62,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">League Image</h2>
+      {!canManage && <CapabilityNote what="changing the league image" />}
       <input
         ref={fileInputRef}
         type="file"
@@ -66,7 +83,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
       <div className="flex items-center gap-4">
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || !canManage}
           className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Upload league image"
         >
@@ -80,7 +97,9 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
         </button>
         <div className="flex-1">
           <p className="text-sm text-secondary">
-            {league.image_url ? 'Click to change image' : 'Add a profile picture for this league'}
+            {!canManage
+              ? 'The league image is set by whoever manages the league’s settings.'
+              : league.image_url ? 'Click to change image' : 'Add a profile picture for this league'}
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
           {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading…</p>}
@@ -95,7 +114,7 @@ function LeagueImageSection({ leagueId, league }: { leagueId: string; league: Le
 // General Info Section
 // ---------------------------------------------------------------------------
 
-function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: League }) {
+function GeneralInfoSection({ leagueId, league, canManage }: { leagueId: string; league: League; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(league.name)
   const [description, setDescription] = useState(league.description ?? '')
@@ -125,6 +144,7 @@ function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: Le
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">General</h2>
+      {!canManage && <CapabilityNote what="renaming the league or editing its description" />}
 
       <div className="space-y-1.5">
         <label htmlFor="league-name" className={labelCls}>Name</label>
@@ -133,6 +153,7 @@ function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: Le
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
+          disabled={!canManage}
           className={inputCls}
           placeholder="League name"
         />
@@ -145,18 +166,21 @@ function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: Le
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={3}
+          disabled={!canManage}
           className={inputCls + ' resize-none'}
           placeholder="Describe this league (optional)"
         />
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={!name.trim() || mutation.isPending}
-        className={btnPrimary}
-      >
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button
+          onClick={handleSave}
+          disabled={!name.trim() || mutation.isPending}
+          className={btnPrimary}
+        >
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -165,7 +189,7 @@ function GeneralInfoSection({ leagueId, league }: { leagueId: string; league: Le
 // Privacy Section
 // ---------------------------------------------------------------------------
 
-function PrivacySection({ leagueId, league }: { leagueId: string; league: League }) {
+function PrivacySection({ leagueId, league, canManage }: { leagueId: string; league: League; canManage: boolean }) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -182,6 +206,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Privacy</h2>
+      {!canManage && <CapabilityNote what="changing who can see this league" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Visibility</label>
@@ -190,7 +215,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ type: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.type === value
@@ -216,7 +241,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ post_visibility: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 league.post_visibility === value
@@ -242,7 +267,7 @@ function PrivacySection({ leagueId, league }: { leagueId: string; league: League
 // Regional Defaults Section
 // ---------------------------------------------------------------------------
 
-function RegionalSection({ leagueId, league }: { leagueId: string; league: League }) {
+function RegionalSection({ leagueId, league, canManage }: { leagueId: string; league: League; canManage: boolean }) {
   const queryClient = useQueryClient()
   const currentDateFormat = (league.date_format as DateFormat | undefined) ?? DEFAULT_PREFS.dateFormat
   const currentTimeFormat = (league.time_format as TimeFormat | undefined) ?? DEFAULT_PREFS.timeFormat
@@ -264,6 +289,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
       <p className="text-[10px] text-muted -mt-2">
         Applied on public pages for this league. Logged-in users see their own preference.
       </p>
+      {!canManage && <CapabilityNote what="changing the league’s date, time and timezone defaults" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Date Format</label>
@@ -272,7 +298,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ date_format: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
@@ -293,7 +319,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
             <button
               key={v}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ time_format: v })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
@@ -313,7 +339,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
           id="league-timezone"
           value={currentTimezone}
           onChange={(e) => mutation.mutate({ timezone: e.target.value })}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || !canManage}
           className={inputCls}
         >
           {!TIMEZONES.includes(currentTimezone) && (
@@ -332,7 +358,7 @@ function RegionalSection({ leagueId, league }: { leagueId: string; league: Leagu
 // Rules Section (consolidated from General + Score Verification)
 // ---------------------------------------------------------------------------
 
-function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueConfig }) {
+function RulesSection({ leagueId, config, canManage }: { leagueId: string; config: LeagueConfig; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [scoringRule, setScoringRule] = useState(config.scoring_rule)
   const [maxSubs, setMaxSubs] = useState(config.max_submissions_per_round)
@@ -374,6 +400,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Rules</h2>
+      {!canManage && <CapabilityNote what="editing the scoring rules and verification settings" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Scoring Rule</label>
@@ -382,6 +409,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
             <button
               key={rule}
               onClick={() => setScoringRule(rule)}
+              disabled={!canManage}
               className={[
                 'flex-1 py-2 rounded text-[11px] tracking-widest uppercase font-medium transition-colors border',
                 scoringRule === rule
@@ -397,17 +425,17 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 
       <div className="space-y-1.5">
         <label className={labelCls}>Max Submissions</label>
-        <input type="number" min={1} value={maxSubs} onChange={e => setMaxSubs(Number(e.target.value))} className={inputCls} />
+        <input type="number" min={1} value={maxSubs} onChange={e => setMaxSubs(Number(e.target.value))} disabled={!canManage} className={inputCls} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label className={labelCls}>Competition Start</label>
-          <input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} className={inputCls} />
+          <input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} disabled={!canManage} className={inputCls} />
         </div>
         <div className="space-y-1.5">
           <label className={labelCls}>Competition End</label>
-          <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} className={inputCls} />
+          <input type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} disabled={!canManage} className={inputCls} />
         </div>
       </div>
 
@@ -418,6 +446,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
           type="checkbox"
           checked={requireVerification}
           onChange={e => setRequireVerification(e.target.checked)}
+          disabled={!canManage}
           className="accent-[var(--brass)] w-4 h-4"
         />
         <span className="text-sm text-secondary">Require score verification</span>
@@ -431,6 +460,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
             min={1}
             value={confirmations}
             onChange={e => setConfirmations(Number(e.target.value))}
+            disabled={!canManage}
             className={inputCls}
           />
         </div>
@@ -441,6 +471,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
           type="checkbox"
           checked={requireImage}
           onChange={e => setRequireImage(e.target.checked)}
+          disabled={!canManage}
           className="accent-[var(--brass)] w-4 h-4"
         />
         <span className="text-sm text-secondary">Require image upload with submissions</span>
@@ -451,6 +482,7 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
           type="checkbox"
           checked={lockAfterVerification}
           onChange={e => setLockAfterVerification(e.target.checked)}
+          disabled={!canManage}
           className="accent-[var(--brass)] w-4 h-4 mt-0.5"
         />
         <span className="text-sm text-secondary">
@@ -459,9 +491,11 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
         </span>
       </label>
 
-      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary}>
-        {mutation.isPending ? 'Saving…' : 'Save Rules'}
-      </button>
+      {canManage && (
+        <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary}>
+          {mutation.isPending ? 'Saving…' : 'Save Rules'}
+        </button>
+      )}
     </div>
   )
 }
@@ -470,11 +504,13 @@ function RulesSection({ leagueId, config }: { leagueId: string; config: LeagueCo
 // Join Policy Section
 // ---------------------------------------------------------------------------
 
-function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
+function JoinPolicySection({ leagueId, config, joinCode, isClubLeague, canManage, canManageMembers }: {
   leagueId: string
   config: LeagueConfig
   joinCode?: string
   isClubLeague: boolean
+  canManage: boolean
+  canManageMembers: boolean
 }) {
   const queryClient = useQueryClient()
   const [joinPolicy, setJoinPolicy] = useState(config.join_policy)
@@ -501,6 +537,7 @@ function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Join Policy</h2>
+      {!canManage && <CapabilityNote what="changing how members join" />}
 
       {isClubLeague && (
         <p className="text-[10px] text-muted -mt-2">
@@ -514,6 +551,7 @@ function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
           <button
             key={policy}
             onClick={() => setJoinPolicy(policy)}
+            disabled={!canManage}
             className={[
               'w-full text-left py-2.5 px-3 rounded text-sm transition-colors border',
               joinPolicy === policy
@@ -534,7 +572,7 @@ function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
           <code className="font-mono text-sm text-[var(--brass)] flex-1">{joinCode || '—'}</code>
           <button
             onClick={() => regenMutation.mutate()}
-            disabled={regenMutation.isPending}
+            disabled={regenMutation.isPending || !canManage}
             className="text-muted hover:text-secondary transition-colors"
             title="Regenerate code"
           >
@@ -543,14 +581,19 @@ function JoinPolicySection({ leagueId, config, joinCode, isClubLeague }: {
         </div>
       )}
 
-      <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className={btnPrimary}>
-        {saveMutation.isPending ? 'Saving…' : 'Save Join Policy'}
-      </button>
+      {canManage && (
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className={btnPrimary}>
+          {saveMutation.isPending ? 'Saving…' : 'Save Join Policy'}
+        </button>
+      )}
 
       {/* Keyed off the saved policy as well as the local selection: requests
           raised under a previous "approval" policy still need deciding even
           after an admin clicks a different radio. */}
-      {(joinPolicy === 'approval' || config.join_policy === 'approval') && (
+      {/* Deciding requests is manage_members, not manage_settings — a
+          moderator who holds one and not the other must still see the queue
+          they can actually act on. */}
+      {(joinPolicy === 'approval' || config.join_policy === 'approval') && canManageMembers && (
         <JoinRequestsList leagueId={leagueId} />
       )}
     </div>
@@ -1295,6 +1338,9 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
   const catalogue = permissionData?.catalogue ?? []
   const viewerRole = permissionData?.role ?? null
   const canDelegate = can(viewerRole, PERM.manageModerators)
+  // Removing somebody is manage_members; changing their role is
+  // manage_moderators. Separate grants, so gate them separately.
+  const canRemove = can(viewerRole, PERM.manageMembers)
   // Owners delegate anything; a moderator may only pass on what they hold.
   const grantable = viewerRole?.is_owner ? null : (viewerRole?.permissions ?? [])
 
@@ -1343,7 +1389,7 @@ function MembersSection({ leagueId, currentUserId }: { leagueId: string; current
                     {member.is_moderator ? <ShieldOff size={14} /> : <Shield size={14} />}
                   </button>
                 )}
-                {!member.is_moderator && !isSelf && (
+                {!member.is_moderator && !isSelf && canRemove && (
                   <button
                     onClick={() => setPendingRemove(member)}
                     disabled={removeMutation.isPending}
@@ -1449,6 +1495,9 @@ export default function LeagueSettings() {
   // every capability here without ever having entered the league.
   const viewerRole = permissionData?.role ?? null
   const isModerator = !isLoading && viewerRole && currentUser ? viewerRole.is_moderator : null
+  // The league's own record — name, privacy, image, join code and scoring
+  // config — is one capability, and it is not part of the promotion grant.
+  const canManageSettings = can(viewerRole, PERM.manageSettings)
 
   useEffect(() => {
     if (isModerator === false) {
@@ -1490,13 +1539,20 @@ export default function LeagueSettings() {
 
       <p className="text-xs text-muted">{league.name}</p>
 
-      <LeagueImageSection leagueId={id} league={league} />
-      <GeneralInfoSection leagueId={id} league={league} />
-      <PrivacySection leagueId={id} league={league} />
-      <RulesSection leagueId={id} config={config} />
+      <LeagueImageSection leagueId={id} league={league} canManage={canManageSettings} />
+      <GeneralInfoSection leagueId={id} league={league} canManage={canManageSettings} />
+      <PrivacySection leagueId={id} league={league} canManage={canManageSettings} />
+      <RulesSection leagueId={id} config={config} canManage={canManageSettings} />
       <SeasonsSection leagueId={id} canManage={can(viewerRole, PERM.manageSeasons)} />
-      <RegionalSection leagueId={id} league={league} />
-      <JoinPolicySection leagueId={id} config={config} joinCode={league.join_code} isClubLeague={!!league.club_id} />
+      <RegionalSection leagueId={id} league={league} canManage={canManageSettings} />
+      <JoinPolicySection
+        leagueId={id}
+        config={config}
+        joinCode={league.join_code}
+        isClubLeague={!!league.club_id}
+        canManage={canManageSettings}
+        canManageMembers={can(viewerRole, PERM.manageMembers)}
+      />
       <MembersSection leagueId={id} currentUserId={currentUser!.id} />
 
       <div className={sectionCls}>

@@ -71,7 +71,7 @@ cd backend && make seed         # load dev seed data (admin accounts, password: 
 
 # Frontend
 cd frontend && npm run dev      # Vite dev server on :5173
-cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
+cd frontend && npm run check    # TypeScript type check (tsc -b — see below)
 cd frontend && npm run lint     # ESLint
 cd frontend && npm test         # Vitest (vitest run)
 cd frontend && npm run build    # Production build (tsc -b && vite build)
@@ -83,6 +83,12 @@ cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
 cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
 ```
+
+`npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
+solution file — `"files": []` plus references to `tsconfig.app.json` and
+`tsconfig.node.json` — so a plain `tsc --noEmit` resolves *no* input files and
+exits 0 on any codebase, however broken. It type-checked nothing for as long as
+it was the CI step. Only build mode follows the references.
 
 Both the `android/` and `ios/` projects are committed (`ios/` was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
@@ -337,6 +343,19 @@ reach stops at the one league or club they were promoted in.
   alongside `is_moderator`, so a Capacitor app running an older bundle keeps
   working. Member listings redact `permissions` for viewers who don't help run
   the group.
+- **A control the viewer's grant doesn't cover is drawn read-only, with the
+  reason.** Reaching the settings page means being a moderator; it does not
+  mean holding every capability on it, and each section saves through a
+  different one — `manage_settings` for the league record (name, description,
+  privacy, image, join code, scoring config, regional defaults),
+  `manage_seasons` for the calendar, `manage_members` for the roster and the
+  join-request queue, `manage_moderators` for roles. Gating the page as a
+  whole and rendering every section live is what produced the original
+  complaint: the forms accepted input and each save came back "Failed to save
+  league" with nothing to explain it. `LeagueSettings.tsx` passes each section
+  the capability its own endpoint checks; the fields stay visible (a moderator
+  may need to read them), the submit disappears, and `CapabilityNote` says
+  which permission is missing and who grants it.
 
 ### Notifications
 

@@ -389,6 +389,79 @@ describe('LeagueSettings seasons and rounds', () => {
   })
 })
 
+// Every section here saves through an endpoint gated on a capability the
+// promotion grant deliberately withholds. Rendering them live meant a
+// moderator could type into the form and get "Failed to save league" back with
+// no hint that a permission was missing.
+describe('LeagueSettings capability gating', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-2', email: 'mod@example.com', display_name: 'Mod User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(leagueApi, 'get').mockResolvedValue(makeLeague())
+    vi.spyOn(leagueApi, 'getConfig').mockResolvedValue(makeConfig({ join_policy: 'approval' }))
+    vi.spyOn(leagueApi, 'listSeasons').mockResolvedValue({ items: [] })
+    vi.spyOn(leagueApi, 'listMembers').mockResolvedValue({
+      items: [makeMember(), makeMember({ user_id: 'user-3', display_name: 'Plain Member', is_admin: false })],
+    })
+    mockAnnouncements()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  function renderAs(permissions: string[]) {
+    vi.spyOn(leagueApi, 'getModeratorPermissions').mockResolvedValue({
+      catalogue: LEAGUE_PERMISSIONS,
+      role: { is_member: true, is_moderator: true, is_owner: false, permissions },
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LeagueSettings />
+      </QueryClientProvider>,
+    )
+  }
+
+  it('renders the league record read-only without manage_settings', async () => {
+    const listJoinRequests = vi.spyOn(leagueApi, 'listJoinRequests').mockResolvedValue({ items: [] })
+    renderAs(['manage_members', 'verify_scores'])
+
+    // The fields are still shown — a moderator may need to read them — but
+    // nothing here can be submitted.
+    expect(await screen.findByLabelText(/name/i)).toBeDisabled()
+    expect(screen.getByLabelText(/description/i)).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save rules/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save join policy/i })).not.toBeInTheDocument()
+    // Visibility and post visibility both offer a "public" switch.
+    screen.getAllByRole('button', { name: /^public$/i }).forEach(b => expect(b).toBeDisabled())
+    // ...and it says why, rather than leaving a dead form.
+    expect(screen.getAllByText(/manage settings.*permission/i).length).toBeGreaterThan(0)
+
+    // manage_members is a different grant and is unaffected: the join-request
+    // queue and the remove control both stay.
+    await waitFor(() => expect(listJoinRequests).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: /remove plain member/i })).toBeInTheDocument()
+  })
+
+  it('leaves the league record editable with manage_settings', async () => {
+    renderAs(['manage_settings'])
+
+    expect(await screen.findByLabelText(/name/i)).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save rules/i })).toBeInTheDocument()
+    expect(screen.queryByText(/manage settings.*permission/i)).not.toBeInTheDocument()
+    // The join-request queue belongs to manage_members, which this one lacks.
+    expect(screen.queryByRole('button', { name: /remove plain member/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('LeagueSettings member roles', () => {
   beforeEach(() => {
     useAuthStore.setState({

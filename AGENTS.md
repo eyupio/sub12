@@ -70,7 +70,7 @@ cd backend && make seed         # load dev seed data (admin accounts, password: 
 
 # Frontend
 cd frontend && npm run dev      # Vite dev server on :5173
-cd frontend && npm run check    # TypeScript type check (tsc --noEmit)
+cd frontend && npm run check    # TypeScript type check (tsc -b — see below)
 cd frontend && npm run lint     # ESLint
 cd frontend && npm test         # Vitest (vitest run)
 cd frontend && npm run build    # Production build (tsc -b && vite build)
@@ -82,6 +82,12 @@ cd frontend && npm run build:mobile   # tsc -b && vite build && cap sync
 cd frontend && npm run run:android    # build + launch on emulator/device
 cd frontend && npm run run:ios         # macOS + Xcode only
 ```
+
+`npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
+solution file — `"files": []` plus references to `tsconfig.app.json` and
+`tsconfig.node.json` — so a plain `tsc --noEmit` resolves *no* input files and
+exits 0 on any codebase, however broken. It type-checked nothing for as long as
+it was the CI step. Only build mode follows the references.
 
 Both the `android/` and `ios/` projects are committed (`ios/` was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
