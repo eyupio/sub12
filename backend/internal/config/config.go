@@ -36,7 +36,7 @@ type Config struct {
 	// Leave empty to derive from SiteURL as {SiteURL}/reset-password. Any
 	// link emitted in an outgoing email must come from this kind of
 	// configurable URL — never hard-code or default to localhost in
-	// production. See AGENTS.md "Outgoing public URLs".
+	// production. See CLAUDE.md "Outgoing public URLs".
 	PasswordResetURL string `envconfig:"PASSWORD_RESET_URL" default:""`
 	// EventInvitationURL is the base URL for event invitation accept pages.
 	// The token is appended as /{token}, e.g.
@@ -53,7 +53,7 @@ type Config struct {
 	// Leave empty to derive from SiteURL as {SiteURL}/default-avatar.svg.
 	// Any link emitted in an outgoing email must come from this kind of
 	// configurable URL — never hard-code or default to localhost in
-	// production. See AGENTS.md "Outgoing public URLs".
+	// production. See CLAUDE.md "Outgoing public URLs".
 	DefaultAvatarURL string `envconfig:"DEFAULT_AVATAR_URL" default:""`
 	// IndexNow key used to authenticate URL submission requests.
 	IndexNowKey string `envconfig:"INDEXNOW_KEY" default:""`
