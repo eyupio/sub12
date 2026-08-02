@@ -1,7 +1,9 @@
+import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '../store/auth'
 import Layout from '../components/Layout'
 import Dashboard from './Dashboard'
 import LandingPage from './LandingPage'
+import NativeLanding from './NativeLanding'
 
 export default function IndexPage() {
   // The persisted `user` is the returning-user signal: tokens are no longer
@@ -17,6 +19,12 @@ export default function IndexPage() {
         <Dashboard />
       </Layout>
     )
+  }
+
+  // Inside the Capacitor shell the marketing site is the wrong first screen —
+  // the app gets its own welcome instead of the web landing page.
+  if (Capacitor.isNativePlatform()) {
+    return <NativeLanding />
   }
 
   return <LandingPage />
