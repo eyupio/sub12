@@ -320,9 +320,12 @@ Adding a type means touching all of these, and the two per-type tests in
    `pages/Notifications.tsx` and the row in
    `components/NotificationPreferencesPanel.tsx` — the one place preferences are
    drawn, rendered by both the profile's Notifications tab and
-   `pages/NotificationSettings.tsx`. Its test asserts every preference the API
-   serves has a toggle and that nothing else calls the preferences endpoints,
-   because a missing row fails silently: the toggle is simply absent.
+   `pages/NotificationSettings.tsx`. A row goes in `NOTIFICATION_PREF_GROUPS`
+   and its switch carries `data-pref="<key>"`; its test *renders* the panel and
+   asserts every preference the API serves is drawn, and that nothing else calls
+   the preferences endpoints. Both halves matter because a missing row fails
+   silently — the toggle is simply absent — and a catalogue entry that is never
+   mapped over satisfies a source scan while leaving the user no switch at all.
 
 Conventions worth keeping:
 
