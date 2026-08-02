@@ -44,10 +44,39 @@ export function findNearbyPlace<
 // The "51.500, -0.120" string the pickers fall back to when nothing better is
 // known. Recognising it lets a saved place's name take over a label that only
 // ever held coordinates.
-const COORD_LABEL_RE = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+const COORD_LABEL_RE = /^(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/
 
 export function isCoordinateLabel(label: string | undefined | null): boolean {
   return typeof label === 'string' && COORD_LABEL_RE.test(label.trim())
+}
+
+/**
+ * The point a coordinate label stands for, or null if it isn't one. Rows
+ * stored before we kept lat/lng — or by a picker that only wrote the label —
+ * still carry the coordinates in the text, to three decimals (~110m). That is
+ * inside the radius within which we'd call two points the same place anyway,
+ * so it is enough to match a saved place or to ask the geocoder.
+ */
+export function parseCoordLabel(
+  label: string | undefined | null,
+): { lat: number; lng: number } | null {
+  const match = COORD_LABEL_RE.exec(typeof label === 'string' ? label.trim() : '')
+  if (!match) return null
+  const lat = Number(match[1])
+  const lng = Number(match[2])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  return { lat, lng }
+}
+
+/** Stored coordinates when we have them, else whatever the label spells out. */
+export function coordsForLabel(
+  label: string | undefined,
+  lat: number | undefined,
+  lng: number | undefined,
+): { lat: number; lng: number } | null {
+  if (typeof lat === 'number' && typeof lng === 'number') return { lat, lng }
+  return parseCoordLabel(label)
 }
 
 export function formatCoordLabel(lat: number, lng: number): string {
@@ -67,10 +96,11 @@ export function resolveLocationLabel<
   lng: number | undefined,
   places: T[],
 ): string {
-  const nearby = findNearbyPlace(lat, lng, places)
+  const coords = coordsForLabel(label, lat, lng)
+  const nearby = findNearbyPlace(coords?.lat, coords?.lng, places)
   if (nearby) return nearby.name
   const trimmed = label?.trim() ?? ''
   if (trimmed && !isCoordinateLabel(trimmed)) return trimmed
-  if (typeof lat === 'number' && typeof lng === 'number') return formatCoordLabel(lat, lng)
+  if (coords) return formatCoordLabel(coords.lat, coords.lng)
   return trimmed
 }

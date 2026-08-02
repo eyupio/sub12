@@ -8,7 +8,7 @@ import { useLocations } from '../api/locations'
 import { nameForPick, reverseGeocodeQuery } from '../api/geo'
 import { toast } from '../store/toast'
 import { requestPosition } from '../utils/geolocation'
-import { isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
+import { coordsForLabel, isCoordinateLabel, resolveLocationLabel } from '../utils/geo'
 import type { PickedLocation } from './MapLocationPicker'
 
 const MapLocationPicker = lazy(() =>
@@ -66,7 +66,12 @@ export function LocationField({
       // when it was stored back when the label was still raw coordinates.
       const label = resolveLocationLabel(loc, lat, lng, places)
       if (!label || buckets.has(label)) return
-      buckets.set(label, { label, lat, lng })
+      // A card stored without coordinates but labelled with them still knows
+      // where it was shot. Carrying that point onto the chip is what lets the
+      // saved place and the geocoder name it, and what puts real coordinates
+      // back on the next card when the chip is picked.
+      const coords = coordsForLabel(loc, lat, lng)
+      buckets.set(label, { label, lat: coords?.lat, lng: coords?.lng })
     }
     recentScore?.items.forEach((s) => visit(s.location, s.location_lat, s.location_lng))
     recentPellet?.items.forEach((s) => visit(s.location, s.location_lat, s.location_lng))
