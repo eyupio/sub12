@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, RefreshCw, Check, X, Shield, ShieldOff, Camera, Trash2, Flag, CalendarRange } from 'lucide-react'
-import { leagueApi, LeagueConfig, League, LeagueMember, Round } from '../api/leagues'
+import { ChevronLeft, RefreshCw, Check, X, Shield, ShieldOff, Camera, Trash2, Flag, CalendarRange, Pencil, Archive, ArchiveRestore } from 'lucide-react'
+import { leagueApi, LeagueConfig, League, LeagueMember, Round, Season, UpdateSeasonPayload } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -630,16 +630,192 @@ function isRoundOpen(round: Round): boolean {
   return true
 }
 
+/**
+ * Renders a stored timestamp into the value a datetime-local input wants,
+ * which is the admin's own wall clock with no zone. An unparseable stamp comes
+ * back empty, and the diffing in the edit form then leaves the field alone
+ * rather than sending the blank on as a clear.
+ */
+function toLocalInput(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/**
+ * Builds the value a PATCH should carry for one field: undefined leaves it
+ * untouched, an empty string clears it. Only a field the admin actually
+ * changed is sent, so a form that failed to render a stored value can never
+ * wipe it on save.
+ */
+function patched(next: string, initial: string, transform?: (v: string) => string): string | undefined {
+  if (next === initial) return undefined
+  if (!next) return ''
+  return transform ? transform(next) : next
+}
+
+const localToISO = (v: string) => new Date(v).toISOString()
+
+function RoundRow({
+  leagueId,
+  seasonId,
+  round,
+  canManage,
+  onDelete,
+}: {
+  leagueId: string
+  seasonId: string
+  round: Round
+  canManage: boolean
+  onDelete: (round: Round) => void
+}) {
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const initial = {
+    name: round.name,
+    opensAt: toLocalInput(round.opens_at),
+    closesAt: toLocalInput(round.closes_at),
+  }
+  const [name, setName] = useState(initial.name)
+  const [opensAt, setOpensAt] = useState(initial.opensAt)
+  const [closesAt, setClosesAt] = useState(initial.closesAt)
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      leagueApi.updateRound(leagueId, seasonId, round.id, {
+        name: patched(name.trim(), initial.name),
+        opens_at: patched(opensAt, initial.opensAt, localToISO),
+        closes_at: patched(closesAt, initial.closesAt, localToISO),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'] })
+      // Moving a round's window can change which round new cards land in.
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'ensure-round'] })
+      setEditing(false)
+      toast('Round updated', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update round', 'error'),
+  })
+
+  function startEditing() {
+    setName(initial.name)
+    setOpensAt(initial.opensAt)
+    setClosesAt(initial.closesAt)
+    setEditing(true)
+  }
+
+  if (editing) {
+    return (
+      <div className="space-y-2 py-1">
+        <input
+          type="text"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Round name"
+          aria-label="Round name"
+          className={inputCls}
+          autoFocus
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label htmlFor={`round-edit-opens-${round.id}`} className="text-[10px] text-muted">Opens</label>
+            <input
+              id={`round-edit-opens-${round.id}`}
+              type="datetime-local"
+              value={opensAt}
+              onChange={e => setOpensAt(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor={`round-edit-closes-${round.id}`} className="text-[10px] text-muted">Closes</label>
+            <input
+              id={`round-edit-closes-${round.id}`}
+              type="datetime-local"
+              value={closesAt}
+              onChange={e => setClosesAt(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <p className="text-[10px] text-muted">Clear both dates to keep this round permanently open.</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={!name.trim() || mutation.isPending}
+            className={btnPrimary}
+          >
+            {mutation.isPending ? 'Saving…' : 'Save round'}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-[11px] tracking-widest uppercase text-muted px-3">
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-secondary">{round.name}</span>
+      {isRoundOpen(round) ? (
+        <span className="text-[9px] tracking-widest uppercase text-green-500">Open</span>
+      ) : (
+        <span className="text-[9px] tracking-widest uppercase text-muted">Closed</span>
+      )}
+      <span className="ml-auto text-[10px] text-muted font-mono">
+        {round.opens_at ? round.opens_at.slice(0, 10) : 'always'}
+        {round.closes_at ? ` → ${round.closes_at.slice(0, 10)}` : ''}
+      </span>
+      {canManage && (
+        <>
+          <button
+            onClick={startEditing}
+            className="text-muted hover:text-[var(--brass)] transition-colors"
+            aria-label={`Edit ${round.name}`}
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={() => onDelete(round)}
+            className="text-muted hover:text-[var(--error-text)] transition-colors"
+            aria-label={`Delete ${round.name}`}
+          >
+            <Trash2 size={13} />
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function RoundList({ leagueId, seasonId, canManage }: { leagueId: string; seasonId: string; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [opensAt, setOpensAt] = useState('')
   const [closesAt, setClosesAt] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<Round | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'],
     queryFn: () => leagueApi.listRounds(leagueId, seasonId),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (roundId: string) => leagueApi.deleteRound(leagueId, seasonId, roundId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons', seasonId, 'rounds'] })
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'ensure-round'] })
+      setPendingDelete(null)
+      toast('Round deleted', 'success')
+    },
+    onError: (err) => {
+      setPendingDelete(null)
+      toast(err instanceof Error ? err.message : 'Failed to delete round', 'error')
+    },
   })
 
   const createMutation = useMutation({
@@ -672,18 +848,14 @@ function RoundList({ leagueId, seasonId, canManage }: { leagueId: string; season
         <p className="text-[11px] text-muted">No rounds in this season.</p>
       )}
       {rounds.map(round => (
-        <div key={round.id} className="flex items-center gap-2 text-xs">
-          <span className="text-secondary">{round.name}</span>
-          {isRoundOpen(round) ? (
-            <span className="text-[9px] tracking-widest uppercase text-green-500">Open</span>
-          ) : (
-            <span className="text-[9px] tracking-widest uppercase text-muted">Closed</span>
-          )}
-          <span className="ml-auto text-[10px] text-muted font-mono">
-            {round.opens_at ? round.opens_at.slice(0, 10) : 'always'}
-            {round.closes_at ? ` → ${round.closes_at.slice(0, 10)}` : ''}
-          </span>
-        </div>
+        <RoundRow
+          key={round.id}
+          leagueId={leagueId}
+          seasonId={seasonId}
+          round={round}
+          canManage={canManage}
+          onDelete={setPendingDelete}
+        />
       ))}
 
       {!canManage ? null : adding ? (
@@ -739,6 +911,169 @@ function RoundList({ leagueId, seasonId, canManage }: { leagueId: string; season
           + Add round
         </button>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete round?"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.name}" will be removed from this season. A round that already has cards in it cannot be deleted — close it instead.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmDisabled={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteMutation.mutate(pendingDelete.id)
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
+    </div>
+  )
+}
+
+function SeasonRow({
+  leagueId,
+  season,
+  canManage,
+  expanded,
+  onToggle,
+  onDelete,
+}: {
+  leagueId: string
+  season: Season
+  canManage: boolean
+  expanded: boolean
+  onToggle: () => void
+  onDelete: (season: Season) => void
+}) {
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const initial = { name: season.name, startsOn: season.starts_on, endsOn: season.ends_on ?? '' }
+  const [name, setName] = useState(initial.name)
+  const [startsOn, setStartsOn] = useState(initial.startsOn)
+  const [endsOn, setEndsOn] = useState(initial.endsOn)
+
+  const mutation = useMutation({
+    mutationFn: (payload: UpdateSeasonPayload) => leagueApi.updateSeason(leagueId, season.id, payload),
+    onSuccess: (_data, payload) => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons'] })
+      // Archiving takes a season's rounds out of the running for new cards.
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'ensure-round'] })
+      setEditing(false)
+      toast(payload.is_active === undefined ? 'Season updated' : payload.is_active ? 'Season restored' : 'Season archived', 'success')
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Failed to update season', 'error'),
+  })
+
+  function startEditing() {
+    setName(initial.name)
+    setStartsOn(initial.startsOn)
+    setEndsOn(initial.endsOn)
+    setEditing(true)
+  }
+
+  return (
+    <div className="space-y-2 py-2 border-b border-subtle last:border-0">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 w-full text-left"
+        aria-expanded={expanded}
+      >
+        <CalendarRange size={13} className={`shrink-0 ${season.is_active ? 'text-[var(--brass)]' : 'text-muted'}`} />
+        <span className={`text-sm ${season.is_active ? 'text-secondary' : 'text-muted'}`}>{season.name}</span>
+        {!season.is_active && (
+          <span className="text-[9px] tracking-widest uppercase text-muted border border-subtle rounded px-1.5 py-0.5">
+            Archived
+          </span>
+        )}
+        <span className="ml-auto text-[10px] text-muted font-mono">
+          {season.starts_on}{season.ends_on ? ` → ${season.ends_on}` : ''}
+        </span>
+        <ChevronLeft
+          size={14}
+          className={`text-muted transition-transform ${expanded ? '-rotate-90' : 'rotate-180'}`}
+        />
+      </button>
+
+      {canManage && !editing && (
+        <div className="flex items-center gap-3 pl-5">
+          <button
+            onClick={startEditing}
+            className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors"
+          >
+            <Pencil size={11} /> Edit
+          </button>
+          <button
+            onClick={() => mutation.mutate({ is_active: !season.is_active })}
+            disabled={mutation.isPending}
+            className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-[var(--brass)] transition-colors disabled:opacity-50"
+          >
+            {season.is_active ? <><Archive size={11} /> Archive</> : <><ArchiveRestore size={11} /> Restore</>}
+          </button>
+          <button
+            onClick={() => onDelete(season)}
+            className="flex items-center gap-1 text-[10px] tracking-widest uppercase text-muted hover:text-[var(--error-text)] transition-colors"
+          >
+            <Trash2 size={11} /> Delete
+          </button>
+        </div>
+      )}
+
+      {editing && (
+        <div className="space-y-2 pl-5">
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Season name"
+            aria-label="Season name"
+            className={inputCls}
+            autoFocus
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label htmlFor={`season-edit-starts-${season.id}`} className="text-[10px] text-muted">Starts</label>
+              <input
+                id={`season-edit-starts-${season.id}`}
+                type="date"
+                value={startsOn}
+                onChange={e => setStartsOn(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor={`season-edit-ends-${season.id}`} className="text-[10px] text-muted">Ends (optional)</label>
+              <input
+                id={`season-edit-ends-${season.id}`}
+                type="date"
+                value={endsOn}
+                onChange={e => setEndsOn(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                mutation.mutate({
+                  name: patched(name.trim(), initial.name),
+                  starts_on: patched(startsOn, initial.startsOn),
+                  ends_on: patched(endsOn, initial.endsOn),
+                })
+              }
+              disabled={!name.trim() || !startsOn || mutation.isPending}
+              className={btnPrimary}
+            >
+              {mutation.isPending ? 'Saving…' : 'Save season'}
+            </button>
+            <button onClick={() => setEditing(false)} className="text-[11px] tracking-widest uppercase text-muted px-3">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {expanded && <RoundList leagueId={leagueId} seasonId={season.id} canManage={canManage} />}
     </div>
   )
 }
@@ -750,10 +1085,25 @@ function SeasonsSection({ leagueId, canManage }: { leagueId: string; canManage: 
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Season | null>(null)
 
   const { data } = useQuery({
     queryKey: ['leagues', leagueId, 'seasons'],
     queryFn: () => leagueApi.listSeasons(leagueId),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (seasonId: string) => leagueApi.deleteSeason(leagueId, seasonId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'seasons'] })
+      queryClient.invalidateQueries({ queryKey: ['leagues', leagueId, 'ensure-round'] })
+      setPendingDelete(null)
+      toast('Season deleted', 'success')
+    },
+    onError: (err) => {
+      setPendingDelete(null)
+      toast(err instanceof Error ? err.message : 'Failed to delete season', 'error')
+    },
   })
 
   const createMutation = useMutation({
@@ -790,24 +1140,15 @@ function SeasonsSection({ leagueId, canManage }: { leagueId: string; canManage: 
       </p>
 
       {seasons.map(season => (
-        <div key={season.id} className="space-y-2 py-2 border-b border-subtle last:border-0">
-          <button
-            onClick={() => setExpanded(expanded === season.id ? null : season.id)}
-            className="flex items-center gap-2 w-full text-left"
-            aria-expanded={expanded === season.id}
-          >
-            <CalendarRange size={13} className="text-[var(--brass)] shrink-0" />
-            <span className="text-sm text-secondary">{season.name}</span>
-            <span className="ml-auto text-[10px] text-muted font-mono">
-              {season.starts_on}{season.ends_on ? ` → ${season.ends_on}` : ''}
-            </span>
-            <ChevronLeft
-              size={14}
-              className={`text-muted transition-transform ${expanded === season.id ? '-rotate-90' : 'rotate-180'}`}
-            />
-          </button>
-          {expanded === season.id && <RoundList leagueId={leagueId} seasonId={season.id} canManage={canManage} />}
-        </div>
+        <SeasonRow
+          key={season.id}
+          leagueId={leagueId}
+          season={season}
+          canManage={canManage}
+          expanded={expanded === season.id}
+          onToggle={() => setExpanded(expanded === season.id ? null : season.id)}
+          onDelete={setPendingDelete}
+        />
       ))}
 
       {seasons.length === 0 && !canManage && (
@@ -867,6 +1208,22 @@ function SeasonsSection({ leagueId, canManage }: { leagueId: string; canManage: 
           + Add season
         </button>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete season?"
+        message={
+          pendingDelete
+            ? `"${pendingDelete.name}" and its rounds will be removed. A season that already has cards in it cannot be deleted — archive it instead to keep the results.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmDisabled={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteMutation.mutate(pendingDelete.id)
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

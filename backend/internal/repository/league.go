@@ -782,6 +782,73 @@ func (r *LeagueRepository) ListSeasons(ctx context.Context, leagueID string) ([]
 	return seasons, rows.Err()
 }
 
+func (r *LeagueRepository) GetSeason(ctx context.Context, seasonID string) (*model.Season, error) {
+	var s model.Season
+	err := r.db.QueryRow(ctx, `
+		SELECT id, league_id, name, starts_on::text, ends_on::text, is_active, created_at
+		FROM seasons WHERE id = $1
+	`, seasonID).Scan(&s.ID, &s.LeagueID, &s.Name, &s.StartsOn, &s.EndsOn, &s.IsActive, &s.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get season: %w", err)
+	}
+	return &s, nil
+}
+
+// UpdateSeason applies the "omit to keep, empty string to clear" convention:
+// a nil field is left alone, and an empty ends_on drops the season's end date.
+func (r *LeagueRepository) UpdateSeason(ctx context.Context, seasonID string, input *model.UpdateSeasonInput) (*model.Season, error) {
+	var s model.Season
+	err := r.db.QueryRow(ctx, `
+		UPDATE seasons SET
+		    name      = COALESCE($2, name),
+		    starts_on = COALESCE($3::date, starts_on),
+		    ends_on   = CASE WHEN $4::text IS NULL THEN ends_on ELSE NULLIF($4::text, '')::date END,
+		    is_active = COALESCE($5, is_active)
+		WHERE id = $1
+		RETURNING id, league_id, name, starts_on::text, ends_on::text, is_active, created_at
+	`, seasonID, input.Name, input.StartsOn, input.EndsOn, input.IsActive).Scan(
+		&s.ID, &s.LeagueID, &s.Name, &s.StartsOn, &s.EndsOn, &s.IsActive, &s.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update season: %w", err)
+	}
+	return &s, nil
+}
+
+// DeleteSeason removes a season and, by cascade, its rounds.
+func (r *LeagueRepository) DeleteSeason(ctx context.Context, seasonID string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM seasons WHERE id = $1`, seasonID)
+	if err != nil {
+		return fmt.Errorf("delete season: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountSeasonCards reports how many score cards sit in any of the season's
+// rounds. Deleting the season would detach every one of them, so the count is
+// what stands between a rename-gone-wrong and a lost league table.
+func (r *LeagueRepository) CountSeasonCards(ctx context.Context, seasonID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)::int FROM score_cards sc
+		JOIN rounds rd ON rd.id = sc.league_round_id
+		WHERE rd.season_id = $1
+	`, seasonID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count season cards: %w", err)
+	}
+	return n, nil
+}
+
 func (r *LeagueRepository) CreateRound(ctx context.Context, seasonID string, input *model.CreateRoundInput) (*model.Round, error) {
 	var rd model.Round
 	err := r.db.QueryRow(ctx, `
@@ -818,23 +885,109 @@ func (r *LeagueRepository) ListRounds(ctx context.Context, seasonID string) ([]*
 	return rounds, rows.Err()
 }
 
+func (r *LeagueRepository) GetRound(ctx context.Context, roundID string) (*model.Round, error) {
+	var rd model.Round
+	err := r.db.QueryRow(ctx, `
+		SELECT id, season_id, name, opens_at::text, closes_at::text, created_at
+		FROM rounds WHERE id = $1
+	`, roundID).Scan(&rd.ID, &rd.SeasonID, &rd.Name, &rd.OpensAt, &rd.ClosesAt, &rd.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get round: %w", err)
+	}
+	return &rd, nil
+}
+
+// UpdateRound applies the "omit to keep, empty string to clear" convention;
+// clearing both dates returns the round to permanently open.
+func (r *LeagueRepository) UpdateRound(ctx context.Context, roundID string, input *model.UpdateRoundInput) (*model.Round, error) {
+	var rd model.Round
+	err := r.db.QueryRow(ctx, `
+		UPDATE rounds SET
+		    name      = COALESCE($2, name),
+		    opens_at  = CASE WHEN $3::text IS NULL THEN opens_at  ELSE NULLIF($3::text, '')::timestamptz END,
+		    closes_at = CASE WHEN $4::text IS NULL THEN closes_at ELSE NULLIF($4::text, '')::timestamptz END
+		WHERE id = $1
+		RETURNING id, season_id, name, opens_at::text, closes_at::text, created_at
+	`, roundID, input.Name, input.OpensAt, input.ClosesAt).Scan(
+		&rd.ID, &rd.SeasonID, &rd.Name, &rd.OpensAt, &rd.ClosesAt, &rd.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update round: %w", err)
+	}
+	return &rd, nil
+}
+
+func (r *LeagueRepository) DeleteRound(ctx context.Context, roundID string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM rounds WHERE id = $1`, roundID)
+	if err != nil {
+		return fmt.Errorf("delete round: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountRoundCards reports how many score cards were submitted to the round.
+// score_cards.league_round_id is ON DELETE SET NULL, so deleting a round with
+// cards in it would silently strip them out of the league rather than fail.
+func (r *LeagueRepository) CountRoundCards(ctx context.Context, roundID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)::int FROM score_cards WHERE league_round_id = $1
+	`, roundID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count round cards: %w", err)
+	}
+	return n, nil
+}
+
+// RoundBelongsToLeague reports whether the round is owned by the league, via
+// its season. The mirror of SeasonBelongsToLeague, and needed for the same
+// reason: a moderator of one league must not be able to edit another's rounds.
+func (r *LeagueRepository) RoundBelongsToLeague(ctx context.Context, roundID, leagueID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM rounds rd
+			JOIN seasons s ON s.id = rd.season_id
+			WHERE rd.id = $1 AND s.league_id = $2
+		)
+	`, roundID, leagueID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("round belongs to league: %w", err)
+	}
+	return exists, nil
+}
+
 // GetOrCreateDefaultRound returns the round new submissions should land in,
 // creating a default "General" season and "Submissions" round if the league has
 // none. Rounds whose window is currently open win over closed or not-yet-open
 // ones, and among those the one that opened most recently wins — so once an
 // admin schedules rounds, submissions follow the schedule instead of piling
 // into whichever round happened to be created first.
+//
+// Archived seasons are out of the running entirely rather than merely ranked
+// last: archiving is how an admin retires a season, and a retired season that
+// still collected cards would make the switch meaningless. A league whose
+// every season is archived therefore gets a fresh "General" one, exactly as a
+// brand-new league does.
 func (r *LeagueRepository) GetOrCreateDefaultRound(ctx context.Context, leagueID string) (*model.ActiveRound, error) {
 	var round model.ActiveRound
 	err := r.db.QueryRow(ctx, `
 		SELECT rd.id, rd.name, s.name
 		FROM rounds rd
 		JOIN seasons s ON s.id = rd.season_id
-		WHERE s.league_id = $1
+		WHERE s.league_id = $1 AND s.is_active
 		ORDER BY
 			(rd.opens_at IS NULL OR rd.opens_at <= NOW())
 				AND (rd.closes_at IS NULL OR rd.closes_at > NOW()) DESC,
-			s.is_active DESC,
 			rd.opens_at DESC NULLS LAST,
 			rd.created_at ASC
 		LIMIT 1

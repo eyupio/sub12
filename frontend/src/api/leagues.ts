@@ -82,6 +82,15 @@ export interface CreateSeasonPayload {
   ends_on?: string
 }
 
+// Omit a field to keep it; send an empty string to clear it. is_active is the
+// archive switch — an archived season keeps its cards but takes no new ones.
+export interface UpdateSeasonPayload {
+  name?: string
+  starts_on?: string
+  ends_on?: string
+  is_active?: boolean
+}
+
 export interface Round {
   id: string
   season_id: string
@@ -93,6 +102,14 @@ export interface Round {
 
 export interface CreateRoundPayload {
   name: string
+  opens_at?: string
+  closes_at?: string
+}
+
+// Same convention as UpdateSeasonPayload: clearing both dates makes the round
+// permanently open again.
+export interface UpdateRoundPayload {
+  name?: string
   opens_at?: string
   closes_at?: string
 }
@@ -254,12 +271,24 @@ export const leagueApi = {
   createSeason: (id: string, payload: CreateSeasonPayload) =>
     api.post<Season>(`/leagues/${id}/seasons`, payload),
 
+  updateSeason: (leagueId: string, seasonId: string, payload: UpdateSeasonPayload) =>
+    api.patch<Season>(`/leagues/${leagueId}/seasons/${seasonId}`, payload),
+
+  deleteSeason: (leagueId: string, seasonId: string) =>
+    api.del<void>(`/leagues/${leagueId}/seasons/${seasonId}`),
+
   // Rounds
   listRounds: (leagueId: string, seasonId: string) =>
     api.get<{ items: Round[] }>(`/leagues/${leagueId}/seasons/${seasonId}/rounds`),
 
   createRound: (leagueId: string, seasonId: string, payload: CreateRoundPayload) =>
     api.post<Round>(`/leagues/${leagueId}/seasons/${seasonId}/rounds`, payload),
+
+  updateRound: (leagueId: string, seasonId: string, roundId: string, payload: UpdateRoundPayload) =>
+    api.patch<Round>(`/leagues/${leagueId}/seasons/${seasonId}/rounds/${roundId}`, payload),
+
+  deleteRound: (leagueId: string, seasonId: string, roundId: string) =>
+    api.del<void>(`/leagues/${leagueId}/seasons/${seasonId}/rounds/${roundId}`),
 
   // Members
   listMembers: (id: string) =>

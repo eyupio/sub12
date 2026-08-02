@@ -422,8 +422,12 @@ func NewRouter(
 			// Seasons & rounds
 			r.Post("/leagues/{id}/seasons", lh.CreateSeason)
 			r.Get("/leagues/{id}/seasons", lh.ListSeasons)
+			r.Patch("/leagues/{id}/seasons/{seasonId}", lh.UpdateSeason)
+			r.Delete("/leagues/{id}/seasons/{seasonId}", lh.DeleteSeason)
 			r.Post("/leagues/{id}/seasons/{seasonId}/rounds", lh.CreateRound)
 			r.Get("/leagues/{id}/seasons/{seasonId}/rounds", lh.ListRounds)
+			r.Patch("/leagues/{id}/seasons/{seasonId}/rounds/{roundId}", lh.UpdateRound)
+			r.Delete("/leagues/{id}/seasons/{seasonId}/rounds/{roundId}", lh.DeleteRound)
 
 			// Join requests (admin)
 			r.Get("/leagues/{id}/join-requests", lh.ListJoinRequests)
