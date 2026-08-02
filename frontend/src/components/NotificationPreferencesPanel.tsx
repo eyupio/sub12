@@ -9,6 +9,12 @@ import { notificationsApi, NotificationPreferences, NotificationPreferencesPatch
  * used to carry a row list each, and the profile tab's copy silently fell a
  * whole release behind: leagues, clubs and events were unreachable for anyone
  * who never went via the bell menu.
+ *
+ * Every switch is a row in NOTIFICATION_PREF_GROUPS and carries `data-pref`
+ * naming the preference it writes, so the test can assert the rendered page
+ * covers the API type rather than assert the file merely mentions it. A
+ * preference declared but never drawn fails nothing on its own — the row is
+ * simply absent — which is how this panel has gone stale twice.
  */
 
 interface PrefRow {
@@ -18,9 +24,24 @@ interface PrefRow {
   description: string
 }
 
+/**
+ * A preference with one switch rather than an in-app/email pair. `column` says
+ * which of the two headings it belongs under: a lone checkbox at the right edge
+ * of a two-column table reads as "email me this", which is wrong for every one
+ * of these but the digest.
+ */
+interface SingleRow {
+  key: keyof NotificationPreferences
+  label: string
+  description: string
+  column: 'in-app' | 'email'
+}
+
 interface PrefGroup {
   title: string
-  rows: PrefRow[]
+  note?: string
+  rows?: PrefRow[]
+  singles?: SingleRow[]
 }
 
 const NOTIFICATION_PREF_GROUPS: PrefGroup[] = [
@@ -43,6 +64,35 @@ const NOTIFICATION_PREF_GROUPS: PrefGroup[] = [
       { inAppKey: 'score_verified', emailKey: 'score_verified_email', label: 'Score verified', description: 'A league moderator confirmed your score.' },
       { inAppKey: 'score_rejected', emailKey: 'score_rejected_email', label: 'Score rejected', description: '' },
       { inAppKey: 'score_amended', emailKey: 'score_amended_email', label: 'Score amended', description: '' },
+    ],
+  },
+  {
+    // Opting in to be asked to verify other people's cards. Not delivery
+    // switches — they widen the audience of a verification request — but they
+    // are what somebody looking for "who sends me cards to check" comes here
+    // for, so they sit with score validation rather than at the foot of the
+    // page, and are named for the three places a card can come from.
+    title: 'Score card verification requests',
+    note: 'Ask to be sent other shooters’ cards when they need verifying. These widen who gets asked — you always hear about cards from people you follow and leagues you help run. Delivery follows the “Validation requested” switches above.',
+    singles: [
+      {
+        key: 'review_requests_public',
+        label: 'Public cards from the feed',
+        description: 'Community review requests on anyone’s public personal card, including shooters you don’t follow.',
+        column: 'in-app',
+      },
+      {
+        key: 'review_requests_leagues',
+        label: 'Cards in leagues I’m in',
+        description: 'League cards waiting on verification in any league you belong to, not just ones you help run.',
+        column: 'in-app',
+      },
+      {
+        key: 'review_requests_club_leagues',
+        label: 'Cards in my clubs’ leagues',
+        description: 'League cards in leagues run under a club you belong to, whether or not you are in that league.',
+        column: 'in-app',
+      },
     ],
   },
   {
@@ -89,32 +139,34 @@ const NOTIFICATION_PREF_GROUPS: PrefGroup[] = [
       { inAppKey: 'feature_request_state_changed', emailKey: 'feature_request_state_changed_email', label: 'Feature request state', description: 'Status changes for feature request tickets.' },
     ],
   },
-]
-
-const ROWS: PrefRow[] = NOTIFICATION_PREF_GROUPS.flatMap((g) => g.rows)
-
-/**
- * Opting in to be asked to validate other people's cards. Unlike the rows
- * above these are not delivery switches — they widen the audience of a
- * validation request — so they get a single toggle and their own section.
- */
-const VOLUNTEER_ROWS: { key: keyof NotificationPreferences; label: string; description: string }[] = [
   {
-    key: 'review_requests_public',
-    label: 'Public cards from anyone',
-    description: 'Community review requests on public personal cards, from shooters you may not follow.',
+    title: 'Moderation',
+    singles: [
+      {
+        key: 'report_filed',
+        label: 'Reports filed',
+        description: 'League/club moderators only. Email delivery is controlled by the digest email setting below.',
+        column: 'in-app',
+      },
+    ],
   },
   {
-    key: 'review_requests_leagues',
-    label: 'Cards in my leagues',
-    description: 'League cards waiting on verification in leagues you belong to.',
-  },
-  {
-    key: 'review_requests_club_leagues',
-    label: "Cards in my clubs' leagues",
-    description: 'League cards in leagues run under a club you belong to, whether or not you are in that league.',
+    title: 'Email digests',
+    singles: [
+      {
+        key: 'digest_email',
+        label: 'Digest email',
+        description: 'Weekly summary by email; also gates report-filed emails for moderators.',
+        column: 'email',
+      },
+    ],
   },
 ]
+
+const ROW_COUNT = NOTIFICATION_PREF_GROUPS.reduce(
+  (n, g) => n + (g.rows?.length ?? 0) + (g.singles?.length ?? 0),
+  0,
+)
 
 export function NotificationPreferencesPanel() {
   const queryClient = useQueryClient()
@@ -142,7 +194,7 @@ export function NotificationPreferencesPanel() {
 
       {isLoading && (
         <div className="space-y-2">
-          {ROWS.map((_, i) => <div key={i} className="h-14 rounded border border-subtle skeleton" />)}
+          {Array.from({ length: ROW_COUNT }, (_, i) => <div key={i} className="h-14 rounded border border-subtle skeleton" />)}
         </div>
       )}
 
@@ -156,8 +208,9 @@ export function NotificationPreferencesPanel() {
           {NOTIFICATION_PREF_GROUPS.map((group) => (
             <div key={group.title} className="pt-2">
               <h2 className="t-section-title mb-2">{group.title}</h2>
+              {group.note && <p className="text-xs text-muted mb-2">{group.note}</p>}
               <ul className="space-y-2">
-                {group.rows.map((row) => {
+                {(group.rows ?? []).map((row) => {
                   const inAppVal = data[row.inAppKey] as boolean
                   const emailVal = data[row.emailKey] as boolean
                   return (
@@ -171,6 +224,7 @@ export function NotificationPreferencesPanel() {
                           <span className="sm:hidden">In-app</span>
                           <input
                             type="checkbox"
+                            data-pref={row.inAppKey}
                             checked={inAppVal}
                             onChange={(e) => mutation.mutate({ [row.inAppKey]: e.target.checked } as NotificationPreferencesPatch)}
                             aria-label={`${group.title} — ${row.label} in-app`}
@@ -181,6 +235,7 @@ export function NotificationPreferencesPanel() {
                           <span className="sm:hidden">Email</span>
                           <input
                             type="checkbox"
+                            data-pref={row.emailKey}
                             checked={emailVal}
                             onChange={(e) => mutation.mutate({ [row.emailKey]: e.target.checked } as NotificationPreferencesPatch)}
                             aria-label={`${group.title} — ${row.label} email`}
@@ -191,79 +246,40 @@ export function NotificationPreferencesPanel() {
                     </li>
                   )
                 })}
+
+                {(group.singles ?? []).map((row) => {
+                  const toggle = (
+                    <label className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-muted cursor-pointer w-12">
+                      <span className="sm:hidden">{row.column === 'email' ? 'Email' : 'In-app'}</span>
+                      <input
+                        type="checkbox"
+                        data-pref={row.key}
+                        checked={data[row.key] as boolean}
+                        onChange={(e) => mutation.mutate({ [row.key]: e.target.checked } as NotificationPreferencesPatch)}
+                        aria-label={`${group.title} — ${row.label}`}
+                        className="scale-125"
+                      />
+                    </label>
+                  )
+                  // The unused column keeps its width, so the switch stays under
+                  // the heading it answers to instead of sliding to the edge.
+                  const spacer = <span className="hidden sm:block w-12" aria-hidden="true" />
+                  return (
+                    <li key={row.key} className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-secondary font-medium">{row.label}</p>
+                        {row.description && <p className="text-xs text-muted">{row.description}</p>}
+                      </div>
+                      <div className="shrink-0 flex items-start gap-4 sm:gap-6">
+                        {row.column === 'email' ? spacer : toggle}
+                        {row.column === 'email' ? toggle : spacer}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}
-
-          <div className="pt-2">
-            <h2 className="t-section-title mb-2">Volunteer to validate cards</h2>
-            <p className="text-xs text-muted mb-2">
-              Ask to be sent other shooters&rsquo; cards when they need confirming. These
-              widen who gets asked — you always hear about cards from people you
-              follow and leagues you help run.
-            </p>
-            <ul className="space-y-2">
-              {VOLUNTEER_ROWS.map((row) => (
-                <li key={row.key} className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-secondary font-medium">{row.label}</p>
-                    <p className="text-xs text-muted">{row.description}</p>
-                  </div>
-                  <label className="shrink-0 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={data[row.key] as boolean}
-                      onChange={(e) => mutation.mutate({ [row.key]: e.target.checked } as NotificationPreferencesPatch)}
-                      aria-label={row.label}
-                      className="scale-125"
-                    />
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="pt-2">
-            <h2 className="t-section-title mb-2">Moderation</h2>
-            <ul className="space-y-2">
-              <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-secondary font-medium">Reports filed</p>
-                  <p className="text-xs text-muted">League/club moderators only. Email delivery is controlled by the digest email setting below.</p>
-                </div>
-                <label className="shrink-0 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={data.report_filed}
-                    onChange={(e) => mutation.mutate({ report_filed: e.target.checked })}
-                    aria-label="Reports filed"
-                    className="scale-125"
-                  />
-                </label>
-              </li>
-            </ul>
-          </div>
-
-          <div className="pt-2">
-            <h2 className="t-section-title mb-2">Email digests</h2>
-            <ul className="space-y-2">
-              <li className="flex items-start justify-between gap-3 p-3 rounded border border-subtle bg-surface">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-secondary font-medium">Digest email</p>
-                  <p className="text-xs text-muted">Weekly summary by email; also gates report-filed emails for moderators.</p>
-                </div>
-                <label className="shrink-0 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={data.digest_email}
-                    onChange={(e) => mutation.mutate({ digest_email: e.target.checked })}
-                    aria-label="Digest email"
-                    className="scale-125"
-                  />
-                </label>
-              </li>
-            </ul>
-          </div>
         </>
       )}
     </div>
