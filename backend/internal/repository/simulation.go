@@ -152,7 +152,12 @@ func (r *SimulationRepository) UpsertSettings(ctx context.Context, input *model.
 			session_actions = EXCLUDED.session_actions,
 			persona_history_days = EXCLUDED.persona_history_days,
 			updated_by = EXCLUDED.updated_by,
-			updated_at = NOW()
+			updated_at = NOW(),
+			-- Saving the settings is the admin acting on whatever the last error
+			-- reported, so it is the one point at which a sticky error clears. If
+			-- the impediment is still there the next batch writes it straight back.
+			last_error = NULL,
+			last_error_at = NULL
 		RETURNING `+simulationSettingsColumns+`
 	`, input.Enabled, input.PersonaCount, input.ActionsPerHour,
 		input.PostWeight, input.LikeWeight, input.CommentWeight, input.FollowWeight,
@@ -209,6 +214,13 @@ func (r *SimulationRepository) TouchRun(ctx context.Context, lastAction string) 
 // last-run metadata in a single update. counts maps action labels ("post",
 // "like", "comment", "follow", "unfollow", "share") to how many of that action
 // were performed. When lastErr is non-empty it is also recorded.
+//
+// An error is kept until another one supersedes it (or the admin saves the
+// settings, which clears it). Blanking it on the next clean batch is what made
+// a stalled engine undiagnosable: the reason the simulation had gone quiet was
+// written to the dashboard and erased seconds later, so nobody ever read it.
+// last_error_at is shown alongside, which is what tells the admin how stale the
+// message is.
 func (r *SimulationRepository) IncrementCounts(ctx context.Context, counts map[string]int, lastAction, lastErr string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE simulation_settings
@@ -222,7 +234,7 @@ func (r *SimulationRepository) IncrementCounts(ctx context.Context, counts map[s
 			follow_count  = follow_count + $6,
 			unfollow_count = unfollow_count + $7,
 			share_count   = share_count + $8,
-			last_error    = NULLIF($9, ''),
+			last_error    = COALESCE(NULLIF($9, ''), last_error),
 			last_error_at = CASE WHEN $9 <> '' THEN NOW() ELSE last_error_at END
 		WHERE id = 1
 	`,
@@ -485,12 +497,28 @@ func (r *SimulationRepository) CountCardsForUser(ctx context.Context, userID str
 	return n, nil
 }
 
+// notAlreadyLiked returns a clause excluding rows $1 has already liked. Every
+// like-target query takes the acting persona as $1, so a single expression
+// serves all of them. Without it the engine re-likes what it already liked:
+// LikeTx is idempotent, so those calls succeed while changing nothing, and the
+// action budget drains into work that leaves no trace on the site.
+func notAlreadyLiked(idExpr, targetType string) string {
+	return ` AND NOT EXISTS (
+		SELECT 1 FROM likes l
+		WHERE l.user_id = $1 AND l.target_id = ` + idExpr + ` AND l.target_type = '` + targetType + `'
+	)`
+}
+
 // eligibleCardWhere returns the WHERE clause (excluding the owner filter) used
-// by both the count and the select for RandomPublicCard.
-func eligibleCardWhere(simulatedOnly bool) string {
+// by both the count and the select for RandomPublicCard. unlikedOnly drops the
+// cards the actor has already liked, for the like path.
+func eligibleCardWhere(simulatedOnly, unlikedOnly bool) string {
 	q := `sc.visibility = 'public' AND sc.is_draft = FALSE AND sc.user_id <> $1`
 	if simulatedOnly {
 		q += ` AND u.is_simulated`
+	}
+	if unlikedOnly {
+		q += notAlreadyLiked("sc.id", "score_card")
 	}
 	return q
 }
@@ -508,9 +536,10 @@ type SimCard struct {
 // RandomPublicCard picks a random public, non-draft score card not owned by
 // excludeUserID, preferring recently posted ones. When simulatedOnly is true,
 // only cards owned by simulated accounts are eligible (keeps simulated
-// interaction off real users' content). ErrNotFound when none is eligible.
-func (r *SimulationRepository) RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly bool) (*SimCard, error) {
-	where := eligibleCardWhere(simulatedOnly)
+// interaction off real users' content). unlikedOnly additionally skips cards
+// the actor has already liked. ErrNotFound when none is eligible.
+func (r *SimulationRepository) RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (*SimCard, error) {
+	where := eligibleCardWhere(simulatedOnly, unlikedOnly)
 	var c SimCard
 	err := r.randomRow(ctx,
 		`score_cards sc JOIN users u ON u.id = sc.user_id`,
@@ -702,20 +731,25 @@ func (r *SimulationRepository) DeleteSimulatedAvatarURL(ctx context.Context, id 
 	return u, nil
 }
 
-// eligiblePostWhere returns the WHERE clause for RandomPublicPost.
-func eligiblePostWhere(simulatedOnly bool) string {
+// eligiblePostWhere returns the WHERE clause for RandomPublicPost. unlikedOnly
+// drops the posts the actor has already liked, for the like path.
+func eligiblePostWhere(simulatedOnly, unlikedOnly bool) string {
 	q := `p.visibility = 'public' AND p.hidden_at IS NULL AND p.user_id <> $1`
 	if simulatedOnly {
 		q += ` AND u.is_simulated`
+	}
+	if unlikedOnly {
+		q += notAlreadyLiked("p.id", "post")
 	}
 	return q
 }
 
 // RandomPublicPost picks a random public, non-hidden post not owned by
 // excludeUserID, preferring recent ones. When simulatedOnly is true, only posts
-// by simulated accounts are eligible. ErrNotFound when no eligible post exists.
-func (r *SimulationRepository) RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
-	where := eligiblePostWhere(simulatedOnly)
+// by simulated accounts are eligible. unlikedOnly additionally skips posts the
+// actor has already liked. ErrNotFound when no eligible post exists.
+func (r *SimulationRepository) RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (string, error) {
+	where := eligiblePostWhere(simulatedOnly, unlikedOnly)
 	var id string
 	err := r.randomRow(ctx,
 		`posts p JOIN users u ON u.id = p.user_id`,
@@ -729,19 +763,24 @@ func (r *SimulationRepository) RandomPublicPost(ctx context.Context, excludeUser
 }
 
 // eligibleActivityWhere returns the WHERE clause for RandomActivity.
-func eligibleActivityWhere(simulatedOnly bool) string {
+// unlikedOnly drops the activities the actor has already liked.
+func eligibleActivityWhere(simulatedOnly, unlikedOnly bool) string {
 	q := `a.visibility = 'public' AND a.hidden_at IS NULL AND a.user_id <> $1`
 	if simulatedOnly {
 		q += ` AND u.is_simulated`
+	}
+	if unlikedOnly {
+		q += notAlreadyLiked("a.id", "activity")
 	}
 	return q
 }
 
 // RandomActivity picks a random public, non-hidden activity not owned by
 // excludeUserID, preferring recent ones. When simulatedOnly is true, only
-// activities by simulated accounts are eligible. ErrNotFound when none exists.
-func (r *SimulationRepository) RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
-	where := eligibleActivityWhere(simulatedOnly)
+// activities by simulated accounts are eligible. unlikedOnly additionally skips
+// activities the actor has already liked. ErrNotFound when none exists.
+func (r *SimulationRepository) RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (string, error) {
+	where := eligibleActivityWhere(simulatedOnly, unlikedOnly)
 	var id string
 	err := r.randomRow(ctx,
 		`activities a JOIN users u ON u.id = a.user_id`,
@@ -783,13 +822,14 @@ func (r *SimulationRepository) RandomTopLevelComment(ctx context.Context, target
 }
 
 // RandomLikeableComment picks a random recent comment not written by
-// excludeUserID. When simulatedOnly is true, only comments by simulated
-// accounts are eligible. ErrNotFound when none exists.
+// excludeUserID and not already liked by them. When simulatedOnly is true, only
+// comments by simulated accounts are eligible. ErrNotFound when none exists.
 func (r *SimulationRepository) RandomLikeableComment(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error) {
 	where := `c.user_id <> $1`
 	if simulatedOnly {
 		where += ` AND u.is_simulated`
 	}
+	where += notAlreadyLiked("c.id", "comment")
 	var id string
 	err := r.randomRow(ctx,
 		`comments c JOIN users u ON u.id = c.user_id`,

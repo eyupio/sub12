@@ -122,8 +122,9 @@ func TestPickActionRespectsWeights(t *testing.T) {
 		assert.Equal(t, "follow", s.pickAction(settings, "user-1"))
 	}
 
-	// Zero total weight falls back to like (never panics).
-	assert.Equal(t, "like", s.pickAction(&model.SimulationSettings{}, "user-1"))
+	// Zero total weight means there is nothing to do (never panics). Falling
+	// back to a like would be performing an action nobody configured.
+	assert.Equal(t, "", s.pickAction(&model.SimulationSettings{}, "user-1"))
 }
 
 func TestPickActionCoversAllWeightedActions(t *testing.T) {
@@ -231,6 +232,8 @@ type mockSimulationRepo struct {
 	seeds        []repository.PersonaSeed
 	displayNames []string
 	createdAt    []time.Time
+	cardsPerUser int    // CountCardsForUser return value
+	recordedErr  string // last lastErr passed to IncrementCounts
 }
 
 func (m *mockSimulationRepo) GetSettings(context.Context) (*model.SimulationSettings, error) {
@@ -242,7 +245,8 @@ func (m *mockSimulationRepo) GetSettings(context.Context) (*model.SimulationSett
 func (m *mockSimulationRepo) UpsertSettings(context.Context, *model.UpsertSimulationSettingsInput, string) (*model.SimulationSettings, error) {
 	return m.settings, nil
 }
-func (m *mockSimulationRepo) IncrementCounts(context.Context, map[string]int, string, string) error {
+func (m *mockSimulationRepo) IncrementCounts(_ context.Context, _ map[string]int, _, lastErr string) error {
+	m.recordedErr = lastErr
 	return nil
 }
 func (m *mockSimulationRepo) TouchTick(context.Context) error { return nil }
@@ -274,18 +278,18 @@ func (m *mockSimulationRepo) DeleteSimulatedUser(context.Context, string) error 
 func (m *mockSimulationRepo) DeleteAllSimulated(context.Context) (int, error)   { return 0, nil }
 func (m *mockSimulationRepo) TrimSimulatedTo(context.Context, int) (int, error) { return 0, nil }
 func (m *mockSimulationRepo) CountCardsForUser(context.Context, string) (int, error) {
-	return 0, nil
+	return m.cardsPerUser, nil
 }
-func (m *mockSimulationRepo) RandomPublicCard(context.Context, string, bool) (*repository.SimCard, error) {
+func (m *mockSimulationRepo) RandomPublicCard(context.Context, string, bool, bool) (*repository.SimCard, error) {
 	return nil, repository.ErrNotFound
 }
 func (m *mockSimulationRepo) RandomFollowTarget(context.Context, string, bool) (string, error) {
 	return "", nil
 }
-func (m *mockSimulationRepo) RandomPublicPost(context.Context, string, bool) (string, error) {
+func (m *mockSimulationRepo) RandomPublicPost(context.Context, string, bool, bool) (string, error) {
 	return "", nil
 }
-func (m *mockSimulationRepo) RandomActivity(context.Context, string, bool) (string, error) {
+func (m *mockSimulationRepo) RandomActivity(context.Context, string, bool, bool) (string, error) {
 	return "", nil
 }
 func (m *mockSimulationRepo) RandomFollowedUser(context.Context, string, bool) (string, error) {
@@ -845,4 +849,101 @@ func TestTierOf(t *testing.T) {
 	assert.Equal(t, tierStrong, tierOf(231))
 	assert.Equal(t, tierSolid, tierOf(212))
 	assert.Equal(t, tierModest, tierOf(180))
+}
+
+// --- the card cap must not stop the simulation silently ---
+
+// cappedService builds a service whose personas have all shot their allocation.
+func cappedService(repo *mockSimulationRepo, personas ...string) *SimulationService {
+	s := &SimulationService{
+		repo:       repo,
+		log:        zerolog.Nop(),
+		rng:        rand.New(rand.NewSource(1)),
+		traits:     map[string]personaTraits{},
+		gear:       map[string]gearIDs{},
+		recentSaid: map[string][]string{},
+		capped:     map[string]bool{},
+		personas:   personas,
+	}
+	for _, id := range personas {
+		s.capped[id] = true
+	}
+	return s
+}
+
+func TestPickActionNeverOffersPostToACappedPersona(t *testing.T) {
+	s := cappedService(&mockSimulationRepo{}, "p1")
+	settings := &model.SimulationSettings{PostWeight: 100, LikeWeight: 1}
+	for i := 0; i < 200; i++ {
+		assert.NotEqual(t, "post", s.pickAction(settings, "p1"),
+			"a persona at the card cap must not be handed an action it cannot perform")
+	}
+	// An uncapped persona still posts under the same weights.
+	saw := false
+	for i := 0; i < 200 && !saw; i++ {
+		saw = s.pickAction(settings, "fresh") == "post"
+	}
+	assert.True(t, saw, "an uncapped persona should still be offered post")
+}
+
+func TestPickActionReturnsNothingWhenPostIsTheOnlyActionAndTheActorIsCapped(t *testing.T) {
+	s := cappedService(&mockSimulationRepo{}, "p1")
+	// Posting is all the admin asked for; falling back to a like would be doing
+	// something nobody configured.
+	assert.Equal(t, "", s.pickAction(&model.SimulationSettings{PostWeight: 5}, "p1"))
+}
+
+func TestPerformActionsReportsWhenEveryPersonaHasHitTheCardCap(t *testing.T) {
+	repo := &mockSimulationRepo{
+		seeds:        []repository.PersonaSeed{{ID: "p1"}, {ID: "p2"}},
+		cardsPerUser: 30,
+	}
+	s := cappedService(repo, "p1", "p2")
+	settings := &model.SimulationSettings{
+		PostWeight:         5,
+		PersonaCount:       2,
+		MaxCardsPerPersona: 30,
+		SessionActions:     3,
+	}
+
+	performed, _, err := s.performActions(context.Background(), settings, 5)
+	require.NoError(t, err)
+	assert.Zero(t, performed, "a fully capped roster cannot post")
+	// The reason has to reach the dashboard, and has to say what to change.
+	assert.Contains(t, repo.recordedErr, "all 2 personas have reached max_cards_per_persona (30)")
+	assert.Contains(t, repo.recordedErr, "raise the cap")
+}
+
+func TestRosterCappedNeedsEveryPersona(t *testing.T) {
+	s := cappedService(&mockSimulationRepo{}, "p1", "p2")
+	assert.True(t, s.rosterCapped([]string{"p1", "p2"}))
+
+	// One persona with cards left to shoot is not a stalled roster: the warning
+	// is for the state where no new score card can ever be posted again.
+	s.capped["p2"] = false
+	assert.False(t, s.rosterCapped([]string{"p1", "p2"}))
+}
+
+func TestDoPostMarksThePersonaCappedWithoutAttemptingTheCard(t *testing.T) {
+	repo := &mockSimulationRepo{cardsPerUser: 30}
+	s := cappedService(repo)
+	// scoreCards is nil: reaching the create path at all would panic, which is
+	// the point — a capped persona must be turned away before then.
+	res := s.doPost(context.Background(), &model.SimulationSettings{MaxCardsPerPersona: 30}, "p1")
+	assert.False(t, res.ok)
+	assert.Equal(t, "persona at card cap", res.err)
+	assert.True(t, s.isCapped("p1"))
+}
+
+func TestRosterCappedIgnoresAnEmptyRoster(t *testing.T) {
+	s := cappedService(&mockSimulationRepo{})
+	assert.False(t, s.rosterCapped(nil), "no personas is not the same as every persona being capped")
+}
+
+func TestInvalidatePersonasClearsTheCapMarks(t *testing.T) {
+	s := cappedService(&mockSimulationRepo{}, "p1")
+	require.True(t, s.isCapped("p1"))
+	// A settings save invalidates the roster, and may have moved the cap itself.
+	s.InvalidatePersonas()
+	assert.False(t, s.isCapped("p1"))
 }
