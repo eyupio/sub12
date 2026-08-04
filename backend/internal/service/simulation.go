@@ -53,12 +53,12 @@ type simulationRepo interface {
 	DeleteAllSimulated(ctx context.Context) (int, error)
 	TrimSimulatedTo(ctx context.Context, target int) (int, error)
 	CountCardsForUser(ctx context.Context, userID string) (int, error)
-	RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly bool) (*repository.SimCard, error)
+	RandomPublicCard(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (*repository.SimCard, error)
 	RandomFollowTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
 	RandomFollowBackTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
 	RandomMutualFollowTarget(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
-	RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
-	RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
+	RandomPublicPost(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (string, error)
+	RandomActivity(ctx context.Context, excludeUserID string, simulatedOnly, unlikedOnly bool) (string, error)
 	RandomFollowedUser(ctx context.Context, followerID string, simulatedOnly bool) (string, error)
 	RandomTopLevelComment(ctx context.Context, targetID, targetType, excludeUserID string, simulatedOnly bool) (string, string, error)
 	RandomLikeableComment(ctx context.Context, excludeUserID string, simulatedOnly bool) (string, error)
@@ -142,7 +142,13 @@ type SimulationService struct {
 	// recentSaid is the last few comment bodies each persona used, so the same
 	// account doesn't repeat itself two cards running.
 	recentSaid map[string][]string
-	session    browseSession
+	// capped records the personas that have reached max_cards_per_persona, so
+	// the engine stops offering them an action they cannot perform, and can
+	// tell the admin when the whole roster has run out of cards to shoot.
+	// Cleared whenever the persona list is invalidated, which includes every
+	// settings save — the cap itself may have moved.
+	capped  map[string]bool
+	session browseSession
 	// includePublic is the cached IncludeInPublicStats flag, used by the feed /
 	// leaderboard via ExcludeSimulatedFromPublic. Synced whenever settings are read.
 	includePublic atomic.Bool
@@ -177,6 +183,7 @@ func NewSimulationService(
 		traits:     map[string]personaTraits{},
 		gear:       map[string]gearIDs{},
 		recentSaid: map[string][]string{},
+		capped:     map[string]bool{},
 	}
 	s.includePublic.Store(true) // DB default; refreshed on first settings read
 	return s
@@ -256,6 +263,49 @@ func (s *SimulationService) InvalidatePersonas() {
 	s.traits = map[string]personaTraits{}
 	s.gear = map[string]gearIDs{}
 	s.recentSaid = map[string][]string{}
+	s.capped = map[string]bool{}
+	s.session = browseSession{}
+}
+
+// markCapped records that a persona has reached max_cards_per_persona.
+func (s *SimulationService) markCapped(id string) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.capped[id] = true
+}
+
+// isCapped reports whether a persona is known to have reached the card cap.
+func (s *SimulationService) isCapped(id string) bool {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	return s.capped[id]
+}
+
+// rosterCapped reports whether every loaded persona has reached the card cap,
+// which is the point at which the simulation stops producing score cards for
+// good. Nothing else in the engine notices — likes and comments carry on
+// churning over the cards that already exist — so this is what turns "enabled,
+// ticking, and nothing new on the site" into something the admin can act on.
+func (s *SimulationService) rosterCapped(personas []string) bool {
+	if len(personas) == 0 {
+		return false
+	}
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	for _, id := range personas {
+		if !s.capped[id] {
+			return false
+		}
+	}
+	return true
+}
+
+// endSession drops the in-flight browse session so the next actor draw picks
+// somebody else. Used when an attempt failed: handing the same persona the
+// remaining retries just fails the same way three times over.
+func (s *SimulationService) endSession() {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
 	s.session = browseSession{}
 }
 
@@ -585,7 +635,19 @@ func (s *SimulationService) performActions(ctx context.Context, settings *model.
 			if res.err != "" && firstErr == "" {
 				firstErr = res.err
 			}
+			// This persona had nothing to give. End their browse session so the
+			// retry draws a different one rather than failing identically.
+			s.endSession()
 		}
+	}
+
+	// A roster where every persona has shot its allocation can still like and
+	// comment forever, so the counters keep climbing while no new content
+	// appears. Say so plainly, and say what to change.
+	if performed == 0 && settings.MaxCardsPerPersona > 0 && s.rosterCapped(personas) {
+		firstErr = fmt.Sprintf(
+			"all %d personas have reached max_cards_per_persona (%d) — no new score cards will be posted; raise the cap, add personas, or set it to 0 for unlimited",
+			len(personas), settings.MaxCardsPerPersona)
 	}
 
 	if performed > 0 || firstErr != "" {
@@ -765,15 +827,22 @@ func actorWeight(activity float64) float64 {
 }
 
 // pickAction selects an action label by weighted random choice, with the base
-// weights biased by the actor's character.
+// weights biased by the actor's character. A persona already at the card cap is
+// never offered "post": drawing an action it cannot perform spends a retry to
+// no purpose, and with the cap reached across the roster that is most of the
+// budget. Returns "" when the actor has nothing it can do.
 func (s *SimulationService) pickAction(settings *model.SimulationSettings, actor string) string {
 	p := s.personaTraitsOf(actor)
 	type wa struct {
 		name   string
 		weight float64
 	}
+	postWeight := float64(settings.PostWeight) * (0.5 + p.competitive)
+	if s.isCapped(actor) {
+		postWeight = 0
+	}
 	choices := []wa{
-		{"post", float64(settings.PostWeight) * (0.5 + p.competitive)},
+		{"post", postWeight},
 		{"like", float64(settings.LikeWeight)},
 		{"comment", float64(settings.CommentWeight) * (0.5 + p.loquacious)},
 		{"follow", float64(settings.FollowWeight) * (0.5 + p.sociable)},
@@ -785,7 +854,10 @@ func (s *SimulationService) pickAction(settings *model.SimulationSettings, actor
 		total += c.weight
 	}
 	if total <= 0 {
-		return "like"
+		// Every weight is zero. That means posting was the only action the admin
+		// asked for and this persona can no longer do it — falling back to a like
+		// would be doing something nobody configured.
+		return ""
 	}
 	pick := s.randFloat(total)
 	for _, c := range choices {
@@ -814,6 +886,8 @@ type actionResult struct {
 func (s *SimulationService) execute(ctx context.Context, settings *model.SimulationSettings, action, actor string) actionResult {
 	simulatedOnly := !settings.InteractWithRealUsers
 	switch action {
+	case "":
+		return actionResult{err: "no action available for persona"}
 	case "post":
 		return s.doPost(ctx, settings, actor)
 	case "comment":
@@ -841,6 +915,7 @@ func (s *SimulationService) doPost(ctx context.Context, settings *model.Simulati
 		return actionResult{err: "count cards failed"}
 	}
 	if settings.MaxCardsPerPersona > 0 && posted >= settings.MaxCardsPerPersona {
+		s.markCapped(actor)
 		return actionResult{err: "persona at card cap"}
 	}
 
@@ -901,17 +976,17 @@ func (s *SimulationService) doPost(ctx context.Context, settings *model.Simulati
 	return actionResult{ok: true}
 }
 
-// doLike likes a random piece of recent content. Score cards dominate, but a
-// member who only ever likes cards and never a post, a comment or a personal
-// best is recognisably not a member.
+// doLike likes a random piece of recent content the persona has not already
+// liked. Score cards dominate, but a member who only ever likes cards and never
+// a post, a comment or a personal best is recognisably not a member.
 func (s *SimulationService) doLike(ctx context.Context, actor string, simulatedOnly bool) bool {
 	switch roll := s.randIntn(100); {
 	case roll < 20:
-		if id, err := s.repo.RandomPublicPost(ctx, actor, simulatedOnly); err == nil {
+		if id, err := s.repo.RandomPublicPost(ctx, actor, simulatedOnly, true); err == nil {
 			return s.like(ctx, actor, id, model.LikeTargetPost)
 		}
 	case roll < 32:
-		if id, err := s.repo.RandomActivity(ctx, actor, simulatedOnly); err == nil {
+		if id, err := s.repo.RandomActivity(ctx, actor, simulatedOnly, true); err == nil {
 			return s.like(ctx, actor, id, model.LikeTargetActivity)
 		}
 	case roll < 40:
@@ -920,19 +995,24 @@ func (s *SimulationService) doLike(ctx context.Context, actor string, simulatedO
 		}
 	}
 	// Score cards, and the fallback whenever the chosen surface had nothing.
-	card, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly)
+	card, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly, true)
 	if err != nil {
 		return false
 	}
 	return s.like(ctx, actor, card.ID, model.LikeTargetScoreCard)
 }
 
+// like reports whether a like was actually created. LikeTx is idempotent, so
+// re-liking something returns no error while changing nothing; counting that as
+// a performed action is what let total_actions climb steadily on a site where
+// nothing was happening.
 func (s *SimulationService) like(ctx context.Context, actor, targetID, targetType string) bool {
-	if _, err := s.likes.Like(ctx, actor, targetID, targetType); err != nil {
+	created, err := s.likes.Like(ctx, actor, targetID, targetType)
+	if err != nil {
 		s.log.Warn().Err(err).Str("target_type", targetType).Msg("simulation: like failed")
 		return false
 	}
-	return true
+	return created
 }
 
 // doComment leaves a remark on a randomly chosen score card, post or activity.
@@ -947,17 +1027,17 @@ func (s *SimulationService) doComment(ctx context.Context, settings *model.Simul
 	var card *repository.SimCard
 	switch roll := s.randIntn(10); {
 	case roll < 3:
-		if id, err := s.repo.RandomPublicPost(ctx, actor, simulatedOnly); err == nil {
+		if id, err := s.repo.RandomPublicPost(ctx, actor, simulatedOnly, false); err == nil {
 			targetID, targetType = id, "post"
 		}
 	case roll < 4:
-		if id, err := s.repo.RandomActivity(ctx, actor, simulatedOnly); err == nil {
+		if id, err := s.repo.RandomActivity(ctx, actor, simulatedOnly, false); err == nil {
 			targetID, targetType = id, "activity"
 		}
 	}
 	if targetID == "" {
 		// Score cards, and the fallback when the chosen surface had nothing.
-		c, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly)
+		c, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly, false)
 		if err != nil {
 			return false
 		}
@@ -1037,7 +1117,7 @@ func (s *SimulationService) doShare(ctx context.Context, actor string, simulated
 	if s.posts == nil {
 		return false
 	}
-	card, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly)
+	card, err := s.repo.RandomPublicCard(ctx, actor, simulatedOnly, false)
 	if err != nil {
 		return false
 	}

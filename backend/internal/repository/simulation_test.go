@@ -143,6 +143,49 @@ func TestSimTouchTickAndCounts(t *testing.T) {
 	assert.Equal(t, before+1, st.ShareCount)
 }
 
+// A stalled engine explains itself through last_error, and the batch that
+// follows is usually a clean one — likes and comments carry on long after the
+// card cap has stopped the posting. Blanking the message on that next batch is
+// what left the admin with "enabled, ticking, nothing happening" and no reason.
+func TestSimLastErrorSurvivesTheNextCleanBatch(t *testing.T) {
+	pool, cleanup := simTestPool(t)
+	defer cleanup()
+	repo := NewSimulationRepository(pool)
+	ctx := context.Background()
+
+	require.NoError(t, repo.IncrementCounts(ctx, map[string]int{}, "", "roster is at the card cap"))
+	st, err := repo.GetSettings(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, st.LastError)
+	assert.Equal(t, "roster is at the card cap", *st.LastError)
+	firstAt := st.LastErrorAt
+
+	require.NoError(t, repo.IncrementCounts(ctx, map[string]int{"like": 1}, "like", ""))
+	st, err = repo.GetSettings(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, st.LastError, "a clean batch must not erase the reason the engine stalled")
+	assert.Equal(t, "roster is at the card cap", *st.LastError)
+	assert.Equal(t, firstAt, st.LastErrorAt, "the timestamp still reports when it was raised")
+
+	// A newer error supersedes it.
+	require.NoError(t, repo.IncrementCounts(ctx, map[string]int{}, "", "post failed"))
+	st, err = repo.GetSettings(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, st.LastError)
+	assert.Equal(t, "post failed", *st.LastError)
+
+	// Saving the settings is the admin acting on it, and clears it.
+	_, err = repo.UpsertSettings(ctx, &model.UpsertSimulationSettingsInput{
+		PersonaCount: 1, ActionsPerHour: 1, LikeWeight: 1, ActiveEndHour: 24,
+		SessionActions: 1,
+	}, simTestActor(t, pool))
+	require.NoError(t, err)
+	st, err = repo.GetSettings(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, st.LastError)
+	assert.Nil(t, st.LastErrorAt)
+}
+
 func TestSimAuditAppend(t *testing.T) {
 	pool, cleanup := simTestPool(t)
 	defer cleanup()
@@ -204,7 +247,7 @@ func TestSimPersonaProvisioningAndTargets(t *testing.T) {
 	cardID := insertSimTestCard(t, pool, alice, 231, 9)
 
 	t.Run("card selection carries the score", func(t *testing.T) {
-		card, err := repo.RandomPublicCard(ctx, bob, true)
+		card, err := repo.RandomPublicCard(ctx, bob, true, false)
 		require.NoError(t, err)
 		assert.Equal(t, cardID, card.ID)
 		assert.Equal(t, alice, card.OwnerID)
@@ -212,8 +255,31 @@ func TestSimPersonaProvisioningAndTargets(t *testing.T) {
 		assert.Equal(t, int16(9), card.XCount)
 
 		// The owner is never handed their own card to react to.
-		_, err = repo.RandomPublicCard(ctx, alice, true)
+		_, err = repo.RandomPublicCard(ctx, alice, true, false)
 		assert.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("the like path skips what the actor already liked", func(t *testing.T) {
+		// Still eligible before Bob has liked it.
+		_, err := repo.RandomPublicCard(ctx, bob, true, true)
+		require.NoError(t, err)
+
+		_, err = pool.Exec(ctx,
+			`INSERT INTO likes (user_id, target_id, target_type) VALUES ($1, $2, 'score_card')`,
+			bob, cardID)
+		require.NoError(t, err)
+
+		// A re-like changes nothing on the site, so the card must drop out of the
+		// like pool entirely rather than be handed back and counted as an action.
+		_, err = repo.RandomPublicCard(ctx, bob, true, true)
+		assert.ErrorIs(t, err, ErrNotFound)
+
+		// Commenting and sharing are unaffected — those are not one-per-person.
+		_, err = repo.RandomPublicCard(ctx, bob, true, false)
+		assert.NoError(t, err)
+
+		_, err = pool.Exec(ctx, `DELETE FROM likes WHERE user_id = $1 AND target_id = $2`, bob, cardID)
+		require.NoError(t, err)
 	})
 
 	t.Run("follow graph preferences", func(t *testing.T) {
@@ -294,9 +360,9 @@ func TestSimPersonaProvisioningAndTargets(t *testing.T) {
 	})
 
 	t.Run("empty surfaces report not found rather than erroring", func(t *testing.T) {
-		_, err := repo.RandomPublicPost(ctx, alice, true)
+		_, err := repo.RandomPublicPost(ctx, alice, true, false)
 		assert.ErrorIs(t, err, ErrNotFound)
-		_, err = repo.RandomActivity(ctx, alice, true)
+		_, err = repo.RandomActivity(ctx, alice, true, false)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 }
