@@ -149,7 +149,7 @@ cd backend && make build         # compile to bin/api
 cd backend && make tidy          # go mod tidy + verify
 
 # Frontend
-cd frontend && npm run check     # tsc --noEmit
+cd frontend && npm run check     # tsc -b
 cd frontend && npm run lint      # ESLint
 cd frontend && npm test          # Vitest
 cd frontend && npm run build     # production build
