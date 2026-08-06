@@ -29,6 +29,16 @@ var (
 
 const emailChangeTTL = 24 * time.Hour
 
+// Caps on free-form profile text. Without these, an authenticated user could
+// PATCH ~1 MiB (the JSON decoder's per-request cap) into their `users` row and
+// have it streamed back on every profile view. Runes so multi-byte scripts
+// get the same character allowance as ASCII.
+const (
+	maxUserBioLen      = 1000
+	maxUserLocationLen = 120
+	maxUserClubLen     = 120
+)
+
 // SessionInvalidator revokes a user's refresh tokens. Implemented by
 // AuthService; injected into UserService post-construction to avoid a
 // constructor-level cycle.
@@ -184,6 +194,15 @@ func (s *UserService) UpdateMe(ctx context.Context, id string, in *model.UpdateP
 	}
 	if in.DisplayName != nil && len(*in.DisplayName) > 64 {
 		return nil, fmt.Errorf("%w: display_name must be 64 characters or fewer", ErrInvalidProfile)
+	}
+	if in.Bio != nil && len([]rune(*in.Bio)) > maxUserBioLen {
+		return nil, fmt.Errorf("%w: bio must be %d characters or fewer", ErrInvalidProfile, maxUserBioLen)
+	}
+	if in.Location != nil && len([]rune(*in.Location)) > maxUserLocationLen {
+		return nil, fmt.Errorf("%w: location must be %d characters or fewer", ErrInvalidProfile, maxUserLocationLen)
+	}
+	if in.Club != nil && len([]rune(*in.Club)) > maxUserClubLen {
+		return nil, fmt.Errorf("%w: club must be %d characters or fewer", ErrInvalidProfile, maxUserClubLen)
 	}
 	if in.ProfileVisibility != nil && *in.ProfileVisibility != "public" && *in.ProfileVisibility != "private" {
 		return nil, fmt.Errorf("%w: profile_visibility must be 'public' or 'private'", ErrInvalidProfile)
