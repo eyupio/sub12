@@ -31,16 +31,24 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
   // A simple FIFO queue so that rapid step transitions don't fire overlapping
   // PATCHes — each save awaits the previous one before starting.
   const queueRef = useRef<Promise<unknown>>(Promise.resolve())
+  // Mirrors state.draftId, read inside queued work instead of the closed-over
+  // `state`. Two calls fired from the same stale render (a double-tapped
+  // Continue button before React re-renders) share the same `state.draftId`
+  // closure, so the second would still see it as null when its turn in the
+  // queue comes up and quickCreate a second, orphaned draft session instead
+  // of patching the first. The ref is mutated synchronously the moment a
+  // draft id is known, so a later-queued check always sees it.
+  const draftIdRef = useRef<string | null>(initialId ?? null)
 
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['pellet-tests'] })
     qc.invalidateQueries({ queryKey: ['pellet-drafts'] })
     qc.invalidateQueries({ queryKey: ['pellet-drafts-count'] })
-    if (state.draftId) {
-      qc.invalidateQueries({ queryKey: ['pellet-tests', state.draftId] })
-      qc.invalidateQueries({ queryKey: ['pellet-test', state.draftId] })
+    if (draftIdRef.current) {
+      qc.invalidateQueries({ queryKey: ['pellet-tests', draftIdRef.current] })
+      qc.invalidateQueries({ queryKey: ['pellet-test', draftIdRef.current] })
     }
-  }, [qc, state.draftId])
+  }, [qc])
 
   const enqueue = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
     const next = queueRef.current.then(() => work())
@@ -51,11 +59,12 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
   const ensureDraft = useCallback(
     async (payload: QuickCreatePelletTestPayload): Promise<PelletTestSession> => {
       return enqueue(async () => {
-        if (state.draftId) {
+        if (draftIdRef.current) {
           // Already exists — patch instead.
+          const id = draftIdRef.current
           setState(s => ({ ...s, isSaving: true, error: null }))
           try {
-            const session = await pelletTestApi.update(state.draftId!, payload as UpdatePelletTestPayload)
+            const session = await pelletTestApi.update(id, payload as UpdatePelletTestPayload)
             setState(s => ({ ...s, isSaving: false, lastSavedAt: new Date() }))
             invalidate()
             return session
@@ -68,6 +77,7 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
         setState(s => ({ ...s, isSaving: true, error: null }))
         try {
           const session = await pelletTestApi.quickCreate(payload)
+          draftIdRef.current = session.id
           setState({
             draftId: session.id,
             isSaving: false,
@@ -84,16 +94,18 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
         }
       })
     },
-    [enqueue, invalidate, onCreated, state.draftId],
+    [enqueue, invalidate, onCreated],
   )
 
   const patch = useCallback(
     async (payload: UpdatePelletTestPayload): Promise<PelletTestSession | null> => {
-      if (!state.draftId) return null
+      if (!draftIdRef.current) return null
       return enqueue(async () => {
+        const id = draftIdRef.current
+        if (!id) return null
         setState(s => ({ ...s, isSaving: true, error: null }))
         try {
-          const session = await pelletTestApi.update(state.draftId!, payload)
+          const session = await pelletTestApi.update(id, payload)
           setState(s => ({ ...s, isSaving: false, lastSavedAt: new Date() }))
           invalidate()
           return session
@@ -104,7 +116,7 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
         }
       })
     },
-    [enqueue, invalidate, state.draftId],
+    [enqueue, invalidate],
   )
 
   const createFull = useCallback(
@@ -113,6 +125,7 @@ export function usePelletDraftAutosave({ initialId, onCreated }: UsePelletDraftA
         setState(s => ({ ...s, isSaving: true, error: null }))
         try {
           const session = await pelletTestApi.create(payload)
+          draftIdRef.current = session.id
           setState({
             draftId: session.id,
             isSaving: false,
