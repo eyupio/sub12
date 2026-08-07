@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { Calendar, Check, MapPin, X } from 'lucide-react'
 import { eventInvitationsApi } from '../api/eventInvitations'
+import { Skeleton, SkeletonText } from '../components/Skeleton'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 
@@ -55,7 +56,13 @@ export default function EventInvitationAccept() {
       <div className="p-4 lg:p-8 max-w-2xl mx-auto pb-32 space-y-5">
         <h1 className="t-page-title">Event invitation</h1>
 
-        {isLoading && <p className="text-sm text-muted">Loading invitation…</p>}
+        {isLoading && (
+          <div className="bg-surface border border-line rounded-lg p-5 lg:p-6 shadow-card space-y-4" role="status" aria-busy="true" aria-label="Loading invitation">
+            <Skeleton height={11} width={160} rounded="sm" />
+            <Skeleton height={20} width={220} rounded="sm" />
+            <SkeletonText lines={2} />
+          </div>
+        )}
         {error && (
           <div className="bg-surface border border-line rounded-lg p-5 shadow-card">
             <p className="text-sm text-[var(--error-text)]">
