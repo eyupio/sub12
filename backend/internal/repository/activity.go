@@ -189,6 +189,10 @@ func (r *ActivityRepository) GetFeedFiltered(ctx context.Context, req model.Feed
 		simFilterForYou = " AND (a.user_id = $1 OR NOT u.is_simulated)"
 	}
 
+	// Every branch below excludes activity in both directions of a block
+	// (blocker_id = viewer and blocked_id = viewer): a block is symmetric, so
+	// neither side should see the other's activity regardless of who blocked
+	// whom.
 	switch req.Filter {
 	case model.FeedPublic:
 		rows, err = r.db.Query(ctx, `
