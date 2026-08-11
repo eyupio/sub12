@@ -53,7 +53,7 @@ A target shooting companion app for the UK airgun benchrest community. Log 25-sh
 
 | Layer | Technology |
 |---|---|
-| Backend | Go 1.24, Chi v5, pgx v5, zerolog, golang-jwt, go-redis |
+| Backend | Go 1.25, Chi v5, pgx v5, zerolog, golang-jwt, go-redis |
 | Database | PostgreSQL 16 (golang-migrate, embedded SQL migrations) |
 | Cache | Redis 7 |
 | Frontend | React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4 |
@@ -94,7 +94,7 @@ sub-12/
 
 ### Prerequisites
 
-- [Go 1.24+](https://go.dev/dl/)
+- [Go 1.25+](https://go.dev/dl/)
 - [Node 20+](https://nodejs.org/)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
