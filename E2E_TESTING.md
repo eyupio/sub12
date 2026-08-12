@@ -72,5 +72,6 @@ admin API.
 ## CI
 
 [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) runs the same suite
-against `STAGING_URL` on PRs that touch `frontend/`, `backend/`, or `e2e/`,
-and nightly at 03:00 UTC.
+against `STAGING_URL`, but only via manual `workflow_dispatch` — it is **not**
+part of the PR gate and does not run on a schedule. Run it yourself (or
+trigger it manually from the Actions tab) when changing a flow it covers.
