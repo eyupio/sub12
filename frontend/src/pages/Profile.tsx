@@ -31,7 +31,7 @@ import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader } from '../components/leagues'
 import '../components/leagues/styles.css'
-import { SkeletonList } from '../components/Skeleton'
+import { SkeletonList, SkeletonText } from '../components/Skeleton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -938,7 +938,7 @@ function SecurityTab() {
           <span className="lc-section-title"><ShieldCheck size={12} /> Two-factor authentication</span>
         </div>
         <div className="p-5 space-y-4">
-          {isLoading && <p className="text-xs text-muted">Loading…</p>}
+          {isLoading && <SkeletonText lines={2} />}
 
           {!isLoading && status && !status.enabled && enrollStep === 'idle' && (
             <>
