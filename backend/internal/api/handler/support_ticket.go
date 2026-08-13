@@ -344,7 +344,9 @@ func (h *SupportTicketHandler) writeValidationError(w http.ResponseWriter, err e
 		errors.Is(err, service.ErrSupportInvalidStatus),
 		errors.Is(err, service.ErrSupportInvalidPriority),
 		errors.Is(err, service.ErrSupportTitleEmpty),
-		errors.Is(err, service.ErrSupportBodyEmpty):
+		errors.Is(err, service.ErrSupportBodyEmpty),
+		errors.Is(err, service.ErrSupportTitleTooLong),
+		errors.Is(err, service.ErrSupportBodyTooLong):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "support ticket request failed")
