@@ -8,6 +8,7 @@ import { twoFactorApi, type EnrollBeginResponse } from '../api/twoFactor'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { SkeletonText } from '../components/Skeleton'
 
 type EnrollStep = 'idle' | 'qr' | 'codes'
 type DisableMode = 'password' | 'code'
@@ -179,7 +180,7 @@ export default function SecuritySettings() {
           <ShieldCheck size={12} /> Two-factor authentication
         </h2>
 
-        {isLoading && <p className="text-xs text-muted">Loading…</p>}
+        {isLoading && <SkeletonText lines={2} />}
 
         {!isLoading && status && !status.enabled && enrollStep === 'idle' && (
           <>
