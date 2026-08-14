@@ -17,6 +17,14 @@ var (
 	ErrSupportInvalidPriority = errors.New("invalid support priority")
 	ErrSupportTitleEmpty      = errors.New("support title cannot be empty")
 	ErrSupportBodyEmpty       = errors.New("support message cannot be empty")
+	ErrSupportTitleTooLong    = errors.New("support title is too long")
+	ErrSupportBodyTooLong     = errors.New("support message is too long")
+)
+
+// Rune-count caps on ticket free-text (storage-DoS + notification/email amplification).
+const (
+	maxSupportTitleLen = 200
+	maxSupportBodyLen  = 20000
 )
 
 type SupportTicketService struct {
@@ -64,6 +72,12 @@ func (s *SupportTicketService) Create(ctx context.Context, requesterID string, i
 	}
 	if strings.TrimSpace(in.Description) == "" {
 		return nil, ErrSupportBodyEmpty
+	}
+	if len([]rune(in.Title)) > maxSupportTitleLen {
+		return nil, ErrSupportTitleTooLong
+	}
+	if len([]rune(in.Description)) > maxSupportBodyLen {
+		return nil, ErrSupportBodyTooLong
 	}
 	if err := s.authorizeRequesterScope(ctx, requesterID, in.ScopeType, in.ScopeID); err != nil {
 		return nil, err
@@ -188,6 +202,12 @@ func (s *SupportTicketService) Update(ctx context.Context, id, actorID string, i
 	if in.Description != nil && strings.TrimSpace(*in.Description) == "" {
 		return nil, ErrSupportBodyEmpty
 	}
+	if in.Title != nil && len([]rune(*in.Title)) > maxSupportTitleLen {
+		return nil, ErrSupportTitleTooLong
+	}
+	if in.Description != nil && len([]rune(*in.Description)) > maxSupportBodyLen {
+		return nil, ErrSupportBodyTooLong
+	}
 	if in.Status != nil && !model.IsValidSupportStatus(*in.Status) {
 		return nil, ErrSupportInvalidStatus
 	}
@@ -261,6 +281,9 @@ func (s *SupportTicketService) AdminDelete(ctx context.Context, id, actorID stri
 func (s *SupportTicketService) AddMessage(ctx context.Context, ticketID, authorID string, in *model.AddSupportTicketMessageInput) (*model.SupportTicketMessage, error) {
 	if strings.TrimSpace(in.Body) == "" {
 		return nil, ErrSupportBodyEmpty
+	}
+	if len([]rune(in.Body)) > maxSupportBodyLen {
+		return nil, ErrSupportBodyTooLong
 	}
 	ticket, err := s.repo.GetByID(ctx, ticketID)
 	if err != nil {
