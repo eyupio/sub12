@@ -46,6 +46,10 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
     mutationFn: (file: File) => clubsApi.uploadImage(clubId, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
+      // The global staleTime is 5 minutes, so without this the Dashboard and
+      // Feed 'my-clubs' widgets (which cache this club's own image_url) would
+      // keep showing the old image until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['my-clubs'] })
     },
   })
 
@@ -123,6 +127,10 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club', clubId] })
       queryClient.invalidateQueries({ queryKey: ['clubs'] })
+      // The global staleTime is 5 minutes, so without this the Dashboard and
+      // Feed 'my-clubs' widgets (which cache this club's own name/
+      // description) would keep showing the pre-edit text until it lapses.
+      queryClient.invalidateQueries({ queryKey: ['my-clubs'] })
       toast('Club saved', 'success')
     },
     onError: () => toast('Failed to save', 'error'),
