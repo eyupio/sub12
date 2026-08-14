@@ -16,11 +16,23 @@ var ErrInvalidMeasurement = errors.New("invalid measurement")
 // yardsToMeters is the exact conversion factor (1 yd = 0.9144 m per NIST).
 const yardsToMeters = 0.9144
 
+// Confidence badge thresholds for a rifle/pellet combo (see GetConfidenceBadge).
+// consistencyScore is STDDEV_POP of average_group_size_mm across the combo's
+// tests (repository.GetConfidenceData) — a lower value means group size varies
+// less test-to-test, i.e. more repeatable. "Proven" requires both a track
+// record and tight enough spread to trust it; a combo can clear the test-count
+// bar without clearing the consistency one and still only reach "emerging".
+const (
+	provenMinTestCount          = 5
+	provenMaxConsistencyScoreMM = 1.0
+	emergingMinTestCount        = 2
+)
+
 type PelletTestService struct {
 	repo         *repository.PelletTestRepository
-	users        UserProfileReader   // nil skips owner-privacy checks
-	activity     *ActivityService    // nil disables feed ingestion
-	achievements *AchievementService // nil disables achievement evaluation
+	users        UserProfileReader      // nil skips owner-privacy checks
+	activity     *ActivityService       // nil disables feed ingestion
+	achievements *AchievementService    // nil disables achievement evaluation
 	simFilter    SimulatedContentFilter // nil = include simulated in public leaderboard
 }
 
@@ -648,9 +660,9 @@ func (s *PelletTestService) GetConfidenceBadge(ctx context.Context, userID, rifl
 	}
 
 	level := "single"
-	if testCount >= 5 && consistency != nil && *consistency < 1.0 {
+	if testCount >= provenMinTestCount && consistency != nil && *consistency < provenMaxConsistencyScoreMM {
 		level = "proven"
-	} else if testCount >= 2 {
+	} else if testCount >= emergingMinTestCount {
 		level = "emerging"
 	}
 
