@@ -450,6 +450,35 @@
       border-radius: 4px; padding: 2px 7px;
     }
 
+    /* ── Demo recordings ("See it in action") ───────────── */
+    .demos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .demo-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+      display: flex; flex-direction: column;
+    }
+    .demo-card:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+    .demo-card.demo-featured { grid-column: 1 / -1; }
+    .demo-card video {
+      display: block; width: 100%; aspect-ratio: 16 / 9;
+      background: #000; object-fit: cover;
+    }
+    .demo-card-body { padding: 16px 20px 18px; }
+    .demo-kind {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--brass); background: var(--brass-dim); border: 1px solid var(--brass-line);
+      border-radius: 4px; padding: 2px 7px; display: inline-block; margin-bottom: 8px;
+    }
+    .demo-title { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+    .demo-desc  { font-size: 13px; color: var(--text-3); line-height: 1.6; }
+
     /* ── Spotlight section ──────────────────────────────── */
     .spotlight {
       position: relative; overflow: hidden;
@@ -1313,6 +1342,58 @@
           <p class="feature-desc">Phone, tablet, or desktop. Install as an app on iOS, Android, or any desktop browser. Works offline at the range.</p>
         </div>
 
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Demo recordings ───────────────────────────────────── -->
+  <section class="section" style="background:var(--bg-raised);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
+    <div class="container">
+      <div class="section-header">
+        <span class="label">See it in action</span>
+        <h2 class="heading-lg">Real recordings. Real cards.</h2>
+      </div>
+      <div class="demos-grid">
+        <div class="demo-card demo-featured">
+          <video controls preload="none" playsinline muted
+                 poster="https://sub12.io/demos/showcase-score-card.jpg"
+                 src="https://sub12.io/demos/showcase-score-card.webm"></video>
+          <div class="demo-card-body">
+            <span class="demo-kind">Showcase</span>
+            <p class="demo-title">A 25-shot card, start to finish</p>
+            <p class="demo-desc">Tap every shot, and the totals, averages and personal bests take care of themselves. This is the whole flow, unedited.</p>
+          </div>
+        </div>
+        <div class="demo-card">
+          <video controls preload="none" playsinline muted
+                 poster="https://sub12.io/demos/howto-add-gear.jpg"
+                 src="https://sub12.io/demos/howto-add-gear.webm"></video>
+          <div class="demo-card-body">
+            <span class="demo-kind">How-to</span>
+            <p class="demo-title">Add your rifle and pellets</p>
+            <p class="demo-desc">Pick your gear from the catalog — the specs fill themselves in.</p>
+          </div>
+        </div>
+        <div class="demo-card">
+          <video controls preload="none" playsinline muted
+                 poster="https://sub12.io/demos/howto-first-card.jpg"
+                 src="https://sub12.io/demos/howto-first-card.webm"></video>
+          <div class="demo-card-body">
+            <span class="demo-kind">How-to</span>
+            <p class="demo-title">Log your first score card</p>
+            <p class="demo-desc">From dashboard to a saved card, one tap per shot.</p>
+          </div>
+        </div>
+        <div class="demo-card">
+          <video controls preload="none" playsinline muted
+                 poster="https://sub12.io/demos/howto-join-league.jpg"
+                 src="https://sub12.io/demos/howto-join-league.webm"></video>
+          <div class="demo-card-body">
+            <span class="demo-kind">How-to</span>
+            <p class="demo-title">Join a league and submit a card</p>
+            <p class="demo-desc">A join code, an open round, and your score is on the table.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>

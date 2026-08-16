@@ -22,6 +22,7 @@
   },
   "include": [
     "auth/**/*.ts",
+    "demos/**/*.ts",
     "fixtures/**/*.ts",
     "helpers/**/*.ts",
     "pages/**/*.ts",
