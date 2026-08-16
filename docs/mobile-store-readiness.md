@@ -273,5 +273,11 @@ Preferences file and WebView storage.
 **Both**
 - [ ] Decide: ship push, or drop the plugin for v1
 - [ ] Privacy nutrition labels / Data safety: email, name, photos, precise location, user content
+- [ ] App preview videos: portrait (390×844) demo recordings already exist at
+      `frontend/public/demos/showcase-score-card-mobile.webm` and
+      `…/showcase-pellet-testing-mobile.webm` (re-record with
+      `./scripts/record-demos.sh` — see docs/demo-recordings.md, "Portrait
+      variants"). Store uploads need them transcoded to the stores' mp4/mov
+      specs; the webm is the source of truth.
 - [ ] Support URL, marketing URL, privacy policy URL (`https://sub12.io/privacy` is live and public)
 - [ ] Review notes covering the airgun/target-shooting context

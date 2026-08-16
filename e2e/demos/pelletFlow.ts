@@ -80,6 +80,9 @@ export async function generateTargetImage(browser: Browser, outPath: string): Pr
  */
 export async function tapCanvas(page: Page, frac: { x: number; y: number }): Promise<void> {
   const canvas = page.locator('canvas').first();
+  // On the phone viewport the canvas starts half below the fold; a tap past
+  // the viewport edge lands on nothing.
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('measurement canvas not visible');
   const scale = Math.min(box.width / TARGET_W, box.height / TARGET_H) * 0.95;
@@ -191,6 +194,17 @@ function textVisible(page: Page, text: string): () => Promise<boolean> {
 }
 
 export async function driveMeasurement(page: Page, demo: Overlay, captions: boolean): Promise<MeasureResult> {
+  // Make sure the measurement canvas is actually mounted — on slower loads
+  // the step renders before the photo becomes active; tapping the thumbnail
+  // activates it.
+  const canvas = page.locator('canvas').first();
+  try {
+    await canvas.waitFor({ state: 'visible', timeout: 8_000 });
+  } catch {
+    await page.getByLabel(/photo$/).first().click();
+    await canvas.waitFor({ state: 'visible', timeout: 15_000 });
+  }
+
   // 1. Aim point. An autosave remount can wipe the tapped aim point before
   // NEXT is pressed, so tap → click-NEXT-if-enabled → verify step 2 arrived,
   // and retry the whole sequence when the remount wins the race.
