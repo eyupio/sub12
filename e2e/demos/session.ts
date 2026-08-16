@@ -125,6 +125,12 @@ export class DemoApi {
     return (await res.json().catch(() => ({}))) as T;
   }
 
+  async patch<T>(path: string, data: unknown): Promise<T> {
+    const res = await this.ctx.patch(`${API_URL}${path}`, { headers: this.headers(), data });
+    if (!res.ok()) throw new Error(`PATCH ${path} failed (${res.status()}): ${await res.text()}`);
+    return (await res.json().catch(() => ({}))) as T;
+  }
+
   async delete(path: string): Promise<void> {
     const res = await this.ctx.delete(`${API_URL}${path}`, { headers: this.headers() });
     if (!res.ok() && res.status() !== 404) {

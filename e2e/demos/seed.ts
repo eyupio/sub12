@@ -174,3 +174,21 @@ export async function joinWithCard(
 export async function adminDeleteLeague(adminApi: DemoApi, id: string): Promise<void> {
   await adminApi.delete(`/admin/leagues/${id}`);
 }
+
+/** Standings read better with real-looking names than seed-account labels. */
+export async function setDisplayName(api: DemoApi, displayName: string): Promise<void> {
+  await api.patch('/users/me', { display_name: displayName });
+}
+
+/** Switch league score verification on/off (and how many confirmations). */
+export async function setLeagueVerification(
+  adminApi: DemoApi,
+  leagueId: string,
+  on: boolean,
+  confirmations = 1,
+): Promise<void> {
+  await adminApi.patch(`/leagues/${leagueId}/config`, {
+    require_score_verification: on,
+    required_confirmations: confirmations,
+  });
+}
