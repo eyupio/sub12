@@ -609,6 +609,34 @@ as invariants and lean on the tests that pin them.
 
   Personas are built to read as people rather than as a bot roster (see "Simulation realism" below for how, and which parts are admin-tunable).
 
+## Demo Recordings & Video Guides
+
+Short screen recordings of the real app with the narration baked into the
+frames as overlay text (title card, lower-third captions, cursor dot), in two
+kinds: **showcase** (landing page) and **how-to** (`/help`). Nothing is edited
+by hand — every video is reproducible with one command whenever the UI it
+shows changes.
+
+- `docs/demo-recordings.md` is the catalog: production standard, storyboards
+  and exact caption lines. New video = storyboard there first.
+- `e2e/demos/` is the recorder — a Playwright project separate from the e2e
+  suite (own config, one worker, video always on, human-pace slowMo). Specs
+  seed their own data through the API under `demo@sub12.local` and film
+  against the same local stack as `scripts/e2e.sh`. Posters are screenshots
+  the spec takes at its best moment (`demo.saveMoment()`); Playwright's
+  bundled ffmpeg only encodes VP8, so frames can't be extracted afterwards.
+- `./scripts/record-demos.sh [slug]` boots the stack if needed, records, and
+  publishes webm + poster jpeg into `frontend/public/demos/` (served at
+  `/demos/…`, committed to the repo, deliberately not in the PWA precache and
+  not in nginx's immutable-cache block so re-recordings propagate).
+- `frontend/src/catalog/videoGuides.ts` is the one place a recording is
+  registered. `available: true` promises the files are shipped — a test fails
+  if the webm or poster is missing — and only available entries render, so a
+  planned video can sit in the catalog without dangling a broken player.
+- Surfaces: `components/VideoGuides.tsx` renders the rail + player on `/help`,
+  and the landing page's "See it in action" section embeds the videos by
+  absolute `https://sub12.io/demos/…` URL.
+
 ## Simulation Realism
 
 Everything that makes the simulated community look inhabited lives in

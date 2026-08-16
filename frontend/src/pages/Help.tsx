@@ -9,6 +9,7 @@ import {
   Package, Target, Users, Crosshair, LifeBuoy, Lightbulb,
 } from 'lucide-react'
 import { faqApi, type FAQ } from '../api/faq'
+import VideoGuides from '../components/VideoGuides'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { SkeletonList } from '../components/Skeleton'
@@ -166,6 +167,9 @@ export default function Help() {
           ))}
         </ol>
       </section>
+
+      {/* ── Video guides ─────────────────────────────────────────────── */}
+      <VideoGuides />
 
       <div className="mb-5 relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
