@@ -273,6 +273,9 @@ jobs:
           rm -rf "$RUNNER_TEMP/signing" "$HOME/Library/MobileDevice/Provisioning Profiles"
 
       - name: Upload IPA artifact
+        # The build itself is the check; losing the artifact (e.g. to the
+        # org's artifact storage quota) must not fail an otherwise-green job.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: sub12-ipa-${{ steps.stage.outputs.variant }}
