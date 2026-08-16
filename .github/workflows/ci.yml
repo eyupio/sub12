@@ -75,6 +75,9 @@ jobs:
 
       - name: Upload backend coverage
         if: always()
+        # Coverage reports are a convenience, not a gate — losing one (e.g. to
+        # the org's artifact storage quota) must not fail the build.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
@@ -117,6 +120,9 @@ jobs:
 
       - name: Upload frontend coverage
         if: always()
+        # Coverage reports are a convenience, not a gate — losing one (e.g. to
+        # the org's artifact storage quota) must not fail the build.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
