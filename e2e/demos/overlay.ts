@@ -87,6 +87,7 @@ export class Overlay {
   private async card(label: string, heading: string, sub: string, hold = 2500): Promise<void> {
     await this.page.evaluate(
       ({ label, heading, sub, gold, font }) => {
+        const narrow = window.innerWidth < 500;
         const el = document.createElement('div');
         el.id = '__demo_card';
         el.style.cssText = [
@@ -94,14 +95,14 @@ export class Overlay {
           'display:flex', 'flex-direction:column', 'align-items:center', 'justify-content:center',
           'gap:14px', 'background:#101014', 'color:#f5f1e8',
           `font-family:${font}`, 'opacity:0', 'transition:opacity 400ms ease',
-          'text-align:center', 'padding:0 60px',
+          'text-align:center', `padding:0 ${narrow ? 28 : 60}px`,
         ].join(';');
         el.innerHTML =
           (label
-            ? `<div style="letter-spacing:0.22em;font-size:13px;font-weight:600;color:${gold}">${label}</div>`
+            ? `<div style="letter-spacing:0.22em;font-size:${narrow ? 11 : 13}px;font-weight:600;color:${gold}">${label}</div>`
             : '') +
-          `<div style="font-size:40px;font-weight:700;line-height:1.15;max-width:820px">${heading}</div>` +
-          `<div style="font-size:15px;color:#b9b4a8">${sub}</div>`;
+          `<div style="font-size:${narrow ? 26 : 40}px;font-weight:700;line-height:1.15;max-width:820px">${heading}</div>` +
+          `<div style="font-size:${narrow ? 12 : 15}px;color:#b9b4a8">${sub}</div>`;
         document.documentElement.appendChild(el);
         requestAnimationFrame(() => { el.style.opacity = '1'; });
       },
@@ -126,14 +127,17 @@ export class Overlay {
       ({ text, gold, panel, font }) => {
         let el = document.getElementById('__demo_caption');
         if (!el) {
+          // On a phone frame the caption sits above the bottom tab bar and
+          // drops a size, or it covers the very controls being demonstrated.
+          const narrow = window.innerWidth < 500;
           el = document.createElement('div');
           el.id = '__demo_caption';
           el.style.cssText = [
-            'position:fixed', 'left:50%', 'bottom:36px', 'transform:translate(-50%, 12px)',
-            'max-width:76%', 'padding:12px 22px', 'border-radius:10px',
+            'position:fixed', 'left:50%', `bottom:${narrow ? 96 : 36}px`, 'transform:translate(-50%, 12px)',
+            `max-width:${narrow ? 88 : 76}%`, `padding:${narrow ? '9px 14px' : '12px 22px'}`, 'border-radius:10px',
             `background:${panel}`, 'color:#f5f1e8', 'backdrop-filter:blur(6px)',
             `border-left:3px solid ${gold}`,
-            `font-family:${font}`, 'font-size:19px', 'font-weight:500', 'line-height:1.35',
+            `font-family:${font}`, `font-size:${narrow ? 15 : 19}px`, 'font-weight:500', 'line-height:1.35',
             'z-index:2147483645', 'opacity:0',
             'transition:opacity 250ms ease, transform 250ms ease',
             'box-shadow:0 8px 28px rgba(0,0,0,0.4)', 'text-align:center',

@@ -126,6 +126,24 @@ Trends (weekly/monthly) → rifle showcase charts.
 The install prompt lives in browser chrome, outside the page, so this one is
 a real device capture, not a harness job.
 
+## Portrait variants
+
+`*.mobile.ts` specs record at 390×844 (phone frame, touch enabled) under the
+`demos-mobile` Playwright project — run them with
+`npx playwright test --config demos/playwright.config.ts --project demos-mobile`
+(or they're included in a full `record-demos.sh` run). The overlay drops a
+size and the caption sits above the bottom tab bar on narrow frames.
+
+| Slug | Source flow | Length | Use |
+|---|---|---|---|
+| `showcase-score-card-mobile` | showcase-score-card | 0:44 | App-store preview, social |
+| `showcase-pellet-testing-mobile` | showcase-pellet-testing | 0:35 | App-store preview, social |
+
+These are **assets, not catalog entries** — they ship in
+`frontend/public/demos/` for store listings and social cuts (see
+`docs/mobile-store-readiness.md`), and are deliberately not rendered on
+`/help` or the landing page, whose players are sized for 16:9.
+
 ## Recording
 
 ```bash

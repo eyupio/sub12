@@ -44,5 +44,19 @@ export default defineConfig({
     navigationTimeout: 30_000,
     launchOptions: { slowMo: 120, executablePath },
   },
-  projects: [{ name: 'demos' }],
+  projects: [
+    { name: 'demos', testMatch: '**/*.demo.ts' },
+    // Portrait phone recordings (*.mobile.ts) — app-store preview clips and
+    // social cuts. Same harness, phone-shaped frame.
+    {
+      name: 'demos-mobile',
+      testMatch: '**/*.mobile.ts',
+      use: {
+        viewport: { width: 390, height: 844 },
+        video: { mode: 'on', size: { width: 390, height: 844 } },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+  ],
 });

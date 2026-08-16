@@ -214,6 +214,9 @@ jobs:
         run: rm -f frontend/android/keystore.properties frontend/android/release.keystore
 
       - name: Upload APK artifact
+        # The build itself is the check; losing the artifact (e.g. to the
+        # org's artifact storage quota) must not fail an otherwise-green job.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: sub12-apk-${{ steps.vars.outputs.variant }}
