@@ -142,6 +142,9 @@ mutes that are applied in the query rather than hidden in the client.
 - Password reset, avatar upload, email change
 
 ### Admin
+- A first-run setup wizard, and branding a self-hoster owns: name, tagline,
+  logo, accent colour (light and dark), boot theme, welcome copy, and whether
+  the installation presents as a community or as one club's own site
 - Users, leagues, clubs, events, gear analytics, FAQ, categories, feature board
 - SMTP settings and an email template editor with live preview
 - Sitemap & SEO reporting with IndexNow submission
@@ -150,6 +153,7 @@ mutes that are applied in the query rather than hidden in the client.
 - Activity simulation for populating a demo instance
 
 ### Platform
+- Self-hostable with its own identity — see [the setup wizard](#first-run-the-setup-wizard)
 - Installable PWA, offline-aware, with a queued score outbox
 - Native iOS and Android shells from the same bundle: share sheet, camera,
   geolocation, deep links, push, haptics
@@ -312,6 +316,44 @@ rotated, and the old file is backed up.
 
 On Windows, run it under WSL2 — which Docker Desktop needs anyway. There is no
 PowerShell installer yet; the manual steps below work from any shell.
+
+### First run: the setup wizard
+
+The first time you open a fresh deployment you land on **`/setup`** instead of a
+sign-in form, because there is nothing yet to sign in as. Six short steps:
+
+1. **Deployment shape.** A **community** — anyone signs up, discovers clubs and
+   joins leagues, the way [sub12.io](https://sub12.io) runs — or **one club**,
+   where the whole installation is your club's own site. In single-club mode the
+   wizard creates the club, the nav carries its name instead of "Clubs", and the
+   club directory goes straight through to it.
+2. **Identity.** Name, tagline, welcome heading and message (both shown on the
+   sign-in screen), support email, and whether registration is open to anyone or
+   accounts are created by an administrator.
+3. **Look.** An accent colour — six presets or your own hex, separately for light
+   and dark mode — which theme people start in, and whether they may switch. The
+   whole gold family in the design system is derived from the one colour you
+   pick, and the wizard repaints live as you choose.
+4. **Administrator.** The first account, promoted to platform admin.
+
+**The wizard runs exactly once.** It closes the moment it creates that first
+administrator and can never be reopened — the endpoint behind it refuses a
+second submission whether or not anyone loads the page. Do it before the site is
+in front of anyone.
+
+Everything except the account is editable afterwards from **Admin → Branding**,
+which is also the only place to upload a logo (that needs an account, and setup
+runs before there is one).
+
+Upgrading an existing deployment skips all this: a database with users in it is
+already set up, so nothing changes.
+
+> A rebranded deployment still carries **Powered by SUB12 · by EyUp.io · Source**
+> in its footer. Those links come from server-side constants rather than from
+> the settings you edit, so there is no branding choice that removes them: the
+> **Source** link is how AGPL-3.0 section 13 is discharged, and the other two say
+> what the software is and who wrote it. Put your club's name over the door —
+> the building still gets a plaque.
 
 ### Prerequisites
 

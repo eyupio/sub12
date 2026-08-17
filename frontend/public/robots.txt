@@ -40,6 +40,11 @@ Disallow: /events
 # Admin paths
 Disallow: /admin
 
+# First-run setup. A public page (a fresh install has no account to sign in
+# with) but never content: it either offers a one-time wizard or redirects to
+# the sign-in form, and it is served only on deployments nobody has set up yet.
+Disallow: /setup
+
 # Settings paths
 Disallow: /settings
 

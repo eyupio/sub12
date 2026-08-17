@@ -352,6 +352,20 @@ func (r *UserRepository) ListAllUserIDs(ctx context.Context) ([]string, error) {
 	return ids, rows.Err()
 }
 
+// AdminExists reports whether the deployment has at least one live
+// administrator. It is the second gate on the setup wizard: even if the
+// site_settings stamp were somehow cleared, a deployment that already has an
+// administrator is one somebody is running, and the wizard stays shut.
+func (r *UserRepository) AdminExists(ctx context.Context) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND deleted_at IS NULL)
+	`).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check admin exists: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *UserRepository) GetAdminByID(ctx context.Context, id string) (*model.AdminUser, error) {
 	var u model.AdminUser
 	err := r.db.QueryRow(ctx, `

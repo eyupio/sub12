@@ -56,6 +56,28 @@ export const useThemeStore = create<ThemeState>()(
   ),
 )
 
+// A deployment picks the theme its app boots into (and may withhold the
+// toggle entirely — a club that has chosen its look does not want a member's
+// screenshot coming back in the other one).
+//
+// `enforce` is the withheld-toggle case and always wins. Otherwise the
+// deployment default only applies to a visitor who has never chosen: the
+// presence of the persisted key is that record, so the choice is adopted once
+// and then belongs to the visitor rather than being re-imposed on every load.
+export function adoptDeploymentTheme(theme: Theme, enforce: boolean) {
+  let stored: string | null = null
+  try {
+    stored = localStorage.getItem('sub12-theme')
+  } catch { /* private mode / storage disabled — treat as no choice */ }
+  if (!enforce && stored) return
+  if (useThemeStore.getState().theme === theme) {
+    // Already right; re-setting would only churn localStorage.
+    applyToDOM(getResolvedTheme(theme))
+    return
+  }
+  useThemeStore.getState().setTheme(theme)
+}
+
 // Apply theme immediately on import (before React mounts) to prevent FOUC
 export function initTheme() {
   // Read persisted theme from localStorage

@@ -308,7 +308,12 @@ func main() {
 
 	gallerySvc := service.NewGalleryService(repository.NewGalleryRepository(pool))
 
-	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc, geocodeSvc, announcementSvc, gallerySvc)
+	// Deployment identity: this installation's own name, colours and shape,
+	// plus the once-only first-run wizard that decides them.
+	siteSettingsSvc := service.NewSiteSettingsService(
+		repository.NewSiteSettingsRepository(pool), userRepo, authSvc, clubSvc, log.Logger)
+
+	router := api.NewRouter(cfg, log.Logger, pool, authSvc, scoreCardSvc, statsSvc, rifleSvc, pelletSvc, userSvc, socialSvc, leagueSvc, pelletTestSvc, commentSvc, activitySvc, achievementSvc, smtpSvc, emailTemplateSvc, emailSenderSvc, clubSvc, blockSvc, likeSvc, postSvc, notificationSvc, deviceSvc, moderationSvc, supportTicketSvc, featureRequestSvc, faqSvc, sitemapSvc, muteRepo, rl, imageRepo, twoFactorSvc, communityReviewSvc, locationSvc, backupSvc, backupRepo, categorySvc, eventSvc, eventInvitationSvc, simulationSvc, gearShowcaseSvc, adminGearSvc, geocodeSvc, announcementSvc, gallerySvc, siteSettingsSvc)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

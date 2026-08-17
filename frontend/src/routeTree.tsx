@@ -60,6 +60,7 @@ const LazyAdminLeagueDetail = lazy(() => import('./pages/AdminLeagueDetail'))
 const LazyAdminClubs = lazy(() => import('./pages/AdminClubs'))
 const LazyAdminClubDetail = lazy(() => import('./pages/AdminClubDetail'))
 const LazyAdminSitemap = lazy(() => import('./pages/AdminSitemap'))
+const LazyAdminBranding = lazy(() => import('./pages/AdminBranding'))
 const LazyAdminBackup = lazy(() => import('./pages/AdminBackup'))
 const LazyAdminSimulation = lazy(() => import('./pages/AdminSimulation'))
 const LazyAdminAnnouncements = lazy(() => import('./pages/AdminAnnouncements'))
@@ -91,6 +92,7 @@ const LazyQuickCapture = lazy(() => import('./pages/QuickCapture'))
 const LazyDrafts = lazy(() => import('./pages/Drafts'))
 const LazyGallery = lazy(() => import('./pages/Gallery'))
 const LazyPrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const LazySetupWizard = lazy(() => import('./pages/SetupWizard'))
 const LazyTermsOfUse = lazy(() => import('./pages/TermsOfUse'))
 const LazyCookiePolicy = lazy(() => import('./pages/CookiePolicy'))
 const LazyEvents = lazy(() => import('./pages/Events'))
@@ -133,6 +135,16 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: IndexPage,
+})
+
+// First-run setup. A child of rootRoute, not appRoute: on a fresh install
+// there is no account to authenticate with, which is exactly what it fixes.
+// The page itself asks the backend whether the wizard is still open and
+// bounces to /login when it is not.
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  component: lz(LazySetupWizard),
 })
 
 const privacyPolicyRoute = createRoute({
@@ -546,6 +558,12 @@ const adminClubDetailRoute = createRoute({
   component: lz(LazyAdminClubDetail),
 })
 
+const adminBrandingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/admin/branding',
+  component: lz(LazyAdminBranding),
+})
+
 const adminSitemapRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/sitemap',
@@ -706,6 +724,7 @@ const twoFactorChallengeRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  setupRoute,
   privacyPolicyRoute,
   termsOfUseRoute,
   cookiePolicyRoute,
@@ -767,7 +786,8 @@ export const routeTree = rootRoute.addChildren([
     adminLeagueDetailRoute,
     adminClubsRoute,
     adminClubDetailRoute,
-    adminSitemapRoute,
+    adminBrandingRoute,
+  adminSitemapRoute,
     adminBackupRoute,
     adminSimulationRoute,
     adminAnnouncementsRoute,

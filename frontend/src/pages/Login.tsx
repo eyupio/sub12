@@ -7,6 +7,8 @@ import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { clearClientSession } from '../utils/clearSession'
 import { Spinner } from '../components/Skeleton'
+import { useBranding } from '../store/branding'
+import { PoweredBy } from '../components/PoweredBy'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -18,6 +20,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const branding = useBranding()
+  const branded = branding.site_name !== 'SUB12' || Boolean(branding.logo_url)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -52,12 +56,30 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-8 animate-fade-in-up">
+        {/* The sign-in screen is the first thing anyone sees, so it is where
+            a self-hosted deployment's own identity has to land. An installation
+            that has not been branded keeps the SUB12 lockup unchanged. */}
         <div className="text-center">
-          <div className="inline-flex items-baseline justify-center">
-            <span style={{ fontFamily: 'var(--serif)', fontSize: '4rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--ink)' }}>SUB</span>
-            <span style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'var(--gold)' }}>12</span>
-          </div>
-          <p className="mt-4 t-section-title">Sign in to your account</p>
+          {branding.logo_url ? (
+            <img src={branding.logo_url} alt={branding.site_name} className="mx-auto h-16 max-w-[240px] object-contain" />
+          ) : branded ? (
+            <h1
+              className="text-4xl font-bold leading-tight text-primary"
+              style={{ fontFamily: 'var(--serif)' }}
+            >
+              {branding.site_name}
+            </h1>
+          ) : (
+            <div className="inline-flex items-baseline justify-center">
+              <span style={{ fontFamily: 'var(--serif)', fontSize: '4rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--ink)' }}>SUB</span>
+              <span style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'var(--gold)' }}>12</span>
+            </div>
+          )}
+          {branding.tagline && <p className="mt-2 text-sm text-muted">{branding.tagline}</p>}
+          <p className="mt-4 t-section-title">{branding.welcome_heading || 'Sign in to your account'}</p>
+          {branding.welcome_message && (
+            <p className="mt-2 text-sm text-secondary whitespace-pre-line">{branding.welcome_message}</p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -122,12 +144,24 @@ export default function Login() {
           </Link>
         </p>
 
-        <p className="text-center t-section-title">
-          No account?{' '}
-          <Link to="/register" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
-            Register
-          </Link>
-        </p>
+        {/* A deployment that creates accounts by hand should not invite people
+            to a sign-up form that will refuse them. */}
+        {branding.public_registration && (
+          <p className="text-center t-section-title">
+            No account?{' '}
+            <Link to="/register" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
+              Register
+            </Link>
+          </p>
+        )}
+        {!branding.public_registration && branding.support_email && (
+          <p className="text-center t-section-title">
+            No account?{' '}
+            <a href={`mailto:${branding.support_email}`} className="text-[var(--brass)] hover:opacity-80 transition-opacity">
+              Ask an administrator
+            </a>
+          </p>
+        )}
 
         <p className="text-center t-section-title">
           <Link to="/" className="text-muted hover:text-[var(--brass)] transition-colors">
@@ -141,6 +175,10 @@ export default function Login() {
           <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
           <span aria-hidden>·</span>
           <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
+        </p>
+
+        <p className="text-center text-[11px] text-muted">
+          <PoweredBy />
         </p>
       </div>
     </div>

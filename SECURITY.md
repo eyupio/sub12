@@ -87,6 +87,16 @@ rather than working around it:
   refresh cookie is sent with credentials.
 - **`ADMIN_PASSWORD`** only matters when `SEED_ADMIN=true`. Turn seeding off
   once the account exists.
+- **Run the first-run wizard before the site is reachable by anyone else.** A
+  deployment with no administrator serves `/setup`, which creates one without
+  authentication — there is nothing yet to authenticate as. It is a one-shot:
+  it claims the deployment with a conditional update, so exactly one caller can
+  ever succeed and every later attempt is refused whether or not it loads the
+  page, and it is rate-limited per IP like the other credential endpoints. The
+  window is real all the same, and it is the interval between the stack
+  answering and you finishing the wizard. Close it promptly, or set
+  `SEED_ADMIN=true` with a real `ADMIN_PASSWORD` so the account exists the
+  moment the backend boots and the wizard is shut from the start.
 - **Backups** are AES-encrypted with a key derived from a passphrase you set.
   Without a passphrase a backup run fails rather than uploading plaintext —
   that is deliberate.
