@@ -52,12 +52,22 @@ export default defineConfig({
         // Route-level lazy loading keeps the main entry below the 2 MiB
         // default Workbox precache ceiling — no override needed.
         // Prevent the service worker from serving the SPA shell for
-        // backend-generated SEO endpoints (sitemap, robots, IndexNow key files).
+        // backend-generated SEO endpoints (sitemap, robots, IndexNow key files)
+        // and for the demo recordings.
+        //
+        // /demos/* is a real file on disk, not a router path. Opening one
+        // directly — the README links to them, and so does anyone sharing a
+        // recording — is a *navigation*, so without this the service worker
+        // answers it with index.html and the router, which has no /demos route,
+        // renders "Target not found". The file is served correctly by nginx;
+        // only visitors who had already loaded the site (and so registered the
+        // worker) ever saw the 404.
         navigateFallbackDenylist: [
           /^\/sitemap\.xml$/,
           /^\/siteindex\.xml$/,
           /^\/robots\.txt$/,
           /^\/[a-fA-F0-9]+\.txt$/,
+          /^\/demos\//,
         ],
         // All authenticated API responses are served NetworkOnly. Caching them
         // by URL is unsafe: cache keys don't include the user identity, so a

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -43,6 +43,24 @@ describe('VideoGuides', () => {
 
 		fireEvent.keyDown(window, { key: 'Escape' })
 		expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+	})
+
+	it('keeps /demos/ off the service worker navigate fallback', () => {
+		// A /demos/*.webm URL is a file, not a router path, and opening one
+		// directly is a navigation. Left off the denylist, the service worker
+		// answers it with index.html and the router — which has no /demos route
+		// — renders "Target not found", so every shared or README link 404s for
+		// anyone who had already loaded the site. Nothing about that failure
+		// shows up server-side: nginx serves the file correctly.
+		const config = readFileSync(
+			resolve(dirname(fileURLToPath(import.meta.url)), '../../../vite.config.ts'),
+			'utf-8',
+		)
+		// Closing bracket on its own line — an inner `]` belongs to a character
+		// class in one of the patterns, not to the array.
+		const denylist = config.match(/navigateFallbackDenylist:\s*\[([\s\S]*?)\n\s*\],/)?.[1]
+		expect(denylist, 'navigateFallbackDenylist not found in vite.config.ts').toBeDefined()
+		expect(denylist).toContain('/^\\/demos\\//')
 	})
 
 	it('has a shipped recording for every guide marked available', () => {

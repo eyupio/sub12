@@ -613,9 +613,10 @@ as invariants and lean on the tests that pin them.
 
 Short screen recordings of the real app with the narration baked into the
 frames as overlay text (title card, lower-third captions, cursor dot), in two
-kinds: **showcase** (landing page) and **how-to** (`/help`). Nothing is edited
-by hand — every video is reproducible with one command whenever the UI it
-shows changes.
+kinds: **showcase** (the pitch — what the app does) and **how-to** (the
+instruction — how you do it). Both play on the landing page and on `/help`.
+Nothing is edited by hand — every video is reproducible with one command
+whenever the UI it shows changes.
 
 - `docs/demo-recordings.md` is the catalog: production standard, storyboards
   and exact caption lines. New video = storyboard there first.
@@ -633,9 +634,29 @@ shows changes.
   registered. `available: true` promises the files are shipped — a test fails
   if the webm or poster is missing — and only available entries render, so a
   planned video can sit in the catalog without dangling a broken player.
-- Surfaces: `components/VideoGuides.tsx` renders the rail + player on `/help`,
-  and the landing page's "See it in action" section embeds the videos by
-  absolute `https://sub12.io/demos/…` URL.
+- Surfaces, all four fed from that one catalog:
+  - `components/VideoGuides.tsx` — the rail + modal player on `/help`.
+  - `pages/LandingPage.tsx` — the `#demos` "See it in action" section. This is
+    the page actually served at `https://sub12.io/`, so it is the only one of
+    these a visitor sees **before signing in**; `/help` is an `appRoute` child
+    and every other surface is behind auth. A recording that isn't here is a
+    recording no prospective user will ever watch. Its players are
+    `preload="none"` — the files run to several MB each and the posters carry
+    the section until somebody presses play.
+  - `landing/index.html` — the standalone static landing page, which is
+    deployed separately (nothing in `docker-compose.yml` or CI builds it) and
+    so must reference the videos by absolute `https://sub12.io/demos/…` URL.
+    Editing it is not editing what sub12.io serves.
+  - `README.md` — `<video>` players sourced from this repository's own raw
+    URLs, so the recordings play on GitHub without a site visit or a login.
+- **`/demos/` is on the service worker's `navigateFallbackDenylist`**
+  (`frontend/vite.config.ts`). A `/demos/x.webm` URL is a file, not a router
+  path, and opening one directly — from the README, or from a shared link — is
+  a *navigation*. Left off the denylist the worker answers it with
+  `index.html`, and the router, which has no `/demos` route, renders "Target
+  not found". nginx serves the file correctly throughout, so the 404 appears
+  only for visitors who had already loaded the site once, and never in a
+  server log.
 
 ## Simulation Realism
 

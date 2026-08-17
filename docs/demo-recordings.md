@@ -166,13 +166,26 @@ state.
 
 ## Where the videos surface
 
-- **Landing page** — `landing/index.html` "See it in action" section plays the
-  showcase videos inline (muted, poster until tapped).
+- **Landing page** — `frontend/src/pages/LandingPage.tsx`, the `#demos` "See it
+  in action" section. This is the page served at `https://sub12.io/` and the
+  only surface a visitor reaches *before signing in*, so it plays every
+  available recording, showcase and how-to alike, straight from the catalog.
+  Players are `preload="none"`: posters until somebody presses play.
+- **Standalone landing** — `landing/index.html` carries the same section for
+  the separately-deployed static page, and must use absolute
+  `https://sub12.io/demos/…` URLs because it isn't served from the app origin.
 - **Help & FAQ** — `/help` renders a "Video guides" rail from
   `frontend/src/catalog/videoGuides.ts`; each entry names the FAQ category it
   belongs beside. Only entries whose `available` flag is true are rendered, so
   a planned video can sit in the catalog without dangling a broken player.
+- **README** — `<video>` players sourced from the repo's own raw URLs, so the
+  recordings play on GitHub with no site visit and no login.
 - Support replies can link a video directly: `https://sub12.io/demos/<slug>.webm`.
+  That link only survives because `/demos/` is on the service worker's
+  `navigateFallbackDenylist` in `frontend/vite.config.ts` — without it the
+  worker answers the navigation with the SPA shell and the visitor gets the
+  router's "Target not found" page instead of the video.
 
 Adding a new video = storyboard here → spec in `e2e/demos/` → run the script
-→ add the catalog entry (and the landing card if it's a showcase).
+→ add the catalog entry (the landing page and `/help` pick it up from there;
+add a card to `landing/index.html` and the README by hand).
