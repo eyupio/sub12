@@ -1,0 +1,90 @@
+name: Feature request
+description: Suggest something sub12 should do
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        sub12 is built around what shooting actually looks like at the range, so
+        describing the situation you're in is more useful to us than describing a
+        screen you'd like. Tell us the problem and we'll argue about the UI later.
+
+        There is also a feature board inside the app — ideas raised there get
+        triaged onto the public roadmap. Either route is fine.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched [existing issues](https://github.com/eyupio/sub12/issues?q=is%3Aissue) and this isn't already suggested
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: What are you trying to do, and what stops you today?
+      placeholder: |
+        Our club shoots two disciplines on the same evening and the results go on
+        one sheet. I have to keep two leagues and remember which card belongs to
+        which, and I get it wrong roughly once a month.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like sub12 to do?
+      description: A rough idea is fine. Say if you don't know.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What are you doing instead right now?
+      description: Workarounds, a spreadsheet, another app — this tells us how much the gap costs.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      multiple: true
+      options:
+        - Score cards / capture
+        - Pellet testing / measurement
+        - Leagues (seasons, rounds, standings, verification)
+        - Clubs
+        - Events
+        - Gear (rifles, pellets, comparison)
+        - Social (feed, posts, comments, follows)
+        - Notifications / push / email
+        - Stats and analytics
+        - Admin
+        - Mobile apps
+        - Self-hosting / deployment
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who does this affect?
+      options:
+        - Just me
+        - Others at my club would use it
+        - Anyone running a league
+        - Anyone self-hosting sub12
+        - Most users
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Would you like to build it?
+      description: Entirely optional. See [CONTRIBUTING.md](https://github.com/eyupio/sub12/blob/main/CONTRIBUTING.md).
+      options:
+        - label: I'd be willing to open a pull request for this

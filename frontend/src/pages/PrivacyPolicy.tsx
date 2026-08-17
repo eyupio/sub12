@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { sourceUrl } from '../utils/site'
 
 export default function PrivacyPolicy() {
   return (
@@ -12,8 +13,21 @@ export default function PrivacyPolicy() {
 
         <section className="space-y-3 text-sm text-secondary leading-relaxed">
           <p>
+            sub-12 is developed and operated by <a href="https://eyup.io" target="_blank" rel="noopener noreferrer" className="text-[var(--brass)] hover:underline">EyUp.io</a>,
+            who are the data controller for the information described below.
+          </p>
+          <p>
             This Privacy Policy describes how sub-12 ("we", "us") handles personal information when you use our target-shooting
             companion app and related services (the "Service"). By using the Service, you agree to the practices described here.
+          </p>
+          <p>
+            sub-12 is open source under the{' '}
+            <a href="https://github.com/eyupio/sub12/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="text-[var(--brass)] hover:underline">AGPL-3.0</a> licence,
+            and the code that handles your data is{' '}
+            <a href={sourceUrl()} target="_blank" rel="noopener noreferrer" className="text-[var(--brass)] hover:underline">public and auditable</a>.
+            This policy covers the instance operated by EyUp.io at sub12.io. Anyone
+            self-hosting their own copy is a separate controller, responsible for
+            their own deployment and their own policy.
           </p>
         </section>
 

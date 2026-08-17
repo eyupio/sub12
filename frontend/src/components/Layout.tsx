@@ -18,6 +18,7 @@ import QuickCaptureFab from './QuickCaptureFab'
 import { usePullToRefresh, pageScrollTop } from '../hooks/usePullToRefresh'
 import { clearClientSession } from '../utils/clearSession'
 import { haptics } from '../utils/haptics'
+import { sourceUrl } from '../utils/site'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -349,12 +350,37 @@ export default function Layout({ children }: PropsWithChildren) {
             <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
             <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
+            {/* sub12 is AGPL-3.0, and section 13 obliges anyone running a
+                modified copy as a network service to offer its source to the
+                people using it over that network. This link is how — it is a
+                licence obligation, not a courtesy, so don't remove it. A fork
+                that changes the code points VITE_SOURCE_URL at its own
+                repository rather than deleting the link. */}
+            <a
+              href={sourceUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--brass)] transition-colors"
+            >
+              Source
+            </a>
             <span className="opacity-70 inline-flex items-baseline">
               <span>©&nbsp;</span>
               <span className="inline-flex items-baseline" style={{ fontFamily: 'var(--serif)' }}>
                 <span className="font-bold">SUB</span>
                 <span className="font-bold text-[0.75em]" style={{ color: 'var(--gold)' }}>12</span>
               </span>
+            </span>
+            <span className="opacity-70">
+              by{' '}
+              <a
+                href="https://eyup.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--brass)] transition-colors"
+              >
+                EyUp.io
+              </a>
             </span>
           </footer>
         </main>

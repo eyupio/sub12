@@ -1,4 +1,4 @@
-.PHONY: dev up down logs build help
+.PHONY: dev up down logs build check security install help
 
 .DEFAULT_GOAL := help
 
@@ -30,3 +30,30 @@ logs:
 build:
 	$(MAKE) -C backend build
 	cd frontend && npm run build
+
+## install: interactive installer — prerequisites, secrets, .env, migrations
+install:
+	./scripts/install.sh
+
+## check: run everything the PR gate runs (backend + frontend)
+## Backend tests that need a database skip unless DB_HOST is set — run `make dev` first.
+check:
+	@printf '\n\033[1m── backend ──\033[0m\n'
+	$(MAKE) -C backend lint
+	$(MAKE) -C backend test
+	@printf '\n\033[1m── frontend ──\033[0m\n'
+	cd frontend && npm run check && npm run lint && npm test && npm run build
+	@printf '\n\033[32m✓ everything CI gates on passed\033[0m\n'
+
+## security: run the vulnerability scanners (govulncheck + npm audit)
+## Mirrors .github/workflows/security.yml. Known accepted findings are in SECURITY.md.
+security:
+	@printf '\n\033[1m── Go: reachable vulnerabilities ──\033[0m\n'
+	@cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./... || \
+		printf '\033[33m! a stdlib finding is fixed by raising the `go` directive in backend/go.mod\033[0m\n'
+	@printf '\n\033[1m── frontend: runtime dependencies (these ship to browsers) ──\033[0m\n'
+	@cd frontend && npm audit --omit=dev --audit-level=moderate
+	@printf '\n\033[1m── frontend: build tooling (advisory — see SECURITY.md) ──\033[0m\n'
+	@cd frontend && npm audit --audit-level=high || true
+	@printf '\n\033[1m── e2e ──\033[0m\n'
+	@cd e2e && npm audit --audit-level=high || true

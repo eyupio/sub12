@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/eyupio/sub12/security/advisories/new
+    about: Privately, never as a public issue. See SECURITY.md for what to include.
+  - name: Self-hosting or install trouble
+    url: https://github.com/eyupio/sub12/blob/main/README.md#installation
+    about: Try ./scripts/install.sh first — it checks prerequisites and generates real secrets. Open a bug report if it fails.
+  - name: How the code is organised
+    url: https://github.com/eyupio/sub12/blob/main/CLAUDE.md
+    about: Architecture, layer boundaries, and the reasons behind the rules. Read before a substantial pull request.

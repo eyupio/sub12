@@ -12,8 +12,17 @@ export default function TermsOfUse() {
 
         <section className="space-y-3 text-sm text-secondary leading-relaxed">
           <p>
-            These Terms of Use ("Terms") govern your access to and use of sub-12 (the "Service"). By creating an account or using
-            the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
+            These Terms of Use ("Terms") govern your access to and use of sub-12 (the "Service"), developed and operated
+            by <a href="https://eyup.io" target="_blank" rel="noopener noreferrer" className="text-[var(--brass)] hover:underline">EyUp.io</a>.
+            By creating an account or using the Service, you agree to be bound by these Terms. If you do not agree, do not
+            use the Service.
+          </p>
+          <p>
+            These Terms govern the Service as operated by EyUp.io. The sub-12 software
+            itself is separately licensed under the{' '}
+            <a href="https://github.com/eyupio/sub12/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="text-[var(--brass)] hover:underline">AGPL-3.0</a> —
+            these Terms are about the hosted service, not your rights in the code, and
+            nothing here restricts what that licence grants you.
           </p>
         </section>
 

@@ -3,6 +3,11 @@ name: e2e
 on:
   workflow_dispatch:
 
+# Read-only: the suite drives a browser against a deployed staging environment
+# and writes nothing back here.
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true

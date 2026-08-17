@@ -26,7 +26,11 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/jnnngs/sub-12-backend:${IMAGE_TAG:-latest}
+    # IMAGE_REPO lets a fork run its own images without editing this file:
+    # release.yml publishes to ghcr.io/<your-org>/sub-12-{backend,frontend}, so
+    # set IMAGE_REPO=ghcr.io/your-org in .env and both services follow.
+    # IMAGE_TAG pins a specific build (`sha-<commit>`) instead of `latest`.
+    image: ${IMAGE_REPO:-ghcr.io/eyupio}/sub-12-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -42,16 +46,31 @@ services:
       # cannot reach it, every shared link and every fixed public page serves
       # a holding page marked noindex, and nothing anywhere reports an error.
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://frontend:8080}
-      # Public URLs used in outgoing emails. SITE_URL is the canonical host;
-      # the specific URLs are derived from it in code if left unset, but we
-      # set them explicitly here so operators can see all the email-link
-      # knobs in one place. Never let these fall back to localhost in prod.
-      SITE_URL: ${SITE_URL:-https://sub12.io}
-      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-https://sub12.io/reset-password}
-      EVENT_INVITATION_URL: ${EVENT_INVITATION_URL:-https://sub12.io/events/invitations}
+      # SITE_URL is the single source of truth for every link sent by email or
+      # push: applyDerivedDefaults() in internal/config builds PASSWORD_RESET_URL,
+      # EVENT_INVITATION_URL and DEFAULT_AVATAR_URL from it whenever they are
+      # unset. So set this one and the rest follow.
+      #
+      # These deliberately have no sub12.io fallback. They used to, and it meant
+      # a self-hoster who set SITE_URL to their own domain still emailed their
+      # members password-reset links pointing at sub12.io — an account recovery
+      # flow that silently sent people to somebody else's site. Pass them
+      # explicitly only if you genuinely serve those pages from another host.
+      SITE_URL: ${SITE_URL:?SITE_URL is required — the public URL people reach sub12 at}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+      EVENT_INVITATION_URL: ${EVENT_INVITATION_URL:-}
       # Reverse geocoding for picked locations. Empty disables the lookup and
       # the app falls back to showing coordinates.
       GEOCODE_URL: ${GEOCODE_URL:-https://nominatim.openstreetmap.org}
+      # Postgres sits on this compose network with no published port, and
+      # postgres:16-alpine serves no certificate unless one is mounted, so the
+      # connection is unencrypted and nothing off-host can observe it. In
+      # production the backend refuses an unencrypted database connection unless
+      # the operator says that deliberately — this is that statement, scoped to
+      # the topology this file defines. Pointing DB_HOST at a managed database
+      # somewhere else means setting DB_SSLMODE=require and removing this line.
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_ALLOW_INSECURE_LOCAL_NETWORK: ${DB_ALLOW_INSECURE_LOCAL_NETWORK:-true}
     # No host port — the frontend nginx proxies /api/ to this container
     # internally. Expose 8080 here only if you need direct curl access.
     depends_on:
@@ -67,10 +86,13 @@ services:
       start_period: 15s
 
   frontend:
-    image: ghcr.io/jnnngs/sub-12-frontend:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPO:-ghcr.io/eyupio}/sub-12-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "3000:8080"
+      # Put a TLS-terminating reverse proxy in front of this port. The container
+      # serves the SPA and proxies /api/ to the backend internally, so it is the
+      # only upstream a proxy needs.
+      - "${WEB_PORT:-3000}:8080"
     depends_on:
       backend:
         condition: service_healthy

@@ -36,6 +36,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Needed only to refresh the rolling `ios-latest` pre-release and attach an .ipa
+# to a tagged release. Fork pull requests get a read-only token from GitHub
+# regardless of this block, so they cannot publish. See the note in android.yml.
 permissions:
   contents: write
 

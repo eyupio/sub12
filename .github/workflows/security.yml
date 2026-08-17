@@ -1,0 +1,189 @@
+name: Security
+
+# Standing security scans. Deliberately separate from ci.yml: these are the
+# checks whose answer changes when nothing in the repository changes — a CVE
+# published against a dependency we already shipped — so they run on a schedule
+# as well as on pull requests.
+#
+# ci.yml already runs govulncheck and `npm audit` as advisory steps on every PR.
+# This workflow is the version that *fails*, so a new advisory gets a red tick
+# somebody has to look at rather than a line buried in a passing log.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays 07:00 UTC, an hour after Dependabot opens its pull requests, so the
+    # scan reflects whatever it did or could not fix.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# Every job narrows this further. Nothing here needs write access to the
+# repository except CodeQL's SARIF upload, which asks for security-events.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------- CodeQL
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: autobuild
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      # Go needs a toolchain before autobuild, and it has to be the one go.mod
+      # pins — CodeQL analysing a build that never happened finds nothing and
+      # still reports success.
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # security-extended adds the rules that are accurate but noisier than
+          # the default pack. Worth it on a codebase handling auth and uploads.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  # ----------------------------------------------------------------- Go modules
+  govulncheck:
+    name: Go vulnerabilities
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # govulncheck reports only vulnerabilities actually reachable from our
+      # code, so unlike a plain dependency diff a finding here means something.
+      # A stdlib finding is fixed by raising the `go` directive in backend/go.mod
+      # to the patch release named in the report — that directive is what CI
+      # resolves the toolchain from.
+      - name: govulncheck
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # ---------------------------------------------------------------- npm projects
+  npm-audit:
+    name: npm audit (${{ matrix.project }})
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [frontend, e2e]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      # --omit=dev first: a vulnerability in something that ships to a user's
+      # browser is a different kind of problem from one in a build tool, and
+      # should never be lost in the same list. This half must stay clean.
+      - name: Runtime dependencies (must be clean)
+        working-directory: ${{ matrix.project }}
+        run: npm audit --omit=dev --audit-level=moderate
+
+      # Build and test tooling. Advisory: the known exceptions are documented in
+      # SECURITY.md ("Known accepted risks") along with why they are not yet
+      # fixed, and a red tick here every Monday would train everyone to ignore
+      # this workflow. Read the log when it is yellow.
+      - name: All dependencies (advisory)
+        working-directory: ${{ matrix.project }}
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  # -------------------------------------------------- new dependencies in a PR
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # sub12 is AGPL-3.0, so a permissively licensed dependency is fine and
+          # a copyleft-incompatible one is not. These three cannot be combined
+          # with AGPL-3.0 distribution.
+          deny-licenses: MS-RL, SSPL-1.0, BUSL-1.1
+
+  # ------------------------------------------------------------ secrets in git
+  secret-scan:
+    name: Secret scan
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs history to scan the commits a PR adds, not just the
+          # tree. A secret committed and then removed in the same PR is still a
+          # secret that was pushed to GitHub, and still needs rotating.
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ------------------------------------------- placeholder secrets must be refused
+  # The guard that stops a self-hoster booting production with the published
+  # example credentials is only worth having if it is known to work. This asserts
+  # that the .env.example we ship is refused in production and accepted in
+  # development — see internal/config.Validate and SECURITY.md.
+  config-guard:
+    name: Placeholder credentials are refused
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: config.Validate rejects every published placeholder
+        working-directory: backend
+        run: go test -run 'TestValidate|TestPlaceholder|TestIsPlaceholder' -v ./internal/config/

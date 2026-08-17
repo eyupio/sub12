@@ -1,0 +1,40 @@
+# https://editorconfig.org
+# Matches the formatters already in use: gofmt for Go, the repo's ESLint/Prettier
+# defaults for the frontend. Kept here so an editor without those plugins still
+# produces a diff that isn't all whitespace.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# gofmt is authoritative for Go and uses tabs.
+[*.go]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.{md,markdown}]
+# Two trailing spaces are a hard line break in Markdown.
+trim_trailing_whitespace = false
+
+[*.{sql,sh}]
+indent_size = 4
+
+# Windows tooling expects CRLF in PowerShell scripts.
+[*.ps1]
+end_of_line = crlf
+
+# Generated or vendored — leave alone.
+[{frontend/package-lock.json,e2e/package-lock.json,backend/go.sum}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[frontend/{android,ios}/**]
+indent_style = unset
+indent_size = unset

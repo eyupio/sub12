@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -22,8 +23,16 @@ type Config struct {
 	DBUser     string `envconfig:"DB_USER" default:"sub12"`
 	DBPassword string `envconfig:"DB_PASSWORD" required:"true"`
 	// DBSSLMode controls libpq TLS negotiation. Must be set to `require`,
-	// `verify-ca`, or `verify-full` in production.
+	// `verify-ca`, or `verify-full` in production unless
+	// DBAllowInsecureLocalNetwork says otherwise.
 	DBSSLMode string `envconfig:"DB_SSLMODE" default:"disable"`
+	// DBAllowInsecureLocalNetwork is the operator asserting that Postgres is not
+	// reachable from outside this host, so an unencrypted connection cannot be
+	// observed. It is the only way past the production TLS check in Validate(),
+	// and it exists because the shipped docker-compose topology puts Postgres on
+	// a private bridge with no published port, where TLS would be ceremony. Do
+	// not set it for a managed database or anything across a real network.
+	DBAllowInsecureLocalNetwork bool `envconfig:"DB_ALLOW_INSECURE_LOCAL_NETWORK" default:"false"`
 
 	// Redis
 	RedisURL string `envconfig:"REDIS_URL" default:"redis://localhost:6379"`
@@ -182,25 +191,195 @@ func (c *Config) applyDerivedDefaults() {
 	}
 }
 
-// Validate enforces production-safe values for outgoing public URLs.
-// In production, refuses to start if any user-facing URL still points at
-// localhost — this is the guard rail against shipping emails that contain
-// `http://localhost:5173/...` links.
+// minSecretLength is the shortest JWT_SECRET production will accept. A 32-byte
+// secret is the floor at which HMAC-SHA256 offline brute force stops being the
+// cheapest way in; scripts/install.sh generates considerably more.
+const minSecretLength = 32
+
+// minAdminPasswordLength applies to ADMIN_PASSWORD while SEED_ADMIN is on. The
+// account it creates is a platform administrator, reachable from the public
+// login form.
+const minAdminPasswordLength = 12
+
+// placeholderSecrets are the values shipped in .env.example, seed data and this
+// project's documentation, plus the words people reach for when they mean "I'll
+// fix this later". sub12's source is public, so the published ones are known to
+// anyone who can read the repository — a deployment still carrying one is not
+// "using a weak password", it is publishing its own credentials.
+//
+// Matched case-insensitively and as a substring, so `changeme123` and
+// `CHANGEME-0000` are caught along with the bare value.
+//
+// Every entry has to be a phrase nobody would find in a secret they actually
+// generated. Short generic words like `test` were deliberately removed: a real
+// 64-character secret can contain one by chance, and a passphrase-style secret
+// easily can, and rejecting it with "this is a published placeholder" would be
+// both wrong and baffling. Prefer a false negative here over an error that
+// misleads — the length check backs this up, and the installer generates
+// something no human would have typed.
+//
+// Add to this list, rather than adding another check below, whenever a new
+// placeholder appears in .env.example, docker-compose.yml or the dev seed.
+var placeholderSecrets = []string{
+	"changeme",
+	"change-me",
+	"password123",
+	"placeholder",
+	"replace-me",
+	"replaceme",
+	"insecure",
+	"your-secret",
+	"yoursecret",
+	"my-secret",
+	"mysecret",
+	"supersecret",
+	"super-secret",
+	"todo",
+	"xxxx",
+}
+
+// Validate enforces production-safe configuration. It returns nil outside
+// production so local development stays frictionless — every check below exists
+// because the value is safe on a laptop and dangerous on the internet.
+//
+// Every problem is reported at once rather than one per restart: an operator
+// bringing up a new deployment should get the whole list in a single failure,
+// not discover the next one each time they fix the last.
+//
+// Two families of check:
+//
+//   - Outgoing public URLs must not point at localhost. This is the guard rail
+//     against emailing people `http://localhost:5173/reset-password`.
+//   - Secrets must not be the placeholders published in this repository, and
+//     must be long enough to be worth having. This one matters far more than it
+//     looks: the JWT_SECRET in .env.example is public knowledge, and anyone who
+//     knows it can mint a token for any user id with the admin role — no
+//     password, no login, no rate limit in the way. That is a complete
+//     authentication bypass on any deployment that copied the example file and
+//     changed nothing.
 func (c *Config) Validate() error {
 	if !strings.EqualFold(c.Env, "production") {
 		return nil
 	}
-	checks := map[string]string{
-		"SITE_URL":             c.SiteURL,
-		"PASSWORD_RESET_URL":   c.PasswordResetURL,
-		"EVENT_INVITATION_URL": c.EventInvitationURL,
-		"DEFAULT_AVATAR_URL":   c.DefaultAvatarURL,
+
+	var problems []error
+	fail := func(format string, args ...any) {
+		problems = append(problems, fmt.Errorf(format, args...))
 	}
-	for name, val := range checks {
-		lv := strings.ToLower(val)
-		if strings.Contains(lv, "localhost") || strings.Contains(lv, "127.0.0.1") {
-			return fmt.Errorf("config: %s must not contain localhost in production (got %q)", name, val)
+
+	urls := []struct{ name, val string }{
+		{"SITE_URL", c.SiteURL},
+		{"PASSWORD_RESET_URL", c.PasswordResetURL},
+		{"EVENT_INVITATION_URL", c.EventInvitationURL},
+		{"DEFAULT_AVATAR_URL", c.DefaultAvatarURL},
+	}
+	for _, u := range urls {
+		if isLoopback(u.val) {
+			fail("config: %s must not contain localhost in production (got %q)", u.name, u.val)
 		}
 	}
-	return nil
+
+	// JWT_SECRET signs every access token. A known value is an admin account.
+	switch {
+	case isPlaceholderSecret(c.JWTSecret):
+		fail("config: JWT_SECRET is a placeholder published in this repository — " +
+			"anyone can forge an admin token against it. Generate a real one: `openssl rand -base64 48`")
+	case len(c.JWTSecret) < minSecretLength:
+		fail("config: JWT_SECRET must be at least %d characters in production (got %d) — "+
+			"generate one with `openssl rand -base64 48`", minSecretLength, len(c.JWTSecret))
+	}
+
+	if isPlaceholderSecret(c.DBPassword) {
+		fail("config: DB_PASSWORD is a placeholder published in this repository — " +
+			"set a real one: `openssl rand -base64 32`")
+	}
+
+	// libpq accepts an unencrypted connection under `disable`, `prefer` and
+	// `allow` without complaint, so the password and every row cross the network
+	// in the clear if anything is listening.
+	//
+	// This is the one check with an opt-out, because the stack we ship genuinely
+	// does not need TLS: postgres:16-alpine serves no certificate unless you
+	// mount one, and in docker-compose the database is on a private bridge
+	// network with no published port, so nothing can be listening. Refusing to
+	// boot there would mean the documented deployment fails out of the box and
+	// every operator learns to reach for the override — which teaches them to
+	// ignore it on the deployment where it matters.
+	//
+	// So: unencrypted is allowed, but only when the operator has said in writing
+	// that the database is not reachable off-host. Anyone pointing sub12 at a
+	// managed Postgres over the internet has to make that claim knowingly, and
+	// it is grep-able in their config afterwards.
+	switch strings.ToLower(c.DBSSLMode) {
+	case "require", "verify-ca", "verify-full":
+	case "disable", "prefer", "allow", "":
+		if !c.DBAllowInsecureLocalNetwork {
+			fail("config: DB_SSLMODE=%q sends the database password and every row over the "+
+				"network unencrypted. Set DB_SSLMODE=require (or verify-ca / verify-full) for "+
+				"any database reachable off this host. If Postgres is on a private network with "+
+				"no published port — the topology docker-compose.yml ships — set "+
+				"DB_ALLOW_INSECURE_LOCAL_NETWORK=true to confirm that deliberately.", c.sslMode())
+		}
+	default:
+		fail("config: DB_SSLMODE=%q is not a libpq TLS mode (want disable, allow, prefer, "+
+			"require, verify-ca or verify-full)", c.DBSSLMode)
+	}
+
+	// The refresh cookie is sent with credentials, so Allow-Origin can never be
+	// `*` — browsers reject that combination, which would break refresh
+	// silently rather than loudly.
+	switch {
+	case strings.TrimSpace(c.CORSOrigin) == "":
+		fail("config: CORS_ORIGIN must name your own origin in production (e.g. https://sub12.io)")
+	case strings.Contains(c.CORSOrigin, "*"):
+		fail("config: CORS_ORIGIN must not contain a wildcard (got %q) — the refresh cookie is "+
+			"sent with credentials, and browsers refuse a wildcard origin on a credentialed "+
+			"request, so token refresh would fail for every user", c.CORSOrigin)
+	case isLoopback(c.CORSOrigin):
+		fail("config: CORS_ORIGIN must not point at localhost in production (got %q)", c.CORSOrigin)
+	}
+
+	// Only meaningful while seeding is on; an unset password with SEED_ADMIN off
+	// is the normal steady state.
+	if c.SeedAdmin {
+		switch {
+		case strings.TrimSpace(c.AdminPassword) == "":
+			fail("config: SEED_ADMIN is on but ADMIN_PASSWORD is empty")
+		case isPlaceholderSecret(c.AdminPassword):
+			fail("config: ADMIN_PASSWORD is a placeholder published in this repository — " +
+				"the seeded account is a platform administrator reachable from the public login form")
+		case len(c.AdminPassword) < minAdminPasswordLength:
+			fail("config: ADMIN_PASSWORD must be at least %d characters in production (got %d)",
+				minAdminPasswordLength, len(c.AdminPassword))
+		}
+	}
+
+	return errors.Join(problems...)
+}
+
+// isLoopback reports whether a URL points back at the machine serving it, which
+// makes it useless in an email and a sign of a copied development config.
+func isLoopback(val string) bool {
+	lv := strings.ToLower(val)
+	return strings.Contains(lv, "localhost") ||
+		strings.Contains(lv, "127.0.0.1") ||
+		strings.Contains(lv, "[::1]") ||
+		strings.Contains(lv, "0.0.0.0")
+}
+
+// isPlaceholderSecret reports whether a secret is one of the values published in
+// this repository, or contains one. Empty counts: envconfig marks JWT_SECRET and
+// DB_PASSWORD required, so an empty value here means a caller built a Config
+// directly, and "no secret" is not a production secret either.
+func isPlaceholderSecret(secret string) bool {
+	s := strings.ToLower(strings.TrimSpace(secret))
+	if s == "" {
+		return true
+	}
+	for _, placeholder := range placeholderSecrets {
+		if strings.Contains(s, placeholder) {
+			return true
+		}
+	}
+	return false
 }

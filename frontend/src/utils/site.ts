@@ -17,8 +17,19 @@ const CANONICAL_SITE_URL = 'https://sub12.io'
 const CANONICAL_ANDROID_APK_URL =
   'https://github.com/eyupio/sub12/releases/download/android-latest/sub12.apk'
 
+// Where this build's source can be obtained. sub12 is AGPL-3.0, and section 13
+// obliges anyone running a modified copy as a network service to offer its
+// source to the people using it over that network — a link in the footer is the
+// FSF's own suggested way to do that for a web app. A fork that changes the code
+// must therefore point VITE_SOURCE_URL at its own repository, not leave it here.
+const CANONICAL_SOURCE_URL = 'https://github.com/eyupio/sub12'
+
 export function androidApkUrl(): string {
   return import.meta.env.VITE_ANDROID_APK_URL || CANONICAL_ANDROID_APK_URL
+}
+
+export function sourceUrl(): string {
+  return import.meta.env.VITE_SOURCE_URL || CANONICAL_SOURCE_URL
 }
 
 export function siteOrigin(): string {

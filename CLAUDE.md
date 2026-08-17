@@ -7,6 +7,26 @@ sub-12 is a target shooting companion app (PWA + Capacitor) for logging 25-shot 
 `AGENTS.md` is a pointer to this file — this is the single source of truth, so
 document a change here and nowhere else.
 
+**sub12 is public and AGPL-3.0 licensed.** Two consequences that change how you
+work on it:
+
+- Every placeholder in `.env.example` is now public knowledge, so
+  `config.Validate()` refuses to boot production with one. See "Placeholder
+  credentials are refused" below — that section is the most security-relevant
+  thing in this file.
+- AGPL section 13 obliges a modified copy run as a network service to offer its
+  source to the people using it. The **Source** link in `Layout.tsx`'s footer,
+  built from `sourceUrl()` in `utils/site.ts`, is how we discharge that. It is a
+  licence obligation, not decoration — don't remove it, and a fork sets
+  `VITE_SOURCE_URL` rather than deleting it.
+
+Contributor-facing documentation lives outside this file, because it is written
+for people who have not read this one: `README.md` (features, install,
+self-hosting), `CONTRIBUTING.md` (setup, review conventions), `SECURITY.md`
+(disclosure, what a self-hoster owns, accepted risks), `CODE_OF_CONDUCT.md`,
+`CHANGELOG.md`, and `docs/README.md` as the documentation index. Keep them in
+step with this file when a convention changes.
+
 ## Repository Structure
 
 Layer directories hold one file per domain, named after it (`league.go`,
@@ -57,6 +77,23 @@ scripts/              build-mobile + e2e helpers (.sh and .ps1)
 
 `__tests__/` folders sit next to the code they cover (`api/`, `pages/`,
 `components/`, `hooks/`, `store/`, `utils/`).
+
+Root also carries the public-project files: `LICENSE` (AGPL-3.0), `README.md`,
+`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md` and
+`.editorconfig`, plus `.github/` issue and pull-request templates and
+`dependabot.yml`. `.jules/` holds the engineering journals — recurring bug and
+vulnerability patterns found in this codebase. There used to be a second
+`.Jules/` alongside it; they were merged, because a case-insensitive filesystem
+(macOS and Windows by default) cannot check out both and leaves a contributor
+with a permanently dirty working tree. Don't reintroduce a name that differs from
+an existing one only by case.
+
+The Go module is `github.com/jnnngs/sub-12/backend`, which no longer matches the
+repository at `github.com/eyupio/sub12`. That is a known cosmetic inconsistency,
+left alone deliberately: the module is an application rather than a library, so
+nothing ever `go get`s that path, and renaming it rewrites the import line of
+~157 files for no functional gain. If it is ever renamed, do it as its own commit
+and nothing else.
 
 ## Tech Stack
 
@@ -130,12 +167,34 @@ docker compose logs backend     # check for migration/startup errors
 ### Top-Level Makefile
 
 ```bash
-make dev    # start infra (postgres + redis) for local dev
-make up     # start full stack (infra + backend + frontend containers)
-make down   # stop all containers
-make logs   # tail all container logs
-make build  # build backend binary + frontend bundle
+make install   # interactive installer (scripts/install.sh)
+make dev       # start infra (postgres + redis) for local dev
+make up        # start full stack (infra + backend + frontend containers)
+make down      # stop all containers
+make logs      # tail all container logs
+make build     # build backend binary + frontend bundle
+make check     # everything the PR gate runs, both halves
+make security  # govulncheck + npm audit, mirroring security.yml
+make help      # list targets
 ```
+
+`scripts/install.sh` is the front door for anyone who did not write this code:
+it checks prerequisites, generates real secrets, writes `.env` at mode 600,
+prepares `data/backups` with the UID the container needs, runs migrations and
+waits for a healthy stack. Three modes — `dev`, `self-host`, `build` — plus
+`--check`, `--yes` and `--no-start` for unattended use.
+
+Two invariants it maintains, both of which bite if you edit it:
+
+- **It never rotates a secret already in `.env`.** Rotating `JWT_SECRET` signs
+  every user out; rotating `DB_PASSWORD` after Postgres has initialised locks the
+  app out of its own database, because Postgres keeps the password it was created
+  with and ignores the variable afterwards. `secret_for()` reuses any existing
+  non-placeholder value, and `check_postgres_password_matches()` catches the
+  leftover-data-directory case before it becomes a confusing migration failure.
+- **`is_placeholder()` mirrors `isPlaceholderSecret()` in
+  `internal/config/config.go`.** If the two drift, the installer writes a config
+  the backend then refuses to boot. Change both together.
 
 ### Database Migrations
 
@@ -209,6 +268,93 @@ Any link sent to a user via email, push, or other out-of-band channel **must** b
 - Add the new field name to the `Validate()` localhost guard so production refuses to boot with a localhost link.
 - Document the new env var in this file, in `.env.example`, and in `docker-compose.yml`.
 - Existing examples to copy: `PasswordResetURL` (used in `backend/internal/service/auth.go` `buildResetLink`), `EventInvitationURL` (used in `backend/internal/service/event_invitation.go`), `DefaultAvatarURL`.
+
+### Placeholder credentials are refused
+
+`config.Validate()` only runs its checks when `ENV=production`, so local
+development is unaffected by all of this. In production it reports **every**
+problem at once via `errors.Join` — an operator bringing up a new deployment
+should get the whole list in one failure, not discover the next one on each
+restart after fixing the last.
+
+The check that matters most: **the values in `.env.example` are public.** sub12's
+source is open, so a deployment that kept the example `JWT_SECRET` can have a
+token minted for any user id with the admin role — no password, no login form, no
+rate limiter in the way. That is a complete authentication bypass, and the only
+thing standing between a careless `cp .env.example .env` and it is this guard. So:
+
+- `isPlaceholderSecret()` matches the `placeholderSecrets` list as a
+  case-insensitive **substring**, so `changeme123` is caught as well as
+  `changeme`. Empty counts too. When a new placeholder appears in `.env.example`,
+  `docker-compose.yml` or the dev seed, add it to that list rather than writing
+  another check — and keep `is_placeholder()` in `scripts/install.sh` in step.
+- `JWT_SECRET` must additionally be at least `minSecretLength` (32) characters.
+  Length alone is not the test: the `.env.example` value is 47 characters.
+- `ADMIN_PASSWORD` is only checked while `SEED_ADMIN` is on, since an empty one
+  with seeding off is the normal steady state.
+- `CORS_ORIGIN` must not be `*`, empty or localhost. A wildcard is worse than
+  useless here — the API sets `Access-Control-Allow-Credentials` so the refresh
+  cookie is delivered, browsers refuse `*` on a credentialed request, and every
+  user's token refresh would fail with nothing in the logs to explain it.
+
+**`DB_SSLMODE` is the one check with an opt-out, deliberately.**
+`postgres:16-alpine` serves no certificate unless one is mounted, and in the
+shipped compose topology the database is on a private bridge with no published
+port — so requiring TLS there would make the documented deployment fail out of
+the box, and every operator would learn to reach for the override, which is
+exactly how you train people to ignore it on the deployment where it matters.
+Instead, an unencrypted connection is allowed only when
+`DB_ALLOW_INSECURE_LOCAL_NETWORK=true` states that the database is not reachable
+off-host. `docker-compose.yml` sets it, scoped to the topology it defines;
+anything pointing at a managed database has to make that claim knowingly, and it
+is grep-able afterwards. The error message names the opt-out, or an operator
+running the shipped stack would be stuck with no way forward — a test pins that.
+
+`docker-compose.yml` deliberately has **no `sub12.io` fallback** for
+`PASSWORD_RESET_URL` / `EVENT_INVITATION_URL`. It used to, which meant a
+self-hoster who set `SITE_URL` to their own domain still emailed their members
+password-reset links pointing at sub12.io — an account-recovery flow silently
+sending people to somebody else's site. `SITE_URL` is required and everything
+else derives from it.
+
+### Security scanning
+
+`make security` is the one command; `.github/workflows/security.yml` is the CI
+version, and it runs on a schedule as well as on pull requests because the answer
+changes when nothing in the repository does.
+
+- **A stdlib `govulncheck` finding is fixed by raising the `go` directive in
+  `backend/go.mod`** to the patch release the report names. CI resolves its
+  toolchain from that file (`go-version-file: backend/go.mod`), so that directive
+  — not the `golang:` tag in the Dockerfile — is what decides which stdlib the
+  shipped binary is built against. A bare `go 1.25` left us on 1.25.0 and 44
+  reachable advisories.
+- **`npm audit` is split in two.** `--omit=dev` covers what ships to a browser
+  and must stay clean; the full run covers build and test tooling and is
+  advisory, with the known exceptions written up in `SECURITY.md`. Don't merge
+  the two lists — a vulnerability in Vite's dev server and one in a shipped
+  bundle are different problems.
+- `@capacitor/cli` → `tar` (critical) is a known accepted risk: dev-only, and the
+  fix is a Capacitor major that rewrites the native projects and needs on-device
+  testing. Dependabot is configured to never propose it automatically.
+
+### CI workflows are a security surface
+
+- **`opencode.yml` is gated on `author_association`** (`OWNER`, `MEMBER`,
+  `COLLABORATOR`). It fires on `issue_comment`, so without that gate any GitHub
+  user could spend `OPENCODE_API_KEY` in a loop and — worse — inject arbitrary
+  instructions, since the comment body *is* the agent's prompt. `CONTRIBUTOR` is
+  excluded on purpose: one merged PR is a low bar. Keep both halves in a single
+  `if` on the job; moving the trust check into a step lets the job start, which is
+  already a spend.
+- **Never convert a workflow to `pull_request_target`**, and never check out
+  `github.event.pull_request.head.sha`. Either runs fork-authored code with
+  access to secrets.
+- Every workflow declares explicit `permissions`. `contents: write` on
+  `android.yml` / `ios.yml` exists only to publish releases; fork pull requests
+  get a read-only token from GitHub regardless, so they cannot publish.
+- The frontend image builds with `npm ci` from the committed lockfile, not
+  `npm install`, so a container build resolves the same tree CI tested.
 
 ### General
 
@@ -735,7 +881,10 @@ the message is.
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `sub12` | Database name |
 | `DB_USER` | `sub12` | Database user |
-| `DB_SSLMODE` | `disable` | libpq TLS mode; set to `require` (or `verify-full`) in production |
+| `DB_SSLMODE` | `disable` | libpq TLS mode. Production refuses anything unencrypted unless `DB_ALLOW_INSECURE_LOCAL_NETWORK=true` — see "Placeholder credentials are refused" |
+| `DB_ALLOW_INSECURE_LOCAL_NETWORK` | `false` | The operator asserting Postgres is not reachable off-host, which is the only way past the production TLS check. Set by `docker-compose.yml` for the topology it defines. Never set it for a managed database |
+| `WEB_PORT` | `3000` | Host port the frontend container publishes. Point a reverse proxy here |
+| `IMAGE_REPO` | `ghcr.io/eyupio` | Registry prefix for the two images, so a fork runs its own without editing `docker-compose.yml` |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `JWT_EXPIRY_HOURS` | `24` | JWT token expiry in hours |
 | `PASSWORD_RESET_TTL_MINUTES` | `60` | Password reset token TTL |
@@ -927,7 +1076,10 @@ these over ad-hoc Tailwind so surfaces stay consistent.
 
 ## Container Images
 
-- `ghcr.io/jnnngs/sub-12-backend:latest`
-- `ghcr.io/jnnngs/sub-12-frontend:latest`
+- `ghcr.io/eyupio/sub-12-backend:latest`
+- `ghcr.io/eyupio/sub-12-frontend:latest`
+- `release.yml` publishes to `ghcr.io/${{ github.repository_owner }}/sub-12-*`, so
+  a fork's own builds land under its own owner. Set `IMAGE_REPO` in `.env` to run
+  them instead of ours
 - Tag with `IMAGE_TAG` env var in `docker-compose.yml` for pinned deploys
 - Production frontend nginx proxies `/api/` to backend container (no host port exposed for backend)
