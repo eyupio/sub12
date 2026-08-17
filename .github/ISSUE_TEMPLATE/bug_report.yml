@@ -1,0 +1,117 @@
+name: Bug report
+description: Something in sub12 behaves wrongly
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this.
+
+        **If this is a security vulnerability, stop here** and follow
+        [SECURITY.md](https://github.com/eyupio/sub12/blob/main/SECURITY.md)
+        instead — a public issue tells everyone else how to exploit it first.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched [existing issues](https://github.com/eyupio/sub12/issues?q=is%3Aissue) and this isn't already reported
+          required: true
+        - label: This isn't a security vulnerability
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, and what appeared instead of what you expected?
+      placeholder: |
+        I finished a 25-shot card and tapped Submit to league. The button
+        greyed out and nothing else happened — the card stayed in Drafts.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Number them. A reliable reproduction is the single most useful thing in this form.
+      placeholder: |
+        1. Log in as a league member
+        2. Quick-capture a card, choose the league round
+        3. Enter 25 shots, tap Save
+        4. Open the card, tap Submit to league
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      multiple: true
+      options:
+        - Score cards / capture
+        - Pellet testing / measurement
+        - Leagues (seasons, rounds, standings, verification)
+        - Clubs
+        - Events
+        - Gear (rifles, pellets, comparison)
+        - Social (feed, posts, comments, follows)
+        - Notifications / push / email
+        - Admin
+        - Auth / account / two-factor
+        - Install, self-hosting, Docker
+        - Something else / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where did you hit it?
+      multiple: true
+      options:
+        - Web browser
+        - Installed PWA
+        - Android app
+        - iOS app
+        - Self-hosted deployment
+        - Local development
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit SHA, container tag, APK version from Settings, or the date you last updated.
+      placeholder: "sha-44d8450, or android-latest installed 2026-08-14"
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser / device / OS
+      placeholder: "Chrome 141 on Android 15, Pixel 8"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errors, logs or screenshots
+      description: |
+        Browser console, `docker compose logs backend`, or a screenshot.
+        **Redact tokens, passwords and anything from a `.env` before pasting.**
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Does it happen every time or intermittently? Did it work before?

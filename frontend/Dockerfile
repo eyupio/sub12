@@ -3,8 +3,14 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install -g npm@11 && npm install
+# Copy the lockfile too and install from it. `npm install` against package.json
+# alone re-resolves every range at build time, so the image could ship a
+# dependency tree no test ever ran against — and a compromised patch release
+# would land in a container build while CI, which uses `npm ci`, stayed green.
+# `npm ci` fails loudly if package.json and the lockfile disagree, which is the
+# behaviour you want in an image build.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 RUN npm run build

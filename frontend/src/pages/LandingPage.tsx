@@ -28,6 +28,7 @@ import {
 import { CornerMark } from '../components/CornerMark'
 import { Sub12BrandLockup } from '../components/Sub12BrandLockup'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { sourceUrl } from '../utils/site'
 import {
   availableVideoGuides,
   formatGuideDuration,
@@ -1255,8 +1256,17 @@ export default function LandingPage() {
 
       <footer className="border-t border-subtle py-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">SUB12 - Precision shooting platform</p>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">&copy; 2025 SUB12. Built around shooter workflows.</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">
+            SUB12 - Precision shooting platform - Developed by{' '}
+            <a href="https://eyup.io" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--brass)] transition-colors">EyUp.io</a>
+          </p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted">
+            &copy; 2025 SUB12 -{' '}
+            {/* AGPL-3.0 section 13: a network service built from modified sources
+                must offer those sources to its users. This is that offer. */}
+            <a href={sourceUrl()} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--brass)] transition-colors">Open source</a>
+            {' '}under AGPL-3.0
+          </p>
         </div>
       </footer>
     </div>

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Nothing in the PR gate writes to the repository. Declaring this explicitly
+# means the workflow's token stays read-only regardless of the org-wide default,
+# so a compromised dependency in a build step cannot push a commit or a package.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

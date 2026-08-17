@@ -1,53 +1,162 @@
-# sub12
+<div align="center">
 
-A target shooting companion app for the UK airgun benchrest community. Log 25-shot score cards, manage gear, run leagues and clubs, test pellets with image-based group measurement, and follow other shooters.
+<img src="brand/svg/logo-primary-dark.svg#gh-dark-mode-only" alt="sub12" width="180">
+<img src="brand/svg/logo-primary-light.svg#gh-light-mode-only" alt="sub12" width="180">
 
-## Features
+### Log the card. Run the league. Know what your gear actually does.
 
-### Scoring & Gear
-- **Score cards** — Log 25-shot cards with per-shot entry, target presets, and image attachments
-- **Rifles** — Maintain a personal rifle inventory with images and metadata; built-in catalog of common models
-- **Pellets** — Track pellet inventory with images; built-in catalog of common brands and weights
-- **Stats** — Personal score trends, rifle-specific stats, and historical performance charts (Recharts)
+An open-source target shooting companion for the UK airgun benchrest community —
+25-shot score cards, gear tracking, leagues and clubs, and pellet testing that
+measures your groups from a photograph.
 
-### Pellet Testing
-- **Image-based group measurement** — Upload target photos, auto-detect holes, and measure groups
-- **Manual measurement fallback** — Override detection with manual hole placement when needed
-- **Groups, detections, and confidence scoring** — Per-test breakdowns with confidence indicators
-- **Compare, timeline, batch reports, combo analytics** — Multi-test analysis across pellets and rifles
-- **Public leaderboard** — Share top results without requiring login
-- **Ballistics utilities** — Frontend ballistics helpers for downrange calculations
+[![CI](https://github.com/eyupio/sub12/actions/workflows/ci.yml/badge.svg)](https://github.com/eyupio/sub12/actions/workflows/ci.yml)
+[![Security](https://github.com/eyupio/sub12/actions/workflows/security.yml/badge.svg)](https://github.com/eyupio/sub12/actions/workflows/security.yml)
+[![Android](https://github.com/eyupio/sub12/actions/workflows/android.yml/badge.svg)](https://github.com/eyupio/sub12/actions/workflows/android.yml)
+[![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0-D4A44A.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](backend/go.mod)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](frontend/package.json)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-2D5A27.svg)](CONTRIBUTING.md)
+
+**[Try it](https://sub12.io)** · **[Install your own](#installation)** ·
+**[Contribute](CONTRIBUTING.md)** · **[Security](SECURITY.md)** ·
+**[Changelog](CHANGELOG.md)**
+
+<sub>Developed by **[EyUp.io](https://eyup.io)** · AGPL-3.0 · self-host it, fork it, run it for your club</sub>
+
+</div>
+
+---
+
+## What it does
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**Score cards that survive the evening**
+
+A 25-shot card, captured shot by shot, with target presets and a photo of the
+card itself. Then — and this is the part most tools get wrong — the card's
+context stays changeable. Shot it against the wrong league? Round filled up
+before you submitted? Move it. Nobody re-shoots a card because software filed it
+badly.
+
+</td>
+<td width="50%" valign="top">
+
+**Pellet testing from a photograph**
+
+Photograph the target, and sub12 finds the holes, measures the group and scores
+its own confidence in the reading. Manual placement is there when detection is
+wrong. Then compare tins, chart the timeline, run batch reports across
+rifle/pellet combinations, and put a result on the public leaderboard.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+**Leagues that a volunteer can actually run**
+
+Seasons and rounds get edited far more often than created, so all of it is full
+CRUD — rename, re-date, archive, delete. Score verification with member
+confirmations, moderator amend/reject, and a complete audit trail. Owners
+delegate specific capabilities rather than handing over the keys.
+
+</td>
+<td width="50%" valign="top">
+
+**Clubs, events and the people**
+
+Club profiles with a real-world identity — address, map pin, disciplines,
+facilities, opening hours. Events other people enter, with delegated scorers and
+CSV results. Follows, an activity feed, comments, achievements, and blocks and
+mutes that are applied in the query rather than hidden in the client.
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+
+|  |  |  |
+|:--:|:--:|:--:|
+| <img src="marketing/devto-images/sub12-dashboard.png" alt="Dashboard" width="260"> | <img src="marketing/devto-images/sub12-score-card.png" alt="Score card capture" width="260"> | <img src="marketing/devto-images/sub12-pellet-testing.png" alt="Pellet testing" width="260"> |
+| **Dashboard** | **Score card capture** | **Pellet testing** |
+| <img src="marketing/devto-images/sub12-my-cards.png" alt="My cards" width="260"> | <img src="marketing/devto-images/sub12-gear.png" alt="Gear" width="260"> | <img src="marketing/devto-images/sub12-club.png" alt="Club page" width="260"> |
+| **Your cards** | **Gear** | **Clubs** |
+
+</div>
+
+<details>
+<summary><b>The full feature list</b></summary>
+
+### Scoring & gear
+- 25-shot cards with per-shot entry, target presets, image attachments and drafts
+- A card's context (personal / league / club / event) is changeable after capture
+- Rifle and pellet inventories with images, plus built-in catalogs of common models
+- Opt-in anonymised gear comparison — your make and model against everyone else's,
+  suppressed entirely below three contributing owners
+- Personal trends, rifle-specific stats and historical charts
+- A gallery of every photo you've uploaded, with submit and withdraw actions
+
+### Pellet testing
+- Image-based group measurement with automatic hole detection
+- Manual hole placement when detection gets it wrong
+- Per-test confidence scoring, so a bad photo reads as a bad photo
+- Compare, timeline, batch reports and combo analytics across pellets and rifles
+- Public leaderboard, no login required
+- Ballistics helpers for downrange calculations
 
 ### Leagues
-- Create leagues, join via request flow, manage members and seasons
-- Rounds, standings, configurable scoring rules
-- **Score verification** — Confirm / amend / reject submissions with full audit trail
+- Seasons and rounds with full CRUD; archiving retires a season that's been shot
+- Standings, configurable scoring, join requests
+- Score verification: member confirmations, moderator verify / amend / reject /
+  reopen, with an audit trail
+- Delegated moderator capabilities — the owner grants specific duties, and a
+  control the grant doesn't cover is drawn read-only with the reason
 
-### Clubs
-- Create clubs, manage members, upload club imagery
-- Public club pages with standings
+### Clubs & events
+- Club profiles: postal address, map pin, disciplines, distances, facilities,
+  membership and visitor info, opening hours
+- A club's authority reaches the leagues it hosts
+- Events addressed by slug, with participants, guests, invitations, delegated
+  scorers, scoreboard and `results.csv`
 
-### Social
-- **Follow / unfollow** other shooters
-- **Activity feed** with privacy-aware filters
-- **Comments** on score cards
-- **Achievements** unlocked from milestones
+### Social & moderation
+- Follow / unfollow, activity feed, posts, comments, likes, achievements
+- Blocks and mutes applied inside the feed query, symmetrically
+- Reports on posts, comments and users; an admin decision queue; a background
+  sweeper that gives the author a grace period to amend first
+- Group announcements from leagues, clubs, events and the platform
+
+### Notifications
+- One row per recipient, delivered in-app, by push and by email — each gated on
+  the recipient's own preference
+- Validation requests go to whoever can actually act, with volunteers able to opt
+  in to reviewing other shooters' cards
+
+### Accounts
+- Email/password with JWT sessions and refresh tokens
+- TOTP two-factor with bcrypt-hashed backup codes
+- Password reset, avatar upload, email change
 
 ### Admin
-- User management (list, role updates, delete)
-- League and club moderation
-- SMTP settings + email template editor with live preview
-
-### Auth & Accounts
-- Email/password registration, JWT sessions, refresh tokens
-- Forgot/reset password via email
-- Profile editing, avatar upload, email change flow
+- Users, leagues, clubs, events, gear analytics, FAQ, categories, feature board
+- SMTP settings and an email template editor with live preview
+- Sitemap & SEO reporting with IndexNow submission
+- Encrypted S3 backups — a run without a passphrase fails rather than uploading
+  plaintext
+- Activity simulation for populating a demo instance
 
 ### Platform
-- **PWA** — Installable, offline-aware via `vite-plugin-pwa`
-- **Capacitor** — iOS and Android native shells from the same codebase
-- **Mobile keyboard handling** — Header/bottom-nav auto-hide while typing (see [policy](#mobile-keyboard--navigation-policy))
-- **Dark mode** — Theme toggle persisted per user
+- Installable PWA, offline-aware, with a queued score outbox
+- Native iOS and Android shells from the same bundle: share sheet, camera,
+  geolocation, deep links, push, haptics
+- Dark mode, and a design system with motion tokens and a `prefers-reduced-motion`
+  guard
+
+</details>
 
 ## See it in action
 
@@ -166,273 +275,392 @@ Nothing is edited by hand: every video is re-recorded with one command
 [docs/demo-recordings.md](docs/demo-recordings.md) is the production standard
 and storyboard catalog.
 
-## Stack
+## Installation
 
-| Layer | Technology |
-|---|---|
-| Backend | Go 1.25, Chi v5, pgx v5, zerolog, golang-jwt, go-redis |
-| Database | PostgreSQL 16 (golang-migrate, embedded SQL migrations) |
-| Cache | Redis 7 |
-| Frontend | React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4 |
-| Styling | Tailwind CSS v3, Lucide icons, Recharts |
-| Mobile | Capacitor 6 (iOS / Android) |
-| PWA | vite-plugin-pwa |
-| Testing | Go test + testify, Vitest + Testing Library |
-| CI/CD | GitHub Actions → GHCR container images |
+One command, and it will ask you what you want:
 
-## Repository Structure
-
-```
-sub-12/
-├── backend/              Go REST API
-│   ├── cmd/api/          Entrypoint
-│   └── internal/
-│       ├── api/          Handlers, middleware, router (Chi)
-│       ├── config/       Env-based config (envconfig)
-│       ├── db/           pgxpool, migrations, Redis, dev seed
-│       ├── email/        Template renderer
-│       ├── model/        Domain types
-│       ├── repository/   pgx data access (one file per domain)
-│       └── service/      Business logic
-├── frontend/             React PWA
-│   └── src/
-│       ├── api/          Typed fetch wrappers per domain
-│       ├── catalog/      Static pellet & rifle catalogs
-│       ├── components/   Shared UI (Layout, ImageMeasurement, …)
-│       ├── pages/        ~37 route pages
-│       ├── store/        Zustand stores (auth, theme, toast)
-│       └── utils/        Ballistics, hole detection, dates
-├── brand/                SVG brand assets
-├── landing/              Static landing page
-└── .github/              CI/CD workflows
+```bash
+git clone https://github.com/eyupio/sub12.git
+cd sub12
+./scripts/install.sh
 ```
 
-## Quick Start
+The installer checks your prerequisites, **generates real secrets** (never the
+placeholders in `.env.example` — those are public now, see
+[Security](#security)), writes `.env` with mode 600, prepares the backup
+directory with the ownership the container needs, runs migrations and waits until
+the stack answers. It offers three modes:
+
+| Mode | What you get | Who it's for |
+|---|---|---|
+| **Local development** | Postgres + Redis in Docker; you run the Go API and Vite yourself, with hot reload and seed data | Changing the code |
+| **Self-host** | The whole stack from published container images | Running it for your club |
+| **Self-host, from source** | Same, but images built from your checkout | You've changed something, or you want to verify the build |
+
+Useful flags:
+
+```bash
+./scripts/install.sh --check                        # prerequisites only, changes nothing
+./scripts/install.sh --mode dev --seed --yes        # unattended dev setup
+./scripts/install.sh --mode self-host \
+    --site-url https://shoot.myclub.org --port 3000 --yes
+./scripts/install.sh --no-start                     # write config, start nothing
+```
+
+Re-running it is safe: every secret already in your `.env` is preserved, not
+rotated, and the old file is backed up.
+
+On Windows, run it under WSL2 — which Docker Desktop needs anyway. There is no
+PowerShell installer yet; the manual steps below work from any shell.
 
 ### Prerequisites
 
-- [Go 1.25+](https://go.dev/dl/)
-- [Node 20+](https://nodejs.org/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+| | Needed for |
+|---|---|
+| [Docker](https://docs.docker.com/get-docker/) + Compose v2 | All modes — Postgres and Redis |
+| [Go 1.25+](https://go.dev/dl/) | Local development only |
+| [Node 20+](https://nodejs.org/) | Local development only |
+| `curl`, `make`, `openssl` | Health checks, migrations, secret generation |
 
-### Local development
+### Doing it by hand
 
-```bash
-cp .env.example .env                       # configure environment variables
-make dev                                   # start Postgres + Redis
-cd backend && make migrate-up              # run database migrations
-cd backend && make run                     # start API on :8080
-cd frontend && npm install && npm run dev  # start Vite on :5173
-```
-
-### Full stack via Docker
+<details>
+<summary><b>Local development, manually</b></summary>
 
 ```bash
-cp .env.example .env
-mkdir -p ./data/backups
-sudo chown 10001:10001 ./data/backups && sudo chmod 750 ./data/backups
-make up        # builds and runs infra + backend + frontend
-make logs      # tail container logs
-make down      # stop everything
+cp .env.example .env                       # then edit it
+make dev                                   # Postgres + Redis
+cd backend && make migrate-up              # schema
+cd backend && make seed                    # optional: test accounts and data
+cd backend && make run                     # API on :8080
+cd frontend && npm install && npm run dev  # app on :5173
 ```
 
-The backend container runs as UID 10001 and writes encrypted backup archives to `/var/lib/sub12/backups`, which is bind-mounted to `./data/backups` on the host. Pre-creating the directory with that ownership lets scheduled and manual admin backups succeed; without it, runs fail with `mkdir /var/lib/sub12: permission denied`.
-
-## Test Accounts
-
-Seed with `cd backend && make seed` (Postgres must be running).
+Seeded accounts, development only:
 
 | Email | Password | Role |
 |---|---|---|
 | `dev@sub12.local` | `password123` | User |
 | `admin@sub12.local` | `password123` | Admin |
 
-## API
+</details>
 
-Routes are versioned under `/api/v1/`. Health probes live at the root.
+<details>
+<summary><b>Full Docker stack, manually</b></summary>
 
-- `GET /healthz` — liveness
-- `GET /readyz` — readiness (DB check)
+```bash
+cp .env.example .env
+# Edit .env: set a real JWT_SECRET and DB_PASSWORD, set SITE_URL,
+# set ENV=production. The backend refuses to start otherwise — see Security.
 
-Public endpoints include auth, image fetch, league/club listings, public score-card comments, and the pellet-test public leaderboard. All other endpoints require `Authorization: Bearer <jwt>`. Admin routes are gated by `RequireAdmin`. See [CLAUDE.md](CLAUDE.md) for the full surface.
+mkdir -p ./data/backups
+sudo chown 10001:10001 ./data/backups && sudo chmod 750 ./data/backups
+
+docker compose up -d
+docker compose logs backend   # a rejected config value is printed at startup
+```
+
+The backend container runs as UID 10001 and writes AES-encrypted backup archives
+to `/var/lib/sub12/backups`, bind-mounted to `./data/backups`. Pre-creating that
+directory with the right ownership is what lets admin backup runs succeed —
+without it they fail with `mkdir /var/lib/sub12: permission denied`, which you'd
+rather not discover at the moment you need a backup.
+
+</details>
+
+<details>
+<summary><b>Running it behind a reverse proxy</b></summary>
+
+The frontend container serves the SPA and proxies `/api/` to the backend
+internally, so it is the only upstream your proxy needs. The backend port is
+never published to the host.
+
+```
+your proxy (TLS) ──▶ localhost:${WEB_PORT:-3000} ──▶ frontend:8080 ──▶ backend:8080
+```
+
+Set `SITE_URL` to the URL people actually visit. Every link sent by email or push
+is built from it, and `PASSWORD_RESET_URL`, `EVENT_INVITATION_URL` and
+`DEFAULT_AVATAR_URL` are all derived from it — so one setting retargets the lot.
+Set `CORS_ORIGIN` to the same value.
+
+Forks running their own images set `IMAGE_REPO=ghcr.io/your-org` rather than
+editing `docker-compose.yml`.
+
+</details>
+
+### Upgrading
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Migrations run on startup and are idempotent. Check `docker compose logs backend`
+afterwards.
+
+## Security
+
+sub12 handles accounts, uploads and a public API, so a few things are worth
+stating plainly. The full picture is in **[SECURITY.md](SECURITY.md)**, including
+how to report a vulnerability privately — please don't open a public issue for
+one.
+
+**The placeholders in `.env.example` are public.** They always were in spirit;
+now the repository is open they demonstrably are. A deployment that keeps the
+example `JWT_SECRET` can have tokens forged against it by anyone who reads this
+repo — including admin tokens, with no password and no login involved. So the
+backend **refuses to start** in `ENV=production` when it finds:
+
+- a `JWT_SECRET` or `DB_PASSWORD` that is one of the published placeholders, or a
+  `JWT_SECRET` shorter than 32 characters
+- `DB_SSLMODE` allowing an unencrypted connection, unless you set
+  `DB_ALLOW_INSECURE_LOCAL_NETWORK=true` to state that the database isn't
+  reachable off-host — which is true of the shipped Compose topology and not of a
+  managed database somewhere else
+- a `CORS_ORIGIN` that is `*`, empty, or pointing at localhost
+- a weak `ADMIN_PASSWORD` while `SEED_ADMIN=true`
+- any user-facing URL still pointing at localhost
+
+It reports every problem at once rather than one per restart. If you see that
+error, the guard is working — `./scripts/install.sh` produces a config that
+passes it.
+
+**What we do already:** bcrypt password hashing, TOTP two-factor, per-IP rate
+limiting on every password-bearing endpoint, parameterised SQL throughout, a
+`script-src 'self'` CSP with HSTS in production, non-root containers, and CodeQL
++ `govulncheck` + `npm audit` + secret scanning in CI.
+
+```bash
+make security   # govulncheck and npm audit, the same as CI runs
+```
+
+## Architecture
+
+```
+┌──────────────┐        ┌──────────────┐        ┌──────────────┐
+│  React PWA   │        │   Go API     │        │ PostgreSQL 16│
+│  Capacitor   │──HTTP──▶│  Chi + pgx   │────────▶│  + Redis 7   │
+│  iOS/Android │        │              │        │              │
+└──────────────┘        └──────┬───────┘        └──────────────┘
+                               │
+                     ┌─────────┴─────────┐
+                     │ SMTP · FCM push   │
+                     │ S3 backups · OG   │
+                     │ image rendering   │
+                     └───────────────────┘
+```
+
+The backend is strictly layered — **handler → service → repository**. Handlers
+write HTTP responses, services hold business logic and return domain errors,
+repositories run pgx queries. No ORM.
+
+```
+backend/
+  cmd/api/                  entrypoint
+  internal/
+    api/handler/            HTTP handlers, one file per domain (~45)
+    api/middleware/         auth (JWT → context), logging, rate limiting
+    api/router.go           every route in the API, in one file
+    config/                 env-based config + production Validate()
+    db/migrations/           sequential SQL, embedded and run on startup
+    model/                   domain types, plus the pure rules worth unit-testing
+    repository/             pgx data access, one file per domain (~40)
+    service/                business logic, one file per domain (~44)
+frontend/
+  src/
+    api/                    typed fetch wrappers, one per domain
+    components/             shared UI plus per-feature subfolders
+    pages/                  route pages (~88)
+    routeTree.tsx           the one route tree — public vs authed lives here
+    store/                  Zustand: auth, theme, toast, navigation
+    utils/                  ballistics, hole detection, share, push, routing
+e2e/                        Playwright suite
+docs/                       long-form design notes
+scripts/                    install, mobile build, e2e, demo recording
+```
+
+`__tests__/` folders sit next to the code they cover.
+
+**[CLAUDE.md](CLAUDE.md) is the single source of truth** for architecture and
+conventions — including the reasons behind rules that look arbitrary until you
+know the outage that produced them. Read it before a substantial change.
+
+### Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Go 1.25, Chi v5, pgx v5, zerolog, golang-jwt v5, go-redis v9 |
+| Database | PostgreSQL 16 with golang-migrate (embedded SQL) |
+| Cache | Redis 7 |
+| Frontend | React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4 |
+| Styling | Tailwind CSS v3, Lucide icons, Recharts |
+| Mobile | Capacitor 6 (iOS / Android), PWA via vite-plugin-pwa |
+| Also | `fogleman/gg` renders share cards, `pquerna/otp` backs 2FA, `minio-go` ships encrypted backups |
+| Testing | Go test + testify, Vitest + Testing Library, Playwright |
+| CI/CD | GitHub Actions → GHCR images |
 
 ## Development
 
 ```bash
-# Backend
-cd backend && make test          # go test -race -count=1 ./...
-cd backend && make lint          # go vet ./...
-cd backend && make build         # compile to bin/api
-cd backend && make tidy          # go mod tidy + verify
-
-# Frontend
-cd frontend && npm run check     # tsc -b
-cd frontend && npm run lint      # ESLint
-cd frontend && npm test          # Vitest
-cd frontend && npm run build     # production build
+make check      # everything the PR gate runs
+make security   # govulncheck + npm audit
+make help       # all targets
 ```
+
+Or by hand:
+
+```bash
+cd backend  && make test    # go test -race -count=1 ./...
+cd backend  && make lint    # go vet ./...
+cd frontend && npm run check && npm run lint && npm test && npm run build
+```
+
+Two things that catch people:
+
+- **`npm run check` is `tsc -b`, not `tsc --noEmit`.** The root `tsconfig.json` is
+  a solution file with `"files": []`, so `tsc --noEmit` resolves no inputs and
+  exits 0 on any codebase, however broken. Only build mode follows the project
+  references.
+- **Backend tests that need a database skip silently unless `DB_HOST` is set.**
+  `make dev` gives you one. Without it, a green run may have skipped exactly the
+  tests covering your change.
+
+The Playwright suite is **not** in the PR gate. Run it yourself when you touch
+score capture, leagues, events or clubs — `./scripts/e2e.sh`, or see
+[E2E_TESTING.md](E2E_TESTING.md).
 
 ### Database migrations
 
 ```bash
 cd backend
-make migrate-create NAME=add_foo  # next sequential migration files
-make migrate-up                   # apply pending migrations
-make migrate-down                 # rollback last migration
-make migrate-lint                 # detect duplicate prefixes
+make migrate-create NAME=add_foo   # picks the next sequence number for you
+make migrate-up
+make migrate-down
+make migrate-lint                  # duplicate prefix check, as CI does
 ```
 
-Migrations are embedded into the binary via `golang-migrate` and run on startup. All DDL must be idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `EXCEPTION WHEN duplicate_object`). Every `.up.sql` requires a matching `.down.sql`.
+Always use `make migrate-create` — never hand-write the file. All DDL must be
+idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`,
+`EXCEPTION WHEN duplicate_object`), every `.up.sql` needs a `.down.sql` that
+fully reverses it, and one concern per migration. These rules exist because we've
+had production outages from migration conflicts.
 
-## Environment
+## Configuration
 
-Required:
+Two variables are required: `DB_PASSWORD` and `JWT_SECRET`. Everything else has a
+default.
 
-| Variable | Description |
-|---|---|
-| `DB_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET` | JWT signing secret |
+The one worth understanding is **`SITE_URL`** — the canonical public host.
+`PASSWORD_RESET_URL`, `EVENT_INVITATION_URL` and `DEFAULT_AVATAR_URL` are all
+derived from it when unset, so one change retargets every link sent by email or
+push.
 
-Common optional overrides: `PORT`, `ENV`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_SSLMODE` (use `require` in production), `REDIS_URL`, `JWT_EXPIRY_HOURS`, `PASSWORD_RESET_TTL_MINUTES`, `PASSWORD_RESET_URL`, `CORS_ORIGIN`, `SEED_ADMIN`, `ADMIN_PASSWORD`. See [CLAUDE.md](CLAUDE.md) for defaults.
+See [`.env.example`](.env.example) for the annotated list and
+[CLAUDE.md](CLAUDE.md#environment-variables) for every variable and its default.
 
-## CI/CD
+## Mobile apps
 
-- **`ci.yml`** (push/PR to `main`) — migration lint, `go vet`, `go test -race` against a Postgres 16 service, `go build`, frontend type-check / lint / test / build, plus a Docker smoke build for both images.
-- **`release.yml`** (push to `main`) — builds and pushes to GHCR with `sha-<commit>` and `latest` tags.
+The web build and the native iOS / Android apps ship from one codebase — the same
+`frontend/dist/` bundle wrapped by [Capacitor 6](https://capacitorjs.com/).
 
-Container images:
-
-- `ghcr.io/jnnngs/sub-12-backend:latest`
-- `ghcr.io/jnnngs/sub-12-frontend:latest`
-
-The production frontend nginx proxies `/api/` to the backend container; the backend port is not exposed to the host.
-
-## Mobile apps (Capacitor)
-
-The web build and the native iOS / Android apps ship from one codebase. The same
-`frontend/dist/` bundle is wrapped in a native shell by [Capacitor 6](https://capacitorjs.com/).
-The `android/` project is committed; the `ios/` project must be generated on a Mac
-(`npx cap add ios`) and committed. The web assets `cap sync` copies into the native
-projects are git-ignored and regenerated from `dist/`.
+**Store releases are still being finished.** Today the PWA installs to the home
+screen on any phone and gives you the whole app, which is why the landing page
+points people there rather than at a sideload. See
+[docs/mobile-store-readiness.md](docs/mobile-store-readiness.md) for what's
+outstanding.
 
 ```bash
 cd frontend
-npm run build:mobile     # tsc -b && vite build && cap sync (copies dist into native)
+npm run build:mobile     # tsc -b && vite build && cap sync
 npm run run:android      # build + launch on emulator/device
 npm run run:ios          # macOS only
-npm run open:android     # open Android Studio
-npm run open:ios         # open Xcode (macOS only)
 ```
 
-What the native shell adds on top of the PWA:
+CI builds the Android app on every push and keeps a rolling `android-latest`
+pre-release, so a fixed URL always points at the newest `main` build
+(`.../releases/download/android-latest/sub12.apk`). That exists for testing and
+for self-hosters building their own; it isn't the recommended way to install
+sub12 yet.
 
-- **API + share hosts** — a native WebView is served from a local origin
-  (`capacitor://localhost` / `https://localhost`), so API calls and user-facing
-  links target the canonical host instead. API base resolves in
-  `src/api/client.ts` (`VITE_API_URL` → `https://sub12.io/api/v1` on native);
-  shareable links resolve in `src/utils/site.ts` (`VITE_SITE_URL` →
-  `https://sub12.io` on native). Set those env vars at build time to retarget a
-  staging/beta build.
-- **Native share sheet** — `src/utils/share.ts` uses the `@capacitor/share`
-  plugin on native (Android WebViews don't expose `navigator.share`) and the Web
-  Share API on web, falling back to an explicit channel grid.
-- **Native camera & photo picker** — `src/utils/imagePicker.ts` routes target /
-  score-card capture through the `@capacitor/camera` plugin on native (camera or
-  photo library), keeping the `<input type="file">` flow on web. iOS needs camera
-  / photo-library usage strings in `Info.plist` (see frontend/README.md).
-- **Native geolocation** — `src/utils/geolocation.ts` resolves the shooter's
-  position via the `@capacitor/geolocation` plugin on native (browser API on web)
-  to tag score cards & pellet tests. Android permissions are in the manifest; iOS
-  needs a location usage string in `Info.plist`.
-- **Deep linking** — `https://sub12.io/...` links open the app on the matching
-  in-app screen (`appUrlOpen` → `src/utils/deepLink.ts` → router). Association
-  files live in `frontend/public/.well-known/` (served as JSON by nginx); the
-  Android intent-filter is in the manifest. Publishing real App/Universal Links
-  needs the release signing SHA-256 and Apple Team ID filled in — see
-  frontend/README.md.
-- **Push notifications** — device tokens register via `@capacitor/push-notifications`
-  (`src/utils/push.ts`) to `POST /devices`; the backend stores them
-  (`device_tokens`) and fans push out from the notification pipeline through a
-  pluggable `PushSender`. The FCM HTTP v1 transport is implemented
-  (`internal/service/push_fcm.go`) — set `FCM_CREDENTIALS_JSON` to enable it,
-  plus Firebase `google-services.json` on Android / an APNs key on iOS. Until
-  configured a no-op sender stores tokens without sending. See frontend/README.md.
-- **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site to the
-  API host from the WebView, so native persists the refresh token and passes it
-  explicitly on `/auth/refresh` and `/auth/logout`; web/PWA keeps the cookie-only
-  flow.
-- **Native chrome** — status-bar styling, splash-screen dismissal, safe-area
-  insets, and Android hardware back-button → SPA history mapping (`src/main.tsx`).
-  The Workbox service worker is skipped on native to avoid serving a stale shell
-  after an app update. The WebView also drops document behaviours that read
-  wrong in an app — long-press callouts, chrome text selection, and rubber-band
-  overscroll (`.native-app` rules in `src/index.css`).
-- **Haptics** — `src/utils/haptics.ts` wraps `@capacitor/haptics` and no-ops on
-  web. Wired into bottom-nav taps, tabs and filter chips, the quick-capture FAB,
-  the like button, wizard step jumps, destructive confirmations, and every toast
-  (success / error notification patterns fire from `src/store/toast.ts`).
-- **Branded icons & splash** — generated from `frontend/assets/` via
-  `npm run cap:assets`.
+| Trigger | Variant | Where it lands |
+|---|---|---|
+| Pull request | debug | Workflow artifact |
+| Push to `main` | release | Rolling `android-latest` pre-release + artifact |
+| Tag `v*` | release | Attached to that version's Release |
 
-### Android APK builds
+`VITE_ANDROID_APK_URL` retargets that link for forks and staging builds; a fork
+that modifies the code should also set `VITE_SOURCE_URL` so the footer's Source
+link points at its own repository.
 
-`.github/workflows/android.yml` builds the Android app in CI and publishes the
-APK as a downloadable release asset.
+<details>
+<summary><b>What the native shell adds over the PWA</b></summary>
 
-| Trigger | Variant | Where the APK lands |
-|---------|---------|---------------------|
-| Pull request | debug | Workflow artifact only |
-| Push to `main` | release | Rolling `android-latest` pre-release **and** an artifact |
-| Tag `v*` | release | Attached to that version's GitHub Release |
-| Manual dispatch | release | Workflow artifact |
+- **API + share hosts** — a native WebView is served from a local origin, so API
+  calls and user-facing links target the canonical host instead
+  (`VITE_API_URL`, `VITE_SITE_URL`)
+- **Native share sheet** — Android WebViews don't expose `navigator.share`
+- **Native camera and photo picker** for target capture
+- **Native geolocation** for tagging cards and pellet tests
+- **Deep linking** — `https://sub12.io/...` opens the matching in-app screen
+- **Push notifications** via FCM; set `FCM_CREDENTIALS_JSON` to enable delivery
+- **Auth** — the `SameSite=Lax` refresh cookie isn't delivered cross-site from a
+  WebView, so native persists the refresh token and passes it explicitly
+- **Native chrome** — status bar, splash, safe areas, Android back button, and
+  the service worker skipped to avoid serving a stale shell after an app update
+- **Haptics** on nav, tabs, the capture FAB, likes and toasts
 
-The rolling pre-release keeps a fixed asset name, so the in-app and landing-page
-download links never change:
+**Signing matters.** Android identifies an installed app by (package name,
+signing certificate), so a key that changes between builds makes every new APK
+refuse to install over the last one — and the phone silently carries on running
+the build it already has. Set `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` to
+sign with a stable release key. Without them CI mints one and reuses it from the
+Actions cache; a cache eviction rotates it, so the release notes carry the
+signer's SHA-256 fingerprint.
 
-```
-https://github.com/<owner>/<repo>/releases/download/android-latest/sub12.apk
-```
+iOS needs a paid Apple Developer membership to produce an installable build.
+Without signing secrets the workflow archives unsigned as a compile check only.
 
-`VITE_ANDROID_APK_URL` overrides that URL at build time (see `src/utils/site.ts`)
-for forks and staging builds.
+See [frontend/README.md](frontend/README.md) for prerequisites and the full asset
+workflow.
 
-**Signing.** Set these repository secrets to sign with a stable release key —
-required for users to upgrade an installed APK in place:
+</details>
 
-| Secret | Description |
-|--------|-------------|
-| `ANDROID_KEYSTORE_BASE64` | Release keystore, base64-encoded (`base64 -w0 release.keystore`) |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
-| `ANDROID_KEY_ALIAS` | Key alias inside the keystore |
-| `ANDROID_KEY_PASSWORD` | Key password |
+## Contributing
 
-Without them the workflow mints its own key on the first run and reuses it from
-the Actions cache on later ones, so sideloaded builds upgrade in place. That
-matters because Android identifies an installed app by (package name, signing
-certificate): re-signing with a fresh key each build makes every new APK refuse
-to install over the previous one, and the phone silently carries on running the
-build it already has. The cache entry expires after 7 days without a build, and
-that rotates the key — the `android-latest` release notes carry the signer's
-SHA-256 fingerprint, and a rotation means uninstalling before installing again.
+Contributions are genuinely welcome — and a bug report from the range is as
+useful as a pull request.
 
-The workflow stamps `versionCode` from the run number and `versionName` from the
-tag (or `0.0.<run>-<sha>` off a tag) via the `ANDROID_VERSION_CODE` /
-`ANDROID_VERSION_NAME` environment variables read in `android/app/build.gradle`.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, conventions, what gets flagged
+  in review
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — how we treat each other
+- **[CLAUDE.md](CLAUDE.md)** — architecture and the reasoning behind it
+- **[CHANGELOG.md](CHANGELOG.md)** — what's changed
 
-See [frontend/README.md](frontend/README.md) for prerequisites, one-time iOS
-setup, and the full asset workflow.
+Good first steps: [open issues](https://github.com/eyupio/sub12/issues),
+documentation fixes, or testing an APK on a device you own and telling us what
+broke.
 
-## Mobile keyboard + navigation policy
+## Licence
 
-For mobile shell layout consistency, sub-12 uses this focused-input behavior:
+**GNU Affero General Public License v3.0** — see [LICENSE](LICENSE).
 
-- Keep the app content scrollable and resized above the on-screen keyboard.
-- Temporarily hide the mobile header and bottom navigation while the keyboard is open.
-- Restore header/nav immediately after the keyboard closes.
+You may run, study, modify and redistribute sub12 freely. The one obligation
+worth knowing about: AGPL section 13 means that if you run a **modified** sub12 as
+a network service, you must offer its source to the people using it over that
+network. That's why the app footer carries a **Source** link — a fork should point
+`VITE_SOURCE_URL` at its own repository rather than removing it.
 
-Implementation:
+Brand assets in [`brand/`](brand/README.md) — the SUB12 name, logo and reticle —
+are not covered by the code licence. Fork the software freely; please give your
+fork its own name and mark.
 
-- [frontend/src/components/Layout.tsx](frontend/src/components/Layout.tsx) detects keyboard-open state on small screens via `window.visualViewport` height changes and toggles mobile chrome visibility.
-- [frontend/capacitor.config.ts](frontend/capacitor.config.ts) sets the Keyboard plugin to `resize: "body"` (with `resizeOnFullScreen: true`) so content reflows instead of being obscured.
+---
 
-If you adjust shell navigation, spacing, or keyboard behavior, preserve this policy so focused inputs remain usable on iOS and Android.
+<div align="center">
+
+**Developed by [EyUp.io](https://eyup.io)**
+
+<sub>Built for shooters, with shooters. If sub12 is useful to your club, a ⭐ helps other people find it.</sub>
+
+</div>

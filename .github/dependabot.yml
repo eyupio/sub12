@@ -1,0 +1,151 @@
+# Dependency updates. Grouped so a week's patch bumps arrive as a handful of
+# reviewable pull requests rather than thirty, and so the ones that need real
+# scrutiny — a major, or anything touching the native mobile projects — stay
+# separate from the noise.
+#
+# `make security` is the check that matters after merging any of these:
+# govulncheck plus npm audit for both npm projects.
+version: 2
+
+updates:
+  # ---------------------------------------------------------------- Go backend
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "backend"]
+    commit-message:
+      prefix: "deps(backend)"
+    groups:
+      golang-x:
+        patterns: ["golang.org/x/*"]
+      go-minor-patch:
+        patterns: ["*"]
+        exclude-patterns: ["golang.org/x/*"]
+        update-types: ["minor", "patch"]
+    # A Go major is an import-path change (/v2 → /v3) and never lands cleanly on
+    # its own, so let it arrive as its own pull request.
+
+  # ------------------------------------------------------------------ Frontend
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 8
+    labels: ["dependencies", "frontend"]
+    commit-message:
+      prefix: "deps(frontend)"
+    versioning-strategy: increase
+    groups:
+      # Vite, its plugins and the PWA generator move together; splitting them
+      # produces PRs that can't build on their own.
+      build-tooling:
+        patterns:
+          - vite
+          - "@vitejs/*"
+          - vite-plugin-*
+          - esbuild
+          - rollup
+          - postcss
+          - autoprefixer
+          - tailwindcss
+      test-tooling:
+        patterns:
+          - vitest
+          - "@vitest/*"
+          - "@testing-library/*"
+          - jsdom
+      linting:
+        patterns:
+          - eslint
+          - "eslint-*"
+          - "@typescript-eslint/*"
+          - typescript
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      tanstack:
+        patterns: ["@tanstack/*"]
+      minor-and-patch:
+        patterns: ["*"]
+        exclude-patterns:
+          - "@capacitor/*"
+          - vite
+          - "@vitejs/*"
+          - vite-plugin-*
+          - react
+          - react-dom
+        update-types: ["minor", "patch"]
+    ignore:
+      # Capacitor majors are a native-project migration: they rewrite Gradle and
+      # CocoaPods config in frontend/android and frontend/ios, and cannot be
+      # merged without building on a real device. Do those by hand, deliberately.
+      - dependency-name: "@capacitor/*"
+        update-types: ["version-update:semver-major"]
+
+  # ----------------------------------------------------------- Playwright e2e
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    labels: ["dependencies", "e2e"]
+    commit-message:
+      prefix: "deps(e2e)"
+    groups:
+      playwright:
+        patterns: ["@playwright/*", "playwright"]
+      everything-else:
+        patterns: ["*"]
+        exclude-patterns: ["@playwright/*", "playwright"]
+
+  # ------------------------------------------------------------ GitHub Actions
+  # Pinning matters more here than anywhere else: a workflow action runs with
+  # access to repository secrets.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # ----------------------------------------------------------------- Container
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "deps(docker)"
+    ignore:
+      # The Go image floats on the 1.25 line deliberately, so it picks up stdlib
+      # security patches on rebuild. The actual floor is the `go` directive in
+      # backend/go.mod, which is what CI resolves its toolchain from — raise that
+      # instead of pinning a tag here.
+      - dependency-name: golang
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

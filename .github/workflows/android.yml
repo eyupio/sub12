@@ -36,6 +36,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `contents: write` is needed by one thing only: refreshing the rolling
+# `android-latest` pre-release and attaching APKs to tagged releases. The build
+# itself needs nothing beyond read.
+#
+# It is safe on the pull_request trigger because GitHub issues a read-only token
+# to workflows running for a pull request from a fork, whatever this block says —
+# so an outside contributor's PR cannot publish a release even though the same
+# workflow can. Don't rely on that alone if this ever grows a second job: scope
+# the write to the publishing job instead.
 permissions:
   contents: write
 
