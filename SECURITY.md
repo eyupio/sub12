@@ -96,15 +96,47 @@ rather than working around it:
 These are tracked, dev-only, and deliberately not fixed yet. They are listed so
 a scanner result does not look like a surprise:
 
-- **`@capacitor/cli` → `tar`** (`GHSA` arbitrary file write, critical). Reached
-  only when a developer runs `npx cap sync` locally or in the mobile build
-  workflows; it is not in the web bundle or either container image. The fix is
-  Capacitor 8, which is a native-project migration needing on-device testing.
-  Tracked separately.
+- **`@capacitor/cli` → `tar`** (arbitrary file write, critical). Reached only
+  when a developer runs `cap sync` locally or in the mobile build workflows; it
+  is not in the web bundle or either container image. The fix is Capacitor 8,
+  which is a native-project migration needing on-device testing. Tracked
+  separately.
 - Any remaining `npm audit` findings under `frontend/` and `e2e/` are build and
   test tooling. `npm run build` output ships; `node_modules` does not.
 
+`npm audit` runs twice, and the split is the point: `--omit=dev` covers what
+reaches a browser and is a **hard gate that must stay clean**, while the full run
+covers build tooling and is advisory. If a dev-only package ever appears in the
+runtime half, that is a dependency misclassified in `package.json` rather than a
+new vulnerability — check which section it is in before reaching for an upgrade.
+
 Run `make security` to see the current state of both scanners.
+
+### Secret scanning
+
+`gitleaks` scans the **full history**, not just the working tree, because a
+secret committed and later removed is still a secret that was pushed.
+
+If it fires: rotate the credential first. Rewriting history does not un-publish
+anything a clone, fork, crawler or Actions log already has, so the commit is the
+cleanup and the rotation is the fix.
+
+Confirmed false positives are allowlisted in `.gitleaks.toml`, each with the
+reasoning written next to it. They are matched as regexes against the specific
+construct rather than excluded by path, deliberately: muting a whole file mutes
+every future finding in it too.
+
+### Two scanners are dormant until this repository is public
+
+CodeQL and GitHub's dependency review are free on public repositories and
+require GitHub Advanced Security on private ones. While sub12 is private, both
+jobs **skip** rather than run — CodeQL's analysis actually succeeds and then
+cannot upload its results, and dependency review refuses outright.
+
+They are skipped rather than marked `continue-on-error` on purpose: a job that
+always reports success while uploading nothing is worse than no job, because
+nobody notices when it quietly stops working. Both start working with no change
+to the workflow the moment visibility flips.
 
 ## Hardening we already do
 

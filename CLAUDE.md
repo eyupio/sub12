@@ -330,13 +330,38 @@ changes when nothing in the repository does.
   shipped binary is built against. A bare `go 1.25` left us on 1.25.0 and 44
   reachable advisories.
 - **`npm audit` is split in two.** `--omit=dev` covers what ships to a browser
-  and must stay clean; the full run covers build and test tooling and is
+  and is a hard gate; the full run covers build and test tooling and is
   advisory, with the known exceptions written up in `SECURITY.md`. Don't merge
   the two lists — a vulnerability in Vite's dev server and one in a shipped
   bundle are different problems.
-- `@capacitor/cli` → `tar` (critical) is a known accepted risk: dev-only, and the
-  fix is a Capacitor major that rewrites the native projects and needs on-device
-  testing. Dependabot is configured to never propose it automatically.
+
+  That split only means anything if `package.json` classifies dependencies
+  honestly. `@capacitor/cli` sat in `dependencies` and dragged a critical `tar`
+  advisory into the runtime half, where it did not belong: the CLI is invoked by
+  the `cap sync` / `cap run` scripts at build time and is never imported by the
+  app. It is a `devDependency` now, which is also what Capacitor's own install
+  instructions use. **A dev-only tool appearing in the runtime audit is a
+  misclassification to fix in `package.json`, not a vulnerability to upgrade
+  around.**
+- `@capacitor/cli` → `tar` (critical) remains a known accepted risk in the
+  advisory half: the fix is a Capacitor major that rewrites the native projects
+  and needs on-device testing. Dependabot is configured to never propose it
+  automatically.
+- **Secret scanning runs the gitleaks CLI from its own pinned image, not
+  `gitleaks-action`** — the wrapper requires a paid licence for
+  organisation-owned repositories and fails hard without one. The tool itself is
+  MIT. It scans the whole history, `--redact` so a real finding is not
+  re-disclosed into a public Actions log, and confirmed false positives live in
+  `.gitleaks.toml` as regexes against the specific construct rather than `paths`
+  exclusions that would also hide the next real one.
+- **CodeQL and dependency review are gated on
+  `github.event.repository.private == false`.** Both are free for public repos
+  and need Advanced Security on private ones; while sub12 is private, CodeQL
+  analyses successfully and then cannot upload, and dependency review refuses.
+  They skip rather than carrying `continue-on-error`, because a job that always
+  passes while uploading nothing is the kind of check nobody notices has died.
+  `== false` rather than `!private` so an event payload with no repository object
+  skips instead of running and failing.
 
 ### CI workflows are a security surface
 

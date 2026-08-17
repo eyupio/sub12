@@ -32,8 +32,11 @@ APK tracks the rolling `android-latest` pre-release.
 - **`make security`** runs `govulncheck` and `npm audit` together, so the state
   of both scanners is one command rather than tribal knowledge.
 - **`make check`** runs everything the PR gate runs, from the repo root.
-- **Security CI** — CodeQL for Go and TypeScript, `govulncheck`, `npm audit` and
-  GitHub dependency review on pull requests.
+- **Security CI** — CodeQL for Go and TypeScript, `govulncheck`, a split
+  `npm audit`, GitHub dependency review, and a full-history secret scan.
+  `.gitleaks.toml` records the confirmed false positives and why each is one.
+  CodeQL and dependency review skip while this repository is private, since both
+  need Advanced Security until it is public.
 - **Dependabot** for Go modules, both npm projects, GitHub Actions and the
   Dockerfiles.
 - **EyUp.io attribution** in the app footer, the landing pages and the About
@@ -64,6 +67,17 @@ APK tracks the rolling `android-latest` pre-release.
 - **npm: `e2e` 2 high → 0; `frontend` 11 → 5**, the remainder being build-time
   tooling reachable only from `@capacitor/cli`. Documented as an accepted risk
   in [SECURITY.md](SECURITY.md) with the reason it is not yet fixed.
+- **`@capacitor/cli` moved from `dependencies` to `devDependencies`**, which is
+  where Capacitor's own install instructions put it. It is invoked by the
+  `cap sync` / `cap run` scripts at build time and never imported by the app, but
+  its position in `dependencies` dragged a critical `tar` advisory into the
+  runtime dependency audit — the half that covers what actually reaches a
+  browser. That audit is now clean, and therefore means something.
+- **The secret scan runs the gitleaks CLI from a pinned image rather than
+  `gitleaks-action`**, whose wrapper requires a paid licence for
+  organisation-owned repositories. A first full-history scan found five hits, all
+  confirmed false positives (presence-only credential booleans, and the
+  high-entropy fixtures the config tests need); no real secret is in the history.
 - **The `opencode` workflow no longer runs for untrusted commenters.** It fired
   on any `/oc` comment from anyone, which on a public repository would have let
   a stranger spend `OPENCODE_API_KEY` and run an agent against the repo; it is

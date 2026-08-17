@@ -1,0 +1,62 @@
+# gitleaks configuration.
+#
+# The secret scan in .github/workflows/security.yml is a hard gate. If it goes
+# red, treat it as a real credential in the history until you have read the
+# finding and proven otherwise — and remember the order of operations: rotate
+# the credential first, because rewriting history does not un-publish anything
+# a crawler, fork or clone already has.
+#
+# To reproduce a CI finding locally:
+#
+#   gitleaks git --redact --no-banner --config .gitleaks.toml .
+#
+# Everything allowlisted below was read and confirmed not to be a credential.
+#
+# Note on shape: the exclusions are all *regexes matched against the whole
+# match*, not `paths` entries. Excluding a path mutes every future finding in
+# that file too, which is how a real key eventually lands somewhere nobody is
+# watching. Describing the exact construct keeps the blind spot the size of the
+# construct.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Confirmed non-credentials — see the comment above each group"
+regexTarget = "match"
+regexes = [
+  # --- "do we hold a credential?" booleans -------------------------------
+  # model.BackupSettings deliberately never serialises the stored S3 keys or the
+  # backup passphrase. It reports only whether each is present, so the admin UI
+  # can show "configured" without the value ever leaving the database:
+  #
+  #   HasS3SecretKey: s.S3SecretKeyEncrypted != nil && *s.S3SecretKeyEncrypted != ""
+  #
+  # generic-api-key matches on the field name and takes the start of the boolean
+  # expression as the "secret" — it reports `s.S3SecretKeyEncrypted`, a Go field
+  # selector. This is the pattern we want in the codebase, so it must not be the
+  # thing that teaches everyone to ignore this scanner.
+  '''Has(S3SecretKey|S3AccessKey|Passphrase):\s+s\.\w*Encrypted''',
+
+  # --- high-entropy test fixtures ---------------------------------------
+  # internal/config/config_test.go asserts that Validate() *accepts* a properly
+  # generated JWT_SECRET / ADMIN_PASSWORD. The fixtures therefore have to be
+  # high-entropy strings containing no placeholder word — the negative cases use
+  # `changeme` and are caught by the validator, not by this scanner. A fixture
+  # that looked obviously fake would defeat the test it exists for.
+  #
+  # These were typed for the test file and sign nothing, anywhere, ever.
+  #
+  # Scoped to an assignment onto a config field: production never assigns these
+  # from a literal, it reads them through envconfig, so this shape only occurs
+  # in tests.
+  '''cfg\.(JWTSecret|AdminPassword|DBPassword)\s*=\s*"[A-Za-z0-9+/=_-]{8,}"''',
+  '''(JWTSecret|AdminPassword|DBPassword):\s+"[A-Za-z0-9+/=_-]{8,}"''',
+
+  # --- documented placeholders ------------------------------------------
+  # .env.example, docker-compose.yml, CLAUDE.md, README.md and SECURITY.md all
+  # quote `changeme` on purpose: it is the value config.Validate() refuses in
+  # production, and the documentation has to be able to name it. Published
+  # deliberately — that is the entire point of the guard.
+  '''change-?me''',
+]

@@ -33,6 +33,21 @@ jobs:
   # --------------------------------------------------------------------- CodeQL
   codeql:
     name: CodeQL (${{ matrix.language }})
+    # Code scanning is free on public repositories and requires GitHub Advanced
+    # Security on private ones. sub12 is being opened up, so until the switch is
+    # flipped this job cannot upload its results: the analysis itself succeeds
+    # and then the SARIF upload fails with "Advanced Security must be enabled
+    # for this repository to use code scanning".
+    #
+    # Skipping is the honest outcome. `continue-on-error` would leave a job that
+    # always reports success and never uploads anything, which is worse than not
+    # having it — nobody would notice when it silently stopped working. A skipped
+    # job is visible in the checks list and starts working, with nothing to
+    # change here, the moment the repository goes public.
+    #
+    # `== false` rather than `!private` deliberately: an event payload without a
+    # repository object then skips rather than running and failing.
+    if: github.event.repository.private == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
@@ -132,7 +147,10 @@ jobs:
   # -------------------------------------------------- new dependencies in a PR
   dependency-review:
     name: Dependency review
-    if: github.event_name == 'pull_request'
+    # Same gate as CodeQL, same reason: the action reports "Dependency review is
+    # not supported on this repository" without Dependency graph + Advanced
+    # Security, which a private repo does not have. Free once public.
+    if: github.event_name == 'pull_request' && github.event.repository.private == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
@@ -162,10 +180,27 @@ jobs:
           # secret that was pushed to GitHub, and still needs rotating.
           fetch-depth: 0
 
+      # The gitleaks *tool* is MIT-licensed and free. `gitleaks-action`, the
+      # wrapper, requires a paid GITLEAKS_LICENSE for organisation-owned repos and
+      # fails hard without one ("[eyupio] is an organization. License key is
+      # required"). So run the CLI from its own image and skip the wrapper — same
+      # scanner, no licence gate, and the version is pinned here rather than
+      # floating on a tag someone else controls.
+      #
+      # --redact matters: without it a genuine finding gets printed into a public
+      # Actions log, which is a second disclosure on top of the first.
+      #
+      # Allowlisted false positives and the reasoning behind each live in
+      # .gitleaks.toml. Reproduce locally with:
+      #   gitleaks git --redact --no-banner --config .gitleaks.toml .
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo:ro" \
+            zricethezav/gitleaks:v8.28.0 \
+            git --source=/repo \
+                --config=/repo/.gitleaks.toml \
+                --redact --no-banner --verbose
 
   # ------------------------------------------- placeholder secrets must be refused
   # The guard that stops a self-hoster booting production with the published
