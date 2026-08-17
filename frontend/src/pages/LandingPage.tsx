@@ -7,6 +7,7 @@ import {
   CalendarRange,
   Check,
   ChevronRight,
+  Clapperboard,
   Clock3,
   Crosshair,
   Gauge,
@@ -28,6 +29,13 @@ import { CornerMark } from '../components/CornerMark'
 import { Sub12BrandLockup } from '../components/Sub12BrandLockup'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { sourceUrl } from '../utils/site'
+import {
+  availableVideoGuides,
+  formatGuideDuration,
+  videoGuidePoster,
+  videoGuideSrc,
+  type VideoGuide,
+} from '../catalog/videoGuides'
 
 type SectionHeaderProps = {
   eyebrow: string
@@ -67,6 +75,12 @@ const whyMeasureCards = [
       'Measured groups feed directly into pellet ranking, batch comparison, and setup-change validation — the decisions serious shooters refuse to guess at.',
   },
 ] as const
+
+// The demo recordings, split by kind. `availableVideoGuides` is the single
+// registry of what has actually been recorded and shipped, so a storyboarded
+// video never leaves a dead player on the landing page.
+const showcaseGuides = availableVideoGuides.filter((g) => g.kind === 'showcase')
+const howToGuides = availableVideoGuides.filter((g) => g.kind === 'how-to')
 
 const trustPoints = [
   'Purpose-built for sub-12 air rifle tracking',
@@ -245,6 +259,39 @@ function SurfaceCard({ children, className = '', style }: SurfaceCardProps) {
     >
       {children}
     </div>
+  )
+}
+
+/**
+ * One recording on the landing page. `preload="none"` matters here: the four
+ * showcase files run to several MB each, so nothing is fetched until a visitor
+ * presses play — the poster carries the section until then. No captions track;
+ * the narration is burned into the frames as overlay text.
+ */
+function DemoVideo({ guide, featured = false }: { guide: VideoGuide; featured?: boolean }) {
+  return (
+    <figure className="flex h-full flex-col overflow-hidden rounded-2xl border border-subtle bg-surface">
+      <video
+        src={videoGuideSrc(guide.slug)}
+        poster={videoGuidePoster(guide.slug)}
+        controls
+        muted
+        playsInline
+        preload="none"
+        aria-label={guide.title}
+        className="aspect-video w-full bg-black object-cover"
+      />
+      <figcaption className={`flex flex-1 flex-col gap-1.5 p-4 ${featured ? 'sm:p-5' : ''}`}>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--brass)]">
+            {guide.kind === 'showcase' ? 'Showcase' : 'How-to'}
+          </span>
+          <span className="text-[11px] text-muted u-tnum">{formatGuideDuration(guide.durationS)}</span>
+        </div>
+        <p className={`font-semibold text-primary ${featured ? 'text-lg' : 'text-base'}`}>{guide.title}</p>
+        <p className="text-sm leading-relaxed text-secondary">{guide.blurb}</p>
+      </figcaption>
+    </figure>
   )
 }
 
@@ -468,6 +515,9 @@ export default function LandingPage() {
             <Sub12BrandLockup variant="compact" />
           </Link>
           <nav className="hidden items-center gap-6 lg:flex">
+            <a href="#demos" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
+              See it in action
+            </a>
             <a href="#image-analysis" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Image analysis
             </a>
@@ -515,8 +565,8 @@ export default function LandingPage() {
                   Track Your First Session
                   <ArrowRight size={16} />
                 </Link>
-                <a href="#image-analysis" className="inline-flex items-center justify-center gap-2 rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
-                  See How SUB12 Works
+                <a href="#demos" className="inline-flex items-center justify-center gap-2 rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
+                  Watch SUB12 In Action
                   <ChevronRight size={16} />
                 </a>
               </div>
@@ -541,6 +591,42 @@ export default function LandingPage() {
             ))}
           </div>
         </section>
+
+        {showcaseGuides.length > 0 && (
+          <section id="demos" className="px-4 py-20 lg:py-24">
+            <div className="mx-auto max-w-7xl">
+              <SectionHeader
+                eyebrow="See it in action"
+                title="Real recordings. Real cards."
+                description="Short screen recordings of the app itself, narrated on screen. Nothing is mocked up and nothing is edited by hand — every clip is re-recorded from the live app whenever the screens change."
+                align="center"
+              />
+
+              <div className="mt-12 grid gap-5 lg:grid-cols-2">
+                {showcaseGuides.map((guide, i) => (
+                  <DemoVideo key={guide.slug} guide={guide} featured={i === 0} />
+                ))}
+              </div>
+
+              {howToGuides.length > 0 && (
+                <>
+                  <div className="mt-14 flex items-center gap-2">
+                    <Clapperboard size={15} className="text-[var(--brass)]" />
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+                      How-to guides
+                    </h3>
+                    <span className="text-xs text-muted">No account needed to watch</span>
+                  </div>
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {howToGuides.map((guide) => (
+                      <DemoVideo key={guide.slug} guide={guide} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="border-y border-subtle bg-surface px-4 py-20 lg:py-24">
           <div className="mx-auto max-w-7xl">

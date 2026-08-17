@@ -18,8 +18,8 @@ measures your groups from a photograph.
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2D5A27.svg)](CONTRIBUTING.md)
 
 **[Try it](https://sub12.io)** · **[Install your own](#installation)** ·
-**[Android APK](https://github.com/eyupio/sub12/releases/download/android-latest/sub12.apk)** ·
-**[Contribute](CONTRIBUTING.md)** · **[Security](SECURITY.md)**
+**[Contribute](CONTRIBUTING.md)** · **[Security](SECURITY.md)** ·
+**[Changelog](CHANGELOG.md)**
 
 <sub>Developed by **[EyUp.io](https://eyup.io)** · AGPL-3.0 · self-host it, fork it, run it for your club</sub>
 
@@ -160,24 +160,120 @@ mutes that are applied in the query rather than hidden in the client.
 
 ## See it in action
 
-Short recordings of the real app, narration baked into the frames. Click a poster
-to watch:
+Short screen recordings of the real app, narration baked into the frames. The
+players below stream the webm files out of this repository, so they play right
+here in the README — no site visit, no account. If your viewer won't play webm
+inline, every clip and poster is a plain file under
+[`frontend/public/demos/`](frontend/public/demos).
 
-| | |
-|---|---|
-| [![A 25-shot card, start to finish](frontend/public/demos/showcase-score-card.jpg)](https://sub12.io/demos/showcase-score-card.webm) **A 25-shot card, start to finish** — capture, totals, stats | [![Photograph the target, read the group](frontend/public/demos/showcase-pellet-testing.jpg)](https://sub12.io/demos/showcase-pellet-testing.webm) **Photograph the target, read the group** — hole detection, group size, leaderboard |
-| [![Your league, live standings](frontend/public/demos/showcase-league.jpg)](https://sub12.io/demos/showcase-league.webm) **Your league, live standings** — standings that move when a card is verified | [![Know exactly what's working](frontend/public/demos/showcase-analytics.jpg)](https://sub12.io/demos/showcase-analytics.webm) **Know exactly what's working** — trends, averages and gear comparisons |
+### Showcase
 
-How-to guides: [add your rifle and pellets](https://sub12.io/demos/howto-add-gear.webm)
-· [log your first score card](https://sub12.io/demos/howto-first-card.webm)
-· [join a league and submit a card](https://sub12.io/demos/howto-join-league.webm)
-· [run a league](https://sub12.io/demos/howto-run-league.webm)
-· [test pellets](https://sub12.io/demos/howto-pellet-test.webm)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-None of these are edited by hand — every one is re-recorded with
-`./scripts/record-demos.sh` whenever the UI it shows changes.
-[docs/demo-recordings.md](docs/demo-recordings.md) is the production standard and
-storyboard catalog.
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-score-card.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-score-card.jpg" controls muted playsinline width="100%"></video>
+
+**A 25-shot card, start to finish**<br>
+Tap every shot; the totals, averages and personal bests take care of themselves.<br>
+<sub><a href="frontend/public/demos/showcase-score-card.webm">open the file</a> · <a href="frontend/public/demos/showcase-score-card.jpg">poster</a></sub>
+
+</td>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-pellet-testing.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-pellet-testing.jpg" controls muted playsinline width="100%"></video>
+
+**Photograph the target, read the group**<br>
+Auto-detected holes, group size in mm and MOA — no ruler.<br>
+<sub><a href="frontend/public/demos/showcase-pellet-testing.webm">open the file</a> · <a href="frontend/public/demos/showcase-pellet-testing.jpg">poster</a></sub>
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-league.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-league.jpg" controls muted playsinline width="100%"></video>
+
+**Your league, live standings**<br>
+Form, history, and a table that moves the moment a card is verified.<br>
+<sub><a href="frontend/public/demos/showcase-league.webm">open the file</a> · <a href="frontend/public/demos/showcase-league.jpg">poster</a></sub>
+
+</td>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-analytics.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/showcase-analytics.jpg" controls muted playsinline width="100%"></video>
+
+**Know exactly what's working**<br>
+Trends, distributions and per-rifle analytics across every card you shoot.<br>
+<sub><a href="frontend/public/demos/showcase-analytics.webm">open the file</a> · <a href="frontend/public/demos/showcase-analytics.jpg">poster</a></sub>
+
+</td>
+</tr>
+</table>
+
+### How-to guides
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-add-gear.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-add-gear.jpg" controls muted playsinline width="100%"></video>
+
+**Add your rifle and pellets**<br>
+Pick your gear from the catalog and the specs fill themselves in.<br>
+<sub><a href="frontend/public/demos/howto-add-gear.webm">open the file</a> · <a href="frontend/public/demos/howto-add-gear.jpg">poster</a></sub>
+
+</td>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-first-card.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-first-card.jpg" controls muted playsinline width="100%"></video>
+
+**Log your first score card**<br>
+25 shots, a rifle, a pellet — one tap per shot and the card keeps count.<br>
+<sub><a href="frontend/public/demos/howto-first-card.webm">open the file</a> · <a href="frontend/public/demos/howto-first-card.jpg">poster</a></sub>
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-pellet-test.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-pellet-test.jpg" controls muted playsinline width="100%"></video>
+
+**Test pellets: photograph and measure a group**<br>
+Photograph the target and sub12 reads the group in mm and MOA.<br>
+<sub><a href="frontend/public/demos/howto-pellet-test.webm">open the file</a> · <a href="frontend/public/demos/howto-pellet-test.jpg">poster</a></sub>
+
+</td>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-join-league.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-join-league.jpg" controls muted playsinline width="100%"></video>
+
+**Join a league and submit a card**<br>
+Enter a join code, send a card to the open round, watch the standings.<br>
+<sub><a href="frontend/public/demos/howto-join-league.webm">open the file</a> · <a href="frontend/public/demos/howto-join-league.jpg">poster</a></sub>
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+<video src="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-run-league.webm" poster="https://github.com/eyupio/sub12/raw/main/frontend/public/demos/howto-run-league.jpg" controls muted playsinline width="100%"></video>
+
+**Run a league: seasons, rounds, verification**<br>
+The organiser's weekly loop, from opening a round to verifying scores.<br>
+<sub><a href="frontend/public/demos/howto-run-league.webm">open the file</a> · <a href="frontend/public/demos/howto-run-league.jpg">poster</a></sub>
+
+</td>
+<td width="50%"></td>
+</tr>
+</table>
+
+The same recordings play in-app on the Help page, and in the "See it in action"
+section of the [landing page](https://sub12.io/#demos) — before you sign in.
+Nothing is edited by hand: every video is re-recorded with one command
+(`./scripts/record-demos.sh`) whenever the UI it shows changes, and
+[docs/demo-recordings.md](docs/demo-recordings.md) is the production standard
+and storyboard catalog.
 
 ## Installation
 
@@ -467,6 +563,12 @@ See [`.env.example`](.env.example) for the annotated list and
 The web build and the native iOS / Android apps ship from one codebase — the same
 `frontend/dist/` bundle wrapped by [Capacitor 6](https://capacitorjs.com/).
 
+**Store releases are still being finished.** Today the PWA installs to the home
+screen on any phone and gives you the whole app, which is why the landing page
+points people there rather than at a sideload. See
+[docs/mobile-store-readiness.md](docs/mobile-store-readiness.md) for what's
+outstanding.
+
 ```bash
 cd frontend
 npm run build:mobile     # tsc -b && vite build && cap sync
@@ -474,12 +576,11 @@ npm run run:android      # build + launch on emulator/device
 npm run run:ios          # macOS only
 ```
 
-Android APKs are built in CI and published to a rolling pre-release, so the
-download link never changes:
-
-```
-https://github.com/eyupio/sub12/releases/download/android-latest/sub12.apk
-```
+CI builds the Android app on every push and keeps a rolling `android-latest`
+pre-release, so a fixed URL always points at the newest `main` build
+(`.../releases/download/android-latest/sub12.apk`). That exists for testing and
+for self-hosters building their own; it isn't the recommended way to install
+sub12 yet.
 
 | Trigger | Variant | Where it lands |
 |---|---|---|
