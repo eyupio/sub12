@@ -49,6 +49,28 @@ A target shooting companion app for the UK airgun benchrest community. Log 25-sh
 - **Mobile keyboard handling** — Header/bottom-nav auto-hide while typing (see [policy](#mobile-keyboard--navigation-policy))
 - **Dark mode** — Theme toggle persisted per user
 
+## See it in action
+
+Short screen recordings of the real app, with the narration baked into the
+frames. Click a poster to watch (webm):
+
+| | |
+|---|---|
+| [![A 25-shot card, start to finish](frontend/public/demos/showcase-score-card.jpg)](https://sub12.io/demos/showcase-score-card.webm) **A 25-shot card, start to finish** — capture, totals, stats | [![Photograph the target, read the group](frontend/public/demos/showcase-pellet-testing.jpg)](https://sub12.io/demos/showcase-pellet-testing.webm) **Photograph the target, read the group** — hole detection, group size, leaderboard |
+| [![Your league, live standings](frontend/public/demos/showcase-league.jpg)](https://sub12.io/demos/showcase-league.webm) **Your league, live standings** — standings that move when a card is verified | [![Know exactly what's working](frontend/public/demos/showcase-analytics.jpg)](https://sub12.io/demos/showcase-analytics.webm) **Know exactly what's working** — trends, averages and gear comparisons |
+
+How-to guides: [add your rifle and pellets](https://sub12.io/demos/howto-add-gear.webm)
+· [log your first score card](https://sub12.io/demos/howto-first-card.webm)
+· [join a league and submit a card](https://sub12.io/demos/howto-join-league.webm)
+· [run a league](https://sub12.io/demos/howto-run-league.webm)
+· [test pellets](https://sub12.io/demos/howto-pellet-test.webm)
+
+The same recordings play in-app on the Help page and on the
+[landing page](https://sub12.io). Nothing is edited by hand — every video is
+re-recorded with one command (`./scripts/record-demos.sh`) whenever the UI it
+shows changes; [docs/demo-recordings.md](docs/demo-recordings.md) is the
+production standard and storyboard catalog.
+
 ## Stack
 
 | Layer | Technology |
