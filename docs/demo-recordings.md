@@ -35,15 +35,15 @@ committed to the repo and shipped in the frontend image.
 
 | # | Slug | Kind | Title | Length | Status |
 |---|---|---|---|---|---|
-| 1 | `howto-add-gear` | how-to | Add your rifle and pellets | 0:52 | **recorded** |
-| 2 | `howto-first-card` | how-to | Log your first score card | 0:41 | **recorded** |
-| 3 | `showcase-score-card` | showcase | A 25-shot card, start to finish | 0:46 | **recorded** |
-| 4 | `howto-join-league` | how-to | Join a league and submit a card | 1:32 | **recorded** |
-| 5 | `howto-run-league` | how-to | Run a league: seasons, rounds, verification | 1:48 | **recorded** |
-| 6 | `showcase-league` | showcase | Your league, live standings | 0:44 | **recorded** |
-| 7 | `howto-pellet-test` | how-to | Test pellets: photograph and measure a group | 0:58 | **recorded** |
-| 8 | `showcase-pellet-testing` | showcase | Photograph the target, read the group | 1:16 | **recorded** |
-| 9 | `showcase-analytics` | showcase | Know exactly what's working | 1:38 | **recorded** |
+| 1 | `howto-add-gear` | how-to | Add your rifle and pellets | 0:26 | **recorded** |
+| 2 | `howto-first-card` | how-to | Log your first score card | 0:30 | **recorded** |
+| 3 | `showcase-score-card` | showcase | A 25-shot card, start to finish | 0:20 | **recorded** |
+| 4 | `howto-join-league` | how-to | Join a league and submit a card | 1:21 | **recorded** |
+| 5 | `howto-run-league` | how-to | Run a league: seasons, rounds, verification | 1:23 | **recorded** |
+| 6 | `showcase-league` | showcase | Your league, live standings | 0:19 | **recorded** |
+| 7 | `howto-pellet-test` | how-to | Test pellets: photograph and measure a group | 0:33 | **recorded** |
+| 8 | `showcase-pellet-testing` | showcase | Photograph the target, read the group | 0:51 | **recorded** |
+| 9 | `showcase-analytics` | showcase | Know exactly what's working | 1:12 | **recorded** |
 | 10 | `howto-install-pwa` | how-to | Install SUB12 on your phone | ~40s | planned — browser chrome can't be captured by the in-page recorder; needs a device capture |
 
 ## Storyboards
@@ -136,8 +136,8 @@ size and the caption sits above the bottom tab bar on narrow frames.
 
 | Slug | Source flow | Length | Use |
 |---|---|---|---|
-| `showcase-score-card-mobile` | showcase-score-card | 0:44 | App-store preview, social |
-| `showcase-pellet-testing-mobile` | showcase-pellet-testing | 0:35 | App-store preview, social |
+| `showcase-score-card-mobile` | showcase-score-card | 0:18 | App-store preview, social |
+| `showcase-pellet-testing-mobile` | showcase-pellet-testing | 0:25 | App-store preview, social |
 
 These are **assets, not catalog entries** — they ship in
 `frontend/public/demos/` for store listings and social cuts (see
@@ -163,6 +163,39 @@ Each demo spec seeds its own data through the API (see `e2e/demos/setup.ts`)
 under the dedicated `demo@sub12.local` account, and tears the account's
 content down afterwards, so recordings are repeatable and never show stale
 state.
+
+### The film starts at the title card, not at the page
+
+Playwright films the whole life of the page, and the page is created before
+the test body runs — so the seeding, the sign-in and, above all, the app's
+first load are all on film before the demo starts. Against a dev stack that
+came to **~26 seconds** of dead air on the front of every recording: about
+thirteen seconds of blank white while the bundle loaded, then about thirteen
+more of a motionless page while `page.goto()` waited for the load event. A
+visitor pressing play on the landing page saw a white rectangle, then a still
+screenshot, and reasonably concluded the player was broken.
+
+So the recorder cuts it. `Overlay` records `filmStartMs` — the moment the
+first title card or caption went up, which is the demo's real first frame —
+and the fixture hands it to `trimRecording()` in `e2e/demos/trimVideo.ts`,
+which rewrites the webm to start there and prints what it cut.
+
+Two things to know about that cut:
+
+- **It never re-encodes.** VP8 inter frames are differences against the frame
+  before, so the film can only be opened at a keyframe. The trimmer keeps the
+  last keyframe before the mark, drops everything earlier, and then drops the
+  run of ~30-byte "nothing changed" frames that follows it, rebasing the
+  timecodes and rebuilding the cues. Every frame that ships is bit-for-bit
+  the frame that was filmed — which matters for a marketing asset, and rules
+  out the generation loss a re-encode would cost.
+- **Keyframes land every ~5s, so up to that much lead-in survives**, as a
+  beat on the app page before the title card fades in. That is the price of
+  not re-encoding; the shipped recordings kept between 0.3s and 2.6s.
+
+The dead air itself is worth attacking at the source too if the recordings
+ever get slow again — `page.goto()` defaults to waiting for the load event,
+and every spec already waits for a landmark element afterwards.
 
 ## Where the videos surface
 

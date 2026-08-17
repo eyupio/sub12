@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Overlay } from './overlay';
+import { trimRecording } from './trimVideo';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const OUTPUT_DIR = resolve(here, '..', 'demo-output');
@@ -14,8 +15,13 @@ export const OUTPUT_DIR = resolve(here, '..', 'demo-output');
  */
 export const test = base.extend<{ demo: Overlay }>({
   demo: async ({ page }, use, testInfo) => {
+    // Filming has already started: the page exists, so everything the test does
+    // before its first overlay — seeding, signing in, waiting for the app to
+    // load — is on film. `Overlay` marks where the demo really begins and the
+    // trim below cuts back to it.
+    const recordingStartedAt = Date.now();
     await Overlay.install(page);
-    const overlay = new Overlay(page);
+    const overlay = new Overlay(page, recordingStartedAt);
     mkdirSync(OUTPUT_DIR, { recursive: true });
     overlay.posterPath = resolve(OUTPUT_DIR, `${testInfo.title}.jpg`);
     await use(overlay);
@@ -26,7 +32,15 @@ export const test = base.extend<{ demo: Overlay }>({
     await page.close();
     if (video && testInfo.status === 'passed') {
       mkdirSync(OUTPUT_DIR, { recursive: true });
-      await video.saveAs(resolve(OUTPUT_DIR, `${testInfo.title}.webm`));
+      const path = resolve(OUTPUT_DIR, `${testInfo.title}.webm`);
+      await video.saveAs(path);
+      const trimmed = trimRecording(path, overlay.filmStartMs);
+      if (trimmed) {
+        console.info(
+          `${testInfo.title}: cut ${(trimmed.trimmedMs / 1000).toFixed(1)}s of lead-in, ` +
+            `film is ${(trimmed.durationMs / 1000).toFixed(1)}s`,
+        );
+      }
     }
   },
 });

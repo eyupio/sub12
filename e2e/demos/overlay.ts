@@ -52,7 +52,28 @@ export class Overlay {
   /** Set by the fixture; where saveMoment() writes the poster jpeg. */
   posterPath: string | null = null;
 
-  constructor(private readonly page: Page) {}
+  /**
+   * Where the finished film starts: the moment the first overlay went up,
+   * measured from the start of the recording. Everything before it is the app
+   * loading, which is dead air on screen — the fixture cuts it off. Null until
+   * a demo puts something on screen.
+   */
+  filmStartMs: number | null = null;
+
+  constructor(
+    private readonly page: Page,
+    private readonly recordingStartedAt: number,
+  ) {}
+
+  /**
+   * The first overlay is the demo's first frame. A little lead-in keeps the
+   * fade from being clipped if the clock and the film have drifted apart.
+   */
+  private markFilmStart(): void {
+    if (this.filmStartMs === null) {
+      this.filmStartMs = Math.max(0, Date.now() - this.recordingStartedAt - 250);
+    }
+  }
 
   /**
    * Capture the current frame as the video's poster image. Call it at the
@@ -85,6 +106,7 @@ export class Overlay {
   }
 
   private async card(label: string, heading: string, sub: string, hold = 2500): Promise<void> {
+    this.markFilmStart();
     await this.page.evaluate(
       ({ label, heading, sub, gold, font }) => {
         const narrow = window.innerWidth < 500;
@@ -123,6 +145,7 @@ export class Overlay {
    * next caption() or clear(). Holds for `hold` ms so the line can be read.
    */
   async caption(text: string, hold = 2200): Promise<void> {
+    this.markFilmStart();
     await this.page.evaluate(
       ({ text, gold, panel, font }) => {
         let el = document.getElementById('__demo_caption');

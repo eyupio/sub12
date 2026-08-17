@@ -797,6 +797,18 @@ whenever the UI it shows changes.
   against the same local stack as `scripts/e2e.sh`. Posters are screenshots
   the spec takes at its best moment (`demo.saveMoment()`); Playwright's
   bundled ffmpeg only encodes VP8, so frames can't be extracted afterwards.
+- **The film is cut back to its title card.** Playwright films the whole life
+  of the page, so the seeding, the sign-in and the app's first load all land
+  on the front of the recording — ~26 seconds of blank white and then of a
+  motionless page, against a dev stack. Pressing play on the landing page and
+  getting a white rectangle followed by a still screenshot is exactly what a
+  broken player looks like, and it is what shipped. `Overlay` now records
+  `filmStartMs` (when the first title card or caption went up) and the fixture
+  hands it to `trimRecording()` in `e2e/demos/trimVideo.ts`, which rewrites the
+  webm to start there. The cut never re-encodes — it opens the film on the last
+  keyframe before the mark and drops the still frames after it — so a marketing
+  asset never picks up generation loss, at the price of the ≤5s of lead-in that
+  keyframe spacing leaves behind.
 - `./scripts/record-demos.sh [slug]` boots the stack if needed, records, and
   publishes webm + poster jpeg into `frontend/public/demos/` (served at
   `/demos/…`, committed to the repo, deliberately not in the PWA precache and
