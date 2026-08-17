@@ -62,6 +62,7 @@ func NewRouter(
 	geocode *service.GeocodeService,
 	announcements *service.AnnouncementService,
 	gallery *service.GalleryService,
+	siteSettings *service.SiteSettingsService,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -126,13 +127,27 @@ func NewRouter(
 	r.Route("/api/v1", func(r chi.Router) {
 		// Pre-instantiate comment handler so it can be used in both protected and public groups
 		commentH := handler.NewComment(comments)
+		// Deployment identity. The branding payload is fetched by every
+		// visitor before the shell paints, so it has to be public; it
+		// carries only what the shell draws. POST /setup is public for the
+		// same reason a fresh install has nobody to authenticate as — it
+		// closes itself permanently the first time it succeeds, and is
+		// rate-limited per IP alongside the other credential endpoints.
+		siteH := handler.NewSiteSettings(siteSettings, images)
+		r.Get("/site/settings", siteH.Public)
+		r.Get("/setup/status", siteH.SetupStatus)
+		r.With(rl.Limit("auth")).Post("/setup", siteH.CompleteSetup)
+
 		// Public auth routes. Password-bearing endpoints are rate-limited
 		// per-IP to blunt credential stuffing and password-reset flooding.
 		// /auth/refresh and /auth/logout are intentionally unbounded here so
 		// that normal token-refresh traffic from returning users isn't
 		// throttled shared with login attempts on the same IP.
 		authHandler := handler.NewAuth(auth, cfg.Env == "production")
-		r.With(rl.Limit("auth")).Post("/auth/register", authHandler.Register)
+		// Sign-up is gated on the deployment's own registration policy — an
+		// invite-only club's setting has to hold against a direct POST, not
+		// just against the link being hidden on the sign-in screen.
+		r.With(rl.Limit("auth"), siteH.RegistrationGate).Post("/auth/register", authHandler.Register)
 		r.With(rl.Limit("auth")).Post("/auth/login", authHandler.Login)
 		r.With(rl.Limit("auth")).Post("/auth/login/2fa", authHandler.LoginVerify2FA)
 		r.Post("/auth/refresh", authHandler.Refresh)
@@ -526,6 +541,13 @@ func NewRouter(
 			// Admin routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireAdmin)
+
+				// Deployment identity — name, colours, theme, logo and
+				// whether this installation is one club's own site.
+				r.Get("/admin/site-settings", siteH.AdminGet)
+				r.Patch("/admin/site-settings", siteH.AdminPatch)
+				r.Post("/admin/site-settings/logo", siteH.AdminUploadLogo)
+				r.Delete("/admin/site-settings/logo", siteH.AdminDeleteLogo)
 
 				// Email settings
 				aeh := handler.NewAdminEmail(smtp, emailTemplates, emailSender)

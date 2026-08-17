@@ -427,10 +427,17 @@ gather_settings() {
         die "generated JWT_SECRET failed its own validity check — refusing to write it"
     fi
 
+    # A fresh deployment normally gets its administrator from the first-run
+    # wizard at /setup, which also asks what the installation is called and
+    # how it should look. Seeding one from .env pre-empts that: the existence
+    # of an administrator is precisely what closes the wizard, so answering
+    # yes here means never being offered it. Worth having anyway for an
+    # unattended install with no browser at the other end, so it is offered —
+    # just no longer as the default.
     SEED_ADMIN="false"
     ADMIN_PASSWORD=""
     if [[ "$MODE" != "dev" ]]; then
-        if confirm "Create a first admin account now?" "y"; then
+        if confirm "Seed an admin account from .env instead of using the setup wizard?" "n"; then
             SEED_ADMIN="true"
             ADMIN_PASSWORD="$(existing_env_value ADMIN_PASSWORD || true)"
             if [[ -z "$ADMIN_PASSWORD" ]] || is_placeholder "$ADMIN_PASSWORD"; then
@@ -639,6 +646,20 @@ EOF
   Point your reverse proxy at that port and serve it as ${BOLD}$SITE_URL${RESET}
   over HTTPS. The container listens on 8080 internally and proxies /api/ to the
   backend itself, so one upstream is all you need.
+
+EOF
+        fi
+        if [[ "$SEED_ADMIN" != "true" ]]; then
+            cat <<EOF
+  ${BOLD}Finish setting up in the browser${RESET}
+
+    Open ${GOLD}http://localhost:${WEB_PORT}${RESET} — you'll land on the setup wizard.
+
+  It asks whether this installation is a community or one club's own site,
+  what it is called and coloured, and who administers it. ${YELLOW}It runs once${RESET}: the
+  moment it creates that first administrator it closes for good, so do it
+  before you put the site in front of anyone. Everything except the account
+  can be changed later from Admin → Branding.
 
 EOF
         fi

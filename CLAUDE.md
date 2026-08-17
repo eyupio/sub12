@@ -665,6 +665,59 @@ the `announcements` table is the one stored original they point at.
   and somebody who joined later can't read backwards through the archive. The
   per-scope *log* is gated on membership instead, since it's the sender's view.
 
+### A deployment owns its own identity
+
+`site_settings` is a singleton row (id = 1, the same shape as `smtp_settings`)
+holding what *this installation* is: its name, tagline, logo, accent colours,
+boot theme, welcome copy, whether registration is open, and whether it presents
+as a community or as one club's own site. The first-run wizard at `/setup`
+writes it; `pages/AdminBranding.tsx` edits it afterwards.
+
+- **The wizard is once-only, and the backend is what enforces that.**
+  `POST /api/v1/setup` is unauthenticated by necessity — a fresh install has
+  nobody to authenticate as — so the guard has to hold against a caller who
+  never loads the page. `SiteSettingsService.CompleteSetup` checks
+  `UserRepository.AdminExists`, then *claims* the deployment with a conditional
+  `UPDATE … WHERE setup_completed_at IS NULL` that exactly one concurrent
+  caller can win, and only the winner creates an account. A claim that then
+  fails (a duplicate email, most likely) is released, or a mistyped address
+  would brick the wizard with no account to log in with. The endpoint is
+  rate-limited under the `auth` bucket alongside the other credential paths.
+- **Setup returns no tokens.** The wizard signs in through the ordinary
+  `POST /auth/login` with the credentials it just set, so the refresh cookie,
+  the rate limiter and the 2FA path are the ones every later session uses.
+- **Migration 000123 stamps an existing deployment as complete** if the `users`
+  table has anything in it. Without that, upgrading drops a running site onto a
+  setup screen. `scripts/install.sh` now defaults to *not* seeding an admin from
+  `.env`, because seeding one is precisely what closes the wizard.
+- **`ENV`-level config is unaffected.** Branding is per-deployment data, not
+  configuration: there is no env var for it, and nothing in `config.Validate()`
+  reads it.
+- **An accent is a hex colour or nothing.** `model.NormaliseAccent` is a strict
+  `#rgb`/`#rrggbb` parser because the value is interpolated into a CSS custom
+  property — arbitrary text there is a declaration injected into every page.
+  `utils/branding.ts` derives the whole gold family from it (`--gold-2`,
+  `--gold-tint`, `--ring`, `--brass-dim`, `--shadow-gold`, `--grid`), because
+  those tokens are rgba() literals of the original hue in `index.css` and a bare
+  `--gold` override leaves them behind as stripes of brass.
+- **Single-club mode needs a club.** Both the wizard and the admin patch refuse
+  the mode without one, since the nav entry and the directory redirect both
+  point at it. The club is an ordinary club owned by the administrator the
+  wizard created — nothing about it is special except that `site_settings`
+  points at it.
+- **`public_registration` is enforced in the router**, not just in the UI.
+  `SiteSettingsHandler.RegistrationGate` wraps `POST /auth/register`, because
+  an invite-only club's setting has to hold against a direct POST — hiding the
+  link is presentation. A settings read that fails allows the sign-up: a
+  transient database fault must not lock out registration site-wide, and the
+  path immediately behind the gate needs the same database anyway.
+- **The attribution is not a setting.** `PublicSiteSettings.Upstream` is stamped
+  by `SiteSettings.ToPublic` from constants in `model/site_setting.go`, so no
+  stored value can remove it, and `components/PoweredBy.tsx` is the single place
+  it is rendered — bundled with the AGPL section 13 **Source** link, because
+  three obligations kept in three places is how one of them goes missing.
+  Tests on both sides pin it. A self-hoster brands the door; the plaque stays.
+
 ### Indexable surface (sitemap, robots.txt, canonicals)
 
 Only two kinds of URL are fit to submit to a search engine: a page an
@@ -719,6 +772,7 @@ as invariants and lean on the tests that pin them.
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/login/2fa`, `POST /auth/refresh`, `POST /auth/logout`
 - `POST /auth/forgot-password`, `POST /auth/reset-password`
   - Every password-bearing endpoint above is rate-limited per IP (`rl.Limit("auth")`). `refresh` and `logout` are deliberately unbounded, so ordinary token refresh from a shared IP is never throttled by somebody else's login attempts.
+- `GET /site/settings` — this deployment's branding, fetched by every visitor before the shell paints. `GET /setup/status` and `POST /setup` are the once-only first-run wizard (`setup` is rate-limited under the `auth` bucket) — see "A deployment owns its own identity"
 - `GET /images/{id}`
 - `GET /faqs`, `GET /faqs/{slug}`
 - `GET /leagues`, `GET /leagues/{id}`
@@ -774,6 +828,7 @@ as invariants and lean on the tests that pin them.
 - **Categories:** CRUD for the shared taxonomy
 - **Feature board:** `PATCH /admin/feature-requests/{id}` and `POST /admin/tickets/{id}/feature-request` — see "Feature board"
 - **Announcements:** `POST /admin/announcements` sends platform-wide — see "Announcements"
+- **Branding:** `GET`/`PATCH /admin/site-settings` and `POST`/`DELETE /admin/site-settings/logo` edit everything the setup wizard asked. The logo lives here rather than in the wizard because uploading one needs an account and setup runs before there is one
 - **Sitemap & SEO:** `/admin/sitemap/stats` reports what is eligible and served, `/ping` submits to IndexNow, `/submissions` is the log, `/indexnow-key` shows the key — see "Indexable surface"
 - **Backup:** `/admin/backup/settings` (+ `test-s3`), `run`, `runs`, download and restore. Dumps are gzipped and AES-encrypted with a passphrase-derived key before upload, so a run without a configured passphrase fails rather than shipping plaintext.
 - **Activity simulation:** Settings (get/patch), status, run-now (configurable batch size with per-action breakdown), personas (list/edit/delete/purge), cleanup (trim to target), audit log. Provisions flagged (`is_simulated`) accounts that post/like/comment/follow/unfollow/share via the normal service paths; paced by a background runner with hourly time-of-day shaping, disabled by default. Per-action counters, last-error, and tick-health surfaced in status; admin operations recorded in `simulation_audit`. Simulated users are flagged in the admin user list (badge + hide filter) and on public profiles. An `include_in_public_stats` toggle excludes simulated content from the public feed and pellet leaderboard.

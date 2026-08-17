@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, X, Trophy, Lock, MapPin, Navigation } from 'lucide-react'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
@@ -17,6 +18,7 @@ import {
   Badge,
 } from '../components/leagues'
 import { StatTile } from '../components/dashboard'
+import { useBranding } from '../store/branding'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -128,6 +130,17 @@ type DisciplineChip = (typeof DISCIPLINE_CHIPS)[number]['value']
 const NEAR_ME_RADIUS_KM = 80
 
 export default function Clubs() {
+  const navigate = useNavigate()
+  const branding = useBranding()
+  // On a single-club deployment the directory is not the point of the
+  // installation — there is one club and it is this one. Anyone who lands here
+  // (the nav entry, a bookmark, a shared link) goes straight through to it.
+  const soleClubId =
+    branding.deployment_mode === 'single_club' ? branding.primary_club?.id : undefined
+  useEffect(() => {
+    if (soleClubId) navigate({ to: '/clubs/$id', params: { id: soleClubId }, replace: true })
+  }, [soleClubId, navigate])
+
   const [showCreate, setShowCreate] = useState(false)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')

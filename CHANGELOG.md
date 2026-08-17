@@ -16,6 +16,29 @@ APK tracks the rolling `android-latest` pre-release.
 
 ### Added
 
+- **First-run setup wizard for self-hosters** (`/setup`). A fresh deployment
+  opens on a six-step wizard instead of a sign-in form for an account that does
+  not exist yet: whether the installation is a **community** or **one club's own
+  site**, its name, tagline and welcome copy, its accent colour (light and dark,
+  previewed live), the theme it boots into, and the first administrator. It runs
+  exactly once — the endpoint behind it claims the deployment with a conditional
+  update and refuses every later submission, whether or not the page is loaded —
+  and returns no tokens, signing in through the ordinary login endpoint instead.
+  Upgrading an existing deployment is unaffected: a database with users in it is
+  stamped as already set up.
+- **Branding a self-hoster owns** — name, tagline, logo, accent colours, boot
+  theme (and whether members may switch it), welcome heading and message, support
+  email, and open-or-invited registration. Editable afterwards at
+  **Admin → Branding**, which is also where the logo is uploaded. One accent
+  colour drives the whole design-system gold family rather than just `--gold`,
+  so nothing is left wearing the old hue.
+- **Single-club deployments.** The wizard creates the club, the nav entry carries
+  its name instead of "Clubs", and the club directory redirects straight to it.
+  The club itself is an ordinary club owned by the administrator, so leagues,
+  standings and moderators all work on it as normal.
+- Every deployment, however rebranded, carries **Powered by SUB12 · by EyUp.io ·
+  Source** in its footer. The links are served from server-side constants rather
+  than from the editable settings, so no branding choice removes them.
 - **AGPL-3.0 licence** ([LICENSE](LICENSE)). A **Source** link in the app footer
   satisfies the licence's section 13 obligation to offer source to users
   reaching the service over a network; forks that modify the code should point

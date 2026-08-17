@@ -6,6 +6,8 @@ import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { clearClientSession } from '../utils/clearSession'
+import { useBranding } from '../store/branding'
+import { PoweredBy } from '../components/PoweredBy'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -18,6 +20,8 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const branding = useBranding()
+  const branded = branding.site_name !== 'SUB12' || Boolean(branding.logo_url)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -31,6 +35,10 @@ export default function Register() {
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 409) {
         setError('Email already registered.')
+      } else if (err instanceof ApiError && err.status === 403) {
+        // The deployment closed registration between this page loading and
+        // the form being submitted.
+        setError(err.message)
       } else {
         setError('Registration failed. Please try again.')
       }
@@ -41,14 +49,56 @@ export default function Register() {
 
   const inputCls = 'w-full bg-surface border border-subtle rounded px-4 py-3 text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)] focus:bg-[var(--brass)]/[0.04] transition-colors text-sm tracking-wider'
 
+  const mark = branding.logo_url ? (
+    <img src={branding.logo_url} alt={branding.site_name} className="mx-auto h-16 max-w-[240px] object-contain" />
+  ) : branded ? (
+    <h1 className="text-4xl font-bold leading-tight text-primary" style={{ fontFamily: 'var(--serif)' }}>
+      {branding.site_name}
+    </h1>
+  ) : (
+    <div className="inline-flex items-baseline justify-center">
+      <span style={{ fontFamily: 'var(--serif)', fontSize: '4rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--ink)' }}>SUB</span>
+      <span style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'var(--gold)' }}>12</span>
+    </div>
+  )
+
+  // A deployment that creates accounts by hand says so here rather than
+  // letting somebody fill the form in and collect a 403 from the server. The
+  // backend refuses the request either way — this is the courtesy, not the rule.
+  if (!branding.public_registration) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm space-y-6 text-center animate-fade-in-up">
+          {mark}
+          <p className="t-section-title">Registration is closed</p>
+          <p className="text-sm text-secondary">
+            Accounts on {branding.site_name} are created by an administrator.
+            {branding.support_email && ' Get in touch and they will set one up for you.'}
+          </p>
+          {branding.support_email && (
+            <p>
+              <a href={`mailto:${branding.support_email}`} className="text-[var(--brass)] hover:opacity-80 transition-opacity text-sm">
+                {branding.support_email}
+              </a>
+            </p>
+          )}
+          <p className="t-section-title">
+            <Link to="/login" className="text-[var(--brass)] hover:opacity-80 transition-opacity">
+              Sign in instead
+            </Link>
+          </p>
+          <p className="text-[11px] text-muted"><PoweredBy /></p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <div className="inline-flex items-baseline justify-center">
-            <span style={{ fontFamily: 'var(--serif)', fontSize: '4rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--ink)' }}>SUB</span>
-            <span style={{ fontFamily: 'var(--serif)', fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'var(--gold)' }}>12</span>
-          </div>
+          {mark}
+          {branding.tagline && <p className="mt-2 text-sm text-muted">{branding.tagline}</p>}
           <p className="mt-4 t-section-title">Create your account</p>
         </div>
 

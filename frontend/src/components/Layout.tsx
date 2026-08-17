@@ -1,6 +1,6 @@
 import { PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw, Megaphone, Images } from 'lucide-react'
+import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw, Megaphone, Images, Palette } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
 import { authApi } from '../api/auth'
@@ -12,13 +12,14 @@ import { ToastContainer } from './Toast'
 import { NotificationBell } from './NotificationBell'
 import { NavTracker } from './NavTracker'
 import { Tooltip } from './Tooltip'
-import { Sub12BrandLockup } from './Sub12BrandLockup'
+import { SiteMark } from './SiteMark'
+import { PoweredBy } from './PoweredBy'
+import { useBranding } from '../store/branding'
 import { tips } from './tooltips'
 import QuickCaptureFab from './QuickCaptureFab'
 import { usePullToRefresh, pageScrollTop } from '../hooks/usePullToRefresh'
 import { clearClientSession } from '../utils/clearSession'
 import { haptics } from '../utils/haptics'
-import { sourceUrl } from '../utils/site'
 
 const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
@@ -39,6 +40,7 @@ const baseNavItems = [
 ] as const
 
 const adminNavItems = [
+  { to: '/admin/branding',       icon: Palette, label: 'Branding',      mobileLabel: 'Brand'  },
   { to: '/admin/faqs',           icon: BookOpen, label: 'Admin FAQs',    mobileLabel: 'FAQs'   },
   { to: '/admin/email/settings', icon: Mail,    label: 'Email Admin',   mobileLabel: 'Email'  },
   { to: '/admin/users',          icon: UserCog, label: 'Admin Users',   mobileLabel: 'Users'  },
@@ -89,13 +91,28 @@ export default function Layout({ children }: PropsWithChildren) {
   const [scrolled, setScrolled] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   const isAdmin = user?.role === 'admin'
+  const branding = useBranding()
+  // A single-club deployment is that club's own site, so the club nav entry
+  // carries its name rather than the directory's. The destination stays
+  // /clubs — the directory redirects straight through to the club, which is
+  // also what happens to anyone who arrives on it from a bookmark.
+  const clubNavLabel =
+    branding.deployment_mode === 'single_club' && branding.primary_club
+      ? branding.primary_club.name
+      : null
   // ⚡ Bolt: memoize navItems — the array spread allocates a new 24-item array on
   // every render. Layout re-renders on every draft-count poll (60 s), route
   // change, and online/offline toggle. isAdmin is stable for the entire session
   // (changes at most once), so the spread cost is nearly always wasted work.
   const navItems = useMemo(
-    () => (isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems),
-    [isAdmin]
+    () => {
+      const items = isAdmin ? [...baseNavItems, ...adminNavItems] : [...baseNavItems]
+      if (!clubNavLabel) return items
+      return items.map((item) =>
+        item.to === '/clubs' ? { ...item, label: clubNavLabel, mobileLabel: 'Club' } : item
+      )
+    },
+    [isAdmin, clubNavLabel]
   )
 
   // Drafts badge: sum of score-card + pellet-test quick-capture drafts.
@@ -227,7 +244,7 @@ export default function Layout({ children }: PropsWithChildren) {
               onClick={() => { void refreshData() }}
               className="inline-block hover:opacity-80 transition-opacity"
             >
-              <Sub12BrandLockup variant="compact" />
+              <SiteMark />
             </Link>
           </Tooltip>
         </div>
@@ -256,7 +273,14 @@ export default function Layout({ children }: PropsWithChildren) {
 
         <div className="px-4 py-4 border-t border-subtle space-y-3">
           <div className="flex items-center justify-between">
-            <Tooltip content={tips.themeToggle}><span><ThemeToggle /></span></Tooltip>
+            {/* A deployment that has fixed its look withholds the toggle. The
+                empty span keeps the row's justify-between spacing, or the
+                notification and logout controls slide to the left edge. */}
+            {branding.allow_theme_toggle ? (
+              <Tooltip content={tips.themeToggle}><span><ThemeToggle /></span></Tooltip>
+            ) : (
+              <span />
+            )}
             <div className="flex items-center gap-3">
               <Tooltip content={tips.notificationBell}><span><NotificationBell /></span></Tooltip>
               <Tooltip content={tips.logout}>
@@ -289,14 +313,14 @@ export default function Layout({ children }: PropsWithChildren) {
             onClick={() => { haptics.tapLight(); void refreshData() }}
             className="inline-block hover:opacity-80 transition-opacity"
           >
-            <Sub12BrandLockup variant="compact" />
+            <SiteMark />
           </Link>
           <div className="flex items-center gap-3">
             {user && (
               <span className="text-sm text-muted hidden sm:block tracking-wide">{user.display_name}</span>
             )}
             <NotificationBell />
-            <ThemeToggle />
+            {branding.allow_theme_toggle && <ThemeToggle />}
             <button
               onClick={handleLogout}
               className="text-muted hover:text-secondary transition-colors"
@@ -350,38 +374,24 @@ export default function Layout({ children }: PropsWithChildren) {
             <Link to="/privacy" className="hover:text-[var(--brass)] transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-[var(--brass)] transition-colors">Terms</Link>
             <Link to="/cookies" className="hover:text-[var(--brass)] transition-colors">Cookies</Link>
-            {/* sub12 is AGPL-3.0, and section 13 obliges anyone running a
-                modified copy as a network service to offer its source to the
-                people using it over that network. This link is how — it is a
-                licence obligation, not a courtesy, so don't remove it. A fork
-                that changes the code points VITE_SOURCE_URL at its own
-                repository rather than deleting the link. */}
-            <a
-              href={sourceUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[var(--brass)] transition-colors"
-            >
-              Source
-            </a>
-            <span className="opacity-70 inline-flex items-baseline">
-              <span>©&nbsp;</span>
-              <span className="inline-flex items-baseline" style={{ fontFamily: 'var(--serif)' }}>
-                <span className="font-bold">SUB</span>
-                <span className="font-bold text-[0.75em]" style={{ color: 'var(--gold)' }}>12</span>
+            {/* A rebranded deployment puts its own name here; sub12.io still
+                gets the unbranded lockup it always had. */}
+            {branding.site_name && branding.site_name !== 'SUB12' ? (
+              <span className="opacity-70">© {branding.site_name}</span>
+            ) : (
+              <span className="opacity-70 inline-flex items-baseline">
+                <span>©&nbsp;</span>
+                <span className="inline-flex items-baseline" style={{ fontFamily: 'var(--serif)' }}>
+                  <span className="font-bold">SUB</span>
+                  <span className="font-bold text-[0.75em]" style={{ color: 'var(--gold)' }}>12</span>
+                </span>
               </span>
-            </span>
-            <span className="opacity-70">
-              by{' '}
-              <a
-                href="https://eyup.io"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[var(--brass)] transition-colors"
-              >
-                EyUp.io
-              </a>
-            </span>
+            )}
+            {/* Project attribution and the AGPL-3.0 section 13 source link.
+                Both are licence-and-provenance obligations rather than
+                decoration — see PoweredBy, which is deliberately the only
+                place they are written. */}
+            <PoweredBy />
           </footer>
         </main>
 
