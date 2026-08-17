@@ -60,11 +60,10 @@ security:
 	@printf '\n\033[1m── secrets in git history ──\033[0m\n'
 	@if command -v gitleaks >/dev/null 2>&1; then \
 		gitleaks git --redact --no-banner --config .gitleaks.toml . ; \
-	elif command -v docker >/dev/null 2>&1; then \
-		docker run --rm -v "$(PWD):/repo:ro" zricethezav/gitleaks:v8.28.0 \
-			git --source=/repo --config=/repo/.gitleaks.toml --redact --no-banner ; \
 	else \
-		printf '\033[33m! skipped — install gitleaks or Docker to run this locally\033[0m\n' ; \
+		printf '\033[33m! skipped — install gitleaks to run this locally:\033[0m\n' ; \
+		printf '  \033[2mhttps://github.com/gitleaks/gitleaks/releases\033[0m\n' ; \
+		printf '  \033[2mCI runs: gitleaks git --redact --no-banner --config .gitleaks.toml .\033[0m\n' ; \
 	fi
 	@printf '\n\033[2mCodeQL and dependency review are CI-only, and are skipped while\n'
 	@printf 'this repository is private — see SECURITY.md.\033[0m\n'

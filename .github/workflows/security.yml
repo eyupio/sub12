@@ -183,24 +183,43 @@ jobs:
       # The gitleaks *tool* is MIT-licensed and free. `gitleaks-action`, the
       # wrapper, requires a paid GITLEAKS_LICENSE for organisation-owned repos and
       # fails hard without one ("[eyupio] is an organization. License key is
-      # required"). So run the CLI from its own image and skip the wrapper — same
-      # scanner, no licence gate, and the version is pinned here rather than
-      # floating on a tag someone else controls.
+      # required"). So install the CLI and skip the wrapper: same scanner, no
+      # licence gate.
       #
-      # --redact matters: without it a genuine finding gets printed into a public
-      # Actions log, which is a second disclosure on top of the first.
+      # Installed as a binary rather than run from the Docker image because the
+      # containerised route needs both a writable mount and a safe.directory
+      # override — git inside the container runs as root against a checkout owned
+      # by the runner user and refuses it as dubious ownership. A pinned tarball
+      # verified against the release checksum is simpler and has a smaller trust
+      # surface than a floating image tag.
       #
-      # Allowlisted false positives and the reasoning behind each live in
-      # .gitleaks.toml. Reproduce locally with:
-      #   gitleaks git --redact --no-banner --config .gitleaks.toml .
-      - name: gitleaks
+      # Pinned by version AND sha256: without the checksum, "pinned" only means
+      # the tag hasn't moved, and a release asset can be replaced.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.28.0
+          GITLEAKS_SHA256: a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb
         run: |
-          docker run --rm \
-            -v "$PWD:/repo:ro" \
-            zricethezav/gitleaks:v8.28.0 \
-            git --source=/repo \
-                --config=/repo/.gitleaks.toml \
-                --redact --no-banner --verbose
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # Scans the whole history, not just the tree: a secret committed and later
+      # removed is still a secret that was pushed.
+      #
+      # --redact matters. Without it a genuine finding is printed into an Actions
+      # log, which on a public repository is a second disclosure on top of the
+      # first.
+      #
+      # Confirmed false positives, and the reasoning for each, live in
+      # .gitleaks.toml. This is the same command `make security` runs, so a CI
+      # finding reproduces locally verbatim.
+      - name: gitleaks
+        run: gitleaks git --redact --no-banner --config .gitleaks.toml .
 
   # ------------------------------------------- placeholder secrets must be refused
   # The guard that stops a self-hoster booting production with the published
