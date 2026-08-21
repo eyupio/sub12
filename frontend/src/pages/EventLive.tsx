@@ -29,19 +29,7 @@ export default function EventLive() {
     refetchOnWindowFocus: true,
   })
 
-  const [countdown, setCountdown] = useState(LIVE_REFRESH_SECONDS)
-
   const categoryLookup = useMemo(() => new Map((cats.data?.items ?? []).map((c) => [c.id, c])), [cats.data])
-
-  useEffect(() => {
-    setCountdown(LIVE_REFRESH_SECONDS)
-  }, [board.dataUpdatedAt, isLive])
-
-  useEffect(() => {
-    if (!isLive) return
-    const id = window.setInterval(() => setCountdown((c) => (c <= 1 ? LIVE_REFRESH_SECONDS : c - 1)), 1000)
-    return () => window.clearInterval(id)
-  }, [isLive])
 
   const rows = useMemo(() => {
     const all = board.data?.items ?? []
@@ -72,7 +60,7 @@ export default function EventLive() {
           </h1>
           <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
             {ev.data?.discipline ?? ''}
-            {isLive && <> · auto-refresh in {countdown}s</>}
+            {isLive && <LiveCountdown resetKey={board.dataUpdatedAt} />}
             {isComplete && <> · final results</>}
           </p>
         </div>
@@ -266,6 +254,23 @@ export default function EventLive() {
       </div>
     </PageGrid>
   )
+}
+
+// Ticks on its own so the once-per-second update doesn't re-render the
+// scoreboard table around it.
+function LiveCountdown({ resetKey }: { resetKey: number | undefined }) {
+  const [countdown, setCountdown] = useState(LIVE_REFRESH_SECONDS)
+
+  useEffect(() => {
+    setCountdown(LIVE_REFRESH_SECONDS)
+  }, [resetKey])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setCountdown((c) => (c <= 1 ? LIVE_REFRESH_SECONDS : c - 1)), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  return <> · auto-refresh in {countdown}s</>
 }
 
 interface PodiumData {
