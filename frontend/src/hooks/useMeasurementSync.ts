@@ -18,6 +18,33 @@ function withSourceTag(notes: string | undefined, source: 'manual' | 'image'): s
   return cleaned ? `${cleaned} ${sourceTag}` : sourceTag
 }
 
+function upsertMeasurement(
+  sessionId: string,
+  imageId: string,
+  measurementId: string | undefined,
+  payload: CreateMeasurementPayload,
+) {
+  return measurementId
+    ? pelletTestApi.updateMeasurement(sessionId, imageId, measurementId, payload)
+    : pelletTestApi.createMeasurement(sessionId, imageId, payload)
+}
+
+// Best-effort: a distance the analyzer read off the image is a convenience
+// update to the session, never something either save mutation should fail on.
+async function applyAnalyzedDistance(
+  sessionId: string,
+  analyzedDistanceValue: number | undefined,
+  analyzedDistanceUnit: 'meters' | 'yards' | undefined,
+) {
+  if (!analyzedDistanceValue || analyzedDistanceValue <= 0) return
+  try {
+    await pelletTestApi.update(sessionId, {
+      distance_value: analyzedDistanceValue,
+      distance_unit: analyzedDistanceUnit ?? 'meters',
+    })
+  } catch { /* best-effort */ }
+}
+
 interface SaveMeasurementArgs {
   imageId: string
   payload: CreateMeasurementPayload
@@ -123,6 +150,17 @@ export function useMeasurementSync({
     [defaultShotCount, groups, pendingGroupSync, sessionId],
   )
 
+  const settleHandlers = {
+    onSuccess: () => {
+      invalidate()
+      setPendingGroupSync(null)
+      onSettled?.()
+    },
+    onError: () => {
+      setPendingGroupSync(null)
+    },
+  }
+
   const saveMeasurementMutation = useMutation({
     mutationFn: async ({
       imageId,
@@ -134,17 +172,8 @@ export function useMeasurementSync({
       analyzedDistanceValue,
       analyzedDistanceUnit,
     }: SaveMeasurementArgs) => {
-      const measurement = measurementId
-        ? await pelletTestApi.updateMeasurement(sessionId, imageId, measurementId, payload)
-        : await pelletTestApi.createMeasurement(sessionId, imageId, payload)
-      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        try {
-          await pelletTestApi.update(sessionId, {
-            distance_value: analyzedDistanceValue,
-            distance_unit: analyzedDistanceUnit ?? 'meters',
-          })
-        } catch { /* best-effort */ }
-      }
+      const measurement = await upsertMeasurement(sessionId, imageId, measurementId, payload)
+      await applyAnalyzedDistance(sessionId, analyzedDistanceValue, analyzedDistanceUnit)
       try {
         await syncGroupFromAnalysis({
           imageId,
@@ -156,14 +185,7 @@ export function useMeasurementSync({
       } catch { /* best-effort */ }
       return measurement
     },
-    onSuccess: () => {
-      invalidate()
-      setPendingGroupSync(null)
-      onSettled?.()
-    },
-    onError: () => {
-      setPendingGroupSync(null)
-    },
+    ...settleHandlers,
   })
 
   const saveDetectionsMutation = useMutation({
@@ -179,9 +201,7 @@ export function useMeasurementSync({
       analyzedDistanceValue,
       analyzedDistanceUnit,
     }: SaveDetectionsArgs) => {
-      const measurement = measurementId
-        ? await pelletTestApi.updateMeasurement(sessionId, imageId, measurementId, payload)
-        : await pelletTestApi.createMeasurement(sessionId, imageId, payload)
+      const measurement = await upsertMeasurement(sessionId, imageId, measurementId, payload)
 
       const detectionsPayload = {
         detection_method: 'auto',
@@ -204,14 +224,7 @@ export function useMeasurementSync({
           await pelletTestApi.uploadAnnotatedImage(sessionId, imageId, measurement.id, annotatedBlob)
         } catch { /* best-effort */ }
       }
-      if (analyzedDistanceValue && analyzedDistanceValue > 0) {
-        try {
-          await pelletTestApi.update(sessionId, {
-            distance_value: analyzedDistanceValue,
-            distance_unit: analyzedDistanceUnit ?? 'meters',
-          })
-        } catch { /* best-effort */ }
-      }
+      await applyAnalyzedDistance(sessionId, analyzedDistanceValue, analyzedDistanceUnit)
 
       try {
         await syncGroupFromAnalysis({
@@ -225,14 +238,7 @@ export function useMeasurementSync({
 
       return measurement
     },
-    onSuccess: () => {
-      invalidate()
-      setPendingGroupSync(null)
-      onSettled?.()
-    },
-    onError: () => {
-      setPendingGroupSync(null)
-    },
+    ...settleHandlers,
   })
 
   return {
