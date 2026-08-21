@@ -49,6 +49,11 @@ const (
 	MaxTaglineLength        = 120
 	MaxWelcomeHeadingLength = 120
 	MaxWelcomeMessageLength = 600
+	// RFC 5321 caps an email address at 254 characters; anything longer is not
+	// a real address and would otherwise ride the whole /site/settings payload
+	// to every visitor on every page load — the same storage/bandwidth DoS
+	// shape as the profile bio and device-token caps.
+	MaxSupportEmailLength = 254
 )
 
 // ErrInvalidSiteSettings is returned for any rejected branding input; handlers
@@ -267,6 +272,9 @@ func ValidateBranding(siteName, tagline, welcomeHeading, welcomeMessage, support
 		return fmt.Errorf("%w: welcome message must be %d characters or fewer", ErrInvalidSiteSettings, MaxWelcomeMessageLength)
 	}
 	if s := strings.TrimSpace(supportEmail); s != "" {
+		if len(s) > MaxSupportEmailLength {
+			return fmt.Errorf("%w: support email must be %d characters or fewer", ErrInvalidSiteSettings, MaxSupportEmailLength)
+		}
 		if _, err := mail.ParseAddress(s); err != nil {
 			return fmt.Errorf("%w: support email must be a valid email address", ErrInvalidSiteSettings)
 		}

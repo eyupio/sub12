@@ -100,6 +100,14 @@ func TestSetupInputValidateRejects(t *testing.T) {
 		in.Club = &SetupClubInput{Name: "   "}
 		require.ErrorIs(t, in.Validate(), ErrInvalidSiteSettings)
 	})
+
+	// /setup is public on a fresh install, so an oversized support_email would
+	// otherwise be persisted straight into every visitor's site payload.
+	t.Run("over-long support email", func(t *testing.T) {
+		in := base()
+		in.SupportEmail = strings.Repeat("a", MaxSupportEmailLength) + "@example.com"
+		require.ErrorIs(t, in.Validate(), ErrInvalidSiteSettings)
+	})
 }
 
 func TestUpdateSiteSettingsInputValidate(t *testing.T) {
@@ -132,6 +140,16 @@ func TestUpdateSiteSettingsInputValidate(t *testing.T) {
 
 	t.Run("bad support email", func(t *testing.T) {
 		email := "not an address"
+		require.ErrorIs(t, (&UpdateSiteSettingsInput{SupportEmail: &email}).Validate(), ErrInvalidSiteSettings)
+	})
+
+	// The support email rides the /site/settings payload to every visitor on
+	// every page load, so an uncapped TEXT column here would let one setting
+	// swell every future response by megabytes. mail.ParseAddress does not
+	// enforce a length; the model must.
+	t.Run("over-long support email", func(t *testing.T) {
+		local := strings.Repeat("a", MaxSupportEmailLength)
+		email := local + "@example.com"
 		require.ErrorIs(t, (&UpdateSiteSettingsInput{SupportEmail: &email}).Validate(), ErrInvalidSiteSettings)
 	})
 }
