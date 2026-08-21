@@ -2,16 +2,16 @@ import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
   Plus, Users, Package, Target,
-  TrendingUp, Crosshair, Trophy, MapPin,
+  Crosshair, Trophy, MapPin,
   FlaskConical, Sparkles, Bell, Calendar,
 } from 'lucide-react'
-import { statsApi, UserStats, RifleStats } from '../api/stats'
-import { scoreCardApi, ScoreCardSummary } from '../api/scoreCards'
+import { statsApi, RifleStats } from '../api/stats'
+import { scoreCardApi } from '../api/scoreCards'
 import { gearApi, Rifle } from '../api/gear'
 import { leagueApi, MyLeagueSummary } from '../api/leagues'
 import { clubsApi, Club } from '../api/clubs'
 import { eventsApi, MyEventSummary } from '../api/events'
-import { pelletTestApi, PelletTestStats, ComboPerformanceSummary } from '../api/pelletTesting'
+import { pelletTestApi, ComboPerformanceSummary } from '../api/pelletTesting'
 import { activityApi, ActivityItem as FeedItem } from '../api/activity'
 import { useAuthStore } from '../store/auth'
 import { UserAvatar } from '../components/UserAvatar'
@@ -29,15 +29,9 @@ import {
   MiniEntityCard,
   TrendPill,
 } from '../components/dashboard'
+import { computeInsights, leagueIsActive, type EnrichedRifleStats } from './dashboardInsights'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-function leagueIsActive(l: MyLeagueSummary): boolean {
-  const today = new Date().toISOString().slice(0, 10)
-  if (l.starts_on && l.starts_on > today) return false
-  if (l.ends_on && l.ends_on < today) return false
-  return true
-}
 
 function formatRelative(iso: string): string {
   const d = new Date(iso)
@@ -50,131 +44,6 @@ function formatRelative(iso: string): string {
   const days = Math.floor(h / 24)
   if (days < 7) return `${days}d ago`
   return d.toISOString().slice(0, 10)
-}
-
-// ─── insight engine (kept from previous Dashboard) ──────────────────────────
-
-interface Insight {
-  id: string
-  icon: React.ReactNode
-  title: string
-  body: string
-  cta?: { label: string; to: string; params?: Record<string, string> }
-}
-
-type EnrichedRifleStats = RifleStats & { make: string; model: string; image_url?: string; calibre: string }
-
-function computeInsights(p: {
-  stats: UserStats | undefined
-  recentCards: ScoreCardSummary[]
-  rifles: Rifle[]
-  rifleStats: RifleStats[]
-  enrichedRifleStats: EnrichedRifleStats[]
-  myLeagues: MyLeagueSummary[]
-  pelletTestStats: PelletTestStats | undefined
-}): Insight[] {
-  const insights: Insight[] = []
-
-  if (
-    p.stats?.cards_logged != null &&
-    p.stats.cards_logged >= 5 &&
-    p.stats.best_score != null &&
-    p.stats.avg_score != null
-  ) {
-    const gap = p.stats.best_score - p.stats.avg_score
-    if (gap <= 3) {
-      insights.push({
-        id: 'pb-close',
-        icon: <Target size={16} />,
-        title: `${gap.toFixed(1)} below your best`,
-        body: 'Your average is tracking close to your personal best. Consistency is your next lever.',
-        cta: { label: 'Log a card', to: '/scores/new' },
-      })
-    }
-  }
-
-  if (p.rifles.length > 0 && p.enrichedRifleStats.length === 0) {
-    insights.push({
-      id: 'no-rifle-stats',
-      icon: <Package size={16} />,
-      title: 'Link a rifle to your next card',
-      body: 'Assigning a rifle unlocks per-platform analysis and shows which setup is performing best.',
-      cta: { label: 'Log card', to: '/scores/new' },
-    })
-  }
-
-  if (insights.length < 4) {
-    const untested = p.rifles.find(r => !p.rifleStats.some(rs => rs.rifle_id === r.id))
-    if (untested) {
-      insights.push({
-        id: 'untested-rifle',
-        icon: <Package size={16} />,
-        title: `${untested.make} ${untested.model} has no data yet`,
-        body: 'Log a card with this rifle to start building per-platform performance history.',
-        cta: { label: 'Log card', to: '/scores/new' },
-      })
-    }
-  }
-
-  if (insights.length < 4 && p.rifles.length > 0 && (p.pelletTestStats?.total_tests ?? 0) === 0) {
-    insights.push({
-      id: 'no-ammo-test',
-      icon: <Crosshair size={16} />,
-      title: 'Ammunition untested',
-      body: 'Pellet selection can account for significant group-size variation. Start a test session to find your optimal load.',
-      cta: { label: 'Start test', to: '/pellet-testing' },
-    })
-  }
-
-  if (insights.length < 4) {
-    const today = new Date().toISOString().slice(0, 10)
-    const urgent = p.myLeagues.find(l => {
-      if (!l.ends_on || l.ends_on < today) return false
-      const daysLeft = Math.ceil((new Date(l.ends_on).getTime() - Date.now()) / 86400000)
-      return daysLeft <= 7 && leagueIsActive(l)
-    })
-    if (urgent) {
-      const daysLeft = Math.ceil((new Date(urgent.ends_on!).getTime() - Date.now()) / 86400000)
-      insights.push({
-        id: 'league-ending',
-        icon: <Trophy size={16} />,
-        title: `${urgent.name} closes soon`,
-        body: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining. Submit your best card before the window closes.`,
-        cta: { label: 'View league', to: '/leagues/$id', params: { id: urgent.id } },
-      })
-    }
-  }
-
-  if (insights.length < 4 && p.myLeagues.length === 0 && (p.stats?.cards_logged ?? 0) >= 3) {
-    insights.push({
-      id: 'no-leagues',
-      icon: <Trophy size={16} />,
-      title: 'Compete in a league',
-      body: 'You have cards logged — see how you rank against other shooters at your level.',
-      cta: { label: 'Browse leagues', to: '/leagues' },
-    })
-  }
-
-  if (
-    insights.length < 4 &&
-    p.recentCards.length >= 3 &&
-    p.stats?.avg_score != null
-  ) {
-    const last3 = p.recentCards.slice(0, 3)
-    const avg = p.stats.avg_score
-    if (last3.every(c => c.total_score > avg)) {
-      const lowest = Math.min(...last3.map(c => c.total_score))
-      insights.push({
-        id: 'positive-trend',
-        icon: <TrendingUp size={16} />,
-        title: "You're above average for 3 in a row",
-        body: `Your last three cards are all above your rolling average (${avg.toFixed(1)}). Lowest was ${lowest} — you're trending up.`,
-        cta: { label: 'View trends', to: '/scores/trends' },
-      })
-    }
-  }
-
-  return insights.slice(0, 4)
 }
 
 // ─── page ────────────────────────────────────────────────────────────────────
