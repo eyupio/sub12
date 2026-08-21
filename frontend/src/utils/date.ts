@@ -22,7 +22,7 @@ export const DATE_FORMAT_OPTIONS: { value: DateFormat; label: string; preview: s
   { value: 'dmy_short', label: '13 Apr 2026', preview: '13 Apr 2026' },
 ]
 
-function toDate(input: string | Date | null | undefined): Date | null {
+export function toDate(input: string | Date | null | undefined): Date | null {
   if (input == null) return null
   if (input instanceof Date) return isNaN(input.getTime()) ? null : input
   // Treat bare YYYY-MM-DD as a local calendar date, not UTC midnight, so the
