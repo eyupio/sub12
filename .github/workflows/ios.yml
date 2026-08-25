@@ -48,7 +48,7 @@ jobs:
     # macOS 15 rather than macos-latest: Blacksmith tracks the GitHub-hosted
     # images, and the 15 image ships the Xcode 16 line that Capacitor 6 and the
     # iOS 13.0 pod deployment target are tested against.
-    runs-on: blacksmith-6vcpu-macos-15
+    runs-on: blacksmith-12vcpu-macos-15
 
     steps:
       - uses: actions/checkout@v4
