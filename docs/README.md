@@ -18,7 +18,7 @@ before touching the thing they describe.
 |---|---|
 | [demo-recordings.md](demo-recordings.md) | The production standard and storyboard catalog for the narrated screen recordings on the landing page and `/help`. A new video starts with a storyboard here. |
 | [mobile-store-readiness.md](mobile-store-readiness.md) | What's still needed before the iOS and Android builds can be submitted to the app stores. |
-| [activity-simulation-followups.md](activity-simulation-followups.md) | Outstanding work on the simulated-persona engine that populates a demo instance. |
+| [activity-simulation-followups.md](activity-simulation-followups.md) | Design record for the simulated-persona engine's follow-up enhancements — every item shipped; kept for the intent and where each feature lives. |
 
 ## Elsewhere in the repo
 
