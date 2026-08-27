@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { Skeleton } from './Skeleton'
 
@@ -21,10 +21,40 @@ interface PickerModalProps {
 }
 
 export function PickerModal({ open, title, items, loading, emptyMessage, onSelect, onClose }: PickerModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    returnFocusRef.current = document.activeElement as HTMLElement | null
+    closeRef.current?.focus()
+    return () => {
+      returnFocusRef.current?.focus?.()
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const nodes = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      if (nodes.length === 0) return
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
@@ -36,6 +66,7 @@ export function PickerModal({ open, title, items, loading, emptyMessage, onSelec
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
+        ref={dialogRef}
         className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
         role="dialog"
         aria-modal="true"
@@ -45,6 +76,7 @@ export function PickerModal({ open, title, items, loading, emptyMessage, onSelec
           <h3 className="t-subsection-title">{title}</h3>
           <button
             type="button"
+            ref={closeRef}
             onClick={onClose}
             aria-label="Close"
             className="text-muted hover:text-secondary transition-colors"
