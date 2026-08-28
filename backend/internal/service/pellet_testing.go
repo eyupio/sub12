@@ -568,6 +568,13 @@ func (s *PelletTestService) computeAutoGroupSize(ctx context.Context, sessionID,
 		return nil, nil, nil
 	}
 
+	return groupSizeFromDetections(detections, session.DistanceM)
+}
+
+// groupSizeFromDetections is the pure math behind computeAutoGroupSize, split
+// out so it can be unit tested without a live DB (computeAutoGroupSize's
+// session lookup otherwise makes that impossible).
+func groupSizeFromDetections(detections []*model.PelletTestDetection, distanceM float64) (*float64, *float64, *float64) {
 	// Find max distance between any two centers (CTC max spread = group size)
 	var maxDist float64
 	var totalConf float64
@@ -591,11 +598,13 @@ func (s *PelletTestService) computeAutoGroupSize(ctx context.Context, sessionID,
 	// the same scale from the first detection's radius/diameter ratio and use it
 	// to convert the pixel-space max spread into a CTC (center-to-center) group
 	// size in mm — spread plus one pellet diameter, since CTC measures rim-to-rim
-	// across the two outermost holes.
-	if detections[0].DiameterMM != nil && detections[0].RadiusPixels > 0 {
+	// across the two outermost holes. DiameterMM must be strictly positive, not
+	// just non-nil: a zero (rather than absent) calibration value would divide
+	// by zero and silently collapse the group to a bogus "perfect" 0mm.
+	if detections[0].DiameterMM != nil && *detections[0].DiameterMM > 0 && detections[0].RadiusPixels > 0 {
 		pixelsPerMM := (detections[0].RadiusPixels * 2) / *detections[0].DiameterMM
 		groupMM := maxDist/pixelsPerMM + *detections[0].DiameterMM
-		groupMOA := calcMOA(groupMM, session.DistanceM)
+		groupMOA := calcMOA(groupMM, distanceM)
 		return &groupMM, &groupMOA, &avgConf
 	}
 

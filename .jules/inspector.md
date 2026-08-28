@@ -1,3 +1,35 @@
+## 2026-08-28 - A Documented, Unfixed Bug Sat in testsmith.md for Six Weeks
+
+**Finding:** `.jules/testsmith.md`'s 2026-07-17 entry named an exact, unguarded
+divide-by-zero at `pellet_testing.go:589` (`computeAutoGroupSize`): the guard
+`detections[0].DiameterMM != nil && detections[0].RadiusPixels > 0` accepts a
+non-nil pointer to a *zero* calibration diameter, and Go float division by
+zero gives `+Inf`, which then makes `maxDist/pixelsPerMM` collapse to `0` —
+so a malformed detection payload (bad client-side calibration, or a
+deliberately hostile `diameter_mm: 0` in the batch-detections POST body)
+silently persists a "perfect" 0mm group instead of erroring or falling back
+to `nil`. That's a data-integrity bug on exactly the kind of "zero" edge case
+this mission brief calls out, on a POST endpoint (`CreateDetections`/
+`ReplaceDetections`) with no server-side validation that `diameter_mm > 0`.
+testsmith deliberately scoped it out ("fixing the zero-diameter guard is out
+of scope for a test-only pass") and left it as a named follow-up with a line
+number. Nobody picked it up in the six weeks and ~9 merged PRs between then
+and this session — it was still exactly where testsmith left it, unchanged.
+**Learning:** A journal entry that says "found X, did not fix, here's the
+line" is a live TODO list this repo doesn't have anywhere else (no TODO/FIXME
+comments exist in the codebase — confirmed by grep). It will not surface on
+its own; nothing greps `.jules/*.md` for "did not fix" as part of any lint or
+CI step. It only gets picked up if a later agent happens to read that specific
+journal and the bug is still reproducible at the line number given.
+**Prevention:** Before starting a fresh audit, `grep -rn "did not fix\|out of
+scope\|follow-up\|scoped it out" .jules/*.md` across *all* the journals (not
+just inspector.md) — testsmith's, bolt's, sentinel's, etc. all occasionally
+name a concrete unfixed defect with enough detail to verify and fix directly,
+which is often faster and higher-confidence than a fresh audit from scratch.
+This session's fix: `groupSizeFromDetections` (extracted from
+`computeAutoGroupSize` so the pure math is unit-testable without the DB call
+that previously blocked it) now requires `*DiameterMM > 0`, not just `!= nil`.
+
 ## 2026-08-21 - A Bare Calendar Date Parsed With `new Date(string)` Is a Recurring Timezone Trap
 **Finding:** `frontend/src/utils/date.ts` already has a documented fix for one specific pitfall: `new Date("2026-04-13")` (a bare `YYYY-MM-DD` string, the shape every SQL `date` column comes back as after the backend's `::text` cast — see `starts_on`/`ends_on` on leagues, seasons and rounds) is parsed by the JS spec as **UTC midnight**, not local midnight. For a viewer west of UTC that lands several hours into the *previous* local day. `toDate()` in that file fixes it by hand-splitting the string into a local `new Date(y, m-1, d)` instead, with a comment explaining exactly why. But that fix is local to `formatDate`/`formatDateShort`/etc. — it was never applied to `Dashboard.tsx`'s own `computeInsights`, which independently did `new Date(l.ends_on).getTime()` (twice) to build the "league closes soon" nudge and its "N days remaining" count. The bug is silent and CI-invisible: the whole frontend test suite runs in a UTC container, where a bare-date UTC parse and a bare-date local parse are numerically identical, so nothing failed. For a real user in a negative-UTC-offset timezone, the countdown reads low by up to a day and a league can either drop out of the "closing soon" insight a day early or (documented as reproduced with `TZ=Etc/GMT+12`) get flagged as closing within 7 days when it is genuinely 8 local days out.
 **Action:** Before writing (or reviewing) *any* `new Date(someString)` in this frontend where `someString` is a bare `YYYY-MM-DD` — grep the surrounding code for what produced the string; if it's a `starts_on`/`ends_on`/similar `*_on` field, it came straight off a Postgres `date` column and is exactly this trap — reuse `toDate` from `utils/date.ts` (now exported) rather than re-deriving the fix. `grep -rn "new Date(" frontend/src --include=*.tsx --include=*.ts` and check each hit's argument against the `date::text`-cast fields in `backend/internal/repository/*.go` (`grep -n "::text" backend/internal/repository/*.go` finds the source columns) is the fast way to sweep for more instances of this same defect class elsewhere in the app — I did not do a full sweep this session, only fixed the one already reported by the audit; `formatRelative`'s own `new Date(iso)` in the same file is fine because push/notification/activity timestamps come back as full RFC3339 instants, not bare dates, so this is a per-field judgement call, not a blanket rule against `new Date(string)`.
