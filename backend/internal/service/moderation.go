@@ -16,12 +16,24 @@ var (
 	ErrReportInvalidTarget  = errors.New("invalid report target_type")
 	ErrReportInvalidAction  = errors.New("invalid moderation action")
 	ErrReportReasonEmpty    = errors.New("report reason cannot be empty")
+	ErrReportReasonTooLong  = errors.New("report reason is too long")
+	ErrReportNotesTooLong   = errors.New("report notes are too long")
 	ErrReportAlreadyDecided = errors.New("report already decided")
 	ErrReportSelfReport     = errors.New("cannot report yourself")
 	ErrReportTargetMissing  = errors.New("report target not found")
 	ErrReportNotInScope     = errors.New("report is not in the requested scope")
 	ErrReporterNotMember    = errors.New("reporter must be a member of the community")
 	ErrReportContextMissing = errors.New("flagging a user requires a league or club context")
+)
+
+// Rune-count caps on report free-text (storage-DoS + admin-queue amplification).
+// `reports.reason` / `reports.notes` are TEXT columns re-served on every
+// moderator queue view, and the 1 MiB JSON body cap alone lets a keen reporter
+// keep pushing multi-KB rows at the report rate limit. Runes so multi-byte
+// scripts get the same character allowance as ASCII.
+const (
+	maxReportReasonLen = 2000
+	maxReportNotesLen  = 2000
 )
 
 // ModerationService coordinates user-submitted reports and admin decisions.
@@ -81,6 +93,12 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID, report
 	}
 	if strings.TrimSpace(in.Reason) == "" {
 		return nil, ErrReportReasonEmpty
+	}
+	if len([]rune(in.Reason)) > maxReportReasonLen {
+		return nil, ErrReportReasonTooLong
+	}
+	if in.Notes != nil && len([]rune(*in.Notes)) > maxReportNotesLen {
+		return nil, ErrReportNotesTooLong
 	}
 	if in.TargetType == model.ReportTargetUser && in.TargetID == reporterID {
 		return nil, ErrReportSelfReport

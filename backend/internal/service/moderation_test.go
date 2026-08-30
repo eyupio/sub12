@@ -1,12 +1,46 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
 )
+
+// `reports.reason` / `reports.notes` are TEXT columns re-served on every
+// moderator queue view. Without per-field caps an authenticated reporter
+// could ship the JSON decoder's whole 1 MiB per POST at the 5/min report
+// rate. Validation runs before the repo call, so a nil repo is safe.
+func TestModerationService_CreateReport_FreeTextLengthCaps(t *testing.T) {
+	svc := &ModerationService{}
+	ctx := context.Background()
+	bigReason := strings.Repeat("r", maxReportReasonLen+1)
+	bigNotes := strings.Repeat("n", maxReportNotesLen+1)
+
+	reasonIn := &model.CreateReportInput{
+		TargetType: model.ReportTargetPost,
+		TargetID:   "target-1",
+		Reason:     bigReason,
+	}
+	if _, err := svc.CreateReport(ctx, "reporter-1", "user", reasonIn); !errors.Is(err, ErrReportReasonTooLong) {
+		t.Fatalf("reason cap: got %v", err)
+	}
+
+	notes := bigNotes
+	notesIn := &model.CreateReportInput{
+		TargetType: model.ReportTargetPost,
+		TargetID:   "target-1",
+		Reason:     "spam",
+		Notes:      &notes,
+	}
+	if _, err := svc.CreateReport(ctx, "reporter-1", "user", notesIn); !errors.Is(err, ErrReportNotesTooLong) {
+		t.Fatalf("notes cap: got %v", err)
+	}
+}
 
 func TestIsValidReportTargetIncludesActivity(t *testing.T) {
 	assert.True(t, model.IsValidReportTarget(model.ReportTargetActivity))

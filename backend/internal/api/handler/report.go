@@ -38,6 +38,8 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, service.ErrReportInvalidTarget),
 			errors.Is(err, service.ErrReportReasonEmpty),
+			errors.Is(err, service.ErrReportReasonTooLong),
+			errors.Is(err, service.ErrReportNotesTooLong),
 			errors.Is(err, service.ErrReportContextMissing):
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
