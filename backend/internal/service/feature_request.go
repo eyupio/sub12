@@ -232,11 +232,24 @@ func (s *FeatureRequestService) filterByVisibility(ctx context.Context, viewerID
 	if viewerID == "" {
 		return items, nil
 	}
+	// Board pages routinely list many items from the same league/club, so
+	// cache each (scopeType, scopeID) membership check for this call rather
+	// than re-querying it once per item.
+	cache := make(map[string]bool)
 	allowed := make([]*model.FeatureRequest, 0, len(items))
 	for _, item := range items {
-		ok, err := s.canVoteInScope(ctx, item.ScopeType, item.ScopeID, viewerID)
-		if err != nil {
-			return nil, err
+		key := item.ScopeType
+		if item.ScopeID != nil {
+			key += ":" + *item.ScopeID
+		}
+		ok, cached := cache[key]
+		if !cached {
+			var err error
+			ok, err = s.canVoteInScope(ctx, item.ScopeType, item.ScopeID, viewerID)
+			if err != nil {
+				return nil, err
+			}
+			cache[key] = ok
 		}
 		if ok {
 			allowed = append(allowed, item)
