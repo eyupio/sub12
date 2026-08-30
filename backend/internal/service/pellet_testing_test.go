@@ -4,8 +4,11 @@ import (
 	"math"
 	"testing"
 
+	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/stretchr/testify/require"
 )
+
+func floatPtr(v float64) *float64 { return &v }
 
 func TestCalcMOA(t *testing.T) {
 	tests := []struct {
@@ -72,4 +75,42 @@ func TestCalcMOA(t *testing.T) {
 			require.InDelta(t, tt.want, got, tt.tolerance)
 		})
 	}
+}
+
+func TestGroupSizeFromDetections(t *testing.T) {
+	t.Run("computes CTC group size from a valid calibration", func(t *testing.T) {
+		detections := []*model.PelletTestDetection{
+			{CenterX: 0, CenterY: 0, RadiusPixels: 10, DiameterMM: floatPtr(4.5), Confidence: 0.9},
+			{CenterX: 100, CenterY: 0, RadiusPixels: 10, DiameterMM: floatPtr(4.5), Confidence: 0.8},
+		}
+		groupMM, groupMOA, avgConf := groupSizeFromDetections(detections, 100)
+		require.NotNil(t, groupMM)
+		require.NotNil(t, groupMOA)
+		require.NotNil(t, avgConf)
+		// pixelsPerMM = 20/4.5; groupMM = 100/(20/4.5) + 4.5 = 27.0
+		require.InDelta(t, 27.0, *groupMM, 0.001)
+		require.InDelta(t, 0.85, *avgConf, 0.0001)
+	})
+
+	t.Run("a zero calibrated diameter is refused rather than reported as a perfect 0mm group", func(t *testing.T) {
+		detections := []*model.PelletTestDetection{
+			{CenterX: 0, CenterY: 0, RadiusPixels: 10, DiameterMM: floatPtr(0), Confidence: 0.9},
+			{CenterX: 100, CenterY: 0, RadiusPixels: 10, DiameterMM: floatPtr(0), Confidence: 0.8},
+		}
+		groupMM, groupMOA, avgConf := groupSizeFromDetections(detections, 100)
+		require.Nil(t, groupMM, "a diameter of exactly zero must not be treated as a valid calibration")
+		require.Nil(t, groupMOA)
+		require.NotNil(t, avgConf, "confidence is still computable even without a usable calibration")
+	})
+
+	t.Run("a missing calibration diameter yields no group size", func(t *testing.T) {
+		detections := []*model.PelletTestDetection{
+			{CenterX: 0, CenterY: 0, RadiusPixels: 10, DiameterMM: nil, Confidence: 0.9},
+			{CenterX: 100, CenterY: 0, RadiusPixels: 10, DiameterMM: nil, Confidence: 0.8},
+		}
+		groupMM, groupMOA, avgConf := groupSizeFromDetections(detections, 100)
+		require.Nil(t, groupMM)
+		require.Nil(t, groupMOA)
+		require.NotNil(t, avgConf)
+	})
 }
