@@ -386,7 +386,7 @@ func (in *SetupInput) Validate() error {
 		if in.Club.Type != "" && in.Club.Type != "public" && in.Club.Type != "private" {
 			return fmt.Errorf("%w: club type must be public or private", ErrInvalidSiteSettings)
 		}
-		if in.Club.JoinPolicy != "" && in.Club.JoinPolicy != "open" && in.Club.JoinPolicy != "invite_code" && in.Club.JoinPolicy != "approval" {
+		if in.Club.JoinPolicy != "" && !IsValidJoinPolicy(in.Club.JoinPolicy) {
 			return fmt.Errorf("%w: club join policy must be open, invite_code or approval", ErrInvalidSiteSettings)
 		}
 	} else if in.DeploymentMode == DeploymentModeSingleClub {

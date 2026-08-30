@@ -23,6 +23,21 @@ var ClubDisciplines = []string{
 // disciplines, distances and facilities.
 const ClubProfileListLimit = 20
 
+// JoinPolicies is the canonical set of ways a club or league can be joined.
+// Clubs and leagues share the identical three-value enum, so this is the one
+// place both check against instead of repeating the literal list.
+var JoinPolicies = []string{"open", "invite_code", "approval"}
+
+// IsValidJoinPolicy reports whether v is one of JoinPolicies.
+func IsValidJoinPolicy(v string) bool {
+	for _, p := range JoinPolicies {
+		if v == p {
+			return true
+		}
+	}
+	return false
+}
+
 // ClubSummary is the minimal public-facing view of a club used to render a
 // "members-only" banner without leaking members, standings or posts. It
 // carries enough of the profile (where the club is, what it shoots) for a

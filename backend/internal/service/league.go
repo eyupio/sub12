@@ -265,7 +265,7 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.ScoringRule != nil && *input.ScoringRule != "highest" && *input.ScoringRule != "average" {
 		return nil, fmt.Errorf("%w: scoring_rule must be 'highest' or 'average'", ErrInvalidLeague)
 	}
-	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
+	if input.JoinPolicy != nil && !model.IsValidJoinPolicy(*input.JoinPolicy) {
 		return nil, fmt.Errorf("%w: join_policy must be 'open', 'invite_code', or 'approval'", ErrInvalidLeague)
 	}
 	// If creating under a club, the caller needs the club's league capability.
@@ -653,7 +653,7 @@ func (s *LeagueService) UpdateConfig(ctx context.Context, leagueID, userID strin
 	if input.ScoringRule != nil && *input.ScoringRule != "highest" && *input.ScoringRule != "average" {
 		return nil, fmt.Errorf("%w: scoring_rule must be 'highest' or 'average'", ErrInvalidConfig)
 	}
-	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
+	if input.JoinPolicy != nil && !model.IsValidJoinPolicy(*input.JoinPolicy) {
 		return nil, fmt.Errorf("%w: join_policy must be 'open', 'invite_code', or 'approval'", ErrInvalidConfig)
 	}
 	if input.MaxSubmissionsPerRound != nil && *input.MaxSubmissionsPerRound < 1 {

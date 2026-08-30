@@ -126,7 +126,7 @@ func (s *ClubService) Create(ctx context.Context, userID string, input *model.Cr
 	if input.Type != nil && *input.Type != "public" && *input.Type != "private" {
 		return nil, ErrClubInvalidType
 	}
-	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite_code" && *input.JoinPolicy != "approval" {
+	if input.JoinPolicy != nil && !model.IsValidJoinPolicy(*input.JoinPolicy) {
 		return nil, ErrClubInvalidPolicy
 	}
 	return s.repo.Create(ctx, userID, input)
@@ -516,7 +516,7 @@ func ValidateClubUpdate(in *model.UpdateClubInput) error {
 	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
 		return ErrClubInvalidType
 	}
-	if in.JoinPolicy != nil && *in.JoinPolicy != "open" && *in.JoinPolicy != "invite_code" && *in.JoinPolicy != "approval" {
+	if in.JoinPolicy != nil && !model.IsValidJoinPolicy(*in.JoinPolicy) {
 		return ErrClubInvalidPolicy
 	}
 	if in.PostVisibility != nil && *in.PostVisibility != "members" && *in.PostVisibility != "public" {
