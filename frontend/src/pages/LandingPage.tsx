@@ -11,11 +11,13 @@ import {
   Clock3,
   Crosshair,
   Gauge,
+  GitPullRequest,
   LineChart,
   Medal,
   NotebookPen,
   Radar,
   ScanLine,
+  Server,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
@@ -531,6 +533,9 @@ export default function LandingPage() {
             <a href="#clubs-leagues" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
               Clubs and leagues
             </a>
+            <a href="#open-source" className="text-sm tracking-wide text-muted transition-colors hover:text-secondary">
+              Open source
+            </a>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
@@ -572,7 +577,11 @@ export default function LandingPage() {
                 </a>
               </div>
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted">
-                Free to use. Open source. No ads. Built for range work, club nights, and proper league tracking.
+                Free to use.{' '}
+                <a href="#open-source" className="underline decoration-[var(--brass)]/40 underline-offset-2 transition-colors hover:text-[var(--brass)]">
+                  Open source
+                </a>
+                . No ads. Built for range work, club nights, and proper league tracking.
               </p>
             </div>
 
@@ -1218,6 +1227,76 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section id="open-source" className="px-4 py-20 lg:py-24">
+          <div className="mx-auto max-w-7xl">
+            <SectionHeader
+              eyebrow="Open Source"
+              title="Yours to read, run, and improve"
+              description="SUB12 is open source under AGPL-3.0. The code that runs sub12.io is public on GitHub — audit how your data is handled, help build the platform, or run the whole thing yourself for your club."
+              align="center"
+            />
+
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <ScanLine size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Every line public</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  No black box between your cards and the standings. The backend, the measurement pipeline, and the apps live in one public repository, auditable by anyone.
+                </p>
+                <a
+                  href={sourceUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-subtle px-5 py-3 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]"
+                >
+                  Read the source
+                  <ArrowRight size={16} />
+                </a>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <Server size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Self-host your own</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  Run SUB12 on your own server with Docker Compose. One installer checks prerequisites, generates real secrets, and brings the stack up — then the first-run wizard makes it your club's own site.
+                </p>
+                <a
+                  href={`${sourceUrl()}#installation`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-subtle px-5 py-3 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]"
+                >
+                  Self-hosting guide
+                  <ArrowRight size={16} />
+                </a>
+              </SurfaceCard>
+
+              <SurfaceCard className="rounded-[24px] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brass)]/10 text-[var(--brass)]">
+                  <GitPullRequest size={20} />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-primary">Built in the open</h3>
+                <p className="mt-2 text-sm leading-6 text-secondary">
+                  Issues, ideas, and pull requests are welcome — and the AGPL-3.0 licence keeps every fork and every hosted copy open for the community that shoots with it.
+                </p>
+                <a
+                  href={`${sourceUrl()}/blob/main/CONTRIBUTING.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-subtle px-5 py-3 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]"
+                >
+                  Contribute
+                  <ArrowRight size={16} />
+                </a>
+              </SurfaceCard>
+            </div>
+          </div>
+        </section>
+
         <section className="border-t border-subtle px-4 py-20 lg:py-28">
           <div className="mx-auto max-w-5xl">
             <SurfaceCard
@@ -1244,10 +1323,18 @@ export default function LandingPage() {
                   <Link to="/login" className="inline-flex items-center justify-center rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]">
                     Sign in
                   </Link>
+                  <a
+                    href={`${sourceUrl()}#installation`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center rounded-xl border border-subtle px-6 py-4 text-sm font-medium uppercase tracking-[0.16em] text-secondary transition-colors hover:border-[var(--brass)]/30 hover:text-[var(--brass)]"
+                  >
+                    Self-host it
+                  </a>
                 </div>
 
                 <p className="mt-5 text-xs uppercase tracking-[0.18em] text-muted">
-                  Start with pellet testing, build your score history, and grow into clubs and leagues when you need them.
+                  Start with pellet testing, build your score history, and grow into clubs and leagues when you need them — or host the whole platform yourself.
                 </p>
               </div>
             </SurfaceCard>

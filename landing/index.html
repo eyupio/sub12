@@ -815,6 +815,7 @@
     .feature-card:nth-child(8)  { animation-delay: 0.40s; }
     .feature-card:nth-child(9)  { animation-delay: 0.45s; }
     .feature-card:nth-child(10) { animation-delay: 0.50s; }
+    .feature-card:nth-child(11) { animation-delay: 0.55s; }
 
     /* ── Divider ─────────────────────────────────────────── */
     .divider {
@@ -1005,13 +1006,13 @@
 
       /* Band rhythm: with the three desktop showcases dropped out, re-point
          the raised bands so plain and raised keep alternating —
-         features · tour · community · achievements · install · close */
+         features · tour · community · achievements · install · open source · close */
       .community, .pwa-section { background: var(--bg) !important; }
-      .achievements-section, .cta-section {
+      .achievements-section, .os-section {
         background: var(--bg-raised);
         border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
       }
-      .achievements-section { border-bottom: 1px solid var(--border); }
       .club-grid { grid-template-columns: 1fr !important; gap: 12px !important; margin-bottom: 28px !important; }
       .club-card:hover { transform: none; }
 
@@ -1200,7 +1201,7 @@
         <a href="/app" class="btn-outline-lg">Sign In</a>
       </div>
 
-      <p class="body-sm" style="margin-top: -8px;">Always free &middot; Open source &middot; No ads, no paywalls &middot; Your data stays yours</p>
+      <p class="body-sm" style="margin-top: -8px;">Always free &middot; <a href="#open-source" style="color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--brass-line);">Open source</a> &middot; No ads, no paywalls &middot; Your data stays yours</p>
     </div>
   </section>
 
@@ -1347,6 +1348,16 @@
           </div>
           <p class="feature-title">Works Everywhere</p>
           <p class="feature-desc">Phone, tablet, or desktop. Install as an app on iOS, Android, or any desktop browser. Works offline at the range.</p>
+        </div>
+
+        <!-- Open source -->
+        <div class="feature-card">
+          <span class="feature-new">New</span>
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <p class="feature-title">Open Source &amp; Self-Hostable</p>
+          <p class="feature-desc">AGPL-3.0 and public on GitHub. Audit the code, contribute — or run your own SUB12 for your club with Docker.</p>
         </div>
 
       </div>
@@ -2066,6 +2077,63 @@
     </div>
   </section>
 
+  <!-- ── Open Source ───────────────────────────────────────── -->
+  <section class="section os-section" id="open-source">
+    <div class="container">
+      <div class="two-col">
+        <div>
+          <span class="label" style="margin-bottom:12px;display:block;">Open Source</span>
+          <h2 class="heading-lg" style="margin-bottom:20px;">Yours to read, run, and improve.</h2>
+          <p class="body-lg" style="margin-bottom:32px;">
+            SUB12 is open source under AGPL-3.0. The code that runs sub12.io is public on GitHub &mdash;
+            audit how your data is handled, help build the platform, or run the whole thing on your own
+            server as your club's own site.
+          </p>
+          <div class="spotlight-bullets">
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Every line public and auditable &mdash; no black box between your cards and the standings</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Self-host with Docker Compose &mdash; one installer, then a first-run wizard brands it as your club's</span>
+            </div>
+            <div class="spotlight-bullet">
+              <span class="bullet-check">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 9 2 6"/></svg>
+              </span>
+              <span>Issues and pull requests welcome &mdash; AGPL-3.0 keeps every fork open for the community</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            <a href="https://github.com/eyupio/sub12" class="btn-large">View on GitHub</a>
+            <a href="https://github.com/eyupio/sub12#installation" class="btn-outline-lg">Self-Hosting Guide</a>
+          </div>
+        </div>
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <span class="mockup-dot" style="background:#ff5f57"></span>
+            <span class="mockup-dot" style="background:#febc2e"></span>
+            <span class="mockup-dot" style="background:#28c840"></span>
+            <span class="body-sm mono" style="margin-left:8px;">your-server &mdash; sub12</span>
+          </div>
+          <div class="mockup-body mono" style="font-size:13px;line-height:2.1;overflow-x:auto;">
+            <div><span style="color:var(--text-3);">$</span> git clone https://github.com/eyupio/sub12.git</div>
+            <div><span style="color:var(--text-3);">$</span> cd sub12 &amp;&amp; make install</div>
+            <div style="color:var(--text-3);">Checking prerequisites&hellip; <span class="brass">ok</span></div>
+            <div style="color:var(--text-3);">Generating secrets&hellip; <span class="brass">ok</span></div>
+            <div style="color:var(--text-3);">Running migrations&hellip; <span class="brass">ok</span></div>
+            <div><span class="brass">&#10003;</span> Your SUB12 is up &mdash; open the setup wizard to make it yours</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Final CTA ─────────────────────────────────────────── -->
   <section class="section cta-section">
     <div class="cta-glow" aria-hidden="true"></div>
@@ -2094,6 +2162,7 @@
       <div class="cta-actions">
         <a href="/app/register" class="btn-large">Create Your Free Account</a>
         <a href="/app" class="btn-outline-lg">Sign In</a>
+        <a href="https://github.com/eyupio/sub12#installation" class="btn-outline-lg">Self-Host Your Own</a>
       </div>
     </div>
   </section>
