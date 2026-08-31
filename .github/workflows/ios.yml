@@ -51,7 +51,7 @@ jobs:
     runs-on: blacksmith-12vcpu-macos-15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve version
         id: vars
@@ -69,7 +69,7 @@ jobs:
           # Monotonic across runs so App Store Connect accepts each upload.
           echo "build_number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -279,7 +279,7 @@ jobs:
         # The build itself is the check; losing the artifact (e.g. to the
         # org's artifact storage quota) must not fail an otherwise-green job.
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sub12-ipa-${{ steps.stage.outputs.variant }}
           path: dist-ipa/*.ipa
