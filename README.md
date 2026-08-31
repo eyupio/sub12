@@ -1,7 +1,9 @@
 <div align="center">
 
-<img src="brand/svg/logo-primary-dark.svg#gh-dark-mode-only" alt="sub12" width="180">
-<img src="brand/svg/logo-primary-light.svg#gh-light-mode-only" alt="sub12" width="180">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/svg/logo-primary-dark.svg">
+  <img src="brand/svg/logo-primary-light.svg" alt="sub12" width="180">
+</picture>
 
 ### Log the card. Run the league. Know what your gear actually does.
 
