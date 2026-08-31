@@ -87,6 +87,7 @@ const trustPoints = [
   'Works on phone, tablet, and desktop',
   'No ad clutter around your data',
   'Free to use — no ads, no paywalls',
+  'Open source — AGPL-3.0',
 ] as const
 
 const comparisonRows = [
@@ -571,7 +572,7 @@ export default function LandingPage() {
                 </a>
               </div>
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-muted">
-                Free to use. No ads. Built for range work, club nights, and proper league tracking.
+                Free to use. Open source. No ads. Built for range work, club nights, and proper league tracking.
               </p>
             </div>
 
