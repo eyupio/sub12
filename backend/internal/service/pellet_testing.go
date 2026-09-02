@@ -441,6 +441,12 @@ func (s *PelletTestService) ReplaceDetections(ctx context.Context, measurementID
 	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
 		return nil, err
 	}
+	// Owning the session is not owning the measurement: UpdateMeasurementDetectionMeta
+	// and SetAnnotatedImage are keyed on the measurement id alone, so a measurement
+	// from someone else's session would be written through the caller's own session.
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 
 	detections, err := s.repo.ReplaceDetectionsForMeasurement(ctx, measurementID, sessionID, in.Detections)
 	if err != nil {
@@ -532,6 +538,9 @@ func (s *PelletTestService) CreateDetections(ctx context.Context, measurementID,
 	if err != nil {
 		return nil, err
 	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 
 	detections, err := s.repo.CreateDetectionsBatch(ctx, measurementID, sessionID, in.Detections)
 	if err != nil {
@@ -615,6 +624,9 @@ func (s *PelletTestService) ListDetections(ctx context.Context, sessionID, measu
 	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
 		return nil, err
 	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 	return s.repo.ListDetections(ctx, measurementID)
 }
 
@@ -632,6 +644,9 @@ func (s *PelletTestService) SetAnnotatedImage(ctx context.Context, measurementID
 	// Verify ownership
 	_, err := s.repo.GetByID(ctx, sessionID, userID)
 	if err != nil {
+		return err
+	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
 		return err
 	}
 	return s.repo.SetAnnotatedImage(ctx, measurementID, imageID)
