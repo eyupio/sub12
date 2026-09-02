@@ -176,7 +176,7 @@ function ModelDetailDrawer({ kind, make, model, onClose }: {
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${make} ${model} detail`}>
+    <div className="fixed inset-0 z-[110] flex justify-end" role="dialog" aria-modal="true" aria-label={`${make} ${model} detail`}>
       <button className="absolute inset-0 bg-black/50" aria-label="Close" onClick={onClose} />
       <div className="relative w-full max-w-2xl h-full overflow-y-auto bg-bg border-l border-subtle p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">

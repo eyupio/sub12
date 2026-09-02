@@ -1516,7 +1516,7 @@ export default function ScoreCardDetail() {
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
           onClick={() => setShowLightbox(false)}
         >
           <div className="relative w-[min(64rem,100vw-2rem)] max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">

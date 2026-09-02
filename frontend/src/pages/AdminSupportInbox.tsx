@@ -254,7 +254,7 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Edit feature request">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Edit feature request">
       <div className="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3">
           <h3 className="t-subsection-title">Edit feature request</h3>

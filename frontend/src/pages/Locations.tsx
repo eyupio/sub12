@@ -250,7 +250,7 @@ export default function Locations() {
       </ul>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowForm(false)} />
           <div className="relative bg-surface border border-subtle rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="flex items-center justify-between p-4 border-b border-subtle">

@@ -734,7 +734,7 @@ export default function ImageMeasurement({
 
   // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className={chromeless ? 'flex flex-col bg-page rounded-lg border border-line overflow-hidden h-[calc(100vh-12rem)] min-h-[520px]' : 'fixed inset-0 z-50 flex flex-col bg-page'}>
+    <div className={chromeless ? 'flex flex-col bg-page rounded-lg border border-line overflow-hidden h-[calc(100vh-12rem)] min-h-[520px]' : 'fixed inset-0 z-[120] flex flex-col bg-page'}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-subtle">
         <button onClick={goBack} className="text-primary p-1" aria-label="Go back"><ArrowLeft size={20} /></button>

@@ -228,7 +228,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
       onClick={onClose}
     >
       <div

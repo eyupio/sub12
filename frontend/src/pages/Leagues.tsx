@@ -59,7 +59,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
     }`
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
         <div className="flex items-center justify-between">

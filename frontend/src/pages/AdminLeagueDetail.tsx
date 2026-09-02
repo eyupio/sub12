@@ -33,7 +33,7 @@ function ConfirmDeleteModal({ league, onConfirm, onCancel, isPending }: {
   isPending: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full sm:max-w-sm bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -83,7 +83,7 @@ function AddSimulatedMemberDialog({ leagueId, pending, onAdd, onCancel }: {
   const personas: SimulatedPersona[] = personasData?.items ?? []
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
