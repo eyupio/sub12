@@ -32,7 +32,7 @@ function ConfirmDeleteModal({ club, onConfirm, onCancel, isPending }: {
   isPending: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full sm:max-w-sm bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">

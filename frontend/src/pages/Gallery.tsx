@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Camera,
@@ -527,15 +528,9 @@ function ItemOverlay({
   onWithdraw: () => void
 }) {
   const closeRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    closeRef.current?.focus()
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  useDialogFocus({ dialogRef, initialFocusRef: closeRef, onClose })
 
   const link = itemLink(item)
   const isCard = item.kind === 'score_card'
@@ -553,6 +548,7 @@ function ItemOverlay({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
+        ref={dialogRef}
         className="relative w-full max-w-lg overflow-hidden rounded-lg border border-subtle bg-surface shadow-xl animate-scale-in"
         role="dialog"
         aria-modal="true"

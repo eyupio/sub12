@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronLeft, X as XIcon, CheckCircle, XCircle, AlertCircle, UserCheck, ShieldCheck, Edit3, Pencil, Camera, Upload, MessageSquare, Share2, RotateCcw, RotateCw, Trophy } from 'lucide-react'
 import { scoreCardApi } from '../api/scoreCards'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { gearApi } from '../api/gear'
 import { leagueApi, ScoreConfirmation, ScoreCardAction } from '../api/leagues'
 import { communityReviewApi } from '../api/communityReview'
@@ -612,6 +613,9 @@ export default function ScoreCardDetail() {
   const { id } = useParams({ from: '/app/scores/$id' })
   const smartBack = useSmartBack('/scores', ['/leagues/', '/clubs/', '/feed', '/profile', '/scores'])
   const [showLightbox, setShowLightbox] = useState(false)
+  const lightboxRef = useRef<HTMLDivElement>(null)
+  const closeLightbox = useCallback(() => setShowLightbox(false), [])
+  useDialogFocus({ dialogRef: lightboxRef, onClose: closeLightbox, open: showLightbox })
   const [showShare, setShowShare] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -1516,10 +1520,10 @@ export default function ScoreCardDetail() {
       {/* Lightbox */}
       {showLightbox && card.card_image_url && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--overlay-bg)] backdrop-blur-sm"
           onClick={() => setShowLightbox(false)}
         >
-          <div className="relative w-[min(64rem,100vw-2rem)] max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
+          <div ref={lightboxRef} tabIndex={-1} className="relative w-[min(64rem,100vw-2rem)] max-h-[90vh] p-4" role="dialog" aria-modal="true" aria-label="Score card photo">
             <button
               onClick={() => setShowLightbox(false)}
               className="tap-target absolute top-2 right-2 bg-page/80 backdrop-blur rounded-full p-2 text-muted hover:text-primary transition-colors z-10"

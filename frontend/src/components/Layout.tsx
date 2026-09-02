@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { LayoutDashboard, Target, Crosshair, Package, Trophy, User, LogOut, Mail, Activity, Users, UserCog, WifiOff, MoreHorizontal, X, Globe, Lightbulb, LifeBuoy, Inbox, HelpCircle, BookOpen, Flag, Zap, MapPin, Database, CalendarClock, Bot, BarChart3, RefreshCw, Megaphone, Images, Palette } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/auth'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { authApi } from '../api/auth'
 import { scoreCardApi } from '../api/scoreCards'
 import { pelletTestApi } from '../api/pelletTesting'
@@ -86,6 +87,7 @@ export default function Layout({ children }: PropsWithChildren) {
   const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const [moreOpen, setMoreOpen] = useState(false)
+  const moreSheetRef = useRef<HTMLDivElement>(null)
   // Drives the sticky mobile header's elevation: flat at the top of the page,
   // shadowed once content has scrolled underneath it.
   const [scrolled, setScrolled] = useState(false)
@@ -173,12 +175,8 @@ export default function Layout({ children }: PropsWithChildren) {
 
   // Close the More sheet when the viewport grows past the mobile breakpoint —
   // otherwise it stays mounted invisibly and traps the next Escape press.
-  useEffect(() => {
-    if (!moreOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [moreOpen])
+  const closeMore = useCallback(() => setMoreOpen(false), [])
+  useDialogFocus({ dialogRef: moreSheetRef, onClose: closeMore, open: moreOpen })
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
@@ -439,6 +437,8 @@ export default function Layout({ children }: PropsWithChildren) {
           <div className="lg:hidden fixed inset-0 z-50" onClick={() => setMoreOpen(false)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
             <div
+              ref={moreSheetRef}
+              tabIndex={-1}
               role="dialog"
               aria-modal="true"
               aria-label="More navigation options"

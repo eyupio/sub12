@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { UsersRound } from 'lucide-react'
 import { clubsApi, type Club } from '../api/clubs'
 import { leagueApi, type League } from '../api/leagues'
 import type { SimulatedPersona } from '../api/adminSimulation'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 
 interface PersonaJoinDialogProps {
   open: boolean
@@ -16,6 +17,7 @@ interface PersonaJoinDialogProps {
 }
 
 export function PersonaJoinDialog({ open, persona, kind, pending, onJoin, onKindChange, onCancel }: PersonaJoinDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState('')
 
   const { data: leaguesData } = useQuery({
@@ -36,14 +38,7 @@ export function PersonaJoinDialog({ open, persona, kind, pending, onJoin, onKind
     if (open) setSelected('')
   }, [open, kind])
 
-  useEffect(() => {
-    if (!open) return
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onCancel])
+  useDialogFocus({ dialogRef, onClose: onCancel, open })
 
   if (!open || !persona) return null
 
@@ -53,6 +48,8 @@ export function PersonaJoinDialog({ open, persona, kind, pending, onJoin, onKind
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         role="dialog"
         aria-modal="true"

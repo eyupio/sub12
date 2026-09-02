@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Clapperboard, Play, X } from 'lucide-react'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import {
   availableVideoGuides,
   formatGuideDuration,
@@ -15,15 +16,10 @@ import {
  */
 export default function VideoGuides() {
   const [active, setActive] = useState<VideoGuide | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!active) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setActive(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [active])
+  const closeActive = useCallback(() => setActive(null), [])
+  useDialogFocus({ dialogRef, onClose: closeActive, open: active !== null })
 
   if (availableVideoGuides.length === 0) return null
 
@@ -85,6 +81,8 @@ export default function VideoGuides() {
           onClick={() => setActive(null)}
         >
           <div
+            ref={dialogRef}
+            tabIndex={-1}
             className="w-full max-w-3xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >

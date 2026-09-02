@@ -115,7 +115,7 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 	switch req.Filter {
 	case model.FeedLeague:
 		if req.LeagueID == "" {
-			return nil, fmt.Errorf("league_id is required for league feed")
+			return nil, fmt.Errorf("%w: league_id is required for the league feed", ErrFeedScopeRequired)
 		}
 		if s.leagueMembers != nil && !isAdmin {
 			ok, err := s.leagueMembers.IsMember(ctx, req.LeagueID, req.ViewerID)
@@ -123,13 +123,13 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 				return nil, fmt.Errorf("check league membership: %w", err)
 			}
 			if !ok {
-				return nil, fmt.Errorf("not a member of this league")
+				return nil, fmt.Errorf("%w: not a member of this league", ErrFeedNotMember)
 			}
 		}
 
 	case model.FeedClub:
 		if req.ClubID == "" {
-			return nil, fmt.Errorf("club_id is required for club feed")
+			return nil, fmt.Errorf("%w: club_id is required for the club feed", ErrFeedScopeRequired)
 		}
 		if s.clubMembers != nil && !isAdmin {
 			ok, err := s.clubMembers.IsMember(ctx, req.ClubID, req.ViewerID)
@@ -137,7 +137,7 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 				return nil, fmt.Errorf("check club membership: %w", err)
 			}
 			if !ok {
-				return nil, fmt.Errorf("not a member of this club")
+				return nil, fmt.Errorf("%w: not a member of this club", ErrFeedNotMember)
 			}
 		}
 	}
@@ -165,6 +165,13 @@ func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*
 }
 
 var ErrActivityNotFound = errors.New("activity not found")
+
+// Feed request faults the caller can act on. Anything else GetFeed returns is
+// an internal fault and must not be echoed to the client.
+var (
+	ErrFeedScopeRequired = errors.New("feed scope required")
+	ErrFeedNotMember     = errors.New("not a member")
+)
 
 // DeleteOwn permanently removes an activity that belongs to the calling user.
 // Returns ErrActivityNotFound when the activity does not exist or is owned by someone else.

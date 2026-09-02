@@ -17,7 +17,7 @@ import { useRegionalPrefs } from '../utils/date'
 
 function FollowListModal({ title, items, onClose }: { title: string; items: FollowListItem[]; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={onClose}>
       <div className="bg-surface border border-subtle rounded-lg w-full max-w-sm mx-4 max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-subtle">
           <h3 className="t-section-title">{title}</h3>

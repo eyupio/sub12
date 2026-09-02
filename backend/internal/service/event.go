@@ -221,6 +221,15 @@ func validateEventInput(in *model.CreateEventInput) error {
 	if strings.TrimSpace(in.Discipline) == "" {
 		return fmt.Errorf("%w: discipline is required", ErrInvalidEvent)
 	}
+	if overLength(&in.Name, maxEntityNameLen) {
+		return fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidEvent, maxEntityNameLen)
+	}
+	if overLength(in.Description, maxDescriptionLen) {
+		return fmt.Errorf("%w: description must be %d characters or fewer", ErrInvalidEvent, maxDescriptionLen)
+	}
+	if overLength(in.Location, maxShortDetailLen) {
+		return fmt.Errorf("%w: location must be %d characters or fewer", ErrInvalidEvent, maxShortDetailLen)
+	}
 	format := model.EventFormatShotGrid
 	if in.Format != nil && *in.Format != "" {
 		format = *in.Format
@@ -412,6 +421,15 @@ func validateEventUpdate(ev *model.Event, in *model.UpdateEventInput) error {
 	}
 	if in.Discipline != nil && strings.TrimSpace(*in.Discipline) == "" {
 		return fmt.Errorf("%w: discipline cannot be empty", ErrInvalidEvent)
+	}
+	if overLength(in.Name, maxEntityNameLen) {
+		return fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidEvent, maxEntityNameLen)
+	}
+	if overLength(in.Description, maxDescriptionLen) {
+		return fmt.Errorf("%w: description must be %d characters or fewer", ErrInvalidEvent, maxDescriptionLen)
+	}
+	if overLength(in.Location, maxShortDetailLen) {
+		return fmt.Errorf("%w: location must be %d characters or fewer", ErrInvalidEvent, maxShortDetailLen)
 	}
 	if in.Format != nil && *in.Format != ev.Format {
 		switch *in.Format {

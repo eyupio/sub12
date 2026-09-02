@@ -476,6 +476,10 @@ func (h *PelletTestHandler) UpdateMeasurement(w http.ResponseWriter, r *http.Req
 			writeError(w, http.StatusNotFound, "measurement not found")
 			return
 		}
+		if errors.Is(err, service.ErrInvalidMeasurement) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to update measurement")
 		return
 	}

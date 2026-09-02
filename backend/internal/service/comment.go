@@ -176,21 +176,21 @@ func (s *CommentService) Create(ctx context.Context, targetID, targetType, userI
 	return comment, nil
 }
 
-// ListByTarget returns top-level comments for a target.
-// viewerID may be empty for unauthenticated viewers; it is used to enforce
-// visibility rules for private score cards and block checks.
-func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType, viewerID string) ([]*model.Comment, error) {
+// ensureTargetVisible reports whether viewerID may read the comments attached
+// to a target, returning repository.ErrNotFound when they may not so that
+// existence is not leaked. viewerID may be empty for unauthenticated viewers.
+func (s *CommentService) ensureTargetVisible(ctx context.Context, targetID, targetType, viewerID string) error {
 	switch targetType {
 	case "score_card":
 		card, err := s.scoreCards.GetForViewer(ctx, targetID, viewerID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if viewerID != "" && viewerID != card.UserID {
 			if blocked, err := s.blocked(ctx, viewerID, card.UserID); err != nil {
-				return nil, err
+				return err
 			} else if blocked {
-				return nil, repository.ErrNotFound
+				return repository.ErrNotFound
 			}
 		}
 	case "post":
@@ -201,28 +201,49 @@ func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType,
 		}
 		post, err := s.postSvc.CanViewPostID(ctx, targetID, viewerPtr)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if viewerID != "" && viewerID != post.UserID {
 			if blocked, err := s.blocked(ctx, viewerID, post.UserID); err != nil {
-				return nil, err
+				return err
 			} else if blocked {
-				return nil, repository.ErrNotFound
+				return repository.ErrNotFound
 			}
 		}
 	case "feature_request":
 		if s.featureRequests == nil {
-			return nil, repository.ErrNotFound
+			return repository.ErrNotFound
 		}
 		if _, err := s.featureRequests.GetByID(ctx, targetID, viewerID); err != nil {
-			return nil, err
+			return err
 		}
+	}
+	return nil
+}
+
+// ListByTarget returns top-level comments for a target.
+// viewerID may be empty for unauthenticated viewers; it is used to enforce
+// visibility rules for private score cards and block checks.
+func (s *CommentService) ListByTarget(ctx context.Context, targetID, targetType, viewerID string) ([]*model.Comment, error) {
+	if err := s.ensureTargetVisible(ctx, targetID, targetType, viewerID); err != nil {
+		return nil, err
 	}
 	return s.comments.ListByTargetWithViewer(ctx, targetID, targetType, viewerID)
 }
 
-// ListReplies returns replies to a specific comment.
+// ListReplies returns replies to a specific comment. The parent's target
+// decides who may read the thread: without this the replies to a comment on a
+// card since made private — or by someone the owner has blocked — stayed
+// readable to anyone holding the parent comment's id, while the card itself
+// and its top-level comments had started answering 404.
 func (s *CommentService) ListReplies(ctx context.Context, commentID, viewerID string) ([]*model.Comment, error) {
+	parent, err := s.comments.GetByID(ctx, commentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureTargetVisible(ctx, parent.TargetID, parent.TargetType, viewerID); err != nil {
+		return nil, err
+	}
 	return s.comments.ListRepliesWithViewer(ctx, commentID, viewerID)
 }
 

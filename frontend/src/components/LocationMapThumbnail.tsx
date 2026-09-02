@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { MapPin, Maximize2, X } from 'lucide-react'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -37,20 +38,9 @@ export function LocationMapThumbnail({ label, lat, lng, className }: LocationMap
   const hasCoords = typeof lat === 'number' && typeof lng === 'number'
   const [expanded, setExpanded] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const collapse = useCallback(() => setExpanded(false), [])
 
-  useEffect(() => {
-    if (!expanded) return
-    returnFocusRef.current = document.activeElement as HTMLElement | null
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setExpanded(false)
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => {
-      window.removeEventListener('keydown', handleKey)
-      returnFocusRef.current?.focus?.()
-    }
-  }, [expanded])
+  useDialogFocus({ dialogRef, onClose: collapse, open: expanded })
 
   if (!hasCoords) {
     return <span className={className}>{label}</span>
@@ -102,6 +92,7 @@ export function LocationMapThumbnail({ label, lat, lng, className }: LocationMap
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpanded(false)} />
           <div
             ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={`Map for ${label}`}

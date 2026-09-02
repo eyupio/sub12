@@ -377,6 +377,19 @@ func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imag
 }
 
 func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID, sessionID, userID string, in *model.UpdatePelletTestMeasurementInput) (*model.PelletTestMeasurement, error) {
+	// Same calibration guards CreateMeasurement applies. A zero or negative
+	// pixels_per_mm is stored verbatim (the repository COALESCEs it in), and the
+	// next bbox edit then divides by it: Go yields ±Inf, which Postgres stores
+	// happily, encoding/json refuses to marshal, and writeJSON discards the
+	// error from — leaving the session's own detail endpoint answering 200 with
+	// an empty body.
+	if in.PixelsPerMM != nil && *in.PixelsPerMM <= 0 {
+		return nil, fmt.Errorf("%w: pixels_per_mm must be positive", ErrInvalidMeasurement)
+	}
+	if in.ReferenceDiameterMM != nil && *in.ReferenceDiameterMM <= 0 {
+		return nil, fmt.Errorf("%w: reference_diameter_mm must be positive", ErrInvalidMeasurement)
+	}
+
 	// Recompute measured size if bbox updated
 	if in.BboxWidth != nil && in.BboxHeight != nil {
 		// Need the measurement's pixels_per_mm — fetch the existing measurement
@@ -385,6 +398,10 @@ func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID
 		found, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID)
 		if err != nil {
 			return nil, err
+		}
+
+		if found.PixelsPerMM <= 0 {
+			return nil, fmt.Errorf("%w: measurement has no usable calibration; set pixels_per_mm first", ErrInvalidMeasurement)
 		}
 
 		diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
@@ -439,6 +456,12 @@ func (s *PelletTestService) GetSessionScoring(ctx context.Context, sessionID, us
 
 func (s *PelletTestService) ReplaceDetections(ctx context.Context, measurementID, sessionID, userID string, in *model.CreateDetectionsBatchInput) ([]*model.PelletTestDetection, error) {
 	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
+		return nil, err
+	}
+	// Owning the session is not owning the measurement: UpdateMeasurementDetectionMeta
+	// and SetAnnotatedImage are keyed on the measurement id alone, so a measurement
+	// from someone else's session would be written through the caller's own session.
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
 		return nil, err
 	}
 
@@ -532,6 +555,9 @@ func (s *PelletTestService) CreateDetections(ctx context.Context, measurementID,
 	if err != nil {
 		return nil, err
 	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 
 	detections, err := s.repo.CreateDetectionsBatch(ctx, measurementID, sessionID, in.Detections)
 	if err != nil {
@@ -615,6 +641,9 @@ func (s *PelletTestService) ListDetections(ctx context.Context, sessionID, measu
 	if _, err := s.repo.GetByID(ctx, sessionID, userID); err != nil {
 		return nil, err
 	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
+		return nil, err
+	}
 	return s.repo.ListDetections(ctx, measurementID)
 }
 
@@ -632,6 +661,9 @@ func (s *PelletTestService) SetAnnotatedImage(ctx context.Context, measurementID
 	// Verify ownership
 	_, err := s.repo.GetByID(ctx, sessionID, userID)
 	if err != nil {
+		return err
+	}
+	if _, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID); err != nil {
 		return err
 	}
 	return s.repo.SetAnnotatedImage(ctx, measurementID, imageID)

@@ -6,6 +6,7 @@ import { supportTicketsApi } from '../api/supportTickets'
 import { useAuthStore } from '../store/auth'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { SkeletonCard } from '../components/Skeleton'
 
 function labelForMessageAuthor(authorId: string | undefined, currentUserId: string | undefined): string {
   if (!authorId) return 'System'
@@ -134,7 +135,7 @@ export default function SupportTicketDetail() {
         <Link to="/support" className="text-sm text-[var(--brass)] hover:underline">Back to support center</Link>
       </div>
 
-      {ticketQuery.isLoading && <p className="text-sm text-muted">Loading ticket…</p>}
+      {ticketQuery.isLoading && <SkeletonCard />}
       {ticketQuery.isError && <p role="alert" className="text-sm text-[var(--error-text)]">Failed to load ticket.</p>}
 
       {detail && (
