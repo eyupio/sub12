@@ -41,6 +41,18 @@ func (h *ScoreCardHandler) QuickCreate(w http.ResponseWriter, r *http.Request) {
 
 	card, err := h.svc.QuickCreate(r.Context(), userID, &input)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidCard) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrNotEventParticipant) {
+			writeError(w, http.StatusForbidden, "join the event before capturing a card for it")
+			return
+		}
+		if errors.Is(err, service.ErrEventNotFound) {
+			writeError(w, http.StatusNotFound, "event not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to save draft")
 		return
 	}
