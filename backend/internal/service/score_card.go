@@ -319,6 +319,24 @@ func applyEventDefaults(discipline, clubID **string, ev *model.Event) {
 // validateCardText caps the two free-text fields a card carries. A card's notes
 // travel with it into every feed item, league standing row and share view, so
 // an unbounded value is re-served far more often than it is written.
+// validateCardVisibility mirrors the check UserService.UpdateMe applies to
+// default_score_visibility. The column is plain TEXT with no CHECK constraint
+// and the repository writes the value through a COALESCE, so an unrecognised
+// string is stored verbatim — and every reader compares against the three
+// known values, so the card silently becomes invisible to everyone but its
+// owner, who can always read their own. Create and QuickCreate normalise an
+// unknown value to "public" at the repository; Update had no equivalent.
+func validateCardVisibility(visibility *string) error {
+	if visibility == nil {
+		return nil
+	}
+	switch *visibility {
+	case "public", "followers", "private":
+		return nil
+	}
+	return fmt.Errorf("%w: visibility must be 'public', 'followers' or 'private'", ErrInvalidCard)
+}
+
 func validateCardText(notes, location *string) error {
 	if overLength(notes, maxFreeNotesLen) {
 		return fmt.Errorf("%w: notes must be %d characters or fewer", ErrInvalidCard, maxFreeNotesLen)
@@ -341,6 +359,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		return nil, fmt.Errorf("%w: shot_at is required", ErrInvalidCard)
 	}
 	if err := validateCardText(input.Notes, input.Location); err != nil {
+		return nil, err
+	}
+	if err := validateCardVisibility(input.Visibility); err != nil {
 		return nil, err
 	}
 
@@ -750,6 +771,9 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 		return nil, fmt.Errorf("%w: shot_at is required", ErrInvalidCard)
 	}
 	if err := validateCardText(input.Notes, input.Location); err != nil {
+		return nil, err
+	}
+	if err := validateCardVisibility(input.Visibility); err != nil {
 		return nil, err
 	}
 
