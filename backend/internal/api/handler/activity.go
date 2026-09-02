@@ -49,7 +49,15 @@ func (h *ActivityHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 
 	feed, err := h.svc.GetFeed(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrFeedScopeRequired) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrFeedNotMember) {
+			writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to load feed")
 		return
 	}
 
