@@ -8,6 +8,7 @@ import { supportTicketsApi, type SupportTicketStatus } from '../api/supportTicke
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
 import { formatDateTime, useRegionalPrefs } from '../utils/date'
+import { SkeletonCard } from '../components/Skeleton'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
 
@@ -199,7 +200,7 @@ export default function AdminSupportTicketDetail() {
         </div>
       </div>
 
-      {ticketQuery.isLoading && <p className="text-sm text-muted">Loading ticket…</p>}
+      {ticketQuery.isLoading && <SkeletonCard />}
       {ticketQuery.isError && <p role="alert" className="text-sm text-[var(--error-text)]">Failed to load ticket.</p>}
 
       {detail && (

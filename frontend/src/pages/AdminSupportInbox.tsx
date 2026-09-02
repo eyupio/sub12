@@ -5,6 +5,7 @@ import { Inbox, Lightbulb, Pencil, Trash2, X } from 'lucide-react'
 import { featureRequestsApi, type FeatureRequest, type FeatureRequestPriority, type FeatureRequestStatus } from '../api/featureRequests'
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
 import { toast } from '../store/toast'
+import { SkeletonList } from '../components/Skeleton'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
 const featureStatuses: FeatureRequestStatus[] = ['submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done', 'implemented']
@@ -95,7 +96,7 @@ export default function AdminSupportInbox() {
           </div>
         </div>
 
-        {ticketsQuery.isLoading && <p className="text-sm text-muted">Loading tickets…</p>}
+        {ticketsQuery.isLoading && <SkeletonList count={3} />}
         {ticketsQuery.isError && <p role="alert" className="text-[var(--error-text)] text-sm">Failed to load tickets.</p>}
         {!ticketsQuery.isLoading && tickets.length === 0 && <p className="text-sm text-muted">No tickets found.</p>}
 
@@ -135,7 +136,7 @@ export default function AdminSupportInbox() {
       <section id="feature-requests" className="rounded-xl border border-subtle bg-surface p-4 space-y-4">
         <h2 className="t-subsection-title flex items-center gap-2"><Lightbulb size={16} className="text-[var(--brass)]" /> Feature requests</h2>
 
-        {featureRequestsQuery.isLoading && <p className="text-sm text-muted">Loading feature requests…</p>}
+        {featureRequestsQuery.isLoading && <SkeletonList count={3} />}
         {featureRequestsQuery.isError && <p role="alert" className="text-[var(--error-text)] text-sm">Failed to load feature requests.</p>}
         {!featureRequestsQuery.isLoading && sortedFeatureRequests.length === 0 && <p className="text-sm text-muted">No feature requests found.</p>}
 
