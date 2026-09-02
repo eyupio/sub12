@@ -259,6 +259,12 @@ func (s *LeagueService) Create(ctx context.Context, userID string, input *model.
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidLeague)
 	}
+	if overLength(&input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidLeague, maxEntityNameLen)
+	}
+	if overLength(input.Description, maxDescriptionLen) {
+		return nil, fmt.Errorf("%w: description must be %d characters or fewer", ErrInvalidLeague, maxDescriptionLen)
+	}
 	if input.Type != "" && input.Type != "public" && input.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
 	}
@@ -746,6 +752,9 @@ func (s *LeagueService) CreateSeason(ctx context.Context, leagueID, userID strin
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidSeason)
 	}
+	if overLength(&input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidSeason, maxEntityNameLen)
+	}
 	if err := validateSeasonWindow(input.StartsOn, input.EndsOn); err != nil {
 		return nil, err
 	}
@@ -805,6 +814,9 @@ func (s *LeagueService) UpdateSeason(ctx context.Context, leagueID, userID, seas
 	if input.Name != nil && *input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidSeason)
 	}
+	if overLength(input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidSeason, maxEntityNameLen)
+	}
 	startsOn := current.StartsOn
 	if input.StartsOn != nil {
 		startsOn = *input.StartsOn
@@ -853,6 +865,9 @@ func (s *LeagueService) CreateRound(ctx context.Context, leagueID, userID, seaso
 	}
 	if input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
+	}
+	if overLength(&input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidRound, maxEntityNameLen)
 	}
 	if err := validateRoundWindow(input.OpensAt, input.ClosesAt); err != nil {
 		return nil, err
@@ -913,6 +928,9 @@ func (s *LeagueService) UpdateRound(ctx context.Context, leagueID, userID, round
 	}
 	if input.Name != nil && *input.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidRound)
+	}
+	if overLength(input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidRound, maxEntityNameLen)
 	}
 	opensAt := current.OpensAt
 	if input.OpensAt != nil {
@@ -1107,7 +1125,13 @@ func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID, userID strin
 		if trimmed == "" {
 			return nil, fmt.Errorf("%w: name cannot be blank", ErrInvalidLeague)
 		}
+		if overLength(&trimmed, maxEntityNameLen) {
+			return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidLeague, maxEntityNameLen)
+		}
 		in.Name = &trimmed
+	}
+	if overLength(in.Description, maxDescriptionLen) {
+		return nil, fmt.Errorf("%w: description must be %d characters or fewer", ErrInvalidLeague, maxDescriptionLen)
 	}
 	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
 		return nil, fmt.Errorf("%w: type must be 'public' or 'private'", ErrInvalidLeague)
@@ -1301,6 +1325,9 @@ func (s *LeagueService) AmendScore(ctx context.Context, scoreCardID, adminID str
 	if input.NewXCount < 0 || input.NewXCount > 25 {
 		return fmt.Errorf("%w: new_x_count must be 0-25", ErrInvalidAmend)
 	}
+	if overLength(input.Reason, maxDecisionReason) {
+		return fmt.Errorf("%w: reason must be %d characters or fewer", ErrInvalidAmend, maxDecisionReason)
+	}
 
 	if err := s.requireForScoreCard(ctx, scoreCardID, adminID, model.PermVerifyScores); err != nil {
 		return err
@@ -1329,6 +1356,9 @@ func (s *LeagueService) RejectScore(ctx context.Context, scoreCardID, adminID st
 	input.Reason = strings.TrimSpace(input.Reason)
 	if input.Reason == "" {
 		return ErrReasonRequired
+	}
+	if overLength(&input.Reason, maxDecisionReason) {
+		return fmt.Errorf("%w: reason must be %d characters or fewer", ErrInvalidAmend, maxDecisionReason)
 	}
 	err := s.leagues.RejectScore(ctx, scoreCardID, adminID, input)
 	if errors.Is(err, repository.ErrCardRejected) {

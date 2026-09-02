@@ -316,6 +316,19 @@ func applyEventDefaults(discipline, clubID **string, ev *model.Event) {
 	}
 }
 
+// validateCardText caps the two free-text fields a card carries. A card's notes
+// travel with it into every feed item, league standing row and share view, so
+// an unbounded value is re-served far more often than it is written.
+func validateCardText(notes, location *string) error {
+	if overLength(notes, maxFreeNotesLen) {
+		return fmt.Errorf("%w: notes must be %d characters or fewer", ErrInvalidCard, maxFreeNotesLen)
+	}
+	if overLength(location, maxShortDetailLen) {
+		return fmt.Errorf("%w: location must be %d characters or fewer", ErrInvalidCard, maxShortDetailLen)
+	}
+	return nil
+}
+
 // Create validates the input and persists a new score card.
 func (s *ScoreCardService) Create(ctx context.Context, userID string, input *model.CreateScoreCardInput) (*model.ScoreCard, error) {
 	if len(input.ShotScores) != 25 {
@@ -326,6 +339,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 	}
 	if input.ShotAt == "" {
 		return nil, fmt.Errorf("%w: shot_at is required", ErrInvalidCard)
+	}
+	if err := validateCardText(input.Notes, input.Location); err != nil {
+		return nil, err
 	}
 
 	var totalScore, xCount int16
@@ -579,6 +595,9 @@ func (s *ScoreCardService) GetDraftCount(ctx context.Context, userID string) (in
 // skipped — those rules apply when the user graduates the draft. Activity
 // feed ingestion is also skipped; drafts are private-to-owner until refined.
 func (s *ScoreCardService) QuickCreate(ctx context.Context, userID string, input *model.QuickCreateScoreCardInput) (*model.ScoreCard, error) {
+	if err := validateCardText(input.Notes, input.Location); err != nil {
+		return nil, err
+	}
 	ev, err := s.resolveEventContext(ctx, userID, input.LeagueRoundID, input.EventParticipantID)
 	if err != nil {
 		return nil, err
@@ -729,6 +748,9 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	}
 	if input.ShotAt == "" {
 		return nil, fmt.Errorf("%w: shot_at is required", ErrInvalidCard)
+	}
+	if err := validateCardText(input.Notes, input.Location); err != nil {
+		return nil, err
 	}
 
 	var totalScore, xCount int16
