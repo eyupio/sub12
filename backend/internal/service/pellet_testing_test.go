@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"math"
 	"testing"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,4 +115,32 @@ func TestGroupSizeFromDetections(t *testing.T) {
 		require.Nil(t, groupMOA)
 		require.NotNil(t, avgConf)
 	})
+}
+
+// UpdateMeasurement must apply the same calibration guards CreateMeasurement
+// does. Without them a zero pixels_per_mm is stored verbatim and the next bbox
+// edit divides by it, producing a +Inf measured size that encoding/json cannot
+// marshal — the session's own detail endpoint then answers 200 with an empty
+// body. Validation refuses before any repository call, so a zero-value service
+// reaches it with no database.
+func TestPelletTestService_UpdateMeasurement_CalibrationGuards(t *testing.T) {
+	cases := []struct {
+		name string
+		in   *model.UpdatePelletTestMeasurementInput
+	}{
+		{"zero pixels_per_mm", &model.UpdatePelletTestMeasurementInput{PixelsPerMM: floatPtr(0)}},
+		{"negative pixels_per_mm", &model.UpdatePelletTestMeasurementInput{PixelsPerMM: floatPtr(-1)}},
+		{"zero reference_diameter_mm", &model.UpdatePelletTestMeasurementInput{ReferenceDiameterMM: floatPtr(0)}},
+		{"negative reference_diameter_mm", &model.UpdatePelletTestMeasurementInput{ReferenceDiameterMM: floatPtr(-2.5)}},
+	}
+
+	svc := &PelletTestService{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := svc.UpdateMeasurement(context.Background(), "measurement", "session", "user", tc.in)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, ErrInvalidMeasurement)
+			assert.Nil(t, m)
+		})
+	}
 }

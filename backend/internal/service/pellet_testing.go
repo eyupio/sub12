@@ -377,6 +377,19 @@ func (s *PelletTestService) GetMeasurements(ctx context.Context, sessionID, imag
 }
 
 func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID, sessionID, userID string, in *model.UpdatePelletTestMeasurementInput) (*model.PelletTestMeasurement, error) {
+	// Same calibration guards CreateMeasurement applies. A zero or negative
+	// pixels_per_mm is stored verbatim (the repository COALESCEs it in), and the
+	// next bbox edit then divides by it: Go yields ±Inf, which Postgres stores
+	// happily, encoding/json refuses to marshal, and writeJSON discards the
+	// error from — leaving the session's own detail endpoint answering 200 with
+	// an empty body.
+	if in.PixelsPerMM != nil && *in.PixelsPerMM <= 0 {
+		return nil, fmt.Errorf("%w: pixels_per_mm must be positive", ErrInvalidMeasurement)
+	}
+	if in.ReferenceDiameterMM != nil && *in.ReferenceDiameterMM <= 0 {
+		return nil, fmt.Errorf("%w: reference_diameter_mm must be positive", ErrInvalidMeasurement)
+	}
+
 	// Recompute measured size if bbox updated
 	if in.BboxWidth != nil && in.BboxHeight != nil {
 		// Need the measurement's pixels_per_mm — fetch the existing measurement
@@ -385,6 +398,10 @@ func (s *PelletTestService) UpdateMeasurement(ctx context.Context, measurementID
 		found, err := s.repo.GetMeasurementByID(ctx, measurementID, sessionID)
 		if err != nil {
 			return nil, err
+		}
+
+		if found.PixelsPerMM <= 0 {
+			return nil, fmt.Errorf("%w: measurement has no usable calibration; set pixels_per_mm first", ErrInvalidMeasurement)
 		}
 
 		diag := math.Sqrt((*in.BboxWidth)*(*in.BboxWidth) + (*in.BboxHeight)*(*in.BboxHeight))
