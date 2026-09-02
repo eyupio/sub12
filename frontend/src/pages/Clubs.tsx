@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, X, Trophy, Lock, MapPin, Navigation } from 'lucide-react'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { clubsApi, type Club, type CreateClubInput } from '../api/clubs'
 import { ApiError } from '../api/client'
 import { HelpIcon } from '../components/Tooltip'
@@ -21,6 +22,9 @@ import { StatTile } from '../components/dashboard'
 import { useBranding } from '../store/branding'
 
 function CreateClubModal({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus({ dialogRef, onClose })
+
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -63,7 +67,7 @@ function CreateClubModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-labelledby="new-club-modal-title" className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="new-club-modal-title" className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 id="new-club-modal-title" className="t-section-title">New Club</h2>
           <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary transition-colors"><X size={18} /></button>

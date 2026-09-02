@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import {
   Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -170,6 +171,9 @@ function ModelDetailDrawer({ kind, make, model, onClose }: {
   model: string
   onClose: () => void
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus({ dialogRef, onClose })
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-gear-model', kind, make, model],
     queryFn: () => adminGearApi.getModelDetail(kind, make, model),
@@ -178,7 +182,7 @@ function ModelDetailDrawer({ kind, make, model, onClose }: {
   return (
     <div className="fixed inset-0 z-[110] flex justify-end" role="dialog" aria-modal="true" aria-label={`${make} ${model} detail`}>
       <button className="absolute inset-0 bg-black/50" aria-label="Close" onClick={onClose} />
-      <div className="relative w-full max-w-2xl h-full overflow-y-auto bg-bg border-l border-subtle p-5 space-y-4">
+      <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-2xl h-full overflow-y-auto bg-bg border-l border-subtle p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="t-page-title normal-case tracking-normal text-primary">{make} {model}</h2>

@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react'
 import type { SimulatedPersona, UpdateSimulatedPersonaInput } from '../api/adminSimulation'
 import { identiconDataUri, identiconPngFile, randomIdenticonSeed } from '../utils/identicon'
 import { toast } from '../store/toast'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -40,16 +41,7 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
     setAvatarPreview(persona.avatar_url ?? null)
   }, [open, persona])
 
-  useEffect(() => {
-    if (!open) return
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onCancel()
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onCancel])
+  useDialogFocus({ dialogRef, onClose: onCancel, open })
 
   if (!open || !persona) return null
 
@@ -92,6 +84,7 @@ export function PersonaEditDialog({ open, persona, pending, onSave, onCancel }: 
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
       <div
         ref={dialogRef}
+        tabIndex={-1}
         className="relative bg-surface border border-subtle rounded-lg shadow-xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         role="dialog"
         aria-modal="true"

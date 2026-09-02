@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Inbox, Lightbulb, Pencil, Trash2, X } from 'lucide-react'
@@ -6,6 +6,7 @@ import { featureRequestsApi, type FeatureRequest, type FeatureRequestPriority, t
 import { supportTicketsApi, type SupportTicketCategory, type SupportTicketStatus } from '../api/supportTickets'
 import { toast } from '../store/toast'
 import { SkeletonList } from '../components/Skeleton'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 
 const ticketStatuses: SupportTicketStatus[] = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed']
 const featureStatuses: FeatureRequestStatus[] = ['submitted', 'refining', 'accepted', 'rejected', 'planned', 'in_progress', 'done', 'implemented']
@@ -227,6 +228,9 @@ interface FeatureRequestEditDialogProps {
 }
 
 function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestEditDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus({ dialogRef, onClose })
+
   const [title, setTitle] = useState(feature.title)
   const [refinedDescription, setRefinedDescription] = useState(feature.refined_description)
   const [status, setStatus] = useState<FeatureRequestStatus>(feature.status)
@@ -255,7 +259,7 @@ function FeatureRequestEditDialog({ feature, onClose, onSaved }: FeatureRequestE
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Edit feature request">
-      <div className="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-4 md:p-6">
+      <div ref={dialogRef} tabIndex={-1} className="w-full max-w-lg rounded-2xl border border-subtle bg-surface p-4 md:p-6">
         <div className="flex items-center justify-between gap-3">
           <h3 className="t-subsection-title">Edit feature request</h3>
           <button type="button" className="rounded-md p-1 hover:bg-[color:var(--surface-muted)]" onClick={onClose} aria-label="Close">

@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import {
   Building2,
   CheckCircle2,
@@ -634,6 +635,7 @@ function IdeaComposer({ open, scopeType, scopeID, scopeLabel, onClose }: {
   const [error, setError] = useState<string | null>(null)
   const [submittedTicketID, setSubmittedTicketID] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -644,12 +646,7 @@ function IdeaComposer({ open, scopeType, scopeID, scopeLabel, onClose }: {
     titleRef.current?.focus()
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  useDialogFocus({ dialogRef, initialFocusRef: titleRef, onClose, open })
 
   const createMutation = useMutation({
     mutationFn: () => supportTicketsApi.create({
@@ -690,6 +687,7 @@ function IdeaComposer({ open, scopeType, scopeID, scopeLabel, onClose }: {
     <div className="fixed inset-0 z-[110] flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="idea-composer-title"

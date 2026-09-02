@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Crop, RotateCcw, RotateCw, X as XIcon } from 'lucide-react'
 import { ChipSelector } from './ChipSelector'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { toast } from '../store/toast'
 import {
   HANDLE_SIZE,
@@ -101,6 +102,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = 'Edit photo', quality = 0.92 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -447,14 +449,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     }
   }
 
-  // Esc closes
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
+  useDialogFocus({ dialogRef, onClose: onCancel })
 
   const aspectChips = lockedRatio != null
     ? null
@@ -469,7 +464,7 @@ export function ImageEditor({ file, onSave, onCancel, aspect = 'free', title = '
     )
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[120] flex flex-col bg-black/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 text-white">
         <button type="button" onClick={onCancel} aria-label="Cancel" className="tap-target w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, Lock, Trophy, X, Check } from 'lucide-react'
 import { leagueApi, CreateLeaguePayload, MyLeagueSummary, type League } from '../api/leagues'
 import { useAuthStore } from '../store/auth'
 import { toast } from '../store/toast'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import {
@@ -20,6 +21,9 @@ import { StatTile } from '../components/dashboard'
 type Filter = 'all' | 'joined' | 'owned'
 
 function CreateLeagueModal({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus({ dialogRef, onClose })
+
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -61,7 +65,7 @@ function CreateLeagueModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-[var(--overlay-bg)] backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
+      <div ref={dialogRef} tabIndex={-1} className="relative w-full sm:max-w-md bg-card border border-subtle rounded-t-2xl sm:rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="new-league-modal-title">
         <div className="flex items-center justify-between">
           <h2 id="new-league-modal-title" className="t-section-title">New League</h2>
           <button onClick={onClose} aria-label="Close" className="text-muted hover:text-secondary transition-colors">
