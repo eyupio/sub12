@@ -713,6 +713,9 @@ func (s *EventService) Join(ctx context.Context, slug, userID string, in *model.
 	if err := validateLaneAssignment(ev, in.LaneAssignment); err != nil {
 		return nil, err
 	}
+	if err := validateEventParticipantText(in.Team, in.WeaponClass, in.WeaponLabel); err != nil {
+		return nil, err
+	}
 	p, err := s.events.AddRegisteredParticipant(ctx, ev.ID, userID, userID, in)
 	if errors.Is(err, repository.ErrConflict) {
 		return nil, ErrAlreadyEventParticipant
@@ -749,6 +752,24 @@ func validateLaneAssignment(ev *model.Event, lane *int) error {
 	return nil
 }
 
+// validateEventParticipantText caps the free-text fields a participant carries
+// on Join and AddGuest. Each value is persisted on event_participants and re-
+// served with the participant listing on every viewer's event page, so the
+// same shape as text_limits.go: cap in runes at the service layer, since the
+// handler's 1 MiB body cap bounds one request rather than the row it writes.
+func validateEventParticipantText(team, weaponClass, weaponLabel *string) error {
+	if overLength(team, maxShortDetailLen) {
+		return fmt.Errorf("%w: team must be %d characters or fewer", ErrInvalidEvent, maxShortDetailLen)
+	}
+	if overLength(weaponClass, maxShortDetailLen) {
+		return fmt.Errorf("%w: weapon_class must be %d characters or fewer", ErrInvalidEvent, maxShortDetailLen)
+	}
+	if overLength(weaponLabel, maxShortDetailLen) {
+		return fmt.Errorf("%w: weapon_label must be %d characters or fewer", ErrInvalidEvent, maxShortDetailLen)
+	}
+	return nil
+}
+
 // AddGuest is owner-only. Allowed in any pre-completion state so owners can
 // recover from "this guy showed up after sign-up closed" reality; completed
 // and archived events refuse new entries.
@@ -769,12 +790,18 @@ func (s *EventService) AddGuest(ctx context.Context, slug, ownerID string, in *m
 	if strings.TrimSpace(in.GuestName) == "" {
 		return nil, fmt.Errorf("%w: guest_name is required", ErrInvalidEvent)
 	}
+	if overLength(&in.GuestName, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: guest_name must be %d characters or fewer", ErrInvalidEvent, maxEntityNameLen)
+	}
 	if in.CategoryID != nil && *in.CategoryID != "" {
 		if !contains(ev.CategoryIDs, *in.CategoryID) {
 			return nil, fmt.Errorf("%w: category is not enabled for this event", ErrInvalidEvent)
 		}
 	}
 	if err := validateLaneAssignment(ev, in.LaneAssignment); err != nil {
+		return nil, err
+	}
+	if err := validateEventParticipantText(in.Team, in.WeaponClass, in.WeaponLabel); err != nil {
 		return nil, err
 	}
 	p, err := s.events.AddGuest(ctx, ev.ID, ownerID, in)

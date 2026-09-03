@@ -80,4 +80,15 @@ func TestServices_FreeTextLengthCaps(t *testing.T) {
 		assert.ErrorIs(t, validateLocationText(nil, nil, &long), ErrInvalidGear)
 		assert.NoError(t, validateLocationText(nil, nil, nil))
 	})
+
+	// The Join and AddGuest paths persist team, weapon_class and weapon_label
+	// on event_participants and re-serve them on the participant listing every
+	// event viewer sees. Same shape as the entity fields above, and the same
+	// commit that capped event Create/Update missed these.
+	t.Run("event participant free-text (team, weapon_class, weapon_label)", func(t *testing.T) {
+		assert.ErrorIs(t, validateEventParticipantText(&long, nil, nil), ErrInvalidEvent)
+		assert.ErrorIs(t, validateEventParticipantText(nil, &long, nil), ErrInvalidEvent)
+		assert.ErrorIs(t, validateEventParticipantText(nil, nil, &long), ErrInvalidEvent)
+		assert.NoError(t, validateEventParticipantText(nil, nil, nil), "all absent is a valid entry")
+	})
 }
