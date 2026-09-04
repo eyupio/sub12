@@ -17,6 +17,13 @@ const (
 	maxFreeNotesLen   = 2000
 	maxShortDetailLen = 200
 	maxDecisionReason = 500
+
+	// maxCommentBodyLen and maxCommentFlagReasonLen predate this file's
+	// caps and still enforce their own limit inline rather than through
+	// overLength — named here so the value isn't duplicated by hand between
+	// the check and the error text it backs (see comment.go).
+	maxCommentBodyLen       = 2000
+	maxCommentFlagReasonLen = 500
 )
 
 // overLength reports whether field exceeds max runes. A nil field is absent

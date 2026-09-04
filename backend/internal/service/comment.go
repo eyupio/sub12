@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jnnngs/sub-12/backend/internal/model"
@@ -11,7 +12,7 @@ import (
 
 var (
 	ErrCommentEmpty           = errors.New("comment body cannot be empty")
-	ErrCommentTooLong         = errors.New("comment body exceeds maximum length of 2000 characters")
+	ErrCommentTooLong         = fmt.Errorf("comment body exceeds maximum length of %d characters", maxCommentBodyLen)
 	ErrCommentDenied          = errors.New("you cannot comment on this content")
 	ErrCommentForbidden       = errors.New("not authorized to moderate this comment")
 	ErrCommentFlagReasonEmpty = errors.New("flag reason is required")
@@ -78,7 +79,7 @@ func (s *CommentService) validateBody(body string) (string, error) {
 	if body == "" {
 		return "", ErrCommentEmpty
 	}
-	if len([]rune(body)) > 2000 {
+	if len([]rune(body)) > maxCommentBodyLen {
 		return "", ErrCommentTooLong
 	}
 	return body, nil
@@ -324,8 +325,8 @@ func (s *CommentService) FlagComment(ctx context.Context, userID, role, commentI
 	if reason == "" {
 		return ErrCommentFlagReasonEmpty
 	}
-	if len([]rune(reason)) > 500 {
-		reason = string([]rune(reason)[:500])
+	if len([]rune(reason)) > maxCommentFlagReasonLen {
+		reason = string([]rune(reason)[:maxCommentFlagReasonLen])
 	}
 	scope, err := s.CanModerateComment(ctx, userID, role, commentID)
 	if err != nil {
