@@ -665,27 +665,20 @@ func (h *EventHandler) ResultsCSV(w http.ResponseWriter, r *http.Request) {
 	_ = writer.Write([]string{"event_slug", "event_name", "discipline", "participant", "team", "lane", "shot", "result", "recorded_at"})
 
 	displayByID := make(map[string]string, len(parts))
+	teamByID := make(map[string]string, len(parts))
 	for _, p := range parts {
 		displayByID[p.ID] = p.DisplayName
+		if p.Team != nil {
+			teamByID[p.ID] = *p.Team
+		}
 	}
 	for _, s := range scores {
-		var team string
-		var name string
-		for _, p := range parts {
-			if p.ID == s.ParticipantID {
-				name = p.DisplayName
-				if p.Team != nil {
-					team = *p.Team
-				}
-				break
-			}
-		}
 		_ = writer.Write([]string{
 			ev.Slug,
 			ev.Name,
 			ev.Discipline,
-			name,
-			team,
+			displayByID[s.ParticipantID],
+			teamByID[s.ParticipantID],
 			strconv.Itoa(s.Lane),
 			strconv.Itoa(s.ShotNumber),
 			s.Result,
