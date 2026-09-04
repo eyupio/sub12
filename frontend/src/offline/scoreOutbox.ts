@@ -8,6 +8,7 @@
 // before approval. The wrapper is intentionally minimal — three operations
 // (enqueue, peek, flush) cover the scorecard's needs.
 
+import { ApiError } from '../api/client'
 import { eventsApi, type RecordScoreItem } from '../api/events'
 
 const DB_NAME = 'sub12-events'
@@ -98,6 +99,16 @@ async function removeMany(clientIds: string[]): Promise<void> {
   })
 }
 
+// A 4xx from recordScores means the server has permanently rejected the
+// batch (bad data, an event that closed, a lane/shot outside the course, or
+// the caller losing scorer access) — resending the identical payload will
+// never succeed. Anything else (network failure, 5xx) is worth retrying.
+// Exported standalone so this classification is unit-testable without an
+// IndexedDB environment.
+export function shouldDropOnFlushError(err: unknown): boolean {
+  return err instanceof ApiError && err.status >= 400 && err.status < 500
+}
+
 // Flush every queued entry for the given event. Returns the number of items
 // confirmed by the server and removed from the outbox. Network errors leave
 // entries in place for the next attempt; client/server validation errors
@@ -108,6 +119,7 @@ export async function flush(eventSlug: string): Promise<{ written: number; remai
   // Send in chunks so a single batch can't blow memory on a long offline run.
   const CHUNK = 100
   let written = 0
+  let firstError: unknown = null
   for (let i = 0; i < pending.length; i += CHUNK) {
     const chunk = pending.slice(i, i + CHUNK)
     const payload: RecordScoreItem[] = chunk.map((c) => ({
@@ -119,12 +131,25 @@ export async function flush(eventSlug: string): Promise<{ written: number; remai
       client_id: c.client_id,
       recorded_at: c.recorded_at,
     }))
-    // On failure, propagate so the caller can surface a stale-state badge;
-    // entries stay queued for retry on the next attempt.
-    const resp = await eventsApi.recordScores(eventSlug, payload)
-    written += resp.written
-    await removeMany(chunk.map((c) => c.client_id))
+    try {
+      const resp = await eventsApi.recordScores(eventSlug, payload)
+      written += resp.written
+      await removeMany(chunk.map((c) => c.client_id))
+    } catch (err) {
+      if (shouldDropOnFlushError(err)) {
+        // Unblock every later flush by dropping this batch, but still
+        // remember the failure so the caller (recordMutation) surfaces it
+        // instead of reporting a false success.
+        await removeMany(chunk.map((c) => c.client_id))
+        firstError = firstError ?? err
+        continue
+      }
+      // Network/5xx: stop here and leave this chunk plus everything after
+      // it queued for the next attempt.
+      throw err
+    }
   }
+  if (firstError) throw firstError
   return { written, remaining: 0 }
 }
 
