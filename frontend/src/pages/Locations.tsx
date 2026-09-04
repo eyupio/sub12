@@ -460,9 +460,14 @@ export default function Locations() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-[var(--brass)] text-black rounded-lg text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="flex-1 py-2 bg-[var(--brass)] text-black rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <Check className="w-4 h-4" />
+                  {createMutation.isPending || updateMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
                   {editing ? 'Save changes' : 'Add location'}
                 </button>
               </div>

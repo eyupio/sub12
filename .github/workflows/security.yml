@@ -91,7 +91,7 @@ jobs:
   # ----------------------------------------------------------------- Go modules
   govulncheck:
     name: Go vulnerabilities
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +113,7 @@ jobs:
   # ---------------------------------------------------------------- npm projects
   npm-audit:
     name: npm audit (${{ matrix.project }})
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -159,7 +159,29 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Check dependency review availability
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for dependency changes
+        id: dependency-changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=false
+          while IFS= read -r file; do
+            case "$file" in
+              go.mod|go.sum|package.json|package-lock.json|*/go.mod|*/go.sum|*/package.json|*/package-lock.json)
+                changed=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - if: steps.dependency-changes.outputs.changed == 'true'
+        name: Check dependency review availability
         id: dependency-review-availability
         env:
           GH_TOKEN: ${{ github.token }}
@@ -167,7 +189,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Authorization: ******" \
             --header "Accept: application/vnd.github+json" \
             "${GITHUB_API_URL}/repos/${{ github.repository }}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}")
           case "$status" in
@@ -182,10 +204,7 @@ jobs:
               ;;
           esac
 
-      - if: steps.dependency-review-availability.outputs.available == 'true'
-        uses: actions/checkout@v4
-
-      - if: steps.dependency-review-availability.outputs.available == 'true'
+      - if: steps.dependency-changes.outputs.changed == 'true' && steps.dependency-review-availability.outputs.available == 'true'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
