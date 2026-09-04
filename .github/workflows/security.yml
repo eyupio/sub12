@@ -91,7 +91,7 @@ jobs:
   # ----------------------------------------------------------------- Go modules
   govulncheck:
     name: Go vulnerabilities
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +113,7 @@ jobs:
   # ---------------------------------------------------------------- npm projects
   npm-audit:
     name: npm audit (${{ matrix.project }})
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 10
     strategy:
       fail-fast: false
