@@ -147,9 +147,11 @@ jobs:
   # -------------------------------------------------- new dependencies in a PR
   dependency-review:
     name: Dependency review
-    # Same gate as CodeQL, same reason: the action reports "Dependency review is
-    # not supported on this repository" without Dependency graph + Advanced
-    # Security, which a private repo does not have. Free once public.
+    # Public repositories can use dependency review for free, but the dependency
+    # graph is still a separate repository setting. Probe it before invoking the
+    # action so a disabled graph does not make every pull request fail. The probe
+    # starts returning 200, and the review starts running, as soon as an admin
+    # enables the graph.
     if: github.event_name == 'pull_request' && github.event.repository.private == false
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
@@ -157,8 +159,34 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - name: Check dependency review availability
+        id: dependency-review-availability
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            "${GITHUB_API_URL}/repos/${{ github.repository }}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}")
+          case "$status" in
+            200) echo "available=true" >> "$GITHUB_OUTPUT" ;;
+            404)
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "::warning::Dependency review skipped because the repository dependency graph is disabled"
+              ;;
+            *)
+              echo "::error::Dependency review availability check returned HTTP ${status}"
+              exit 1
+              ;;
+          esac
+
+      - if: steps.dependency-review-availability.outputs.available == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.dependency-review-availability.outputs.available == 'true'
+        uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
