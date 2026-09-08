@@ -48,7 +48,6 @@ async function loginAndSaveState(creds: UserCreds, baseUrl: string, apiUrl: stri
   }
   const cookieValue = refreshCookieRaw.split(';')[0]!.split('=').slice(1).join('=');
 
-  const baseUrlObj = new URL(baseUrl);
   const apiUrlObj = new URL(apiUrl);
 
   // Open a real browser context so localStorage gets written for the right origin.
@@ -89,7 +88,6 @@ async function loginAndSaveState(creds: UserCreds, baseUrl: string, apiUrl: stri
   await browser.close();
   await apiCtx.dispose();
 
-  // eslint-disable-next-line no-console
   console.info(`[global-setup] saved storage state for User ${creds.label} → ${creds.storagePath}`);
 }
 

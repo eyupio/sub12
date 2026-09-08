@@ -7,7 +7,7 @@ import { deleteAllScoreCards, ensureGear, seedHistory } from './seed';
 test('showcase-analytics', async ({ page, demo }) => {
   const session = await ensureAccount(DEMO_USER.email, DEMO_USER.password, DEMO_USER.displayName);
   const api = await DemoApi.for(session);
-  let rifleId = '';
+  let rifleId: string;
   try {
     await deleteAllScoreCards(api);
     const gear = await ensureGear(api);
