@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN npm run build
 # Runtime stage — nginx serving the static PWA.
 # Uses the unprivileged image which runs as UID 101 and binds to port 8080
 # by default (no root, no cap_net_bind_service needed).
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 

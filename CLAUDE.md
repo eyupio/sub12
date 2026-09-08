@@ -97,9 +97,9 @@ and nothing else.
 
 ## Tech Stack
 
-- **Backend:** Go 1.25, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5, go-redis v9
+- **Backend:** Go 1.26, Chi v5 router, pgx v5, zerolog, envconfig, golang-jwt v5, go-redis v9
 - **Database:** PostgreSQL 16, Redis 7
-- **Frontend:** React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts 3, Lucide React icons
+- **Frontend:** React 19, TypeScript 6, Vite 8, TanStack Router + Query, Zustand 4, Tailwind CSS v3, Recharts 3, Lucide React icons
 - **Mobile:** Capacitor 6 (PWA-first, via vite-plugin-pwa)
 - **Also in the backend:** `fogleman/gg` + `golang.org/x/image` render the `/og/*.png` share cards, `pquerna/otp` backs two-factor auth, `minio-go` ships encrypted database backups to S3-compatible storage, `alicebob/miniredis` fakes Redis in tests
 - **Testing:** Go test + testify (backend), Vitest + Testing Library (frontend), Playwright (e2e)
@@ -1039,7 +1039,7 @@ rest as build/publish plumbing.
 1. **Backend:** Migration lint (duplicate check) → `go vet` → `go test -race` → `go build`
    - Runs against a PostgreSQL 16 service container
 2. **Frontend:** `npm ci` → type check → lint → test → build
-   - Node.js 20
+   - Node.js 26
 3. **Docker:** Smoke-test image builds for both services (depends on backend + frontend jobs)
 
 ### android.yml (PR / push to `main` / tag `v*` / manual)

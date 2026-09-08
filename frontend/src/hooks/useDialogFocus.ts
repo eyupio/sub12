@@ -21,8 +21,8 @@ export function useDialogFocus({
   onClose,
   open = true,
 }: {
-  dialogRef: RefObject<HTMLElement>
-  initialFocusRef?: RefObject<HTMLElement>
+  dialogRef: RefObject<HTMLElement | null>
+  initialFocusRef?: RefObject<HTMLElement | null>
   onClose: () => void
   open?: boolean
 }) {

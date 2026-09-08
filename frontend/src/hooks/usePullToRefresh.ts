@@ -26,7 +26,7 @@ export function pageScrollTop(el: HTMLElement | null): number {
 
 interface PullToRefresh {
   /** Attach to the floating indicator; the hook drives its transform directly. */
-  indicatorRef: RefObject<HTMLDivElement>
+  indicatorRef: RefObject<HTMLDivElement | null>
   /** True from release until onRefresh settles — spin the icon while set. */
   refreshing: boolean
 }
@@ -40,7 +40,7 @@ interface PullToRefresh {
  * every touchmove drops frames.
  */
 export function usePullToRefresh(
-  scrollRef: RefObject<HTMLElement>,
+  scrollRef: RefObject<HTMLElement | null>,
   onRefresh: () => Promise<unknown>,
   enabled = true,
 ): PullToRefresh {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Capacitor } from '@capacitor/core'
-import { X, Share2, Link as LinkIcon, Facebook, Mail, MessageCircle } from 'lucide-react'
+import { X, Share2, Link as LinkIcon, Mail, MessageCircle } from 'lucide-react'
 import { postApi, SharePayload } from '../api/posts'
 import { leagueApi } from '../api/leagues'
 import { clubsApi } from '../api/clubs'
@@ -50,6 +50,23 @@ function isInternalShareType(t: ShareTargetType): t is InternalTargetType {
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// Inline brand marks for the share buttons. Lucide dropped every brand icon in
+// v1, and its old bird under "Twitter" read as a different brand next to the
+// "X" label anyway, so both are drawn here.
+function FacebookIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.5-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z" />
+    </svg>
+  )
+}
 
 // Inline X-mark for the X (formerly Twitter) share button. Lucide still ships
 // the old bird under "Twitter" which reads as a different brand next to the
@@ -387,7 +404,7 @@ export function ShareDialog({ targetId, targetType, targetLabel, shareTitle, sha
               <ExternalButton
                 onClick={() => openExternal(facebookHref)}
                 label="Facebook"
-                icon={<Facebook size={14} />}
+                icon={<FacebookIcon size={14} />}
               />
               <ExternalButton
                 onClick={() => openExternal(whatsappHref)}

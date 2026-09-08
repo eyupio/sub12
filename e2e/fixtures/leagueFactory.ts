@@ -43,7 +43,6 @@ export const test = usersTest.extend<LeagueFactoryFixtures>({
       try {
         await pageA.api.adminDeleteLeague(l.id);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.warn(`[leagueFactory] cleanup failed for ${l.id}: ${(err as Error).message}`);
       }
     }

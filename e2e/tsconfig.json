@@ -15,7 +15,6 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
       "@e2e/*": ["./*"]
     }

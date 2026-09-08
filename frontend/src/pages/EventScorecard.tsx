@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
@@ -327,7 +327,7 @@ function LaneGrid({
   return (
     <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
       {lanes.map((lane) => {
-        const cells: JSX.Element[] = []
+        const cells: ReactElement[] = []
         for (let s = 1; s <= shotsPerTarget; s++) {
           const key = shotKey(participant.id, lane, s)
           const localShot = local.get(key)
