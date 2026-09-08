@@ -11,7 +11,12 @@ const isNative = vi.mocked(Capacitor.isNativePlatform)
 describe('siteOrigin', () => {
   beforeEach(() => {
     isNative.mockReturnValue(false)
-    Object.assign(window, { location: { ...window.location, origin: 'https://app.test' } })
+    // jsdom 30 makes window.location a live Location setter that coerces its
+    // argument to a URL string, so a plain assign no longer swaps the object.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, origin: 'https://app.test' },
+    })
   })
 
   afterEach(() => {

@@ -41,7 +41,12 @@ describe('ShareDialog', () => {
   beforeEach(() => {
     navigateMock.mockReset()
     useToastStore.setState({ toasts: [] })
-    Object.assign(window, { location: { ...window.location, origin: 'https://app.test' } })
+    // jsdom 30 makes window.location a live Location setter that coerces its
+    // argument to a URL string, so a plain assign no longer swaps the object.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, origin: 'https://app.test' },
+    })
     // Default tests run without navigator.share so the fallback channel grid
     // is visible up-front. Individual tests that exercise the Web Share API
     // install their own stub.
