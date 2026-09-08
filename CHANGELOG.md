@@ -78,6 +78,12 @@ APK tracks the rolling `android-latest` pre-release.
   than `npm install`), so a container build resolves the same dependency tree
   CI tested.
 - Container images and release URLs now refer to `eyupio/sub12`.
+- **Toolchain upgrade across both halves.** Go 1.26, React 19, Vite 8,
+  Vitest 5, TypeScript 6, ESLint 10, lucide-react 1 and Node 26 as the build
+  and CI runtime. Two of the proposals were held back deliberately: Tailwind 4
+  changes the meaning of utilities the design system already uses (`shadow-sm`,
+  `rounded-sm`, `ring`, `outline-none`) and needs its own change with a visual
+  review, and TypeScript 7 has no typescript-eslint release supporting it yet.
 
 ### Security
 

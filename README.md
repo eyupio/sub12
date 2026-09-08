@@ -362,8 +362,8 @@ already set up, so nothing changes.
 | | Needed for |
 |---|---|
 | [Docker](https://docs.docker.com/get-docker/) + Compose v2 | All modes — Postgres and Redis |
-| [Go 1.25+](https://go.dev/dl/) | Local development only |
-| [Node 20+](https://nodejs.org/) | Local development only |
+| [Go 1.26+](https://go.dev/dl/) | Local development only |
+| [Node 26+](https://nodejs.org/) | Local development only |
 | `curl`, `make`, `openssl` | Health checks, migrations, secret generation |
 
 ### Doing it by hand
@@ -533,10 +533,10 @@ know the outage that produced them. Read it before a substantial change.
 
 | Layer | Technology |
 |---|---|
-| Backend | Go 1.25, Chi v5, pgx v5, zerolog, golang-jwt v5, go-redis v9 |
+| Backend | Go 1.26, Chi v5, pgx v5, zerolog, golang-jwt v5, go-redis v9 |
 | Database | PostgreSQL 16 with golang-migrate (embedded SQL) |
 | Cache | Redis 7 |
-| Frontend | React 18, TypeScript 5.5, Vite 5, TanStack Router + Query, Zustand 4 |
+| Frontend | React 19, TypeScript 6, Vite 8, TanStack Router + Query, Zustand 4 |
 | Styling | Tailwind CSS v3, Lucide icons, Recharts |
 | Mobile | Capacitor 6 (iOS / Android), PWA via vite-plugin-pwa |
 | Also | `fogleman/gg` renders share cards, `pquerna/otp` backs 2FA, `minio-go` ships encrypted backups |

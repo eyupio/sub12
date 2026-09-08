@@ -8,7 +8,7 @@ module github.com/jnnngs/sub-12/backend
 // and html/template — all called on unauthenticated request paths. Raise this
 // floor whenever `make security` reports a new stdlib advisory; that is the
 // whole fix for a stdlib finding.
-go 1.26.0
+go 1.26.8
 
 require (
 	github.com/alicebob/miniredis/v2 v2.39.0
