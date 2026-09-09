@@ -48,7 +48,7 @@ jobs:
     # `== false` rather than `!private` deliberately: an event payload without a
     # repository object then skips rather than running and failing.
     if: github.event.repository.private == false
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     timeout-minutes: 30
     permissions:
       contents: read
@@ -91,7 +91,7 @@ jobs:
   # ----------------------------------------------------------------- Go modules
   govulncheck:
     name: Go vulnerabilities
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -153,7 +153,7 @@ jobs:
     # starts returning 200, and the review starts running, as soon as an admin
     # enables the graph.
     if: github.event_name == 'pull_request' && github.event.repository.private == false
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     timeout-minutes: 10
     permissions:
       contents: read
@@ -217,7 +217,7 @@ jobs:
   # ------------------------------------------------------------ secrets in git
   secret-scan:
     name: Secret scan
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -275,7 +275,7 @@ jobs:
   # development — see internal/config.Validate and SECURITY.md.
   config-guard:
     name: Placeholder credentials are refused
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
