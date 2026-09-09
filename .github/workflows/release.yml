@@ -11,7 +11,7 @@ concurrency:
 jobs:
   push-backend:
     name: Build and push backend image
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     permissions:
       contents: read
       packages: write
@@ -51,7 +51,7 @@ jobs:
 
   push-frontend:
     name: Build and push frontend image
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: zoomies-linux-x64
     permissions:
       contents: read
       packages: write
