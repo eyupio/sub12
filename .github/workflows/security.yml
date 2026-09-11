@@ -113,7 +113,7 @@ jobs:
   # ---------------------------------------------------------------- npm projects
   npm-audit:
     name: npm audit (${{ matrix.project }})
-    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    runs-on: zoomies-linux-x64
     timeout-minutes: 10
     strategy:
       fail-fast: false
