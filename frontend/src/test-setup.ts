@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+import { configure } from '@testing-library/react'
+
+configure({
+  asyncUtilTimeout: process.env.CI ? 5000 : 1000,
+})
 
 // jsdom lacks ResizeObserver; tests that mount canvas-based components rely on it.
 if (typeof globalThis.ResizeObserver === 'undefined') {
