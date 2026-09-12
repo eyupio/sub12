@@ -674,7 +674,8 @@ as a community or as one club's own site. The first-run wizard at `/setup`
 writes it; `pages/AdminBranding.tsx` edits it afterwards.
 
 - **The wizard is once-only, and the backend is what enforces that.**
-  `POST /api/v1/setup` is unauthenticated by necessity — a fresh install has
+  `POST /api/v1/setup` and `POST /api/v1/setup/restore` are unauthenticated by
+  necessity — a fresh install has
   nobody to authenticate as — so the guard has to hold against a caller who
   never loads the page. `SiteSettingsService.CompleteSetup` checks
   `UserRepository.AdminExists`, then *claims* the deployment with a conditional
@@ -683,6 +684,12 @@ writes it; `pages/AdminBranding.tsx` edits it afterwards.
   fails (a duplicate email, most likely) is released, or a mistyped address
   would brick the wizard with no account to log in with. The endpoint is
   rate-limited under the `auth` bucket alongside the other credential paths.
+- **A fresh install may restore instead of creating a temporary account.** The
+  setup screen accepts an encrypted SUB12 archive and its passphrase, then uses
+  the same setup claim before calling `BackupService`. The passphrase is not
+  saved into the new database; the restored `backup_settings` row remains the
+  source of truth. The route rejects a live deployment before reading the large
+  body and shares the restore-specific 512 MiB/30-minute proxy limits.
 - **Setup returns no tokens.** The wizard signs in through the ordinary
   `POST /auth/login` with the credentials it just set, so the refresh cookie,
   the rate limiter and the 2FA path are the ones every later session uses.

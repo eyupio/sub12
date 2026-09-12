@@ -66,6 +66,57 @@ func (h *SiteSettingsHandler) CompleteSetup(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusCreated, result)
 }
 
+// POST /api/v1/setup/restore — restore an encrypted backup on a fresh install.
+//
+// Like POST /setup this is unauthenticated by necessity and protected by the
+// once-only setup claim. The supplied passphrase is used only for this upload;
+// the restored backup_settings row remains the source of truth afterwards.
+func (h *SiteSettingsHandler) RestoreSetup(w http.ResponseWriter, r *http.Request) {
+	// Reject live deployments before reading a potentially large request body.
+	// RestoreSetup still claims the gate atomically after parsing to close the
+	// race with another setup request.
+	if !h.svc.Status(r.Context()).NeedsSetup {
+		writeError(w, http.StatusConflict, "this deployment has already been set up — sign in instead")
+		return
+	}
+	extendBackupRestoreDeadlines(w, true)
+	r.Body = http.MaxBytesReader(w, r.Body, backupRestoreMaxRequestBytes)
+	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "backup file exceeds 512 MiB limit")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid multipart body")
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "missing file field")
+		return
+	}
+	defer file.Close()
+	if header.Size > backupRestoreMaxFileBytes {
+		writeError(w, http.StatusRequestEntityTooLarge, "backup file exceeds 512 MiB limit")
+		return
+	}
+
+	if err := h.svc.RestoreSetup(r.Context(), file, r.FormValue("passphrase")); err != nil {
+		switch {
+		case errors.Is(err, service.ErrSetupComplete):
+			writeError(w, http.StatusConflict, "this deployment has already been set up — sign in instead")
+		case errors.Is(err, service.ErrWrongPassphrase), errors.Is(err, service.ErrInvalidBackupFile), errors.Is(err, service.ErrNoPassphrase):
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "restore failed")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // RegistrationGate refuses sign-ups on a deployment whose operator has closed
 // them. Hiding the link on the sign-in screen is presentation; this is the
 // rule. A club running an invite-only site would otherwise find that anyone

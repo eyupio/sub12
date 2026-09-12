@@ -14,8 +14,19 @@ APK tracks the rolling `android-latest` pre-release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Database restore uploads now have a dedicated 512 MiB request limit and
+  30-minute request/response deadlines. Previously every API request inherited
+  nginx's 12 MiB cap and the backend's short HTTP deadlines, so a valid backup
+  containing images could be created successfully but not restored.
+
 ### Added
 
+- Fresh installations can now restore an encrypted SUB12 backup directly from
+  the first-run wizard by choosing the archive and entering its passphrase. The
+  setup-only restore route closes as soon as the deployment has an administrator
+  and returns the operator to sign-in with the accounts from the backup.
 - **First-run setup wizard for self-hosters** (`/setup`). A fresh deployment
   opens on a six-step wizard instead of a sign-in form for an account that does
   not exist yet: whether the installation is a **community** or **one club's own

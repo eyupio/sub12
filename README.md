@@ -322,7 +322,13 @@ PowerShell installer yet; the manual steps below work from any shell.
 ### First run: the setup wizard
 
 The first time you open a fresh deployment you land on **`/setup`** instead of a
-sign-in form, because there is nothing yet to sign in as. Six short steps:
+sign-in form, because there is nothing yet to sign in as. If this deployment is
+replacing an earlier one, choose its encrypted `.pgdump.gz.enc` backup, enter
+the backup passphrase, and restore it directly from this first screen. When the
+restore completes, sign in with an account from the backup; there is no need to
+create a temporary administrator first.
+
+For an entirely new deployment, continue through six short steps:
 
 1. **Deployment shape.** A **community** — anyone signs up, discovers clubs and
    joins leagues, the way [sub12.io](https://sub12.io) runs — or **one club**,
@@ -339,9 +345,9 @@ sign-in form, because there is nothing yet to sign in as. Six short steps:
 4. **Administrator.** The first account, promoted to platform admin.
 
 **The wizard runs exactly once.** It closes the moment it creates that first
-administrator and can never be reopened — the endpoint behind it refuses a
-second submission whether or not anyone loads the page. Do it before the site is
-in front of anyone.
+administrator or restores a database containing one, and can never be reopened
+— the endpoints behind it refuse a second submission whether or not anyone
+loads the page. Do it before the site is in front of anyone.
 
 Everything except the account is editable afterwards from **Admin → Branding**,
 which is also the only place to upload a logo (that needs an account, and setup
@@ -409,6 +415,14 @@ to `/var/lib/sub12/backups`, bind-mounted to `./data/backups`. Pre-creating that
 directory with the right ownership is what lets admin backup runs succeed —
 without it they fail with `mkdir /var/lib/sub12: permission denied`, which you'd
 rather not discover at the moment you need a backup.
+
+Admin → Backups and the first-run restore screen accept encrypted restore
+uploads up to 512 MiB and allow up to 30 minutes for the upload and `pg_restore`
+to complete. A reverse proxy or
+CDN in front of sub12 must allow the same body size and duration. When an
+upstream service imposes a lower limit, reach `${WEB_PORT:-3000}` through a
+trusted local connection or SSH tunnel for the restore; the backend port should
+remain private.
 
 </details>
 

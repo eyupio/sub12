@@ -17,7 +17,7 @@ vi.mock('../../api/site', async () => {
   const actual = await vi.importActual<typeof import('../../api/site')>('../../api/site')
   return {
     ...actual,
-    siteApi: { branding: vi.fn(), setupStatus: vi.fn(), completeSetup: vi.fn() },
+    siteApi: { branding: vi.fn(), setupStatus: vi.fn(), completeSetup: vi.fn(), restoreSetup: vi.fn() },
   }
 })
 vi.mock('../../api/auth', () => ({ authApi: { login: vi.fn() } }))
@@ -61,6 +61,21 @@ describe('SetupWizard', () => {
     await advance(4)
     expect(screen.getByLabelText('Name')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled()
+  })
+
+  it('restores an encrypted backup instead of creating a new administrator', async () => {
+    vi.mocked(siteApi.restoreSetup).mockResolvedValue({ ok: true })
+    renderWizard()
+    await screen.findByText(/Already have a SUB12 backup/i)
+
+    const backup = new File(['archive'], 'sub12-backup.pgdump.gz.enc', { type: 'application/octet-stream' })
+    fireEvent.change(screen.getByLabelText('Encrypted backup file'), { target: { files: [backup] } })
+    fireEvent.change(screen.getByLabelText('Backup passphrase'), { target: { value: 'correct horse battery staple' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }))
+
+    await waitFor(() => expect(siteApi.restoreSetup).toHaveBeenCalledWith(backup, 'correct horse battery staple'))
+    expect(siteApi.completeSetup).not.toHaveBeenCalled()
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/login', replace: true }))
   })
 
   it('creates the administrator, then signs in through the ordinary login', async () => {

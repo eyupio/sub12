@@ -91,6 +91,12 @@ export const siteApi = {
   branding: () => api.get<SiteBranding>('/site/settings'),
   setupStatus: () => api.get<{ needs_setup: boolean }>('/setup/status'),
   completeSetup: (payload: SetupInput) => api.post<SetupResult>('/setup', payload),
+  restoreSetup: (file: File, passphrase: string) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('passphrase', passphrase)
+    return api.upload<{ ok: true }>('/setup/restore', fd)
+  },
 }
 
 export const adminSiteApi = {
