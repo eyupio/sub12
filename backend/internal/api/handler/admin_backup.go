@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/jnnngs/sub-12/backend/internal/model"
 	"github.com/jnnngs/sub-12/backend/internal/repository"
 	"github.com/jnnngs/sub-12/backend/internal/service"
+)
+
+const (
+	backupRestoreMaxFileBytes    = 512 << 20
+	backupRestoreMaxRequestBytes = 513 << 20
+	backupRestoreTimeout         = 30 * time.Minute
 )
 
 type AdminBackupHandler struct {
@@ -160,6 +167,7 @@ func (h *AdminBackupHandler) RestoreFromRun(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusUnprocessableEntity, "missing confirm=true; restore is destructive")
 		return
 	}
+	extendBackupRestoreDeadlines(w, false)
 	id := chi.URLParam(r, "id")
 	if err := h.svc.RestoreFromRun(r.Context(), id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -182,16 +190,28 @@ func (h *AdminBackupHandler) RestoreFromUpload(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusUnprocessableEntity, "missing confirm=true; restore is destructive")
 		return
 	}
+	extendBackupRestoreDeadlines(w, true)
+	r.Body = http.MaxBytesReader(w, r.Body, backupRestoreMaxRequestBytes)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "backup file exceeds 512 MiB limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid multipart body")
 		return
 	}
-	file, _, err := r.FormFile("file")
+	defer r.MultipartForm.RemoveAll()
+	file, header, err := r.FormFile("file")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "missing file field")
 		return
 	}
 	defer file.Close()
+	if header.Size > backupRestoreMaxFileBytes {
+		writeError(w, http.StatusRequestEntityTooLarge, "backup file exceeds 512 MiB limit")
+		return
+	}
 	if err := h.svc.RestoreFromReader(r.Context(), file); err != nil {
 		if errors.Is(err, service.ErrWrongPassphrase) || errors.Is(err, service.ErrInvalidBackupFile) || errors.Is(err, service.ErrNoPassphrase) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
@@ -201,4 +221,13 @@ func (h *AdminBackupHandler) RestoreFromUpload(w http.ResponseWriter, r *http.Re
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func extendBackupRestoreDeadlines(w http.ResponseWriter, includeRead bool) {
+	deadline := time.Now().Add(backupRestoreTimeout)
+	controller := http.NewResponseController(w)
+	if includeRead {
+		_ = controller.SetReadDeadline(deadline)
+	}
+	_ = controller.SetWriteDeadline(deadline)
 }

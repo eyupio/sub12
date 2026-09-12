@@ -410,6 +410,13 @@ directory with the right ownership is what lets admin backup runs succeed —
 without it they fail with `mkdir /var/lib/sub12: permission denied`, which you'd
 rather not discover at the moment you need a backup.
 
+Admin → Backups accepts encrypted restore uploads up to 512 MiB and allows up
+to 30 minutes for the upload and `pg_restore` to complete. A reverse proxy or
+CDN in front of sub12 must allow the same body size and duration. When an
+upstream service imposes a lower limit, reach `${WEB_PORT:-3000}` through a
+trusted local connection or SSH tunnel for the restore; the backend port should
+remain private.
+
 </details>
 
 <details>

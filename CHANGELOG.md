@@ -14,6 +14,13 @@ APK tracks the rolling `android-latest` pre-release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Database restore uploads now have a dedicated 512 MiB request limit and
+  30-minute request/response deadlines. Previously every API request inherited
+  nginx's 12 MiB cap and the backend's short HTTP deadlines, so a valid backup
+  containing images could be created successfully but not restored.
+
 ### Added
 
 - **First-run setup wizard for self-hosters** (`/setup`). A fresh deployment

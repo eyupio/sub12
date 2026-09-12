@@ -478,6 +478,9 @@ export default function AdminBackup() {
 
       <div className="bg-surface border border-subtle rounded-lg p-4 space-y-3">
         <h2 className="t-section-title">Restore from upload</h2>
+        <p className="text-xs text-muted">
+          Encrypted backups up to 512 MiB are supported. Large restores can take several minutes; keep this page open.
+        </p>
         <input type="file" ref={fileInputRef} className="text-sm text-secondary" />
         <button type="button" onClick={handleUploadRestore} disabled={uploadRestoreMutation.isPending} className={btnDanger}>
           {uploadRestoreMutation.isPending ? 'Restoring…' : 'Upload and restore'}
