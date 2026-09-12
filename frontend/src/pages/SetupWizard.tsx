@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building2, Check, Globe2, Loader2, Lock, Moon, Palette, ShieldCheck, Sun, Users } from 'lucide-react'
+import { Building2, Check, DatabaseBackup, Globe2, Loader2, Lock, Moon, Palette, ShieldCheck, Sun, Users } from 'lucide-react'
 import { WizardShell } from '../components/wizard/WizardShell'
 import type { WizardStepDescriptor } from '../components/wizard/WizardStepper'
 import { PoweredBy } from '../components/PoweredBy'
@@ -12,6 +12,7 @@ import { ApiError } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { applyAccents, DEFAULT_ACCENT_DARK, DEFAULT_ACCENT_LIGHT } from '../utils/branding'
 import { Spinner } from '../components/Skeleton'
+import { toast } from '../store/toast'
 
 // Accent presets. A self-hoster who has no colour in mind should not have to
 // invent one, and each pair is chosen so the light and dark schemes read as
@@ -109,6 +110,9 @@ export default function SetupWizard() {
   const [index, setIndex] = useState(0)
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [submitting, setSubmitting] = useState(false)
+  const [restoreFile, setRestoreFile] = useState<File | null>(null)
+  const [restorePassphrase, setRestorePassphrase] = useState('')
+  const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { data: status, isLoading } = useQuery({
@@ -228,6 +232,28 @@ export default function SetupWizard() {
     navigate({ to: signedIn ? '/' : '/login', replace: true })
   }
 
+  async function restore() {
+    if (!restoreFile || !restorePassphrase) return
+    setRestoring(true)
+    setError(null)
+    try {
+      await siteApi.restoreSetup(restoreFile, restorePassphrase)
+      await queryClient.invalidateQueries({ queryKey: BRANDING_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: ['setup-status'] })
+      toast('Backup restored. Sign in with an account from the backup.', 'success')
+      navigate({ to: '/login', replace: true })
+    } catch (err) {
+      setRestoring(false)
+      if (err instanceof ApiError && err.status === 409) {
+        setError('This deployment has already been set up. Sign in with the administrator account instead.')
+      } else if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError("Couldn't reach the server. Check the backend is running and try again.")
+      }
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -248,7 +274,7 @@ export default function SetupWizard() {
           : () => setIndex((i) => Math.min(i + 1, STEP_ORDER.length - 1))
       }
       nextLabel={stepKey === 'review' ? (submitting ? 'Setting up…' : 'Finish setup') : 'Continue'}
-      nextDisabled={!stepValid[stepKey] || submitting}
+      nextDisabled={!stepValid[stepKey] || submitting || restoring}
       isLast={stepKey === 'review'}
       saveError={error}
       topBar={
@@ -265,7 +291,16 @@ export default function SetupWizard() {
         </div>
       }
     >
-      {stepKey === 'welcome' && <WelcomeStep />}
+      {stepKey === 'welcome' && (
+        <WelcomeStep
+          file={restoreFile}
+          passphrase={restorePassphrase}
+          restoring={restoring}
+          onFile={setRestoreFile}
+          onPassphrase={setRestorePassphrase}
+          onRestore={() => { void restore() }}
+        />
+      )}
 
       {stepKey === 'shape' && (
         <Section title="What is this installation for?" hint="This decides how the app presents itself. You can switch later.">
@@ -598,28 +633,83 @@ export default function SetupWizard() {
   )
 }
 
-function WelcomeStep() {
+function WelcomeStep({
+  file,
+  passphrase,
+  restoring,
+  onFile,
+  onPassphrase,
+  onRestore,
+}: {
+  file: File | null
+  passphrase: string
+  restoring: boolean
+  onFile: (file: File | null) => void
+  onPassphrase: (passphrase: string) => void
+  onRestore: () => void
+}) {
   return (
-    <Section title="This installation is yours to name" hint="It takes about a minute.">
-      <ul className="space-y-3 text-sm text-secondary">
-        <li className="flex gap-3">
-          <Users size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
-          <span>Decide whether this is a <strong className="text-primary">community</strong> anyone can join, or <strong className="text-primary">one club's own site</strong>.</span>
-        </li>
-        <li className="flex gap-3">
-          <Palette size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
-          <span>Give it your name, tagline and colours — a logo can follow from the admin pages.</span>
-        </li>
-        <li className="flex gap-3">
-          <Lock size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
-          <span>Create the first administrator. After that the wizard closes for good and new accounts come through the normal sign-up.</span>
-        </li>
-      </ul>
-      <p className="mt-6 text-xs text-muted">
-        Nothing here is permanent except the administrator account: every other answer is editable
-        afterwards from Admin → Branding.
-      </p>
-    </Section>
+    <div className="space-y-4">
+      <Section title="This installation is yours to name" hint="It takes about a minute.">
+        <ul className="space-y-3 text-sm text-secondary">
+          <li className="flex gap-3">
+            <Users size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
+            <span>Decide whether this is a <strong className="text-primary">community</strong> anyone can join, or <strong className="text-primary">one club's own site</strong>.</span>
+          </li>
+          <li className="flex gap-3">
+            <Palette size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
+            <span>Give it your name, tagline and colours — a logo can follow from the admin pages.</span>
+          </li>
+          <li className="flex gap-3">
+            <Lock size={16} className="mt-0.5 shrink-0 text-[var(--brass)]" />
+            <span>Create the first administrator. After that the wizard closes for good and new accounts come through the normal sign-up.</span>
+          </li>
+        </ul>
+        <p className="mt-6 text-xs text-muted">
+          Nothing here is permanent except the administrator account: every other answer is editable
+          afterwards from Admin → Branding.
+        </p>
+      </Section>
+
+      <Section title="Already have a SUB12 backup?" hint="Restore it instead of creating an empty installation.">
+        <div className="space-y-4">
+          <div>
+            <label className={labelCls} htmlFor="setup-backup-file">Encrypted backup file</label>
+            <input
+              id="setup-backup-file"
+              type="file"
+              accept=".enc,application/octet-stream"
+              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              className={`${inputCls} file:mr-3 file:rounded file:border-0 file:bg-[var(--brass-dim)] file:px-3 file:py-1 file:text-primary`}
+            />
+            <p className="mt-1.5 text-xs text-muted">SUB12 encrypted backup, up to 512 MiB.</p>
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="setup-backup-passphrase">Backup passphrase</label>
+            <input
+              id="setup-backup-passphrase"
+              type="password"
+              autoComplete="off"
+              className={inputCls}
+              value={passphrase}
+              onChange={(e) => onPassphrase(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={!file || !passphrase || restoring}
+            className="inline-flex items-center gap-2 rounded bg-[var(--brass)] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {restoring ? <Loader2 size={16} className="animate-spin" /> : <DatabaseBackup size={16} />}
+            {restoring ? 'Restoring backup…' : 'Restore backup'}
+          </button>
+          <p className="text-xs text-muted">
+            Keep this page open while the restore runs. When it finishes, sign in with an account from the backup.
+          </p>
+        </div>
+      </Section>
+    </div>
   )
 }
 

@@ -512,7 +512,17 @@ func (s *BackupService) RestoreFromReader(ctx context.Context, r io.Reader) erro
 		return ErrNoPassphrase
 	}
 	passphrase := *settings.PassphraseEncrypted
+	return s.RestoreFromReaderWithPassphrase(ctx, r, passphrase)
+}
 
+// RestoreFromReaderWithPassphrase restores an uploaded archive using a
+// passphrase supplied by the caller. The first-run setup flow uses this before
+// backup_settings exists; the ordinary admin restore path continues to read
+// the stored passphrase through RestoreFromReader above.
+func (s *BackupService) RestoreFromReaderWithPassphrase(ctx context.Context, r io.Reader, passphrase string) error {
+	if passphrase == "" {
+		return ErrNoPassphrase
+	}
 	plainGz, err := decryptStream(r, passphrase)
 	if err != nil {
 		return err

@@ -47,7 +47,7 @@ func TestNginx_BackupRestoreAllowsLargeSlowUploads(t *testing.T) {
 		t.Skipf("nginx.conf not readable from this checkout: %v", err)
 	}
 	conf := string(raw)
-	start := strings.Index(conf, "location = /api/v1/admin/backup/restore/upload {")
+	start := strings.Index(conf, "location ~ ^/api/v1/(admin/backup/restore/upload|setup/restore)$ {")
 	require.NotEqual(t, -1, start, "dedicated backup-restore location missing")
 	body := conf[start:]
 	if end := strings.Index(body, "\n    }"); end != -1 {

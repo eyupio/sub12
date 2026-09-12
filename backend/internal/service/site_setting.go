@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -23,11 +25,13 @@ var ErrSetupComplete = errors.New("setup has already been completed")
 // how it is coloured, whether it runs as a community platform or one club's
 // site, and the once-only first-run wizard that decides all of that.
 type SiteSettingsService struct {
-	repo  *repository.SiteSettingsRepository
-	users *repository.UserRepository
-	auth  *AuthService
-	clubs *ClubService
-	log   zerolog.Logger
+	repo    *repository.SiteSettingsRepository
+	users   *repository.UserRepository
+	auth    *AuthService
+	clubs   *ClubService
+	backup  *BackupService
+	log     zerolog.Logger
+	setupMu sync.Mutex
 }
 
 func NewSiteSettingsService(
@@ -35,9 +39,10 @@ func NewSiteSettingsService(
 	users *repository.UserRepository,
 	auth *AuthService,
 	clubs *ClubService,
+	backup *BackupService,
 	log zerolog.Logger,
 ) *SiteSettingsService {
-	return &SiteSettingsService{repo: repo, users: users, auth: auth, clubs: clubs, log: log}
+	return &SiteSettingsService{repo: repo, users: users, auth: auth, clubs: clubs, backup: backup, log: log}
 }
 
 // Get returns the full stored row, for the admin branding page.
@@ -169,6 +174,9 @@ type SetupResult struct {
 // try again; if it succeeds, no later submission can ever reach the account
 // creation, because both the stamp and the administrator now exist.
 func (s *SiteSettingsService) CompleteSetup(ctx context.Context, in *model.SetupInput) (*SetupResult, error) {
+	s.setupMu.Lock()
+	defer s.setupMu.Unlock()
+
 	if err := in.Validate(); err != nil {
 		return nil, err
 	}
@@ -201,6 +209,43 @@ func (s *SiteSettingsService) CompleteSetup(ctx context.Context, in *model.Setup
 		return nil, err
 	}
 	return result, nil
+}
+
+// RestoreSetup is the second way to close a fresh deployment's first-run
+// wizard. It claims the same once-only setup gate as CompleteSetup before
+// allowing pg_restore to replace the database, so the unauthenticated route
+// cannot be used once an administrator already exists.
+func (s *SiteSettingsService) RestoreSetup(ctx context.Context, r io.Reader, passphrase string) error {
+	s.setupMu.Lock()
+	defer s.setupMu.Unlock()
+
+	if passphrase == "" {
+		return ErrNoPassphrase
+	}
+
+	adminExists, err := s.users.AdminExists(ctx)
+	if err != nil {
+		return err
+	}
+	if adminExists {
+		return ErrSetupComplete
+	}
+
+	claimed, err := s.repo.ClaimSetup(ctx)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return ErrSetupComplete
+	}
+
+	if err := s.backup.RestoreFromReaderWithPassphrase(ctx, r, passphrase); err != nil {
+		if releaseErr := s.repo.ReleaseSetup(ctx); releaseErr != nil {
+			s.log.Error().Err(releaseErr).Msg("failed to release setup restore claim — the wizard may be stuck")
+		}
+		return err
+	}
+	return nil
 }
 
 // completeClaimed does the work once this caller owns the wizard.

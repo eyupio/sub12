@@ -129,14 +129,15 @@ func NewRouter(
 		commentH := handler.NewComment(comments)
 		// Deployment identity. The branding payload is fetched by every
 		// visitor before the shell paints, so it has to be public; it
-		// carries only what the shell draws. POST /setup is public for the
-		// same reason a fresh install has nobody to authenticate as — it
-		// closes itself permanently the first time it succeeds, and is
-		// rate-limited per IP alongside the other credential endpoints.
+		// carries only what the shell draws. POST /setup and /setup/restore
+		// are public for the same reason a fresh install has nobody to
+		// authenticate as — they share a once-only claim and are rate-limited
+		// per IP alongside the other credential endpoints.
 		siteH := handler.NewSiteSettings(siteSettings, images)
 		r.Get("/site/settings", siteH.Public)
 		r.Get("/setup/status", siteH.SetupStatus)
 		r.With(rl.Limit("auth")).Post("/setup", siteH.CompleteSetup)
+		r.With(rl.Limit("auth")).Post("/setup/restore", siteH.RestoreSetup)
 
 		// Public auth routes. Password-bearing endpoints are rate-limited
 		// per-IP to blunt credential stuffing and password-reset flooding.
