@@ -18,6 +18,7 @@ measures your groups from a photograph.
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](backend/go.mod)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](frontend/package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2D5A27.svg)](CONTRIBUTING.md)
+[![CI has the Zoomies](https://zoomies.sh/badge.svg)](https://zoomies.sh)
 
 **[Try it](https://sub12.io)** · **[Install your own](#installation)** ·
 **[Contribute](CONTRIBUTING.md)** · **[Security](SECURITY.md)** ·
