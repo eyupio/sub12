@@ -91,4 +91,16 @@ func TestServices_FreeTextLengthCaps(t *testing.T) {
 		assert.ErrorIs(t, validateEventParticipantText(nil, nil, &long), ErrInvalidEvent)
 		assert.NoError(t, validateEventParticipantText(nil, nil, nil), "all absent is a valid entry")
 	})
+
+	// A pellet-test session's location, notes, bench_setup and scope_details
+	// all reach unbounded TEXT columns and are re-served on the public session
+	// showcase (GetForViewer). Create, QuickCreate and Update all persist them,
+	// so all three paths validate through the shared helper.
+	t.Run("pellet-test session free-text (location, notes, bench_setup, scope_details)", func(t *testing.T) {
+		assert.ErrorIs(t, validatePelletTestSessionText(&long, nil, nil, nil), ErrInvalidPelletTest)
+		assert.ErrorIs(t, validatePelletTestSessionText(nil, &long, nil, nil), ErrInvalidPelletTest)
+		assert.ErrorIs(t, validatePelletTestSessionText(nil, nil, &long, nil), ErrInvalidPelletTest)
+		assert.ErrorIs(t, validatePelletTestSessionText(nil, nil, nil, &long), ErrInvalidPelletTest)
+		assert.NoError(t, validatePelletTestSessionText(nil, nil, nil, nil), "all absent is a valid session")
+	})
 }
