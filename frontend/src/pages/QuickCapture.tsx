@@ -60,10 +60,10 @@ const cancelBtnCls =
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs tracking-wide text-muted mb-1">{label}</label>
+    <label className="block">
+      <span className="block text-xs tracking-wide text-muted mb-1">{label}</span>
       {children}
-    </div>
+    </label>
   )
 }
 
