@@ -1,3 +1,42 @@
+## 2026-09-18 - LeagueSettings' Capability-Gating Fix Was Never Ported to ClubSettings
+
+**Finding:** CLAUDE.md's "Moderator roles" section documents, in detail, a fix
+already shipped in `LeagueSettings.tsx`: every settings section threads a
+`canManage` prop (`can(viewerRole, PERM.manageSettings)`), disables its inputs
+and hides its Save button when the viewer lacks `manage_settings`, and shows a
+`CapabilityNote` explaining which permission is missing and who grants it —
+because rendering the form live for any moderator meant a delegated one could
+type into it and get "Failed to save league" back with no explanation. The
+backend enforces the identical `PermManageSettings` check for every club
+mutation (`UpdateClub`, `UpdateImageURL`, `ReplaceOpeningHours`,
+`RegenerateJoinCode` in `service/club.go`), but `ClubSettings.tsx` — the exact
+structural sibling, built the same way, fetching the same
+`getModeratorPermissions` response — never threaded `canManage` through any of
+its eight sections (Image, General, Location & Contact, Opening Hours,
+Disciplines, Membership, Privacy, Regional). `permissionData` was fetched at
+the page level and used only for `MembersSection`'s `canDelegate` and the
+announcement composer's `canSend` — every other section rendered fully live
+and editable for **any** club moderator, reproducing the exact bug the League
+side was already fixed for. A club moderator promoted with only
+`manage_members` (the default promotion grant explicitly excludes
+`manage_settings`) could edit the club's name, address, opening hours, image,
+disciplines, privacy and regional defaults and have every save silently 403,
+with a bare "Failed to save" toast and no indication a permission was missing.
+
+**Learning:** When CLAUDE.md documents a fix as "this exact bug, already
+fixed here", always check every other file built to the same pattern — a
+league/club (or any other) pair of structurally-parallel settings pages is a
+prime place for a fix to have landed on only one twin. `grep -n "canManage"`
+across sibling files is a fast litmus test: `LeagueSettings.tsx` had ~15 hits,
+`ClubSettings.tsx` had zero, despite both fetching `getModeratorPermissions`
+and rendering the identical section shape.
+**Prevention:** Search for a permission-gating pattern's twin whenever a
+CLAUDE.md doc singles out one page as the place a UX bug was fixed — the
+prose describing the fix is usually written generally enough ("A control the
+viewer's grant doesn't cover is drawn read-only") to sound like a project-wide
+rule, but the code may only have been changed in the one file the bug report
+named.
+
 ## 2026-08-28 - A Documented, Unfixed Bug Sat in testsmith.md for Six Weeks
 
 **Finding:** `.jules/testsmith.md`'s 2026-07-17 entry named an exact, unguarded

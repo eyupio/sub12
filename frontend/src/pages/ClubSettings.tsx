@@ -33,11 +33,27 @@ const labelCls = 't-section-title'
 const sectionCls = 'border border-subtle rounded bg-surface p-4 space-y-4'
 const btnPrimary = 'btn-brass disabled:opacity-50 disabled:cursor-not-allowed text-inverse font-medium text-[11px] tracking-widest uppercase py-2.5 px-4 rounded transition-all'
 
+/**
+ * The line a section shows when the viewer helps run the club but the owner
+ * kept this part of it to themselves. Every save in these sections is gated on
+ * `manage_settings`, which is deliberately not part of the promotion grant —
+ * without this the fields render live and the save comes back "Failed to
+ * save" with no hint that a permission is missing.
+ */
+function CapabilityNote({ what }: { what: string }) {
+  return (
+    <p className="text-[10px] text-muted -mt-2">
+      Read-only — {what} needs the “Manage settings” permission. The club owner
+      grants it from Members, below.
+    </p>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Club Image Section
 // ---------------------------------------------------------------------------
 
-function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
+function ClubImageSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [editingFile, setEditingFile] = useState<File | null>(null)
@@ -66,6 +82,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Club Image</h2>
+      {!canManage && <CapabilityNote what="changing the club image" />}
       <input
         ref={fileInputRef}
         type="file"
@@ -87,7 +104,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
       <div className="flex items-center gap-4">
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || !canManage}
           className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-subtle hover:border-[var(--brass)]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Upload club image"
         >
@@ -101,7 +118,9 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
         </button>
         <div className="flex-1">
           <p className="text-sm text-secondary">
-            {club.image_url ? 'Click to change image' : 'Add a profile picture for this club'}
+            {!canManage
+              ? 'The club image is set by whoever manages the club’s settings.'
+              : club.image_url ? 'Click to change image' : 'Add a profile picture for this club'}
           </p>
           <p className="text-[11px] text-muted">JPEG, PNG, or WebP. Max 5MB.</p>
           {mutation.isPending && <p className="text-[11px] text-muted mt-1">Uploading…</p>}
@@ -116,7 +135,7 @@ function ClubImageSection({ clubId, club }: { clubId: string; club: Club }) {
 // General Info Section
 // ---------------------------------------------------------------------------
 
-function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
+function GeneralInfoSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(club.name)
   const [description, setDescription] = useState(club.description ?? '')
@@ -148,6 +167,7 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">General</h2>
+      {!canManage && <CapabilityNote what="renaming the club or editing its description" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Club Name</label>
@@ -155,6 +175,7 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
+          disabled={!canManage}
           className={inputCls}
           placeholder="Club name"
         />
@@ -165,15 +186,18 @@ function GeneralInfoSection({ clubId, club }: { clubId: string; club: Club }) {
         <textarea
           value={description}
           onChange={e => setDescription(e.target.value)}
+          disabled={!canManage}
           className={inputCls + ' resize-none'}
           rows={3}
           placeholder="A short description of the club"
         />
       </div>
 
-      <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary} aria-label="Save general details">
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button onClick={handleSave} disabled={mutation.isPending || !name.trim()} className={btnPrimary} aria-label="Save general details">
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -187,7 +211,7 @@ function updateErrorMessage(err: unknown, fallback: string) {
   return err instanceof ApiError && err.message ? err.message : fallback
 }
 
-function LocationContactSection({ clubId, club }: { clubId: string; club: Club }) {
+function LocationContactSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [form, setForm] = useState({
     address_line1: club.address_line1 ?? '',
@@ -253,6 +277,7 @@ function LocationContactSection({ clubId, club }: { clubId: string; club: Club }
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Location &amp; Contact</h2>
+      {!canManage && <CapabilityNote what="editing the club's address and contact details" />}
       <p className="text-[10px] text-muted -mt-2">
         Shown on the club page so shooters can find and reach you. Leave anything blank to hide it.
       </p>
@@ -266,6 +291,7 @@ function LocationContactSection({ clubId, club }: { clubId: string; club: Club }
               type={f.type ?? 'text'}
               value={form[f.key]}
               onChange={e => set(f.key, e.target.value)}
+              disabled={!canManage}
               className={inputCls}
               placeholder={f.placeholder}
             />
@@ -279,11 +305,11 @@ function LocationContactSection({ clubId, club }: { clubId: string; club: Club }
           <span className="text-sm text-secondary font-mono">
             {coords ? `${coords.lat}, ${coords.lng}` : 'Not set'}
           </span>
-          <button type="button" onClick={useCurrentLocation} disabled={locating} className="lc-action-ghost">
+          <button type="button" onClick={useCurrentLocation} disabled={locating || !canManage} className="lc-action-ghost">
             <MapPin size={12} /> {locating ? 'Locating…' : 'Use current location'}
           </button>
           {coords && (
-            <button type="button" onClick={() => setCoords(null)} className="lc-action-ghost text-muted">
+            <button type="button" onClick={() => setCoords(null)} disabled={!canManage} className="lc-action-ghost text-muted">
               <XIcon size={12} /> Remove pin
             </button>
           )}
@@ -291,9 +317,11 @@ function LocationContactSection({ clubId, club }: { clubId: string; club: Club }
         <p className="text-[10px] text-muted">A pin lets the club appear in "near me" searches.</p>
       </div>
 
-      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save location and contact">
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save location and contact">
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -303,12 +331,13 @@ function LocationContactSection({ clubId, club }: { clubId: string; club: Club }
 // ---------------------------------------------------------------------------
 
 /** Free-text tag editor used for distances and facilities. */
-function TagInput({ label, hint, placeholder, values, onChange }: {
+function TagInput({ label, hint, placeholder, values, onChange, disabled }: {
   label: string
   hint: string
   placeholder: string
   values: string[]
   onChange: (next: string[]) => void
+  disabled?: boolean
 }) {
   const [draft, setDraft] = useState('')
 
@@ -328,18 +357,19 @@ function TagInput({ label, hint, placeholder, values, onChange }: {
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          disabled={disabled}
           className={inputCls}
           placeholder={placeholder}
           aria-label={label}
         />
-        <button type="button" onClick={add} disabled={!draft.trim()} className="lc-action-ghost shrink-0">Add</button>
+        <button type="button" onClick={add} disabled={disabled || !draft.trim()} className="lc-action-ghost shrink-0">Add</button>
       </div>
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           {values.map(v => (
             <span key={v} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-subtle text-secondary">
               {v}
-              <button type="button" onClick={() => onChange(values.filter(x => x !== v))} aria-label={`Remove ${v}`} className="text-muted hover:text-[var(--error-text)]">
+              <button type="button" onClick={() => onChange(values.filter(x => x !== v))} disabled={disabled} aria-label={`Remove ${v}`} className="text-muted hover:text-[var(--error-text)]">
                 <XIcon size={11} />
               </button>
             </span>
@@ -351,7 +381,7 @@ function TagInput({ label, hint, placeholder, values, onChange }: {
   )
 }
 
-function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
+function DisciplinesSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [disciplines, setDisciplines] = useState<string[]>(club.disciplines)
   const [distances, setDistances] = useState<string[]>(club.distances)
@@ -382,6 +412,7 @@ function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Disciplines &amp; Facilities</h2>
+      {!canManage && <CapabilityNote what="editing disciplines, distances and facilities" />}
       <p className="text-[10px] text-muted -mt-2">
         Disciplines drive the club directory filter — pick every one you shoot.
       </p>
@@ -394,8 +425,9 @@ function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
               key={value}
               type="button"
               onClick={() => toggleDiscipline(value)}
+              disabled={!canManage}
               aria-pressed={disciplines.includes(value)}
-              className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors ${
+              className={`px-3 py-1.5 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 disciplines.includes(value)
                   ? 'border-[var(--brass)] bg-[var(--brass)] text-inverse'
                   : 'border-subtle text-muted hover:text-secondary'
@@ -413,6 +445,7 @@ function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
         placeholder="e.g. 25 yards"
         values={distances}
         onChange={setDistances}
+        disabled={!canManage}
       />
       <TagInput
         label="Facilities"
@@ -420,15 +453,18 @@ function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
         placeholder="e.g. Covered firing line"
         values={facilities}
         onChange={setFacilities}
+        disabled={!canManage}
       />
 
-      <button
-        onClick={() => mutation.mutate({ disciplines, distances, facilities })}
-        disabled={mutation.isPending}
-        className={btnPrimary} aria-label="Save disciplines and facilities"
-      >
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button
+          onClick={() => mutation.mutate({ disciplines, distances, facilities })}
+          disabled={mutation.isPending}
+          className={btnPrimary} aria-label="Save disciplines and facilities"
+        >
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -437,7 +473,7 @@ function DisciplinesSection({ clubId, club }: { clubId: string; club: Club }) {
 // Membership & Visitors Section
 // ---------------------------------------------------------------------------
 
-function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club }) {
+function MembershipInfoSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [membershipInfo, setMembershipInfo] = useState(club.membership_info ?? '')
   const [visitorPolicy, setVisitorPolicy] = useState(club.visitor_policy ?? '')
@@ -465,6 +501,7 @@ function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club })
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Membership &amp; Visitors</h2>
+      {!canManage && <CapabilityNote what="editing membership and visitor information" />}
 
       <div className="space-y-1.5">
         <label className={labelCls} htmlFor="club-membership-info">How to join</label>
@@ -472,6 +509,7 @@ function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club })
           id="club-membership-info"
           value={membershipInfo}
           onChange={e => setMembershipInfo(e.target.value)}
+          disabled={!canManage}
           className={inputCls + ' resize-none'}
           rows={4}
           placeholder="Fees, probationary period, what a new member needs to bring…"
@@ -484,6 +522,7 @@ function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club })
           id="club-visitor-policy"
           value={visitorPolicy}
           onChange={e => setVisitorPolicy(e.target.value)}
+          disabled={!canManage}
           className={inputCls + ' resize-none'}
           rows={3}
           placeholder="Whether guests can shoot, booking requirements, hire availability…"
@@ -498,14 +537,17 @@ function MembershipInfoSection({ clubId, club }: { clubId: string; club: Club })
           inputMode="numeric"
           value={established}
           onChange={e => setEstablished(e.target.value)}
+          disabled={!canManage}
           className={inputCls}
           placeholder="e.g. 1978"
         />
       </div>
 
-      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save membership details">
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save membership details">
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -527,7 +569,7 @@ interface SlotDraft {
 let slotKeySeq = 0
 function newSlotKey() { return `slot-${slotKeySeq++}` }
 
-function OpeningHoursSection({ clubId }: { clubId: string }) {
+function OpeningHoursSection({ clubId, canManage }: { clubId: string; canManage: boolean }) {
   const queryClient = useQueryClient()
   const [slots, setSlots] = useState<SlotDraft[] | null>(null)
 
@@ -589,11 +631,13 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
         <button
           type="button"
           onClick={() => setSlots([...rows, { key: newSlotKey(), day_of_week: 0, opens_at: '10:00', closes_at: '15:00', is_closed: false, note: '' }])}
-          className="lc-action-ghost"
+          disabled={!canManage}
+          className="lc-action-ghost disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={12} /> Add slot
         </button>
       </div>
+      {!canManage && <CapabilityNote what="editing opening times" />}
       <p className="text-[10px] text-muted -mt-2">
         Add a slot per session — a day can have more than one. Mark a day closed to say so explicitly.
       </p>
@@ -608,6 +652,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
             <select
               value={slot.day_of_week}
               onChange={e => update(slot.key, { day_of_week: Number(e.target.value) })}
+              disabled={!canManage}
               className={inputCls + ' w-auto'}
               aria-label="Day of week"
             >
@@ -620,6 +665,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
                   type="time"
                   value={slot.opens_at}
                   onChange={e => update(slot.key, { opens_at: e.target.value })}
+                  disabled={!canManage}
                   className={inputCls + ' w-auto'}
                   aria-label="Opens at"
                 />
@@ -628,6 +674,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
                   type="time"
                   value={slot.closes_at}
                   onChange={e => update(slot.key, { closes_at: e.target.value })}
+                  disabled={!canManage}
                   className={inputCls + ' w-auto'}
                   aria-label="Closes at"
                 />
@@ -639,6 +686,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
                 type="checkbox"
                 checked={slot.is_closed}
                 onChange={e => update(slot.key, { is_closed: e.target.checked })}
+                disabled={!canManage}
               />
               Closed
             </label>
@@ -646,7 +694,8 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
             <button
               type="button"
               onClick={() => setSlots(rows.filter(s => s.key !== slot.key))}
-              className="p-1 rounded text-muted hover:text-[var(--error-text)] ml-auto"
+              disabled={!canManage}
+              className="p-1 rounded text-muted hover:text-[var(--error-text)] ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Remove slot"
             >
               <Trash2 size={14} />
@@ -657,6 +706,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
             type="text"
             value={slot.note}
             onChange={e => update(slot.key, { note: e.target.value })}
+            disabled={!canManage}
             className={inputCls}
             placeholder="Note (optional) — e.g. pre-booking required"
             aria-label="Slot note"
@@ -664,9 +714,11 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
         </div>
       ))}
 
-      <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save opening times">
-        {mutation.isPending ? 'Saving…' : 'Save'}
-      </button>
+      {canManage && (
+        <button onClick={handleSave} disabled={mutation.isPending} className={btnPrimary} aria-label="Save opening times">
+          {mutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      )}
     </div>
   )
 }
@@ -675,7 +727,7 @@ function OpeningHoursSection({ clubId }: { clubId: string }) {
 // Privacy Section
 // ---------------------------------------------------------------------------
 
-function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
+function PrivacySection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -704,6 +756,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
   return (
     <div className={sectionCls}>
       <h2 className="t-section-title">Privacy & Joining</h2>
+      {!canManage && <CapabilityNote what="changing who can see this club" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Visibility</label>
@@ -712,7 +765,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ type: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.type === value
@@ -738,7 +791,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ join_policy: value })}
               className={`px-2 py-2 rounded border text-[10px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.join_policy === value
@@ -765,7 +818,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               type="button"
               onClick={() => regenMutation.mutate()}
-              disabled={regenMutation.isPending}
+              disabled={regenMutation.isPending || !canManage}
               className="text-muted hover:text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Regenerate code"
               aria-label="Regenerate join code"
@@ -784,7 +837,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ post_visibility: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 club.post_visibility === value
@@ -810,7 +863,7 @@ function PrivacySection({ clubId, club }: { clubId: string; club: Club }) {
 // Regional Defaults Section
 // ---------------------------------------------------------------------------
 
-function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
+function RegionalSection({ clubId, club, canManage }: { clubId: string; club: Club; canManage: boolean }) {
   const queryClient = useQueryClient()
   const currentDateFormat = (club.date_format as DateFormat | undefined) ?? DEFAULT_PREFS.dateFormat
   const currentTimeFormat = (club.time_format as TimeFormat | undefined) ?? DEFAULT_PREFS.timeFormat
@@ -832,6 +885,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
       <p className="text-[10px] text-muted -mt-2">
         Applied on public pages for this club. Logged-in users see their own preference.
       </p>
+      {!canManage && <CapabilityNote what="changing the club’s date, time and timezone defaults" />}
 
       <div className="space-y-1.5">
         <label className={labelCls}>Date Format</label>
@@ -840,7 +894,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               key={value}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ date_format: value })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentDateFormat === value
@@ -861,7 +915,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
             <button
               key={v}
               type="button"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canManage}
               onClick={() => mutation.mutate({ time_format: v })}
               className={`px-3 py-2 rounded border text-[11px] tracking-widest uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 currentTimeFormat === v
@@ -881,7 +935,7 @@ function RegionalSection({ clubId, club }: { clubId: string; club: Club }) {
           id="club-timezone"
           value={currentTimezone}
           onChange={(e) => mutation.mutate({ timezone: e.target.value })}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || !canManage}
           className={inputCls}
         >
           {!TIMEZONES.includes(currentTimezone) && (
@@ -1322,6 +1376,7 @@ export default function ClubSettings() {
   if (!isModerator || !currentUser) return null
 
   const members = membersData?.items ?? []
+  const canManageSettings = can(permissionData?.role, PERM.manageSettings)
 
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 max-w-lg lg:max-w-3xl mx-auto pb-24">
@@ -1335,14 +1390,14 @@ export default function ClubSettings() {
 
       <p className="text-xs text-muted">{club.name}</p>
 
-      <ClubImageSection clubId={id} club={club} />
-      <GeneralInfoSection clubId={id} club={club} />
-      <LocationContactSection clubId={id} club={club} />
-      <OpeningHoursSection clubId={id} />
-      <DisciplinesSection clubId={id} club={club} />
-      <MembershipInfoSection clubId={id} club={club} />
-      <PrivacySection clubId={id} club={club} />
-      <RegionalSection clubId={id} club={club} />
+      <ClubImageSection clubId={id} club={club} canManage={canManageSettings} />
+      <GeneralInfoSection clubId={id} club={club} canManage={canManageSettings} />
+      <LocationContactSection clubId={id} club={club} canManage={canManageSettings} />
+      <OpeningHoursSection clubId={id} canManage={canManageSettings} />
+      <DisciplinesSection clubId={id} club={club} canManage={canManageSettings} />
+      <MembershipInfoSection clubId={id} club={club} canManage={canManageSettings} />
+      <PrivacySection clubId={id} club={club} canManage={canManageSettings} />
+      <RegionalSection clubId={id} club={club} canManage={canManageSettings} />
       {club.join_policy === 'approval' && <JoinRequestsSection clubId={id} />}
       <MembersSection clubId={id} currentUserId={currentUser.id} />
 
