@@ -126,3 +126,70 @@ describe('ClubSettings general info save flow', () => {
     })
   })
 })
+
+// Every section here saves through an endpoint gated on manage_settings,
+// which the promotion grant deliberately withholds. Rendering them live for
+// any moderator meant a delegated one without it could type into the form and
+// get an unexplained "Failed to save" back, exactly the bug already fixed for
+// LeagueSettings — this pins the same fix for its club counterpart.
+describe('ClubSettings capability gating', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'user-2', email: 'mod@example.com', display_name: 'Mod User' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+    })
+
+    vi.spyOn(clubsApi, 'get').mockResolvedValue(makeClub({ is_owner: false }))
+    vi.spyOn(clubsApi, 'listMembers').mockResolvedValue({ items: [makeMember()] })
+    vi.spyOn(clubsApi, 'listDisciplines').mockResolvedValue({ items: [] })
+    vi.spyOn(clubsApi, 'getOpeningHours').mockResolvedValue({ items: [] })
+    vi.spyOn(announcementsApi, 'list').mockResolvedValue({ items: [] })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null })
+  })
+
+  function renderAs(permissions: string[]) {
+    vi.spyOn(clubsApi, 'getModeratorPermissions').mockResolvedValue({
+      catalogue: CLUB_PERMISSIONS,
+      role: { is_member: true, is_moderator: true, is_owner: false, permissions },
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ClubSettings />
+      </QueryClientProvider>,
+    )
+  }
+
+  it('renders the club record read-only without manage_settings', async () => {
+    renderAs(['manage_members'])
+
+    // The fields are still shown — a moderator may need to read them — but
+    // nothing here can be submitted.
+    expect(await screen.findByPlaceholderText(/club name/i)).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /save general details/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save location and contact/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save disciplines and facilities/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save membership details/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save opening times/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /upload club image/i })).toBeDisabled()
+    // Privacy and Regional Defaults save on click, so the switches themselves
+    // are what has to be disabled.
+    screen.getAllByRole('button', { name: /^public$/i }).forEach(b => expect(b).toBeDisabled())
+    // ...and every gated section says why, rather than leaving a dead form.
+    expect(screen.getAllByText(/manage settings.*permission/i).length).toBeGreaterThan(1)
+  })
+
+  it('leaves the club record editable with manage_settings', async () => {
+    renderAs(['manage_settings'])
+
+    expect(await screen.findByPlaceholderText(/club name/i)).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /save general details/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save location and contact/i })).toBeInTheDocument()
+    expect(screen.queryByText(/manage settings.*permission/i)).not.toBeInTheDocument()
+  })
+})
