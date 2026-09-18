@@ -54,6 +54,27 @@ func (s *PelletTestService) SetSimulatedContentFilter(f SimulatedContentFilter) 
 
 // ── Session ─────────────────────────────────────────────────────────────────────
 
+// validatePelletTestSessionText caps the free-text fields a pellet-test session
+// carries into the database. Location, Notes, BenchSetup and ScopeDetails all
+// reach TEXT columns and are re-served on the public session view (see
+// GetForViewer), so an unbounded value is paid for on every read. Same shape
+// as the report/profile/gear caps in .jules/sentinel.md.
+func validatePelletTestSessionText(location, notes, benchSetup, scopeDetails *string) error {
+	if overLength(location, maxShortDetailLen) {
+		return fmt.Errorf("%w: location must be %d characters or fewer", ErrInvalidPelletTest, maxShortDetailLen)
+	}
+	if overLength(notes, maxFreeNotesLen) {
+		return fmt.Errorf("%w: notes must be %d characters or fewer", ErrInvalidPelletTest, maxFreeNotesLen)
+	}
+	if overLength(benchSetup, maxFreeNotesLen) {
+		return fmt.Errorf("%w: bench_setup must be %d characters or fewer", ErrInvalidPelletTest, maxFreeNotesLen)
+	}
+	if overLength(scopeDetails, maxFreeNotesLen) {
+		return fmt.Errorf("%w: scope_details must be %d characters or fewer", ErrInvalidPelletTest, maxFreeNotesLen)
+	}
+	return nil
+}
+
 func (s *PelletTestService) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput) (*model.PelletTestSession, error) {
 	if in.RifleID == "" || in.PelletID == "" {
 		return nil, fmt.Errorf("%w: rifle and pellet are required", ErrInvalidPelletTest)
@@ -69,6 +90,9 @@ func (s *PelletTestService) Create(ctx context.Context, userID string, in *model
 	}
 	if in.DistanceValue < 0 {
 		return nil, fmt.Errorf("%w: distance must be zero or greater", ErrInvalidPelletTest)
+	}
+	if err := validatePelletTestSessionText(in.Location, in.Notes, in.BenchSetup, in.ScopeDetails); err != nil {
+		return nil, err
 	}
 
 	distanceM := in.DistanceValue
@@ -163,6 +187,9 @@ func (s *PelletTestService) QuickCreate(ctx context.Context, userID string, in *
 	if unit != "meters" && unit != "yards" {
 		return nil, fmt.Errorf("%w: distance unit must be meters or yards", ErrInvalidPelletTest)
 	}
+	if err := validatePelletTestSessionText(in.Location, in.Notes, nil, nil); err != nil {
+		return nil, err
+	}
 	var distanceM float64
 	if in.DistanceValue != nil && *in.DistanceValue >= 0 {
 		distanceM = *in.DistanceValue
@@ -220,6 +247,9 @@ func (s *PelletTestService) Update(ctx context.Context, id, userID string, in *m
 			d = d * yardsToMeters
 		}
 		distanceM = &d
+	}
+	if err := validatePelletTestSessionText(in.Location, in.Notes, in.BenchSetup, in.ScopeDetails); err != nil {
+		return nil, err
 	}
 
 	session, err := s.repo.Update(ctx, id, userID, in, distanceM)
