@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Entity types stored in share_slug_aliases. Slug uniqueness is scoped per
@@ -39,29 +38,6 @@ var slugFallback = map[string]string{
 type slugQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
-
-// ShareSlugRepository owns the share_slug_aliases table, which maps every slug
-// ever issued to the entity that owns it. Because historical slugs are never
-// deleted, a link shared before a rename keeps resolving and a retired slug is
-// never reassigned to a different entity.
-type ShareSlugRepository struct {
-	db *pgxpool.Pool
-}
-
-func NewShareSlugRepository(db *pgxpool.Pool) *ShareSlugRepository {
-	return &ShareSlugRepository{db: db}
-}
-
-// Resolve maps a slug to its entity ID. Returns ErrNotFound for an unknown
-// slug so callers can fall through to their usual 404 handling.
-func (r *ShareSlugRepository) Resolve(ctx context.Context, entityType, slug string) (string, error) {
-	return resolveShareSlug(ctx, r.db, entityType, slug)
-}
-
-// Claim reserves a slug for entityID; see claimShareSlug.
-func (r *ShareSlugRepository) Claim(ctx context.Context, entityType, entityID, name string) (string, error) {
-	return claimShareSlug(ctx, r.db, entityType, entityID, name)
 }
 
 // resolveEntityRef maps a public reference to an entity's UUID. A reference is
