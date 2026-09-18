@@ -113,6 +113,19 @@ async function handleUnauthorized(): Promise<boolean> {
   return refreshPromise
 }
 
+// Shared by `request` and `requestMultipart`: the refresh failed (or there was
+// no session to refresh), so drop it and send the user back to sign in.
+function dropExpiredSession(): void {
+  useAuthStore.getState().clearAuth()
+  toast('Your session has expired. Please sign in again.', 'error')
+  // SPA navigation, not window.location: a hard document load forces a full
+  // reload from the local WebView origin (capacitor://localhost on iOS,
+  // https://localhost on Android), which re-bootstraps the whole app and is
+  // unreliable for an absolute path under the capacitor:// scheme. Imported
+  // lazily to avoid pulling the route tree into this low-level module.
+  void import('../router').then(({ router }) => router.navigate({ to: '/login' }))
+}
+
 async function request<T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
   const { body, headers, ...rest } = options
   let token = useAuthStore.getState().accessToken
@@ -145,14 +158,7 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     if (refreshed) {
       return request<T>(path, options, true)
     }
-    useAuthStore.getState().clearAuth()
-    toast('Your session has expired. Please sign in again.', 'error')
-    // SPA navigation, not window.location: a hard document load forces a full
-    // reload from the local WebView origin (capacitor://localhost on iOS,
-    // https://localhost on Android), which re-bootstraps the whole app and is
-    // unreliable for an absolute path under the capacitor:// scheme. Imported
-    // lazily to avoid pulling the route tree into this low-level module.
-    void import('../router').then(({ router }) => router.navigate({ to: '/login' }))
+    dropExpiredSession()
     throw new Error('Session expired')
   }
 
@@ -190,14 +196,7 @@ async function requestMultipart<T>(path: string, formData: FormData, isRetry = f
     if (refreshed) {
       return requestMultipart<T>(path, formData, true)
     }
-    useAuthStore.getState().clearAuth()
-    toast('Your session has expired. Please sign in again.', 'error')
-    // SPA navigation, not window.location: a hard document load forces a full
-    // reload from the local WebView origin (capacitor://localhost on iOS,
-    // https://localhost on Android), which re-bootstraps the whole app and is
-    // unreliable for an absolute path under the capacitor:// scheme. Imported
-    // lazily to avoid pulling the route tree into this low-level module.
-    void import('../router').then(({ router }) => router.navigate({ to: '/login' }))
+    dropExpiredSession()
     throw new Error('Session expired')
   }
 
