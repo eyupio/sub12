@@ -75,6 +75,27 @@ func validatePelletTestSessionText(location, notes, benchSetup, scopeDetails *st
 	return nil
 }
 
+// validatePelletTestGroupText and validatePelletTestImageCaption cap the two
+// per-child free-text fields a session hydrates on every public read
+// (hydrateSession → listGroups / listImages). The session-level sweep in
+// .jules/sentinel.md capped location/notes/bench_setup/scope_details but
+// missed these two sibling write paths — same shape as the event
+// Join/AddGuest miss. The multipart body cap bounds one request, not what a
+// row costs on every subsequent read.
+func validatePelletTestGroupText(notes *string) error {
+	if overLength(notes, maxFreeNotesLen) {
+		return fmt.Errorf("%w: notes must be %d characters or fewer", ErrInvalidPelletTest, maxFreeNotesLen)
+	}
+	return nil
+}
+
+func validatePelletTestImageCaption(caption *string) error {
+	if overLength(caption, maxShortDetailLen) {
+		return fmt.Errorf("%w: caption must be %d characters or fewer", ErrInvalidPelletTest, maxShortDetailLen)
+	}
+	return nil
+}
+
 func (s *PelletTestService) Create(ctx context.Context, userID string, in *model.CreatePelletTestSessionInput) (*model.PelletTestSession, error) {
 	if in.RifleID == "" || in.PelletID == "" {
 		return nil, fmt.Errorf("%w: rifle and pellet are required", ErrInvalidPelletTest)
@@ -282,6 +303,9 @@ func (s *PelletTestService) CreateGroup(ctx context.Context, sessionID, userID s
 	if in.ShotCount <= 0 {
 		return nil, fmt.Errorf("%w: shot count must be greater than zero", ErrInvalidPelletTest)
 	}
+	if err := validatePelletTestGroupText(in.Notes); err != nil {
+		return nil, err
+	}
 
 	// Fetch session to get distance for MOA calculation
 	session, err := s.repo.GetByID(ctx, sessionID, userID)
@@ -301,6 +325,9 @@ func (s *PelletTestService) UpdateGroup(ctx context.Context, groupID, sessionID,
 	}
 	if in.ShotCount != nil && *in.ShotCount <= 0 {
 		return nil, fmt.Errorf("%w: shot count must be greater than zero", ErrInvalidPelletTest)
+	}
+	if err := validatePelletTestGroupText(in.Notes); err != nil {
+		return nil, err
 	}
 
 	// If group size is being updated, recompute MOA
@@ -330,6 +357,9 @@ func (s *PelletTestService) DeleteGroup(ctx context.Context, groupID, sessionID,
 // ── Images ──────────────────────────────────────────────────────────────────────
 
 func (s *PelletTestService) CreateImage(ctx context.Context, sessionID, userID, imageID string, groupID *string, caption *string) (*model.PelletTestImage, error) {
+	if err := validatePelletTestImageCaption(caption); err != nil {
+		return nil, err
+	}
 	return s.repo.CreateImage(ctx, sessionID, userID, imageID, groupID, caption)
 }
 
