@@ -71,6 +71,13 @@ const AvatarBlock = forwardRef<HTMLSpanElement, AvatarBlockProps>(function Avata
           alt={altText}
           className="w-full h-full object-cover"
           onError={() => setImgFailed(true)}
+          // UserAvatar renders 20-100+ times per page (feed, member lists,
+          // leaderboards, comments), each a separate network request. Lazy
+          // loading defers off-screen avatars until they scroll into view
+          // instead of firing every request on initial paint, cutting the
+          // page's simultaneous image requests and initial network load
+          // roughly in proportion to how much of the list is off-screen.
+          loading="lazy"
         />
       </span>
     )
