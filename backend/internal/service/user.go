@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -28,6 +29,14 @@ var (
 )
 
 const emailChangeTTL = 24 * time.Hour
+
+// maxEmailLen bounds an email address on every write path. Matches the length
+// cap the auth handler enforces on register/login/forgot-password/reset — a
+// PATCH /users/me/email that took only `strings.Contains(newEmail, "@")` used
+// to accept ~1 MiB of "@" (bounded by decodeJSON) and persist it into the
+// `email_change_tokens` row, the outbound SMTP body and — on confirm — the
+// `users.email` column re-served on every profile view.
+const maxEmailLen = 254
 
 // Caps on free-form profile text. Without these, an authenticated user could
 // PATCH ~1 MiB (the JSON decoder's per-request cap) into their `users` row and
@@ -250,7 +259,10 @@ func (s *UserService) RemoveAvatar(ctx context.Context, id string) (*model.User,
 // RequestEmailChange creates a token and sends a confirmation email to the new address.
 func (s *UserService) RequestEmailChange(ctx context.Context, userID, newEmail string) error {
 	newEmail = strings.ToLower(strings.TrimSpace(newEmail))
-	if newEmail == "" || !strings.Contains(newEmail, "@") {
+	if newEmail == "" || len(newEmail) > maxEmailLen {
+		return ErrInvalidEmail
+	}
+	if _, err := mail.ParseAddress(newEmail); err != nil {
 		return ErrInvalidEmail
 	}
 
