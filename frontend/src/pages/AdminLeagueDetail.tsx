@@ -7,6 +7,7 @@ import { adminSimulationApi, type SimulatedPersona } from '../api/adminSimulatio
 import type { League } from '../api/leagues'
 import { formatDate, useRegionalPrefs } from '../utils/date'
 import { SkeletonList } from '../components/Skeleton'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const inputCls = 'w-full bg-surface border border-subtle rounded px-3 py-2.5 text-sm text-primary placeholder-muted focus:outline-none focus:border-[var(--brass)]/50 transition-colors'
 const labelCls = 't-section-title'
@@ -160,6 +161,7 @@ export default function AdminLeagueDetail() {
   const [saveErr, setSaveErr] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
 
   const { data: league, isLoading, error } = useQuery({
     queryKey: ['admin-league', id],
@@ -214,6 +216,7 @@ export default function AdminLeagueDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-league-members', id] })
     },
+    onSettled: () => setRemoveTarget(null),
   })
 
   const addMemberMutation = useMutation({
@@ -347,7 +350,7 @@ export default function AdminLeagueDetail() {
                   <span className="text-xs text-muted">Joined {formatDate(m.joined_at, prefs)}</span>
                 </div>
                 <button
-                  onClick={() => removeMemberMutation.mutate(m.user_id)}
+                  onClick={() => setRemoveTarget({ id: m.user_id, name: m.display_name })}
                   disabled={removeMemberMutation.isPending}
                   className="text-muted hover:text-[var(--error-text)] transition-colors p-1"
                   title="Remove member"
@@ -394,6 +397,16 @@ export default function AdminLeagueDetail() {
           onCancel={() => setShowAddMemberModal(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`Remove ${removeTarget?.name}?`}
+        message="They will lose their membership and any moderator permissions in this league."
+        confirmLabel="Remove"
+        confirmDisabled={removeMemberMutation.isPending}
+        onConfirm={() => removeTarget && removeMemberMutation.mutate(removeTarget.id)}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   )
 }
