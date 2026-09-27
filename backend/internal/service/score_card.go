@@ -414,6 +414,8 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		if err != nil && !errors.Is(err, repository.ErrNotFound) {
 			return nil, fmt.Errorf("check league config: %w", err)
 		}
+		// excludeSelf is false: this card doesn't exist yet, so every existing
+		// submission for this round counts toward the cap.
 		maxSubmissions, err = s.checkMaxSubmissionsPerRound(ctx, userID, *input.LeagueRoundID, cfg, false)
 		if err != nil {
 			return nil, err
@@ -1076,6 +1078,8 @@ func (s *ScoreCardService) SubmitToLeague(ctx context.Context, cardID, userID, r
 		// graduated cards, and refusing to park a draft in a full round is
 		// exactly the dead end the refine flow exists to avoid.
 		if cfg != nil && !card.IsDraft {
+			// excludeSelf is false: the card isn't counted under this round yet
+			// (it's being moved in), so the existing tally is the whole story.
 			if _, err := s.checkMaxSubmissionsPerRound(ctx, userID, roundID, cfg, false); err != nil {
 				return nil, err
 			}
