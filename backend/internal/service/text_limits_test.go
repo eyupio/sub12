@@ -103,4 +103,19 @@ func TestServices_FreeTextLengthCaps(t *testing.T) {
 		assert.ErrorIs(t, validatePelletTestSessionText(nil, nil, nil, &long), ErrInvalidPelletTest)
 		assert.NoError(t, validatePelletTestSessionText(nil, nil, nil, nil), "all absent is a valid session")
 	})
+
+	// Group notes and image captions land in TEXT columns and are re-served on
+	// every read of the session via hydrateSession's listGroups / listImages.
+	// The session-level sweep capped location/notes/bench_setup/scope_details
+	// but missed these two per-child write paths — same shape as the event
+	// Join/AddGuest miss in the journal.
+	t.Run("pellet-test group notes", func(t *testing.T) {
+		assert.ErrorIs(t, validatePelletTestGroupText(&long), ErrInvalidPelletTest)
+		assert.NoError(t, validatePelletTestGroupText(nil), "an absent field always passes")
+	})
+
+	t.Run("pellet-test image caption", func(t *testing.T) {
+		assert.ErrorIs(t, validatePelletTestImageCaption(&long), ErrInvalidPelletTest)
+		assert.NoError(t, validatePelletTestImageCaption(nil), "an absent field always passes")
+	})
 }

@@ -324,6 +324,10 @@ func (h *PelletTestHandler) UploadImage(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusNotFound, "pellet test not found")
 			return
 		}
+		if errors.Is(err, service.ErrInvalidPelletTest) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to link image")
 		return
 	}
