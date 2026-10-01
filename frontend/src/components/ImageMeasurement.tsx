@@ -713,9 +713,9 @@ export default function ImageMeasurement({
 
   // ── Stats Overlay ──────────────────────────────────────────────────
   const unitToggle = (
-    <div className="flex rounded border border-white/20 overflow-hidden">
-      <button onClick={() => setDisplayUnit('mm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>mm</button>
-      <button onClick={() => setDisplayUnit('cm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>cm</button>
+    <div role="group" aria-label="Display unit" className="flex rounded border border-white/20 overflow-hidden">
+      <button aria-pressed={displayUnit === 'mm'} onClick={() => setDisplayUnit('mm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>mm</button>
+      <button aria-pressed={displayUnit === 'cm'} onClick={() => setDisplayUnit('cm')} className={`px-2 py-0.5 text-[10px] font-medium ${displayUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>cm</button>
     </div>
   )
 
@@ -819,9 +819,9 @@ export default function ImageMeasurement({
             <p className="text-muted text-xs text-center">Distance between points ({calibUnit})</p>
             <div className="flex gap-2">
               <input type="number" step="0.1" min="0" value={calibDistance} onChange={e => setCalibDistance(e.target.value)} placeholder={calibUnit === 'cm' ? '5.5' : '55'} className={inputCls} />
-              <div className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
-                <button onClick={() => setCalibUnit('cm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>cm</button>
-                <button onClick={() => setCalibUnit('mm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>mm</button>
+              <div role="group" aria-label="Calibration unit" className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
+                <button aria-pressed={calibUnit === 'cm'} onClick={() => setCalibUnit('cm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>cm</button>
+                <button aria-pressed={calibUnit === 'mm'} onClick={() => setCalibUnit('mm')} className={`px-3 py-2 text-xs font-medium ${calibUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>mm</button>
               </div>
             </div>
             <button onClick={goNext} disabled={pixelsPerMM <= 0} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[var(--brass)] text-inverse text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
@@ -836,9 +836,9 @@ export default function ImageMeasurement({
             <p className="text-muted text-xs text-center">Distance to target ({distanceUnit === 'yards' ? 'yd' : 'm'})</p>
             <div className="flex gap-2">
               <input type="number" step="0.1" min="0" value={distanceToTarget} onChange={e => setDistanceToTarget(e.target.value)} className={inputCls} />
-              <div className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
-                <button onClick={() => { if (distanceUnit !== 'meters') { setDistanceUnit('meters'); setDistanceToTarget(String(Math.round(yardsToMeters(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'meters' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>m</button>
-                <button onClick={() => { if (distanceUnit !== 'yards') { setDistanceUnit('yards'); setDistanceToTarget(String(Math.round(metersToYards(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'yards' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>yd</button>
+              <div role="group" aria-label="Distance unit" className="flex rounded-lg border border-subtle overflow-hidden shrink-0">
+                <button aria-pressed={distanceUnit === 'meters'} onClick={() => { if (distanceUnit !== 'meters') { setDistanceUnit('meters'); setDistanceToTarget(String(Math.round(yardsToMeters(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'meters' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>m</button>
+                <button aria-pressed={distanceUnit === 'yards'} onClick={() => { if (distanceUnit !== 'yards') { setDistanceUnit('yards'); setDistanceToTarget(String(Math.round(metersToYards(Number(distanceToTarget) || 0) * 10) / 10)) } }} className={`px-3 py-2 text-xs font-medium ${distanceUnit === 'yards' ? 'bg-[var(--brass)] text-inverse' : 'text-secondary'}`}>yd</button>
               </div>
             </div>
             <p className="text-muted text-xs text-center">Impact marker size</p>
@@ -938,9 +938,9 @@ export default function ImageMeasurement({
             <div className="bg-surface border border-subtle rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="t-subsection-title">Group Analysis Results</h2>
-                <div className="flex rounded border border-subtle overflow-hidden">
-                  <button onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>mm</button>
-                  <button onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>cm</button>
+                <div role="group" aria-label="Display unit" className="flex rounded border border-subtle overflow-hidden">
+                  <button aria-pressed={displayUnit === 'mm'} onClick={() => setDisplayUnit('mm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'mm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>mm</button>
+                  <button aria-pressed={displayUnit === 'cm'} onClick={() => setDisplayUnit('cm')} className={`px-2.5 py-1 text-xs font-medium ${displayUnit === 'cm' ? 'bg-[var(--brass)] text-inverse' : 'text-muted'}`}>cm</button>
                 </div>
               </div>
               <div className="flex justify-between text-xs"><span className="text-muted">Shots:</span><span className="text-primary font-semibold">{analysisShotCount}</span></div>
