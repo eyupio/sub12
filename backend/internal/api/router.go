@@ -282,7 +282,12 @@ func NewRouter(
 			r.With(rl.Limit("auth")).Post("/users/me/email", uh.RequestEmailChange)
 			r.Post("/users/me/email/confirm", uh.ConfirmEmailChange)
 			r.Delete("/users/me", uh.DeleteMe)
-			r.Post("/users/me/export", uh.RequestExport)
+			// Rate-limited: ExportData is a synchronous aggregation across the
+			// caller's score cards, posts, clubs and leagues (page sizes of
+			// 1000), so an unbounded loop here is cheap database-exhaustion
+			// amplification. The matching confirm/download for the audit row
+			// stays unlimited.
+			r.With(rl.Limit("auth")).Post("/users/me/export", uh.RequestExport)
 			r.Get("/users/me/export/{id}", uh.GetExport)
 			r.Get("/users", uh.SearchUsers)
 

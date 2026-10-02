@@ -20,3 +20,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function scrollIntoView() {}
 }
+
+// Vitest's jsdom createObjectURL shim reads Blob's private _buffer, which jsdom 30 does not expose.
+URL.createObjectURL = () => 'blob:stub'
+URL.revokeObjectURL = () => {}
