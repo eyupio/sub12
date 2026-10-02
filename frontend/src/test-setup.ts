@@ -15,6 +15,10 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
 }
 
+// jsdom File objects are incompatible with Vitest's native Blob object URL shim.
+URL.createObjectURL = () => 'blob:vitest-test'
+URL.revokeObjectURL = () => {}
+
 // jsdom implements no layout, so it ships no scrollIntoView. Components that
 // bring a deep-linked element into view would otherwise throw on mount.
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
