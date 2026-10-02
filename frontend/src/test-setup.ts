@@ -5,6 +5,12 @@ configure({
   asyncUtilTimeout: process.env.CI ? 5000 : 1000,
 })
 
+// Vitest's object URL shim expects Node Blobs, but jsdom creates its own File
+// objects. Tests do not load blob contents, so use stable URLs instead.
+let objectURLId = 0
+URL.createObjectURL = () => `blob:test-${++objectURLId}`
+URL.revokeObjectURL = () => {}
+
 // jsdom lacks ResizeObserver; tests that mount canvas-based components rely on it.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   class ResizeObserverStub {
