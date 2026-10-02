@@ -5,6 +5,9 @@ configure({
   asyncUtilTimeout: process.env.CI ? 5000 : 1000,
 })
 
+URL.createObjectURL = () => 'blob:mock'
+URL.revokeObjectURL = () => {}
+
 // jsdom lacks ResizeObserver; tests that mount canvas-based components rely on it.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   class ResizeObserverStub {
