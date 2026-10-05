@@ -73,7 +73,8 @@ func (s *LikeService) Like(ctx context.Context, userID, targetID, targetType str
 		ownerID = post.UserID
 	case model.LikeTargetComment:
 		// Comments inherit visibility from their parent target; enforcement is
-		// delegated to the parent listing. Block still applies.
+		// delegated to the parent listing, so no visibility or block check runs
+		// here and ownerID stays empty (no like-received achievement is evaluated).
 	case model.LikeTargetActivity:
 		act, err := s.activities.GetByID(ctx, targetID)
 		if err != nil {
