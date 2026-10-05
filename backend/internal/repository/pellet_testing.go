@@ -552,6 +552,18 @@ func (r *PelletTestRepository) CreateImage(ctx context.Context, sessionID, userI
 		return nil, ErrNotFound
 	}
 
+	// A group is only a valid home for the photo if it belongs to this session;
+	// the FK alone accepts any group in the database, including another user's.
+	if groupID != nil {
+		err = r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pellet_test_groups WHERE id = $1 AND session_id = $2)`, *groupID, sessionID).Scan(&exists)
+		if err != nil {
+			return nil, fmt.Errorf("verify group: %w", err)
+		}
+		if !exists {
+			return nil, ErrNotFound
+		}
+	}
+
 	var img model.PelletTestImage
 	err = r.db.QueryRow(ctx, `
 		INSERT INTO pellet_test_images (session_id, group_id, image_id, caption)
