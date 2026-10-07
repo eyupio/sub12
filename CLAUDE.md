@@ -45,7 +45,7 @@ backend/              Go API server
     db/
       db.go           pgxpool connection
       migrate.go      Embedded golang-migrate runner
-      migrations/     Sequential SQL migrations (000001–000121)
+      migrations/     Sequential SQL migrations (head: `ls` and look at the tail)
       redis.go        Redis client setup
       seed/           Dev seed data (seed.sql + seed.go)
     email/            Email template renderer (renderer.go)
