@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Check, Loader2, MapPin, X } from 'lucide-react'
 import {
   useCreateLocation,
@@ -38,6 +38,7 @@ export function SavePlaceDialog({
 }: SavePlaceDialogProps) {
   const createMutation = useCreateLocation()
 
+  const uid = useId()
   const [name, setName] = useState(initialName)
   const [address, setAddress] = useState(initialAddress)
   const [defaultDistanceM, setDefaultDistanceM] = useState<string>(
@@ -128,8 +129,8 @@ export function SavePlaceDialog({
           </p>
 
           <div>
-            <label className="block text-sm font-medium text-secondary mb-1">Name *</label>
-            <input
+            <label htmlFor={`${uid}-name`} className="block text-sm font-medium text-secondary mb-1">Name *</label>
+            <input id={`${uid}-name`}
               required
               autoFocus
               type="text"
@@ -141,8 +142,8 @@ export function SavePlaceDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-secondary mb-1">Address</label>
-            <input
+            <label htmlFor={`${uid}-address`} className="block text-sm font-medium text-secondary mb-1">Address</label>
+            <input id={`${uid}-address`}
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
@@ -163,8 +164,8 @@ export function SavePlaceDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-secondary mb-1">Default distance</label>
-              <input
+              <label htmlFor={`${uid}-distance`} className="block text-sm font-medium text-secondary mb-1">Default distance</label>
+              <input id={`${uid}-distance`}
                 type="number"
                 inputMode="decimal"
                 value={defaultDistanceM}
@@ -174,8 +175,8 @@ export function SavePlaceDialog({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-secondary mb-1">Unit</label>
-              <select
+              <label htmlFor={`${uid}-unit`} className="block text-sm font-medium text-secondary mb-1">Unit</label>
+              <select id={`${uid}-unit`}
                 value={defaultDistanceUnit}
                 onChange={e => setDefaultDistanceUnit(e.target.value)}
                 className={inputCls}
@@ -188,8 +189,8 @@ export function SavePlaceDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-secondary mb-1">Default target preset</label>
-            <select
+            <label htmlFor={`${uid}-preset`} className="block text-sm font-medium text-secondary mb-1">Default target preset</label>
+            <select id={`${uid}-preset`}
               value={defaultTargetPreset}
               onChange={e => setDefaultTargetPreset(e.target.value)}
               className={inputCls}
@@ -202,8 +203,8 @@ export function SavePlaceDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-secondary mb-1">Notes</label>
-            <textarea
+            <label htmlFor={`${uid}-notes`} className="block text-sm font-medium text-secondary mb-1">Notes</label>
+            <textarea id={`${uid}-notes`}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
