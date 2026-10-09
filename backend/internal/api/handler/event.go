@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -644,6 +645,16 @@ func (h *EventHandler) RejectCard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"rejected": true})
 }
 
+// csvSafe stops a spreadsheet treating user-supplied text as a formula when
+// the export is opened. Cells that begin with a formula trigger character get
+// a leading apostrophe, which spreadsheets render as plain text.
+func csvSafe(v string) string {
+	if v != "" && strings.ContainsRune("=+-@\t\r", rune(v[0])) {
+		return "'" + v
+	}
+	return v
+}
+
 // GET /api/v1/events/{slug}/results.csv
 func (h *EventHandler) ResultsCSV(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
@@ -675,10 +686,10 @@ func (h *EventHandler) ResultsCSV(w http.ResponseWriter, r *http.Request) {
 	for _, s := range scores {
 		_ = writer.Write([]string{
 			ev.Slug,
-			ev.Name,
-			ev.Discipline,
-			displayByID[s.ParticipantID],
-			teamByID[s.ParticipantID],
+			csvSafe(ev.Name),
+			csvSafe(ev.Discipline),
+			csvSafe(displayByID[s.ParticipantID]),
+			csvSafe(teamByID[s.ParticipantID]),
 			strconv.Itoa(s.Lane),
 			strconv.Itoa(s.ShotNumber),
 			s.Result,
