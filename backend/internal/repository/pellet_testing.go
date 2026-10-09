@@ -758,6 +758,19 @@ func (r *PelletTestRepository) CreateMeasurement(ctx context.Context, sessionID,
 		return nil, ErrNotFound
 	}
 
+	// group_id is a bare FK to pellet_test_groups and accepts any row in the
+	// database. A measurement must only reference a group of its own session,
+	// mirroring the check CreateImage applies.
+	if in.GroupID != nil && *in.GroupID != "" {
+		err = r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pellet_test_groups WHERE id = $1 AND session_id = $2)`, *in.GroupID, sessionID).Scan(&exists)
+		if err != nil {
+			return nil, fmt.Errorf("verify group: %w", err)
+		}
+		if !exists {
+			return nil, ErrNotFound
+		}
+	}
+
 	measureMethod := in.MeasureMethod
 	if measureMethod == "" {
 		measureMethod = "impacts"
@@ -828,6 +841,18 @@ func (r *PelletTestRepository) UpdateMeasurement(ctx context.Context, measuremen
 	}
 	if !exists {
 		return nil, ErrNotFound
+	}
+
+	// A moved group_id must still belong to this session; the FK alone accepts
+	// any group in the database.
+	if in.GroupID != nil && *in.GroupID != "" {
+		err = r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pellet_test_groups WHERE id = $1 AND session_id = $2)`, *in.GroupID, sessionID).Scan(&exists)
+		if err != nil {
+			return nil, fmt.Errorf("verify group: %w", err)
+		}
+		if !exists {
+			return nil, ErrNotFound
+		}
 	}
 
 	m, err := scanMeasurement(r.db.QueryRow(ctx, `

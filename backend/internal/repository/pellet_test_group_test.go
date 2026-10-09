@@ -118,4 +118,25 @@ func TestCreateImage_RejectsGroupOfAnotherSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, img.GroupID)
 	assert.Equal(t, groupB.ID, *img.GroupID)
+
+	// pellet_test_measurements.group_id is the same bare FK, so both the
+	// create and update paths must apply the same session-scope check or a
+	// measurement in session A could reference a group in session B.
+	imgA, err := repo.CreateImage(ctx, a.ID, userID, imageID, nil, nil)
+	require.NoError(t, err)
+
+	ppm, ref := 10.0, 5.5
+	_, err = repo.CreateMeasurement(ctx, a.ID, userID, imgA.ID, &model.CreatePelletTestMeasurementInput{
+		GroupID: &groupB.ID, ReferenceDiameterMM: ref, PixelsPerMM: ppm,
+	})
+	assert.ErrorIs(t, err, ErrNotFound)
+
+	ownM, err := repo.CreateMeasurement(ctx, a.ID, userID, imgA.ID, &model.CreatePelletTestMeasurementInput{
+		ReferenceDiameterMM: ref, PixelsPerMM: ppm,
+	})
+	require.NoError(t, err)
+	_, err = repo.UpdateMeasurement(ctx, ownM.ID, a.ID, userID, &model.UpdatePelletTestMeasurementInput{
+		GroupID: &groupB.ID,
+	})
+	assert.ErrorIs(t, err, ErrNotFound)
 }
