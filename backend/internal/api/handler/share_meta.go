@@ -63,6 +63,21 @@ type ShareMeta struct {
 	failTTL  time.Duration
 }
 
+const (
+	// indexShellTTL is how long a fetched index.html is reused before the
+	// frontend container is asked again.
+	indexShellTTL = 60 * time.Second
+	// indexShellFailTTL is the shorter back-off after a failed fetch, so an
+	// unreachable frontend is not re-dialled on every hit.
+	indexShellFailTTL = 10 * time.Second
+	// indexFetchTimeout bounds one internal-network fetch; a hung frontend
+	// must not hold a crawler request open.
+	indexFetchTimeout = 5 * time.Second
+	// maxIndexHTMLBytes caps the upstream body (1 MiB); the real shell is far
+	// smaller.
+	maxIndexHTMLBytes = 1 << 20
+)
+
 // NewShareMeta constructs the share-meta handler. siteURL is the public
 // canonical origin (used to build absolute og:url / og:image) and defaults
 // to the request scheme+host when empty. frontendOrigin is the internal
@@ -102,8 +117,8 @@ func NewShareMeta(
 		siteName:       "SUB12",
 		frontendOrigin: strings.TrimRight(frontendOrigin, "/"),
 		log:            log,
-		ttl:            60 * time.Second,
-		failTTL:        10 * time.Second,
+		ttl:            indexShellTTL,
+		failTTL:        indexShellFailTTL,
 	}
 }
 
@@ -542,7 +557,7 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: indexFetchTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -553,7 +568,7 @@ func fetchIndexHTML(ctx context.Context, origin string) ([]byte, error) {
 	}
 	// Cap the upstream response so a misbehaving or compromised frontend
 	// container can't OOM the backend by serving an oversized index.html.
-	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return io.ReadAll(io.LimitReader(resp.Body, maxIndexHTMLBytes))
 }
 
 // Regexes scoped to tag attributes; all anchored to the beginning of an
