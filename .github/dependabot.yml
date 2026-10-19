@@ -92,6 +92,13 @@ updates:
       # merged without building on a real device. Do those by hand, deliberately.
       - dependency-name: "@capacitor/*"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 is outside typescript-eslint's peer range (<6.1.0) and
+      # breaks `npm ci`; Tailwind 4 moved its PostCSS plugin and config format.
+      # Both have been bumped and reverted once already.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
 
   # ----------------------------------------------------------- Playwright e2e
   - package-ecosystem: npm
