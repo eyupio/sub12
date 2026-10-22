@@ -262,9 +262,13 @@ export default function UserProfile() {
                       <div className="relative">
                         <button
                           onClick={() => setShowMenu(!showMenu)}
+                          aria-label="More actions"
+                          title="More actions"
+                          aria-haspopup="menu"
+                          aria-expanded={showMenu}
                           className="p-1.5 rounded border border-subtle text-muted hover:text-secondary transition-colors"
                         >
-                          <MoreHorizontal size={14} />
+                          <MoreHorizontal size={14} aria-hidden="true" />
                         </button>
                         {showMenu && (
                           <div className="absolute right-0 top-full mt-1 bg-surface border border-subtle rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
