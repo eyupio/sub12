@@ -27,6 +27,18 @@ const (
 	xCountXMachine     = 15 // top tier — majority of shots land in the X-ring
 )
 
+// Community-review achievement rules for EvaluateForCommunityReview.
+const (
+	// Lifetime confirmations a reviewer needs for each tier.
+	reviewsFirst     = 1
+	reviewsCommunity = 10
+	reviewsPeerJudge = 25
+
+	// A confirmation inside this window of the request being opened counts as
+	// a prompt ("helpful") review.
+	helpfulReviewWindow = 24 * time.Hour
+)
+
 type AchievementRepo interface {
 	Award(ctx context.Context, userID, achievementID string) (bool, error)
 	ListForUser(ctx context.Context, userID string) ([]*model.UserAchievement, error)
@@ -384,16 +396,16 @@ func (s *AchievementService) EvaluateForCommunityReview(ctx context.Context, rev
 	if err != nil {
 		return
 	}
-	if count >= 1 {
+	if count >= reviewsFirst {
 		s.award(ctx, reviewerID, "first_review")
 	}
-	if count >= 10 {
+	if count >= reviewsCommunity {
 		s.award(ctx, reviewerID, "community_reviewer")
 	}
-	if count >= 25 {
+	if count >= reviewsPeerJudge {
 		s.award(ctx, reviewerID, "peer_judge")
 	}
-	if !requestCreatedAt.IsZero() && time.Since(requestCreatedAt) <= 24*time.Hour {
+	if !requestCreatedAt.IsZero() && time.Since(requestCreatedAt) <= helpfulReviewWindow {
 		s.award(ctx, reviewerID, "helpful_reviewer")
 	}
 }
