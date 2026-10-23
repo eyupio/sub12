@@ -1611,8 +1611,65 @@ func (r *LeagueRepository) DemoteMemberGuarded(ctx context.Context, leagueID, us
 	return tx.Commit(ctx)
 }
 
+// LeaveLeagueGuarded removes the caller's own membership row, checking the
+// last-moderator invariant inside the same transaction so two moderators
+// leaving at once cannot leave the league without anybody able to run it.
+func (r *LeagueRepository) LeaveLeagueGuarded(ctx context.Context, leagueID, userID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock the moderator rows and count them in Go: FOR UPDATE is rejected
+	// alongside an aggregate (see DemoteMemberGuarded).
+	rows, err := tx.Query(ctx,
+		`SELECT user_id FROM league_members WHERE league_id = $1 AND is_admin = TRUE FOR UPDATE`,
+		leagueID,
+	)
+	if err != nil {
+		return fmt.Errorf("lock league moderators: %w", err)
+	}
+	adminCount := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan league moderator: %w", err)
+		}
+		adminCount++
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iter league moderators: %w", err)
+	}
+
+	var isAdmin bool
+	err = tx.QueryRow(ctx,
+		`SELECT is_admin FROM league_members WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	).Scan(&isAdmin)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read league member: %w", err)
+	}
+	if isAdmin && adminCount <= 1 {
+		return ErrLeagueLastAdmin
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM league_members WHERE league_id = $1 AND user_id = $2`,
+		leagueID, userID,
+	); err != nil {
+		return fmt.Errorf("leave league: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
 // LeaveLeague removes the caller's own membership row regardless of admin
-// status. The last-admin guard is enforced in the service layer.
+// status, with no last-moderator check; LeaveLeagueGuarded is the checked form.
 func (r *LeagueRepository) LeaveLeague(ctx context.Context, leagueID, userID string) error {
 	tag, err := r.db.Exec(ctx,
 		`DELETE FROM league_members WHERE league_id = $1 AND user_id = $2`,
