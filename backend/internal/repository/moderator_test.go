@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -256,4 +257,50 @@ func TestClubAuthorityReachesItsLeagues(t *testing.T) {
 	role, err = repo.GetMemberRole(ctx, solo.ID, clubOwnerID)
 	require.NoError(t, err)
 	assert.False(t, role.IsModerator)
+}
+
+// A moderator leaving while another leaves must be refused: the first sees the
+// second still in place, so a check made outside the transaction that deletes
+// would let both go and leave the league without anybody able to run it. The
+// concurrent leaver is a transaction held open here so the interleaving is
+// exact rather than a matter of timing.
+func TestLeagueLeaveKeepsAModerator(t *testing.T) {
+	pool := clubTestPool(t)
+	repo := NewLeagueRepository(pool)
+	ctx := context.Background()
+
+	ownerID := newClubTestUser(t, pool, "league-leave-owner@example.test")
+	modID := newClubTestUser(t, pool, "league-leave-mod@example.test")
+	plainID := newClubTestUser(t, pool, "league-leave-plain@example.test")
+
+	league, err := repo.Create(ctx, ownerID, &model.CreateLeagueInput{Name: "Leave Test League", Type: "public"})
+	require.NoError(t, err)
+	t.Cleanup(func() { mustExec(t, pool, `DELETE FROM leagues WHERE id = $1`, league.ID) })
+	require.NoError(t, repo.Join(ctx, league.ID, modID))
+	require.NoError(t, repo.Join(ctx, league.ID, plainID))
+	require.NoError(t, repo.PromoteMember(ctx, league.ID, modID, []string{model.PermVerifyScores}))
+
+	// A plain member can always go, once.
+	require.NoError(t, repo.LeaveLeagueGuarded(ctx, league.ID, plainID))
+	assert.ErrorIs(t, repo.LeaveLeagueGuarded(ctx, league.ID, plainID), ErrNotFound)
+
+	// The other moderator is mid-leave: row locked and deleted, not committed.
+	tx, err := pool.Begin(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tx.Rollback(ctx) })
+	rows, err := tx.Query(ctx, `SELECT user_id FROM league_members WHERE league_id = $1 AND is_admin = TRUE FOR UPDATE`, league.ID)
+	require.NoError(t, err)
+	rows.Close()
+	_, err = tx.Exec(ctx, `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2`, league.ID, modID)
+	require.NoError(t, err)
+
+	done := make(chan error, 1)
+	go func() { done <- repo.LeaveLeagueGuarded(ctx, league.ID, ownerID) }()
+	time.Sleep(300 * time.Millisecond)
+	require.NoError(t, tx.Commit(ctx))
+
+	assert.ErrorIs(t, <-done, ErrLeagueLastAdmin)
+	n, err := repo.CountAdmins(ctx, league.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n, "the league must keep a moderator")
 }

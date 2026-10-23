@@ -405,27 +405,14 @@ func (s *LeagueService) delegatable(ctx context.Context, leagueID, granterID str
 // LeaveLeague allows a member to remove themselves. The last moderator must
 // promote another member first.
 func (s *LeagueService) LeaveLeague(ctx context.Context, leagueID, userID string) error {
-	isMember, err := s.leagues.IsMember(ctx, leagueID, userID)
-	if err != nil {
-		return err
-	}
-	if !isMember {
+	err := s.leagues.LeaveLeagueGuarded(ctx, leagueID, userID)
+	if errors.Is(err, repository.ErrNotFound) {
 		return ErrNotMember
 	}
-	isModerator, err := s.leagues.IsModerator(ctx, leagueID, userID)
-	if err != nil {
-		return err
+	if errors.Is(err, repository.ErrLeagueLastAdmin) {
+		return ErrLeagueLastAdmin
 	}
-	if isModerator {
-		count, err := s.leagues.CountAdmins(ctx, leagueID)
-		if err != nil {
-			return err
-		}
-		if count <= 1 {
-			return ErrLeagueLastAdmin
-		}
-	}
-	return s.leagues.LeaveLeague(ctx, leagueID, userID)
+	return err
 }
 
 // ListMyLeagues returns leagues the user is a member of, with their rank in each.
