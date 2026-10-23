@@ -75,11 +75,10 @@ func (s *NotificationService) Fanout(ctx context.Context, ev NotifEvent) {
 	}
 
 	// Respect blocks in both directions and mutes from recipient → actor.
+	// IsBlocked is symmetric, so one query covers both directions (a swapped
+	// second call was a redundant round trip per recipient on every fan-out).
 	if ev.ActorID != "" && s.blocks != nil {
 		if blocked, err := s.blocks.IsBlocked(ctx, ev.RecipientID, ev.ActorID); err == nil && blocked {
-			return
-		}
-		if blocked, err := s.blocks.IsBlocked(ctx, ev.ActorID, ev.RecipientID); err == nil && blocked {
 			return
 		}
 	}

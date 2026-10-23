@@ -248,20 +248,14 @@ func (s *SocialService) CanViewProfile(ctx context.Context, profileUserID, viewe
 	if viewerID == profileUserID {
 		return nil
 	}
-	// Block check is bidirectional.
+	// IsBlocked is already symmetric (either direction), so one query covers
+	// both; a second call with the arguments swapped only repeats it.
 	if viewerID != "" {
 		blocked, err := s.blocks.IsBlocked(ctx, viewerID, profileUserID)
 		if err != nil {
 			return err
 		}
 		if blocked {
-			return repository.ErrNotFound
-		}
-		reverse, err := s.blocks.IsBlocked(ctx, profileUserID, viewerID)
-		if err != nil {
-			return err
-		}
-		if reverse {
 			return repository.ErrNotFound
 		}
 	}
