@@ -67,7 +67,19 @@ func NewRouter(
 	r := chi.NewRouter()
 
 	// Global middleware
-	r.Use(chimiddleware.RealIP)
+	//
+	// chi.RealIP is deprecated (GHSA-3fxj-6jh8-hvhx, GHSA-rjr7-jggh-pgcp,
+	// GHSA-9g5q-2w5x-hmxf): it mutates r.RemoteAddr to the leftmost
+	// X-Forwarded-For entry (or to True-Client-IP / X-Real-IP) whatever the
+	// network topology actually is, so a direct attacker could pin an auth
+	// rate-limit bucket on any IP by sending a header. ClientIPFromXFFTrustedProxies
+	// instead reads the entry contributed by the Nth-from-the-right trusted hop,
+	// which the shipped nginx configuration overwrites unconditionally, so a
+	// client-supplied header cannot shift the bucket. Hops == 0 means "no proxy
+	// in front" and the ratelimiter falls back to the TCP peer in RemoteAddr.
+	if cfg.TrustedProxyHops > 0 {
+		r.Use(chimiddleware.ClientIPFromXFFTrustedProxies(cfg.TrustedProxyHops))
+	}
 	r.Use(middleware.RequestLogger(log))
 	r.Use(chimiddleware.Recoverer)
 	r.Use(securityHeadersMiddleware(cfg.Env))

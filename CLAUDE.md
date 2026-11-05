@@ -1021,6 +1021,7 @@ the message is.
 | `DEFAULT_AVATAR_URL` | *(empty)* | Absolute URL used as the avatar in emails and share cards when a user has none. Covered by the `Validate()` localhost guard. |
 | `INDEXNOW_KEY` | *(empty)* | IndexNow submission key. Empty disables pinging search engines on publish. |
 | `INDEXNOW_KEY_LOCATION` | *(derived)* | URL of the key file; the backend serves it at `/{key}.txt`. |
+| `TRUSTED_PROXY_HOPS` | `1` | Number of reverse proxies between the client and this backend. The router walks `X-Forwarded-For` right-to-left past that many hops and keys auth rate limits on the entry the trusted proxy appended, so a client-supplied header cannot shift the bucket. Set 0 only for direct exposure. |
 | `RATELIMIT_ENABLED` | `true` | Master switch for `middleware/ratelimit.go` (Redis-backed, per-user, per-minute). |
 | `RATELIMIT_AUTH_PER_MIN` | `10` | Login/register/reset attempts. Keyed on IP, not user. |
 | `RATELIMIT_FOLLOW_PER_MIN` | `10` | Follow/unfollow. |
