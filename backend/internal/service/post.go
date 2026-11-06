@@ -214,9 +214,7 @@ func (s *PostService) canViewPost(ctx context.Context, post *model.Post, viewerI
 // ListByLeague returns posts for a league. Private leagues are only visible
 // to members; non-members receive repository.ErrNotFound.
 func (s *PostService) ListByLeague(ctx context.Context, leagueID, viewerID string, limit, offset int) ([]*model.Post, error) {
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
+	limit = clampListLimit(limit)
 	league, err := s.leagues.GetByID(ctx, leagueID)
 	if err != nil {
 		return nil, err
@@ -250,9 +248,7 @@ func (s *PostService) ListByLeague(ctx context.Context, leagueID, viewerID strin
 // ListByClub returns posts for a club. Private clubs are only visible to
 // members; non-members receive repository.ErrNotFound.
 func (s *PostService) ListByClub(ctx context.Context, clubID, viewerID string, limit, offset int) ([]*model.Post, error) {
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
+	limit = clampListLimit(limit)
 	club, err := s.clubs.GetByID(ctx, clubID, viewerID)
 	if err != nil {
 		return nil, err
