@@ -370,6 +370,9 @@ func (s *ScoreCardService) Create(ctx context.Context, userID string, input *mod
 		if score < 0 || score > 10 {
 			return nil, fmt.Errorf("%w: shot %d score %d out of range 0-10", ErrInvalidCard, i+1, score)
 		}
+		if input.ShotXs[i] && score != 10 {
+			return nil, fmt.Errorf("%w: shot %d is marked X but scored %d; only a 10 can be an X", ErrInvalidCard, i+1, score)
+		}
 		totalScore += score
 		if input.ShotXs[i] {
 			xCount++
@@ -781,6 +784,9 @@ func (s *ScoreCardService) Update(ctx context.Context, id, userID string, input 
 	for i, score := range input.ShotScores {
 		if score < 0 || score > 10 {
 			return nil, fmt.Errorf("%w: shot %d score %d out of range 0-10", ErrInvalidCard, i+1, score)
+		}
+		if input.ShotXs[i] && score != 10 {
+			return nil, fmt.Errorf("%w: shot %d is marked X but scored %d; only a 10 can be an X", ErrInvalidCard, i+1, score)
 		}
 		totalScore += score
 		if input.ShotXs[i] {

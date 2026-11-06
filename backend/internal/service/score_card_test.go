@@ -1066,3 +1066,30 @@ func TestValidationRequestPlan_ClublessLeagueSkipsClubVolunteers(t *testing.T) {
 	assert.Empty(t, volunteers.lastClubID, "a league with no club must not query club volunteers")
 	assert.Nil(t, plan.ClubID)
 }
+
+// x_count breaks ties in every standing, so an X on a shot that did not score
+// a 10 would out-rank an honest card with the same total.
+func TestCreateAndUpdate_XOnNonTenIsRejected(t *testing.T) {
+	scores := make([]int16, 25)
+	xs := make([]bool, 25)
+	for i := range 25 {
+		scores[i] = 9
+	}
+	xs[3] = true
+
+	repo := &mockScoreCardRepo{}
+	svc := newTestService(repo)
+
+	_, err := svc.Create(context.Background(), "user1", &model.CreateScoreCardInput{
+		ShotAt: "2025-01-01", ShotScores: scores, ShotXs: xs,
+	})
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.Contains(t, err.Error(), "shot 4")
+	assert.False(t, repo.createCalled)
+
+	_, err = svc.Update(context.Background(), "card1", "user1", &model.UpdateScoreCardInput{
+		ShotAt: "2025-01-01", ShotScores: scores, ShotXs: xs,
+	})
+	assert.ErrorIs(t, err, ErrInvalidCard)
+	assert.False(t, repo.updateCalled)
+}
