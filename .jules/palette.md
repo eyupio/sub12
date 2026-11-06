@@ -1,3 +1,7 @@
+## 2026-11-05 - Icon-only trash buttons in lists still fire destructive mutations directly
+**Learning:** The 2026-09-24 grep (`onClick={() => *Mutation.mutate(`) was re-run with a wider verb list and only matched the `deleteMutation`/`removeMember` names. `EventSettings.tsx`'s delegated-scorer trash button used a mutation named plain `remove`, so it slipped past: one misclick revoked someone's verification duty with no dialog.
+**Action:** Grep for `\.mutate(` inside any `onClick` next to a `Trash2`/`X` icon, not just for destructive mutation names. Gate with `ConfirmDialog` and clear state via `onSettled`.
+
 # Palette Journal — sub12
 
 ## 2026-09-24 - `grep -rn "confirm("` closed one class of missing-confirmation bug, not all of it — a second class fires the mutation directly, with no dialog and no native `confirm()` either

@@ -8,6 +8,7 @@ import { HelpIcon } from '../components/Tooltip'
 import { pageHelp } from '../components/tooltips'
 import { PageGrid, PageHeader, Section, LoadingRows } from '../components/leagues'
 import AnnouncementComposer from '../components/AnnouncementComposer'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { toast } from '../store/toast'
 
 const inputCls =
@@ -288,6 +289,7 @@ function ScorersSection({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(query.trim()), 250)
@@ -323,6 +325,7 @@ function ScorersSection({ slug }: { slug: string }) {
       toast('Scorer removed', 'success')
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Failed to remove scorer', 'error'),
+    onSettled: () => setRemoveTarget(null),
   })
 
   const scorerIds = new Set((scorers.data?.items ?? []).map((s) => s.user_id))
@@ -388,7 +391,7 @@ function ScorersSection({ slug }: { slug: string }) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => remove.mutate(s.user_id)}
+                  onClick={() => setRemoveTarget({ id: s.user_id, name: s.display_name || 'this scorer' })}
                   disabled={remove.isPending}
                   aria-label={`Remove ${s.display_name || 'scorer'}`}
                   className="lc-icon-btn"
@@ -401,6 +404,15 @@ function ScorersSection({ slug }: { slug: string }) {
           </ul>
         )}
       </div>
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title="Remove scorer?"
+        message={`${removeTarget?.name ?? 'This scorer'} will no longer be able to verify cards for this event. You can add them again later.`}
+        confirmLabel={remove.isPending ? 'Removing…' : 'Remove'}
+        confirmDisabled={remove.isPending}
+        onConfirm={() => removeTarget && remove.mutate(removeTarget.id)}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </Section>
   )
 }
