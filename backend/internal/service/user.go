@@ -181,9 +181,7 @@ func (s *UserService) SearchUsers(ctx context.Context, query, viewerID string, l
 	if len([]rune(trimmed)) < 2 {
 		return []*model.PublicProfile{}, nil
 	}
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
+	limit = clampListLimit(limit)
 	return s.users.Search(ctx, trimmed, viewerID, limit)
 }
 

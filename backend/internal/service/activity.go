@@ -101,11 +101,26 @@ func (s *ActivityService) Ingest(ctx context.Context, userID string, actType mod
 	}
 }
 
+// Page-size bounds for the social lists (feed, league/club posts, user search).
+// A missing, negative or oversized client limit falls back to the default
+// rather than being capped at the maximum.
+const (
+	defaultListLimit = 20
+	maxListLimit     = 50
+)
+
+// clampListLimit returns limit, or defaultListLimit when it is non-positive
+// or above maxListLimit.
+func clampListLimit(limit int) int {
+	if limit <= 0 || limit > maxListLimit {
+		return defaultListLimit
+	}
+	return limit
+}
+
 // GetFeed returns a paginated activity feed based on the filter in the request.
 func (s *ActivityService) GetFeed(ctx context.Context, req model.FeedRequest) (*model.FeedResponse, error) {
-	if req.Limit <= 0 || req.Limit > 50 {
-		req.Limit = 20
-	}
+	req.Limit = clampListLimit(req.Limit)
 	if req.Filter == "" {
 		req.Filter = model.FeedForYou
 	}
