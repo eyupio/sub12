@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -1031,20 +1032,25 @@ func (r *EventRepository) ListEventCards(ctx context.Context, eventID string) ([
 	return items, rows.Err()
 }
 
+// sortStandings orders by points, then hits, then name (case-insensitive).
+// The leaderboard is rebuilt on every live-scoreboard poll, so this is an
+// O(n log n) stable sort that lowercases each name once, not an insertion sort
+// that lowercased both names on every comparison.
 func sortStandings(items []*model.EventStandingRow) {
-	for i := 1; i < len(items); i++ {
-		for j := i; j > 0; j-- {
-			a, b := items[j-1], items[j]
-			if a.Points < b.Points ||
-				(a.Points == b.Points && a.HitCount < b.HitCount) ||
-				(a.Points == b.Points && a.HitCount == b.HitCount &&
-					strings.Compare(strings.ToLower(a.DisplayName), strings.ToLower(b.DisplayName)) > 0) {
-				items[j-1], items[j] = items[j], items[j-1]
-				continue
-			}
-			break
-		}
+	keys := make(map[*model.EventStandingRow]string, len(items))
+	for _, it := range items {
+		keys[it] = strings.ToLower(it.DisplayName)
 	}
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		if a.Points != b.Points {
+			return a.Points > b.Points
+		}
+		if a.HitCount != b.HitCount {
+			return a.HitCount > b.HitCount
+		}
+		return keys[a] < keys[b]
+	})
 }
 
 // assignPositions applies standard competition ranking ("1224"): rows tied on
