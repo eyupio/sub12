@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -62,9 +63,11 @@ func (rl *RateLimiter) Limit(bucket string) func(http.Handler) http.Handler {
 			if ok {
 				key = fmt.Sprintf("rl:%s:u:%s", bucket, userID)
 			} else {
-				// Unauthenticated (e.g. /auth/*) — key by client IP. RealIP
-				// middleware populates r.RemoteAddr from X-Forwarded-For when
-				// present, so we inherit the LB's trust configuration.
+				// Unauthenticated (e.g. /auth/*) — key by client IP. See
+				// clientIP below: with ClientIPFromXFFTrustedProxies wired in
+				// the router, a header a direct client appended cannot win
+				// over the IP the trusted proxy wrote, so the bucket is
+				// stable per real client.
 				key = fmt.Sprintf("rl:%s:ip:%s", bucket, clientIP(r))
 			}
 			allowed, retryAfter := rl.check(r, key, limit)
@@ -107,10 +110,17 @@ func (rl *RateLimiter) bucketLimit(bucket string) int {
 	return 0
 }
 
-// clientIP extracts the best-effort client IP from the request. RealIP
-// middleware rewrites r.RemoteAddr from X-Forwarded-For / X-Real-IP when
-// configured, so we inherit the LB's trust configuration here.
+// clientIP extracts the best-effort client IP from the request. When
+// ClientIPFromXFFTrustedProxies is wired into the router it walks
+// X-Forwarded-For right-to-left past the configured number of trusted hops
+// and stashes the result in the context, so a client-supplied XFF entry can
+// never win over the IP the trusted proxy appended. When that middleware is
+// not in the chain (unit tests, or an operator who set TRUSTED_PROXY_HOPS=0)
+// we fall back to the TCP peer in r.RemoteAddr, which no header can forge.
 func clientIP(r *http.Request) string {
+	if ip := chimiddleware.GetClientIP(r.Context()); ip != "" {
+		return ip
+	}
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}

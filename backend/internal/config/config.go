@@ -56,6 +56,15 @@ type Config struct {
 	// CORS
 	CORSOrigin string `envconfig:"CORS_ORIGIN" default:"http://localhost:5173"`
 
+	// TrustedProxyHops is the number of reverse proxies between the client and
+	// this backend, used to pick the client IP out of X-Forwarded-For safely.
+	// The default of 1 matches the shipped docker-compose topology (one nginx
+	// in front). Set to 2 behind a CDN that forwards through nginx, 0 when the
+	// backend is reached directly with no proxy — any value >= 1 makes the
+	// server ignore attacker-supplied XFF entries left of the last N hops, so
+	// the per-IP auth rate limiter cannot be bypassed by sending a fake header.
+	TrustedProxyHops int `envconfig:"TRUSTED_PROXY_HOPS" default:"1"`
+
 	// Public site URL used for sitemap generation and SEO pings.
 	SiteURL string `envconfig:"SITE_URL" default:"https://sub12.io"`
 	// DefaultAvatarURL is the public URL of the default user avatar image.
