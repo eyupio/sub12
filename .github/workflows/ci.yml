@@ -150,6 +150,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          # setup-buildx-action validates keep-state with
+          # core.getBooleanInput(); with nothing passed here the step receives
+          # an empty string and dies with 'Input does not meet YAML 1.2 "Core
+          # Schema" specification: keep-state'. State does not need to persist
+          # between the two build steps, so the default (false) is correct.
+          keep-state: false
 
       - name: Build backend image
         uses: docker/build-push-action@v7
