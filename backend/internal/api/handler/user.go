@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 
 	"github.com/go-chi/chi/v5"
 
@@ -165,6 +166,21 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	// Enforce the same bounds and format rules as Register so an authenticated
+	// user cannot submit an oversized or malformed address that still reaches
+	// the DB write and SMTP send below. RFC 5321 caps an address at 254 octets.
+	if body.Email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+	if len(body.Email) > 254 {
+		writeError(w, http.StatusBadRequest, "email is too long")
+		return
+	}
+	if _, err := mail.ParseAddress(body.Email); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "invalid email address")
 		return
 	}
 
