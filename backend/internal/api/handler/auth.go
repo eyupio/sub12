@@ -96,8 +96,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
 		return
 	}
-	if len(body.Password) > 128 {
-		writeError(w, http.StatusBadRequest, "password is too long")
+	// bcrypt refuses anything over 72 bytes; a longer password would pass
+	// this check and then fail in the service as a 500.
+	if len(body.Password) > 72 {
+		writeError(w, http.StatusBadRequest, "password must be 72 bytes or fewer")
 		return
 	}
 
@@ -304,8 +306,10 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "new_password must be at least 8 characters")
 		return
 	}
-	if len(body.NewPassword) > 128 {
-		writeError(w, http.StatusBadRequest, "new_password is too long")
+	// bcrypt refuses anything over 72 bytes. The reset token is consumed
+	// before hashing, so a longer password would burn it and return a 500.
+	if len(body.NewPassword) > 72 {
+		writeError(w, http.StatusBadRequest, "new_password must be 72 bytes or fewer")
 		return
 	}
 

@@ -374,8 +374,9 @@ func (in *SetupInput) Validate() error {
 	if len(in.Admin.Password) < 8 {
 		return fmt.Errorf("%w: administrator password must be at least 8 characters", ErrInvalidSiteSettings)
 	}
-	if len(in.Admin.Password) > 128 {
-		return fmt.Errorf("%w: administrator password is too long", ErrInvalidSiteSettings)
+	// bcrypt refuses anything over 72 bytes.
+	if len(in.Admin.Password) > 72 {
+		return fmt.Errorf("%w: administrator password must be 72 bytes or fewer", ErrInvalidSiteSettings)
 	}
 
 	if in.Club != nil {

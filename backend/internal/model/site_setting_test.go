@@ -71,6 +71,13 @@ func TestSetupInputValidateRejects(t *testing.T) {
 		require.ErrorIs(t, in.Validate(), ErrInvalidSiteSettings)
 	})
 
+	// bcrypt refuses more than 72 bytes, so the wizard must too.
+	t.Run("password over the bcrypt limit", func(t *testing.T) {
+		in := base()
+		in.Admin.Password = strings.Repeat("a", 73)
+		require.ErrorIs(t, in.Validate(), ErrInvalidSiteSettings)
+	})
+
 	t.Run("bad admin email", func(t *testing.T) {
 		in := base()
 		in.Admin.Email = "not-an-address"
