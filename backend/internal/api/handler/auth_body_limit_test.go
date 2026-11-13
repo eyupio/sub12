@@ -51,3 +51,31 @@ func TestAuth_BodySizeLimit(t *testing.T) {
 		})
 	}
 }
+
+// bcrypt refuses passwords over 72 bytes. The handlers must reject them with
+// 400 up front: past the handler the service returns a 500, and on reset the
+// single-use token has already been consumed by then.
+func TestAuth_PasswordOverBcryptLimitIs400(t *testing.T) {
+	h := &AuthHandler{}
+	long := strings.Repeat("a", 73)
+
+	cases := []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+		body    string
+	}{
+		{"Register", h.Register, `{"email":"x@x.test","display_name":"X","password":"` + long + `"}`},
+		{"ResetPassword", h.ResetPassword, `{"token":"t","new_password":"` + long + `"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/x", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			tc.handler(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("%s: 73-byte password must be 400, got %d (%s)", tc.name, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
