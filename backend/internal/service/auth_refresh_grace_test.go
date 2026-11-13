@@ -62,7 +62,7 @@ func TestInvalidateAllRefreshTokens_RevokesGracedTokens(t *testing.T) {
 	const activeToken = "active-token"
 	const gracedToken = "graced-token"
 
-	require.NoError(t, s.redis.Set(ctx, refreshKeyPrefix+activeToken, userID, refreshTokenTTL).Err())
+	require.NoError(t, s.redis.Set(ctx, refreshKeyPrefix+activeToken, userID, RefreshTokenTTL).Err())
 	require.NoError(t, s.redis.SAdd(ctx, userTokensPrefix+userID, activeToken).Err())
 	require.NoError(t, s.redis.Set(ctx, refreshKeyPrefix+gracedToken, userID, refreshTokenGracePeriod).Err())
 	require.NoError(t, s.redis.SAdd(ctx, userGraceTokensPrefix+userID, gracedToken).Err())

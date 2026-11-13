@@ -28,7 +28,10 @@ var (
 )
 
 const (
-	refreshTokenTTL = 30 * 24 * time.Hour
+	// RefreshTokenTTL is how long a refresh token lives in Redis. The handler
+	// uses it for the cookie's lifetime too, so the browser never keeps a cookie
+	// the server has already forgotten, or the reverse.
+	RefreshTokenTTL = 30 * 24 * time.Hour
 	// refreshTokenGracePeriod is how long a just-rotated refresh token stays
 	// valid after a successful Refresh. It covers the window where a hard page
 	// reload (Ctrl+F5) aborts the refresh response after the server has rotated
@@ -434,7 +437,7 @@ func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPai
 		return nil, fmt.Errorf("generate refresh token: %w", err)
 	}
 
-	if err := s.redis.Set(ctx, refreshKeyPrefix+refreshToken, userID, refreshTokenTTL).Err(); err != nil {
+	if err := s.redis.Set(ctx, refreshKeyPrefix+refreshToken, userID, RefreshTokenTTL).Err(); err != nil {
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
 	// The token must also live in the per-user set so InvalidateAllRefreshTokens
@@ -445,7 +448,7 @@ func (s *AuthService) issueTokens(ctx context.Context, userID string) (*TokenPai
 		s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
 		return nil, fmt.Errorf("track refresh token: %w", err)
 	}
-	if err := s.redis.Expire(ctx, userTokensPrefix+userID, refreshTokenTTL).Err(); err != nil {
+	if err := s.redis.Expire(ctx, userTokensPrefix+userID, RefreshTokenTTL).Err(); err != nil {
 		s.redis.Del(ctx, refreshKeyPrefix+refreshToken)
 		s.redis.SRem(ctx, userTokensPrefix+userID, refreshToken)
 		return nil, fmt.Errorf("set refresh token ttl: %w", err)
