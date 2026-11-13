@@ -17,7 +17,7 @@ import (
 const (
 	refreshCookieName = "sub12_refresh"
 	refreshCookiePath = "/api/v1/auth"
-	refreshCookieTTL  = 30 * 24 * time.Hour
+	refreshCookieTTL  = service.RefreshTokenTTL
 )
 
 type AuthHandler struct {
