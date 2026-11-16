@@ -18,7 +18,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/pquerna/otp v1.5.0
