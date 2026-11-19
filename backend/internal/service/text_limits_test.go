@@ -118,4 +118,18 @@ func TestServices_FreeTextLengthCaps(t *testing.T) {
 		assert.ErrorIs(t, validatePelletTestImageCaption(&long), ErrInvalidPelletTest)
 		assert.NoError(t, validatePelletTestImageCaption(nil), "an absent field always passes")
 	})
+
+	// A feature request's title and refined_description land in TEXT columns on
+	// feature_requests and are re-served on every roadmap read to every viewer
+	// in scope. The admin edit (CreateFromTicket, Update) was the uncapped
+	// path — a scoped moderator could put a multi-MiB blob there and have it
+	// amplified on every subsequent board render. Same shape as support-ticket
+	// Title/Description, with which the caps are shared.
+	t.Run("feature request title and refined_description", func(t *testing.T) {
+		overTitle := strings.Repeat("a", maxSupportTitleLen+1)
+		overBody := strings.Repeat("a", maxSupportBodyLen+1)
+		assert.ErrorIs(t, validateFeatureRequestText(&overTitle, nil), ErrFeatureRequestTitleTooLong)
+		assert.ErrorIs(t, validateFeatureRequestText(nil, &overBody), ErrFeatureRequestBodyTooLong)
+		assert.NoError(t, validateFeatureRequestText(nil, nil), "an absent field always passes")
+	})
 }

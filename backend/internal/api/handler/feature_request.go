@@ -173,7 +173,9 @@ func (h *FeatureRequestHandler) writeError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "feature request not found")
 	case errors.Is(err, service.ErrFeatureRequestInvalidStatus),
 		errors.Is(err, service.ErrFeatureRequestInvalidPriority),
-		errors.Is(err, service.ErrFeatureRequestTitleEmpty):
+		errors.Is(err, service.ErrFeatureRequestTitleEmpty),
+		errors.Is(err, service.ErrFeatureRequestTitleTooLong),
+		errors.Is(err, service.ErrFeatureRequestBodyTooLong):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "feature request request failed")
