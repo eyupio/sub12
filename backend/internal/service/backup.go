@@ -600,6 +600,16 @@ func decryptStream(r io.Reader, passphrase string) (io.Reader, error) {
 	return strings.NewReader(string(plain)), nil
 }
 
+// retentionCutoff returns the instant before which a backup is too old to keep.
+// The zero time means "no age limit" (retain_days of 0 or less), so callers
+// must test IsZero before comparing against it.
+func retentionCutoff(retainDays int, now time.Time) time.Time {
+	if retainDays <= 0 {
+		return time.Time{}
+	}
+	return now.Add(-time.Duration(retainDays) * 24 * time.Hour)
+}
+
 // prune deletes backups exceeding retain_count or older than retain_days from
 // both local disk and S3, then removes the corresponding backup_runs rows.
 func (s *BackupService) prune(ctx context.Context, settings *model.BackupSettings) error {
@@ -609,10 +619,7 @@ func (s *BackupService) prune(ctx context.Context, settings *model.BackupSetting
 	}
 	sort.SliceStable(runs, func(i, j int) bool { return runs[i].StartedAt.After(runs[j].StartedAt) })
 
-	cutoff := time.Time{}
-	if settings.RetainDays > 0 {
-		cutoff = time.Now().Add(-time.Duration(settings.RetainDays) * 24 * time.Hour)
-	}
+	cutoff := retentionCutoff(settings.RetainDays, time.Now())
 
 	var toDelete []*model.BackupRun
 	for i, run := range runs {
