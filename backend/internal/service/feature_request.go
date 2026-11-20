@@ -13,7 +13,26 @@ var (
 	ErrFeatureRequestInvalidStatus   = errors.New("invalid feature request status")
 	ErrFeatureRequestInvalidPriority = errors.New("invalid feature request priority")
 	ErrFeatureRequestTitleEmpty      = errors.New("feature request title cannot be empty")
+	ErrFeatureRequestTitleTooLong    = errors.New("feature request title is too long")
+	ErrFeatureRequestBodyTooLong     = errors.New("feature request description is too long")
 )
+
+// validateFeatureRequestText caps the TEXT columns a refined request writes
+// into (`title`, `refined_description`). Both are re-served on every roadmap
+// read to every viewer in scope, so an unbounded admin edit becomes a
+// shared-view storage/bandwidth amplification exactly like the support-ticket
+// and announcement paths it borrows its limits from. Runes rather than bytes
+// so a non-ASCII entry is not punished against an ASCII one. See
+// .jules/sentinel.md for the shape of this class of defect.
+func validateFeatureRequestText(title, refined *string) error {
+	if title != nil && len([]rune(*title)) > maxSupportTitleLen {
+		return ErrFeatureRequestTitleTooLong
+	}
+	if refined != nil && len([]rune(*refined)) > maxSupportBodyLen {
+		return ErrFeatureRequestBodyTooLong
+	}
+	return nil
+}
 
 type FeatureRequestService struct {
 	repo          *repository.FeatureRequestRepository
@@ -64,9 +83,13 @@ func (s *FeatureRequestService) CreateFromTicket(ctx context.Context, ticketID, 
 	if title == "" {
 		return nil, ErrFeatureRequestTitleEmpty
 	}
+	refined := strings.TrimSpace(in.RefinedDescription)
+	if err := validateFeatureRequestText(&title, &refined); err != nil {
+		return nil, err
+	}
 	input := &model.CreateFeatureRequestFromTicketInput{
 		Title:              title,
-		RefinedDescription: strings.TrimSpace(in.RefinedDescription),
+		RefinedDescription: refined,
 		OwnerAdminID:       in.OwnerAdminID,
 	}
 	item, err := s.repo.CreateFromTicket(ctx, ticket, actorID, input)
@@ -128,6 +151,9 @@ func (s *FeatureRequestService) Update(ctx context.Context, id, actorID string, 
 	if in.RefinedDescription != nil {
 		trimmed := strings.TrimSpace(*in.RefinedDescription)
 		in.RefinedDescription = &trimmed
+	}
+	if err := validateFeatureRequestText(in.Title, in.RefinedDescription); err != nil {
+		return nil, err
 	}
 	updated, err := s.repo.Update(ctx, id, in, actorID)
 	if err != nil {
