@@ -43,7 +43,7 @@ const layout = `<!DOCTYPE html>
 // layoutTpl is parsed once at package init rather than on every RenderHTML
 // call: the layout markup is a fixed constant, and re-parsing it per email
 // (including once per recipient in an announcement fan-out, per
-// CLAUDE.md "Delivery is bulk") wasted a full html/template parse for work
+// docs/claude/domain-rules.md "Delivery is bulk") wasted a full html/template parse for work
 // whose result never changes. html/template.Execute is safe for concurrent
 // use once parsing is complete, so a shared *Template is fine here.
 var layoutTpl = htmltpl.Must(htmltpl.New("layout").Parse(layout))
