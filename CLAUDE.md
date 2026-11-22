@@ -82,11 +82,10 @@ Root also carries the public-project files: `LICENSE` (AGPL-3.0), `README.md`,
 `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md` and
 `.editorconfig`, plus `.github/` issue and pull-request templates and
 `dependabot.yml`. `.jules/` holds the engineering journals — recurring bug and
-vulnerability patterns found in this codebase. There used to be a second
-`.Jules/` alongside it; they were merged, because a case-insensitive filesystem
-(macOS and Windows by default) cannot check out both and leaves a contributor
-with a permanently dirty working tree. Don't reintroduce a name that differs from
-an existing one only by case.
+vulnerability patterns found in this codebase. Keep one such directory: a second one whose name
+differs only by case (`.Jules/`) cannot be checked out on a case-insensitive
+filesystem (macOS and Windows by default) and leaves a contributor with a
+permanently dirty working tree.
 
 The Go module is `github.com/jnnngs/sub-12/backend`, which no longer matches the
 repository at `github.com/eyupio/sub12`. That is a known cosmetic inconsistency,
@@ -148,8 +147,7 @@ yourself when changing a flow it covers — score capture, leagues, events, club
 `npm run check` is `tsc -b`, not `tsc --noEmit`. The root `tsconfig.json` is a
 solution file — `"files": []` plus references to `tsconfig.app.json` and
 `tsconfig.node.json` — so a plain `tsc --noEmit` resolves *no* input files and
-exits 0 on any codebase, however broken. It type-checked nothing for as long as
-it was the CI step. Only build mode follows the references.
+exits 0 on any codebase, however broken. Only build mode follows the references.
 
 Both `frontend/android/` and `frontend/ios/` are committed (the iOS project was generated with
 `npx cap add ios` on a Mac — it can't be created on Linux). The web assets
@@ -311,11 +309,10 @@ is grep-able afterwards. The error message names the opt-out, or an operator
 running the shipped stack would be stuck with no way forward — a test pins that.
 
 `docker-compose.yml` deliberately has **no `sub12.io` fallback** for
-`PASSWORD_RESET_URL` / `EVENT_INVITATION_URL`. It used to, which meant a
-self-hoster who set `SITE_URL` to their own domain still emailed their members
-password-reset links pointing at sub12.io — an account-recovery flow silently
-sending people to somebody else's site. `SITE_URL` is required and everything
-else derives from it.
+`PASSWORD_RESET_URL` / `EVENT_INVITATION_URL`: a fallback would email a
+self-hoster's members password-reset links pointing at sub12.io, an
+account-recovery flow silently sending people to somebody else's site.
+`SITE_URL` is required and everything else derives from it.
 
 ### Security scanning
 
@@ -336,11 +333,10 @@ changes when nothing in the repository does.
   bundle are different problems.
 
   That split only means anything if `package.json` classifies dependencies
-  honestly. `@capacitor/cli` sat in `dependencies` and dragged a critical `tar`
-  advisory into the runtime half, where it did not belong: the CLI is invoked by
-  the `cap sync` / `cap run` scripts at build time and is never imported by the
-  app. It is a `devDependency` now, which is also what Capacitor's own install
-  instructions use. **A dev-only tool appearing in the runtime audit is a
+  honestly. `@capacitor/cli` is a `devDependency`, as Capacitor's own install
+  instructions have it: the CLI is invoked by the `cap sync` / `cap run` scripts
+  at build time and is never imported by the app, so in `dependencies` it would
+  drag its `tar` advisory into the runtime half. **A dev-only tool appearing in the runtime audit is a
   misclassification to fix in `package.json`, not a vulnerability to upgrade
   around.**
 - `@capacitor/cli` → `tar` (critical) remains a known accepted risk in the
@@ -977,10 +973,10 @@ lie, and both are the shape to watch for when adding an action:
   personas, or setting it to 0 is the fix — the engine cannot invent headroom.
 
 `last_error` therefore persists until another error supersedes it or the admin
-saves the settings. It used to be blanked by the next clean batch, which meant
-the reason the engine had gone quiet was written to the dashboard and erased
-seconds later; `last_error_at` is rendered beside it and is what says how stale
-the message is.
+saves the settings: the next clean batch must not blank it, or the reason the
+engine had gone quiet would be erased seconds after it was written to the
+dashboard. `last_error_at` is rendered beside it and says how stale the message
+is.
 
 ## Environment Variables
 
@@ -1039,8 +1035,9 @@ the four URL fields listed in it — see "Outgoing public URLs".
 
 ## CI Pipeline
 
-Seven GitHub Actions workflows. `ci.yml` is the one that gates a PR; treat the
-rest as build/publish plumbing.
+The GitHub Actions workflows are in `.github/workflows/`. `ci.yml` is the one
+that gates a PR; treat the rest as build/publish plumbing (`security.yml` is
+described under "Security scanning").
 
 ### ci.yml (push/PR to `main`)
 
