@@ -39,7 +39,7 @@ export function ToastContainer() {
     // card to a league, flagging a post). At a layer below the dialogs they
     // landed behind the backdrop, blurred and unreadable, so the failure looked
     // like nothing happening. This has to stay above every overlay in the app —
-    // see the layer stack in CLAUDE.md; Toast.test.tsx pins it.
+    // see the layer stack in docs/claude/frontend-design-system.md; Toast.test.tsx pins it.
     <div
       className="fixed top-4 right-4 left-4 sm:left-auto sm:w-[22rem] z-[150] space-y-2 pointer-events-none"
       aria-live="polite"
