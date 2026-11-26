@@ -367,10 +367,10 @@ function AuditTrailSection({ scoreCardId, cardOwnerID, verification }: {
           {showAmend && (
             <div className="space-y-2 bg-surface rounded p-3">
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="New total score" value={amendScore} onChange={e => setAmendScore(e.target.value)} className={inputCls} />
-                <input type="number" placeholder="New X count" value={amendX} onChange={e => setAmendX(e.target.value)} className={inputCls} />
+                <input type="number" aria-label="New total score" placeholder="New total score" value={amendScore} onChange={e => setAmendScore(e.target.value)} className={inputCls} />
+                <input type="number" aria-label="New X count" placeholder="New X count" value={amendX} onChange={e => setAmendX(e.target.value)} className={inputCls} />
               </div>
-              <input type="text" placeholder="Reason (optional)" value={amendReason} onChange={e => setAmendReason(e.target.value)} className={inputCls} />
+              <input type="text" aria-label="Reason for amendment (optional)" placeholder="Reason (optional)" value={amendReason} onChange={e => setAmendReason(e.target.value)} className={inputCls} />
               <button
                 onClick={() => amendMutation.mutate()}
                 disabled={amendMutation.isPending || !amendScore || !amendX}

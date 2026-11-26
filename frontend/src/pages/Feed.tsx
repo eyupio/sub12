@@ -1507,7 +1507,7 @@ function InlineComments({ post }: { post: FeedPost }) {
       {currentUser && (
         <form className="comment-compose" onSubmit={(e) => { e.preventDefault(); if (body.trim()) mutation.mutate() }}>
           <UserAvatar user={currentUser} size={22} showHoverCard={false} />
-          <input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write a reply..." maxLength={500} />
+          <input value={body} onChange={(e) => setBody(e.target.value)} aria-label="Write a reply" placeholder="Write a reply..." maxLength={500} />
           <button type="submit" className="feed-icon-send" disabled={!body.trim() || mutation.isPending} aria-label="Send reply">
             <Send size={13} />
           </button>

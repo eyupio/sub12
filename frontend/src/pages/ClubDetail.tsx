@@ -515,9 +515,9 @@ export default function ClubDetail() {
                 onSubmit={(e) => { e.preventDefault(); createLeagueMutation.mutate() }}
                 style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid var(--line)' }}
               >
-                <input type="text" placeholder="League name" value={newLeagueName} onChange={(e) => setNewLeagueName(e.target.value)} required autoFocus
+                <input type="text" aria-label="League name" placeholder="League name" value={newLeagueName} onChange={(e) => setNewLeagueName(e.target.value)} required autoFocus
                   style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontSize: 13 }} />
-                <input type="text" placeholder="Description (optional)" value={newLeagueDesc} onChange={(e) => setNewLeagueDesc(e.target.value)}
+                <input type="text" aria-label="League description (optional)" placeholder="Description (optional)" value={newLeagueDesc} onChange={(e) => setNewLeagueDesc(e.target.value)}
                   style={{ background: 'var(--lc-surface)', border: '1px solid var(--line)', padding: '8px 12px', borderRadius: 6, color: 'var(--ink)', fontSize: 13 }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--ink-2)' }}>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
