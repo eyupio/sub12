@@ -46,6 +46,24 @@ func TestServices_FreeTextLengthCaps(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidLeague)
 	})
 
+	// Club Create was the sibling write path missed by the cap sweep: Update
+	// (ValidateClubUpdate) bounded every TEXT field, but Create went straight
+	// to the repository with only the handler's 1 MiB body cap. A club's name
+	// and description are re-served on the unauthenticated clubs directory.
+	t.Run("club name and description", func(t *testing.T) {
+		svc := &ClubService{}
+		_, err := svc.Create(ctx, "user", &model.CreateClubInput{Name: name})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidClub)
+
+		_, err = svc.Create(ctx, "user", &model.CreateClubInput{Name: "ok", Description: &long})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidClub)
+
+		overName := name
+		assert.ErrorIs(t, ValidateClubUpdate(&model.UpdateClubInput{Name: &overName}), ErrClubValidation)
+	})
+
 	t.Run("event name, description and location", func(t *testing.T) {
 		require.ErrorIs(t, validateEventInput(&model.CreateEventInput{Name: name, Discipline: "ft"}), ErrInvalidEvent)
 		require.ErrorIs(t, validateEventInput(&model.CreateEventInput{Name: "ok", Discipline: "ft", Description: &long}), ErrInvalidEvent)

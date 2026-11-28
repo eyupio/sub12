@@ -123,6 +123,17 @@ func (s *ClubService) Create(ctx context.Context, userID string, input *model.Cr
 	if input.Name == "" {
 		return nil, ErrInvalidClub
 	}
+	// Create was the sibling write path missed when ValidateClubUpdate capped
+	// every other TEXT field; without a cap here a signed-in user could file
+	// a multi-MiB name or description into the public clubs directory, which
+	// re-serves both on every anonymous read. See .jules/sentinel.md for the
+	// shape of this class of defect.
+	if overLength(&input.Name, maxEntityNameLen) {
+		return nil, fmt.Errorf("%w: name must be %d characters or fewer", ErrInvalidClub, maxEntityNameLen)
+	}
+	if overLength(input.Description, maxDescriptionLen) {
+		return nil, fmt.Errorf("%w: description must be %d characters or fewer", ErrInvalidClub, maxDescriptionLen)
+	}
 	if input.Type != nil && *input.Type != "public" && *input.Type != "private" {
 		return nil, ErrClubInvalidType
 	}
@@ -511,6 +522,9 @@ func ValidateClubUpdate(in *model.UpdateClubInput) error {
 		*in.Name = strings.TrimSpace(*in.Name)
 		if *in.Name == "" {
 			return ErrInvalidClub
+		}
+		if overLength(in.Name, maxEntityNameLen) {
+			return clubInvalid("name must be %d characters or fewer", maxEntityNameLen)
 		}
 	}
 	if in.Type != nil && *in.Type != "public" && *in.Type != "private" {
