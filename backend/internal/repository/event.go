@@ -818,7 +818,21 @@ func (r *EventRepository) UpsertScores(ctx context.Context, eventID, recordedBy 
 		return 0, fmt.Errorf("%w: one or more participant_ids do not belong to this event", ErrNotFound)
 	}
 
-	written := 0
+	// Queue every upsert and send them in one round trip: a live-event flush
+	// of N shots used to cost N sequential network round trips inside the
+	// transaction (N+1 -> 1). Statements still run in order, so results match.
+	const upsertScoreSQL = `
+		INSERT INTO event_scores (
+			participant_id, lane, shot_number, result, note, recorded_at, recorded_by, client_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (participant_id, lane, shot_number)
+		DO UPDATE SET
+			result = EXCLUDED.result,
+			note = EXCLUDED.note,
+			recorded_at = EXCLUDED.recorded_at,
+			recorded_by = EXCLUDED.recorded_by,
+			client_id = EXCLUDED.client_id`
+	batch := &pgx.Batch{}
 	for _, s := range scores {
 		recordedAt := time.Now()
 		if s.RecordedAt != nil {
@@ -826,30 +840,27 @@ func (r *EventRepository) UpsertScores(ctx context.Context, eventID, recordedBy 
 		}
 		// Lane/shot bounds are validated in the service layer against the
 		// event's course; nothing is silently clamped here.
-		shot := s.ShotNumber
-		tag, err := tx.Exec(ctx, `
-			INSERT INTO event_scores (
-				participant_id, lane, shot_number, result, note, recorded_at, recorded_by, client_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			ON CONFLICT (participant_id, lane, shot_number)
-			DO UPDATE SET
-				result = EXCLUDED.result,
-				note = EXCLUDED.note,
-				recorded_at = EXCLUDED.recorded_at,
-				recorded_by = EXCLUDED.recorded_by,
-				client_id = EXCLUDED.client_id
-		`, s.ParticipantID, s.Lane, shot, s.Result, s.Note, recordedAt, recordedBy, s.ClientID)
+		batch.Queue(upsertScoreSQL, s.ParticipantID, s.Lane, s.ShotNumber, s.Result, s.Note, recordedAt, recordedBy, s.ClientID)
+	}
+	br := tx.SendBatch(ctx, batch)
+	written := 0
+	for range scores {
+		tag, err := br.Exec()
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 				// Duplicate client_id from a re-flush; ignore — already persisted.
 				continue
 			}
+			_ = br.Close()
 			return 0, fmt.Errorf("upsert score: %w", err)
 		}
 		if tag.RowsAffected() > 0 {
 			written++
 		}
+	}
+	if err := br.Close(); err != nil {
+		return 0, fmt.Errorf("upsert scores batch: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return 0, fmt.Errorf("commit scores: %w", err)
